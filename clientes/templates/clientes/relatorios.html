@@ -4,6 +4,24 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Relatórios e Métricas</h1>
 </div>
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" action="{% url 'relatorios' %}" class="row g-3 align-items-center">
+            <div class="col-md-5">
+                <label for="start_date" class="form-label">Data de Início</label>
+                <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-5">
+                <label for="end_date" class="form-label">Data Final</label>
+                <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+            </div>
+        </form>
+        <a href="{% url 'exportar_relatorio_pdf' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="btn btn-secondary mt-3">Exportar para PDF</a>
+    </div>
+</div>
 
 <div class="row mb-4">
     <div class="col-md-3">

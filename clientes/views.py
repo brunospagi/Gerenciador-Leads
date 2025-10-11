@@ -9,6 +9,10 @@ from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Avg, Count, F, ExpressionWrapper, fields
+from django.http import HttpResponse
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from datetime import datetime
 
 # --- Views existentes ---
 class ClienteListView(LoginRequiredMixin, ListView):
@@ -126,13 +130,23 @@ def adicionar_historico(request, pk):
             
     return redirect('cliente_detail', pk=cliente.pk)
 
-# --- NOVA VIEW DE RELATÓRIOS ---
+# --- VIEW DE RELATÓRIOS ATUALIZADA ---
 @login_required
 def relatorio_dashboard(request):
     if not request.user.is_superuser:
         raise PermissionDenied("Você não tem permissão para acessar esta página.")
 
-    clientes_todos = Cliente.objects.all()
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+
+    if start_date_str and end_date_str:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    else:
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=30)
+
+    clientes_todos = Cliente.objects.filter(data_primeiro_contato__date__range=[start_date, end_date])
     total_clientes = clientes_todos.count()
     clientes_ativos = clientes_todos.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
     clientes_finalizados = clientes_todos.filter(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
@@ -168,6 +182,78 @@ def relatorio_dashboard(request):
         'tipo_negociacao_values': tipo_negociacao_values,
         'vendedor_labels': vendedor_labels,
         'vendedor_values': vendedor_values,
+        'start_date': start_date,
+        'end_date': end_date,
     }
     
     return render(request, 'clientes/relatorios.html', context)
+
+# --- NOVA VIEW PARA EXPORTAR PDF ---
+@login_required
+def exportar_relatorio_pdf(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied("Você não tem permissão para acessar esta página.")
+
+    start_date_str = request.GET.get('start_date')
+    end_date_str = request.GET.get('end_date')
+
+    if start_date_str and end_date_str:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    else:
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=30)
+
+    clientes_todos = Cliente.objects.filter(data_primeiro_contato__date__range=[start_date, end_date])
+    total_clientes = clientes_todos.count()
+    clientes_ativos = clientes_todos.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
+    clientes_finalizados = clientes_todos.filter(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
+
+    taxa_conversao = (clientes_finalizados.count() / total_clientes) * 100 if total_clientes > 0 else 0
+
+    tempo_medio_fechamento_delta = clientes_finalizados.annotate(
+        duracao=ExpressionWrapper(F('data_ultimo_contato') - F('data_primeiro_contato'), output_field=fields.DurationField())
+    ).aggregate(tempo_medio=Avg('duracao'))['tempo_medio']
+    
+    tempo_medio_fechamento_dias = tempo_medio_fechamento_delta.days if tempo_medio_fechamento_delta else 0
+
+    status_data = clientes_ativos.values('status_negociacao').annotate(total=Count('id')).order_by('-total')
+    status_labels = [Cliente.StatusNegociacao(item['status_negociacao']).label for item in status_data]
+    status_values = [item['total'] for item in status_data]
+    
+    tipo_negociacao_data = clientes_todos.values('tipo_negociacao').annotate(total=Count('id')).order_by('-total')
+    tipo_negociacao_labels = [Cliente.TipoNegociacao(item['tipo_negociacao']).label for item in tipo_negociacao_data]
+    tipo_negociacao_values = [item['total'] for item in tipo_negociacao_data]
+
+    vendedor_data = clientes_todos.values('vendedor__username').annotate(total=Count('id')).order_by('-total')
+    vendedor_labels = [item['vendedor__username'] for item in vendedor_data]
+    vendedor_values = [item['total'] for item in vendedor_data]
+
+    context = {
+        'total_clientes': total_clientes,
+        'total_clientes_ativos': clientes_ativos.count(),
+        'taxa_conversao': round(taxa_conversao, 2),
+        'tempo_medio_fechamento_dias': tempo_medio_fechamento_dias,
+        'status_labels': status_labels,
+        'status_values': status_values,
+        'tipo_negociacao_labels': tipo_negociacao_labels,
+        'tipo_negociacao_values': tipo_negociacao_values,
+        'vendedor_labels': vendedor_labels,
+        'vendedor_values': vendedor_values,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    
+    template_path = 'clientes/relatorios.html'
+    template = get_template(template_path)
+    html = template.render(context)
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="relatorio.pdf"'
+
+    pisa_status = pisa.CreatePDF(
+       html, dest=response)
+
+    if pisa_status.err:
+       return HttpResponse('We had some errors <pre>' + html + '</pre>')
+    return response
