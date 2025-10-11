@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Meus Clientes</h1>
+    <a href="{% url 'cliente_create' %}" class="btn btn-primary">Adicionar Cliente</a>
+</div>
+
+<div class="mb-4">
+    <span class="me-2">Filtrar por último contato:</span>
+    <div class="btn-group" role="group" aria-label="Filtros de período">
+        <a href="{% url 'cliente_list' %}" class="btn btn-outline-secondary {% if not periodo_selecionado %}active{% endif %}">
+            Mais Recentes
+        </a>
+        <a href="?dias=15" class="btn btn-outline-secondary {% if periodo_selecionado == '15' %}active{% endif %}">
+            Últimos 15 dias
+        </a>
+        <a href="?dias=30" class="btn btn-outline-secondary {% if periodo_selecionado == '30' %}active{% endif %}">
+            Últimos 30 dias
+        </a>
+        <a href="?dias=45" class="btn btn-outline-secondary {% if periodo_selecionado == '45' %}active{% endif %}">
+            Últimos 45 dias
+        </a>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>Nome</th>
+                <th>Fonte</th>
+                <th>Tipo de Contato</th>
+                <th>Negociação</th>
+                <th>Último Contato</th>
+                <th>Status</th>
+                {% if user.is_superuser %}
+                    <th>Vendedor</th>
+                {% endif %}
+                <th>Prioridade</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cliente in clientes %}
+            <tr class="{% if cliente.contato_atrasado %}table-danger{% endif %}">
+                <td>{{ cliente.nome_cliente }}</td>
+                <td>{{ cliente.fonte_cliente|default:"N/A" }}</td>
+                <td>{{ cliente.get_tipo_contato_display }}</td>
+                <td>{{ cliente.get_tipo_negociacao_display }}</td>
+                <td>{{ cliente.data_ultimo_contato|date:"d/m/Y H:i" }}</td>
+                <td><span class="badge bg-info text-dark">{{ cliente.get_status_negociacao_display }}</span></td>
+                {% if user.is_superuser %}
+                    <td>{{ cliente.vendedor.username }}</td>
+                {% endif %}
+                <td>
+                    {% if cliente.prioridade == 'Quente' %}
+                        <span class="badge bg-danger">{{ cliente.get_prioridade_display }}</span>
+                    {% elif cliente.prioridade == 'Morno' %}
+                        <span class="badge bg-warning text-dark">{{ cliente.get_prioridade_display }}</span>
+                    {% else %}
+                        <span class="badge bg-primary">{{ cliente.get_prioridade_display }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'cliente_detail' cliente.pk %}" class="btn btn-sm btn-secondary">Detalhes</a>
+                    <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-sm btn-info">Editar</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9" class="text-center">Nenhum cliente encontrado.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

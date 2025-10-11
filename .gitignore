@@ -1,0 +1,19 @@
+# Python
+*.pyc
+__pycache__/
+*.log
+*.pot
+.env
+.venv/
+venv/
+env/
+# Django-specific
+db.sqlite3
+media/
+static_collected/
+local_settings.py
+# IDE-specific (e.g., PyCharm)
+.idea/
+# OS-specific
+.DS_Store
+Thumbs.db

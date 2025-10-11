@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Relatórios e Métricas</h1>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h6 class="card-title text-muted">Clientes Ativos</h6>
+                <p class="card-text fs-2 fw-bold">{{ total_clientes_ativos }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h6 class="card-title text-muted">Taxa de Conversão</h6>
+                <p class="card-text fs-2 fw-bold">{{ taxa_conversao }}%</p>
+                <small class="text-muted">Meta: > 25%</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h6 class="card-title text-muted">Tempo Médio de Fechamento</h6>
+                <p class="card-text fs-2 fw-bold">{{ tempo_medio_fechamento_dias }} dias</p>
+                <small class="text-muted">Meta: < 15 dias</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h6 class="card-title text-muted">Total de Leads</h6>
+                <p class="card-text fs-2 fw-bold">{{ total_clientes }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">Status das Negociações Ativas</div>
+            <div class="card-body">
+                <canvas id="statusChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">Desempenho por Vendedor</div>
+            <div class="card-body">
+                <canvas id="vendedorChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">Tipos de Negociação</div>
+            <div class="card-body">
+                <canvas id="tipoNegociacaoChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const ctxStatus = document.getElementById('statusChart');
+    new Chart(ctxStatus, {
+        type: 'doughnut',
+        data: {
+            labels: {{ status_labels|safe }},
+            datasets: [{
+                label: 'Total',
+                data: {{ status_values|safe }},
+                backgroundColor: ['#0d6efd', '#6c757d', '#198754', '#ffc107', '#dc3545', '#0dcaf0'],
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            }
+        }
+    });
+
+    const ctxTipoNegociacao = document.getElementById('tipoNegociacaoChart');
+    new Chart(ctxTipoNegociacao, {
+        type: 'bar',
+        data: {
+            labels: {{ tipo_negociacao_labels|safe }},
+            datasets: [{
+                label: 'Total de Clientes',
+                data: {{ tipo_negociacao_values|safe }},
+                backgroundColor: 'rgba(25, 135, 84, 0.7)',
+                borderColor: 'rgba(25, 135, 84, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            },
+            responsive: true,
+        }
+    });
+
+    const ctxVendedor = document.getElementById('vendedorChart');
+    new Chart(ctxVendedor, {
+        type: 'bar',
+        data: {
+            labels: {{ vendedor_labels|safe }},
+            datasets: [{
+                label: 'Clientes por Vendedor',
+                data: {{ vendedor_values|safe }},
+                backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                borderColor: 'rgba(13, 110, 253, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            indexAxis: 'y', // Deixa as barras na horizontal para melhor leitura
+            scales: {
+                x: {
+                    beginAtZero: true
+                }
+            },
+            responsive: true,
+        }
+    });
+});
+</script>
+{% endblock %}

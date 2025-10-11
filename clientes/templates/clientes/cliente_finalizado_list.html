@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Clientes Finalizados (Arquivados)</h1>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>Nome</th>
+                <th>Veículo</th>
+                <th>Data Finalização</th>
+                <th>Fonte</th>
+                {% if user.is_superuser %}
+                    <th>Vendedor</th>
+                {% endif %}
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cliente in clientes %}
+            <tr class="table-secondary">
+                <td>{{ cliente.nome_cliente }}</td>
+                <td>{{ cliente.modelo_veiculo }}</td>
+                <td>{{ cliente.data_ultimo_contato|date:"d/m/Y" }}</td>
+                <td>{{ cliente.fonte_cliente|default:"N/A" }}</td>
+                {% if user.is_superuser %}
+                    <td>{{ cliente.vendedor.username }}</td>
+                {% endif %}
+                <td>
+                    <a href="{% url 'cliente_detail' cliente.pk %}" class="btn btn-sm btn-secondary">Ver Detalhes</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center">
+                    Nenhum cliente foi finalizado ainda.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

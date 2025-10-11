@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>{{ cliente.nome_cliente }}</h2>
+        <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-warning">Editar Cliente</a>
+    </div>
+    <div class="card-body">
+        <p><strong>WhatsApp:</strong> {{ cliente.whatsapp }}</p>
+        <p><strong>Fonte do Cliente:</strong> {{ cliente.fonte_cliente|default:"Não informado" }}</p>
+        <p><strong>Quantidade de Ligações:</strong> {{ cliente.quantidade_ligacoes }}</p>
+        <p><strong>Veículo:</strong> {{ cliente.modelo_veiculo }} (Valor Estimado: R$ {{ cliente.valor_estimado_veiculo }})</p>
+        <hr>
+        <p><strong>Status da Negociação:</strong> <span class="badge bg-primary">{{ cliente.get_status_negociacao_display }}</span></p>
+        <p><strong>Tipo de Negociação:</strong> <span class="badge bg-success">{{ cliente.get_tipo_negociacao_display }}</span></p>
+        <p><strong>Último Contato:</strong> {{ cliente.data_ultimo_contato|date:"d/m/Y H:i" }}</p>
+        <p><strong>Próximo Contato Agendado para:</strong> {{ cliente.data_proximo_contato|date:"d/m/Y" }}</p>
+        <p><strong>Prioridade:</strong> {{ cliente.get_prioridade_display }}</p>
+        <hr>
+        <h5>Observações:</h5>
+        <p>{{ cliente.observacao|linebreaks|default:"Nenhuma observação." }}</p>
+        <a href="{% url 'cliente_list' %}" class="btn btn-secondary mt-3">Voltar para a Lista</a>
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-header">
+        <h3>Histórico de Interações</h3>
+    </div>
+    <div class="card-body">
+        <form action="{% url 'adicionar_historico' cliente.pk %}" method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+                {{ historico_form.motivacao }}
+            </div>
+            <button type="submit" class="btn btn-primary">Adicionar Interação</button>
+        </form>
+        <hr>
+        {% for historico in historicos %}
+            <div class="alert alert-light">
+                <strong>{{ historico.data_interacao|date:"d/m/Y H:i" }}:</strong>
+                <p class="mb-0">{{ historico.motivacao|linebreaks }}</p>
+            </div>
+        {% empty %}
+            <p>Nenhuma interação registrada.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
