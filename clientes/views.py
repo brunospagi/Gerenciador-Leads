@@ -188,7 +188,7 @@ def relatorio_dashboard(request):
     
     return render(request, 'clientes/relatorios.html', context)
 
-# --- NOVA VIEW PARA EXPORTAR PDF ---
+# --- VIEW PARA EXPORTAR PDF ATUALIZADA ---
 @login_required
 def exportar_relatorio_pdf(request):
     if not request.user.is_superuser:
@@ -217,43 +217,37 @@ def exportar_relatorio_pdf(request):
     
     tempo_medio_fechamento_dias = tempo_medio_fechamento_delta.days if tempo_medio_fechamento_delta else 0
 
-    status_data = clientes_ativos.values('status_negociacao').annotate(total=Count('id')).order_by('-total')
-    status_labels = [Cliente.StatusNegociacao(item['status_negociacao']).label for item in status_data]
-    status_values = [item['total'] for item in status_data]
-    
-    tipo_negociacao_data = clientes_todos.values('tipo_negociacao').annotate(total=Count('id')).order_by('-total')
-    tipo_negociacao_labels = [Cliente.TipoNegociacao(item['tipo_negociacao']).label for item in tipo_negociacao_data]
-    tipo_negociacao_values = [item['total'] for item in tipo_negociacao_data]
+    status_data_list = clientes_ativos.values('status_negociacao').annotate(total=Count('id')).order_by('-total')
+    status_data_dict = {Cliente.StatusNegociacao(item['status_negociacao']).label: item['total'] for item in status_data_list}
 
-    vendedor_data = clientes_todos.values('vendedor__username').annotate(total=Count('id')).order_by('-total')
-    vendedor_labels = [item['vendedor__username'] for item in vendedor_data]
-    vendedor_values = [item['total'] for item in vendedor_data]
+    tipo_negociacao_list = clientes_todos.values('tipo_negociacao').annotate(total=Count('id')).order_by('-total')
+    tipo_negociacao_dict = {Cliente.TipoNegociacao(item['tipo_negociacao']).label: item['total'] for item in tipo_negociacao_list}
+
+    vendedor_list = clientes_todos.values('vendedor__username').annotate(total=Count('id')).order_by('-total')
+    vendedor_dict = {item['vendedor__username']: item['total'] for item in vendedor_list}
 
     context = {
         'total_clientes': total_clientes,
         'total_clientes_ativos': clientes_ativos.count(),
         'taxa_conversao': round(taxa_conversao, 2),
         'tempo_medio_fechamento_dias': tempo_medio_fechamento_dias,
-        'status_labels': status_labels,
-        'status_values': status_values,
-        'tipo_negociacao_labels': tipo_negociacao_labels,
-        'tipo_negociacao_values': tipo_negociacao_values,
-        'vendedor_labels': vendedor_labels,
-        'vendedor_values': vendedor_values,
+        'status_data': status_data_dict,
+        'tipo_negociacao_data': tipo_negociacao_dict,
+        'vendedor_data': vendedor_dict,
         'start_date': start_date,
         'end_date': end_date,
     }
     
-    template_path = 'clientes/relatorios.html'
+    template_path = 'clientes/relatorio_pdf.html' # Utiliza o novo template
     template = get_template(template_path)
     html = template.render(context)
 
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="relatorio.pdf"'
+    response['Content-Disposition'] = 'attachment; filename="relatorio_leads.pdf"'
 
     pisa_status = pisa.CreatePDF(
        html, dest=response)
 
     if pisa_status.err:
-       return HttpResponse('We had some errors <pre>' + html + '</pre>')
+       return HttpResponse('Ocorreram alguns erros <pre>' + html + '</pre>')
     return response

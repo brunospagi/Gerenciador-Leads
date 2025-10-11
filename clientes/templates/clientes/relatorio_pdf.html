@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Leads</title>
+    <style>
+        @page {
+            size: a4 portrait;
+            margin: 1cm;
+        }
+        body {
+            font-family: "Helvetica", sans-serif;
+            color: #333;
+            font-size: 12px;
+        }
+        h1 {
+            text-align: center;
+            color: #111;
+            font-size: 22px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        h2 {
+            font-size: 16px;
+            color: #333;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 5px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        .report-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .report-header p {
+            font-size: 14px;
+            margin: 0;
+        }
+        .metrics-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .metrics-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: center;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .metric-value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .data-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .data-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <h1>Relatório de Desempenho de Leads</h1>
+        <p>Período de Análise: {{ start_date|date:"d/m/Y" }} a {{ end_date|date:"d/m/Y" }}</p>
+    </div>
+
+    <h2>Resumo de Métricas</h2>
+    <table class="metrics-table">
+        <tr>
+            <td>
+                <span class="metric-label">Clientes Ativos</span>
+                <span class="metric-value">{{ total_clientes_ativos }}</span>
+            </td>
+            <td>
+                <span class="metric-label">Taxa de Conversão</span>
+                <span class="metric-value">{{ taxa_conversao }}%</span>
+            </td>
+            <td>
+                <span class="metric-label">Tempo Médio de Fechamento</span>
+                <span class="metric-value">{{ tempo_medio_fechamento_dias }} dias</span>
+            </td>
+            <td>
+                <span class="metric-label">Total de Leads</span>
+                <span class="metric-value">{{ total_clientes }}</span>
+            </td>
+        </tr>
+    </table>
+
+    <h2>Detalhes das Negociações</h2>
+
+    <table class="data-table">
+        <thead>
+            <tr><th colspan="2">Status das Negociações Ativas</th></tr>
+            <tr>
+                <th>Status</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for label, value in status_data.items %}
+            <tr>
+                <td>{{ label }}</td>
+                <td>{{ value }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2">Nenhum dado encontrado.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="data-table">
+        <thead>
+            <tr><th colspan="2">Desempenho por Vendedor</th></tr>
+            <tr>
+                <th>Vendedor</th>
+                <th>Total de Clientes</th>
+            </tr>
+        </thead>
+        <tbody>
+             {% for label, value in vendedor_data.items %}
+            <tr>
+                <td>{{ label }}</td>
+                <td>{{ value }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2">Nenhum dado encontrado.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="data-table">
+        <thead>
+            <tr><th colspan="2">Tipos de Negociação</th></tr>
+            <tr>
+                <th>Tipo</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for label, value in tipo_negociacao_data.items %}
+            <tr>
+                <td>{{ label }}</td>
+                <td>{{ value }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2">Nenhum dado encontrado.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+</html>
