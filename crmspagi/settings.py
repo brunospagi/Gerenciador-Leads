@@ -79,12 +79,6 @@ MINIO_STORAGE_MEDIA_BUCKET_NAME = 'leads-spagi-media'
 MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
 MINIO_STORAGE_MEDIA_USE_PRESIGNED = True
 
-# --- CONFIGURAÇÕES PARA ARQUIVOS DE MÍDIA (UPLOADS) ---
-
-# Nome do bucket para os uploads dos usuários.
-MINIO_STORAGE_MEDIA_BUCKET_NAME = 'media'
-
-# CORREÇÃO 1: Garante que o bucket criado seja PÚBLICO.
 # Isso permite que qualquer pessoa com o link possa ver as imagens.
 MINIO_STORAGE_AUTO_CREATE_MEDIA_POLICY = 'public-read'
 

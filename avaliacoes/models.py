@@ -1,17 +1,20 @@
+# brunospagi/gerenciador-leads/Gerenciador-Leads-fecd02772f93afa4ca06347c8334383a86eb8295/avaliacoes/models.py
+
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
 from django.utils.timezone import is_aware, make_aware
 import uuid
 import os
-from minio_storage.storage import MinioMediaStorage 
 
+# ... (função get_upload_path e model Avaliacao permanecem iguais) ...
 def get_upload_path(instance, filename):
     ext = os.path.splitext(filename)[1]
     unique_filename = f"{uuid.uuid4()}{ext}"
     return os.path.join('avaliacoes', instance.avaliacao.placa, unique_filename)
 
 class Avaliacao(models.Model):
+    # ... (código do modelo Avaliacao) ...
     STATUS_CHOICES = (
         ('disponivel', 'Disponível'),
         ('finalizado', 'Finalizado'),
@@ -42,17 +45,14 @@ class Avaliacao(models.Model):
         if self.pk and self.is_expired:
             self.status = 'finalizado'
         super().save(*args, **kwargs)
-# Fim do código inalterado
+
 
 class AvaliacaoFoto(models.Model):
     avaliacao = models.ForeignKey(Avaliacao, related_name='fotos', on_delete=models.CASCADE)
     
-    # --- CORREÇÃO PRINCIPAL ---
-    # 2. Force o uso do MinioMediaStorage diretamente neste campo.
-    foto = models.ImageField(
-        upload_to=get_upload_path,
-        storage=MinioMediaStorage() # <-- Adicione esta linha
-    )
+    # CORREÇÃO: Remova o argumento 'storage'.
+    # O Django agora usará o DEFAULT_FILE_STORAGE definido no settings.py
+    foto = models.ImageField(upload_to=get_upload_path)
 
     def __str__(self):
         return f"Foto de {self.avaliacao.modelo}"
