@@ -81,7 +81,6 @@ MINIO_STORAGE_USE_HTTPS = True
 # --- Configuração de Storage ---
 MINIO_STORAGE_MEDIA_BUCKET_NAME = 'leads-spagi-media'
 MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
-MINIO_STORAGE_AUTO_CREATE_MEDIA_POLICY = 'public-read'
 
 # Usar a nossa classe customizada
 DEFAULT_FILE_STORAGE = 'crmspagi.storage_backends.PublicMediaStorage'
