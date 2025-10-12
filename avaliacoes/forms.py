@@ -14,5 +14,6 @@ class AvaliacaoFotoForm(forms.ModelForm):
         model = AvaliacaoFoto
         fields = ['foto']
         widgets = {
-            'foto': forms.ClearableFileInput(attrs={'multiple': True})
+            # CORREÇÃO: Troque ClearableFileInput por FileInput para permitir múltiplos uploads
+            'foto': forms.FileInput(attrs={'multiple': True})
         }
