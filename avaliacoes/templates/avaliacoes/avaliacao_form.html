@@ -7,29 +7,51 @@
             <div class="card-header bg-dark text-white">
                 <h4 class="mb-0">{% if form.instance.pk %}Editar Avaliação{% else %}Cadastrar Nova Avaliação de Veículo{% endif %}</h4>
             </div>
-            <div class="card-body">
-                <form method="post" enctype="multipart/form-data">
+            <div class="card-body p-4">
+                <form method="post" enctype="multipart/form-data" id="avaliacaoForm">
                     {% csrf_token %}
-                    
-                    <h5 class="mb-3 border-bottom pb-2">Dados do Veículo e Contato</h5>
+                    {{ form.marca }}
+                    {{ form.modelo }}
+                    {{ form.ano }}
+
+                    <h5 class="mb-3 border-bottom pb-2">1. Seleção do Veículo (API FIPE)</h5>
                     <div class="row">
-                        {% for field in form %}
-                            {% if field.name != 'valor_avaliado' and field.name != 'observacao' %}
-                                <div class="col-md-6 mb-3">
-                                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                                    {{ field }}
-                                    {% if field.errors %}
-                                        <div class="text-danger small mt-1">
-                                            {{ field.errors.as_text }}
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            {% endif %}
-                        {% endfor %}
+                        <div class="col-md-4 mb-3">
+                            <label for="marca_select" class="form-label">Marca</label>
+                            <select id="marca_select" class="form-select" required>
+                                <option value="" selected disabled>Carregando...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="modelo_select" class="form-label">Modelo</label>
+                            <select id="modelo_select" class="form-select" disabled required>
+                                <option value="" selected disabled>Selecione uma marca</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="ano_select" class="form-label">Ano</label>
+                            <select id="ano_select" class="form-select" disabled required>
+                                <option value="" selected disabled>Selecione um modelo</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <h5 class="mt-3 mb-3 border-bottom pb-2">Observações e Valor Avaliado</h5>
+                    <h5 class="mt-4 mb-3 border-bottom pb-2">2. Dados da Avaliação e Contato</h5>
                     <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.placa.id_for_label }}" class="form-label">{{ form.placa.label }}</label>
+                            {{ form.placa }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.telefone.id_for_label }}" class="form-label">{{ form.telefone.label }}</label>
+                            {{ form.telefone }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.valor_pretendido.id_for_label }}" class="form-label">{{ form.valor_pretendido.label }}</label>
+                            {{ form.valor_pretendido }}
+                        </div>
+                    </div>
+                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="{{ form.observacao.id_for_label }}" class="form-label">{{ form.observacao.label }}</label>
                             {{ form.observacao }}
@@ -37,27 +59,21 @@
                         <div class="col-md-6 mb-3">
                             <label for="{{ form.valor_avaliado.id_for_label }}" class="form-label">{{ form.valor_avaliado.label }}</label>
                             {{ form.valor_avaliado }}
-                             {% if form.valor_avaliado.errors %}
-                                <div class="text-danger small mt-1">
-                                    {{ form.valor_avaliado.errors.as_text }}
-                                </div>
-                            {% endif %}
                         </div>
                     </div>
                     
                     {% if not form.instance.pk %}
-                    <h5 class="mt-3 mb-3 border-bottom pb-2">Fotos do Veículo</h5>
+                    <h5 class="mt-4 mb-3 border-bottom pb-2">3. Fotos do Veículo</h5>
                     <div class="row">
                         <div class="col-md-12 mb-3">
                             <label for="id_fotos" class="form-label">Selecione as Fotos (até 20)</label>
                             <input type="file" name="fotos" class="form-control" id="id_fotos" multiple>
-                            <div class="form-text">Você pode selecionar múltiplos arquivos de uma vez.</div>
                         </div>
                     </div>
                     {% endif %}
 
-                    <div class="card-footer bg-light text-end">
-                        <a href="{% if form.instance.pk %}{% url 'avaliacao_detail' form.instance.pk %}{% else %}{% url 'avaliacao_list' %}{% endif %}" class="btn btn-secondary">Cancelar</a>
+                    <div class="card-footer bg-light text-end mt-4">
+                        <a href="{% url 'avaliacao_list' %}" class="btn btn-secondary">Cancelar</a>
                         <button type="submit" class="btn btn-success">Salvar Avaliação</button>
                     </div>
                 </form>
@@ -65,4 +81,110 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Seletores dos elementos
+    const marcaSelect = document.getElementById('marca_select');
+    const modeloSelect = document.getElementById('modelo_select');
+    const anoSelect = document.getElementById('ano_select');
+
+    // Campos ocultos do formulário Django
+    const marcaInput = document.getElementById('id_marca');
+    const modeloInput = document.getElementById('id_modelo');
+    const anoInput = document.getElementById('id_ano');
+
+    // URLs da API
+    const marcasUrl = "{% url 'api_fipe_marcas' %}";
+
+    // Função para limpar e desabilitar selects
+    const resetSelect = (select, message) => {
+        select.innerHTML = `<option value="" selected disabled>${message}</option>`;
+        select.disabled = true;
+    };
+
+    // 1. Carregar Marcas
+    fetch(marcasUrl)
+        .then(response => response.json())
+        .then(data => {
+            marcaSelect.innerHTML = '<option value="" selected disabled>Selecione uma marca</option>';
+            data.forEach(marca => {
+                const option = new Option(marca.nome, marca.codigo);
+                marcaSelect.add(option);
+            });
+        })
+        .catch(error => {
+            console.error('Erro ao carregar marcas:', error);
+            marcaSelect.innerHTML = '<option value="" selected disabled>Erro ao carregar</option>';
+        });
+
+    // 2. Event Listener para Marcas -> Carregar Modelos
+    marcaSelect.addEventListener('change', () => {
+        const marcaId = marcaSelect.value;
+        const marcaNome = marcaSelect.options[marcaSelect.selectedIndex].text;
+        
+        resetSelect(modeloSelect, 'Carregando modelos...');
+        resetSelect(anoSelect, 'Selecione um modelo');
+        
+        if (!marcaId) return;
+
+        marcaInput.value = marcaNome; // Salva o nome da marca no campo oculto
+        modeloInput.value = '';
+        anoInput.value = '';
+
+        fetch(`/api/fipe/marcas/${marcaId}/modelos/`)
+            .then(response => response.json())
+            .then(data => {
+                modeloSelect.innerHTML = '<option value="" selected disabled>Selecione um modelo</option>';
+                data.forEach(modelo => {
+                    const option = new Option(modelo.nome, modelo.codigo);
+                    modeloSelect.add(option);
+                });
+                modeloSelect.disabled = false;
+            })
+            .catch(error => console.error('Erro ao carregar modelos:', error));
+    });
+
+    // 3. Event Listener para Modelos -> Carregar Anos
+    modeloSelect.addEventListener('change', () => {
+        const marcaId = marcaSelect.value;
+        const modeloId = modeloSelect.value;
+        const modeloNome = modeloSelect.options[modeloSelect.selectedIndex].text;
+
+        resetSelect(anoSelect, 'Carregando anos...');
+
+        if (!modeloId) return;
+
+        modeloInput.value = modeloNome; // Salva o nome do modelo
+        anoInput.value = '';
+
+        fetch(`/api/fipe/marcas/${marcaId}/modelos/${modeloId}/anos/`)
+            .then(response => response.json())
+            .then(data => {
+                anoSelect.innerHTML = '<option value="" selected disabled>Selecione o ano</option>';
+                data.forEach(ano => {
+                    const option = new Option(ano.nome, ano.codigo);
+                    anoSelect.add(option);
+                });
+                anoSelect.disabled = false;
+            })
+            .catch(error => console.error('Erro ao carregar anos:', error));
+    });
+
+    // 4. Event Listener para Ano -> Salvar valor final
+    anoSelect.addEventListener('change', () => {
+        const anoNome = anoSelect.options[anoSelect.selectedIndex].text;
+        anoInput.value = anoNome;
+    });
+
+    // Adiciona classes do Bootstrap aos campos do Django
+    document.querySelectorAll('#avaliacaoForm input, #avaliacaoForm textarea').forEach(input => {
+        if (input.type !== 'hidden' && input.type !== 'file') {
+            input.classList.add('form-control');
+        }
+    });
+});
+</script>
 {% endblock %}

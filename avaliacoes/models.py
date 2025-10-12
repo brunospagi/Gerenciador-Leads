@@ -1,10 +1,11 @@
+# brunospagi/gerenciador-leads/Gerenciador-Leads-fecd02772f93afa4ca06347c8334383a86eb8295/avaliacoes/models.py
+
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
 from django.utils.timezone import is_aware, make_aware
 import uuid
 import os
-# 1. IMPORTE A NOSSA CLASSE DE STORAGE PERSONALIZADA
 from crmspagi.storage_backends import PublicMediaStorage
 
 def get_upload_path(instance, filename):
@@ -13,13 +14,17 @@ def get_upload_path(instance, filename):
     return f"avaliacoes/{instance.avaliacao.placa}/{unique_filename}"
 
 class Avaliacao(models.Model):
-    # ... (o seu modelo Avaliacao, que já está correto, permanece aqui) ...
     STATUS_CHOICES = (
         ('disponivel', 'Disponível'),
         ('finalizado', 'Finalizado'),
     )
-    placa = models.CharField(max_length=10, unique=True)
+    # --- Novos Campos ---
+    marca = models.CharField(max_length=100, default='')
     modelo = models.CharField(max_length=100)
+    ano = models.CharField(max_length=20, default='')
+    # --- Fim dos Novos Campos ---
+    
+    placa = models.CharField(max_length=10, unique=True)
     telefone = models.CharField(max_length=20)
     valor_pretendido = models.DecimalField(max_digits=10, decimal_places=2)
     observacao = models.TextField(blank=True, null=True)
@@ -28,7 +33,7 @@ class Avaliacao(models.Model):
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='disponivel')
 
     def __str__(self):
-        return f"{self.modelo} - {self.placa}"
+        return f"{self.marca} {self.modelo} {self.ano} - {self.placa}"
 
     @property
     def is_expired(self):
@@ -48,13 +53,9 @@ class Avaliacao(models.Model):
 
 class AvaliacaoFoto(models.Model):
     avaliacao = models.ForeignKey(Avaliacao, related_name='fotos', on_delete=models.CASCADE)
-    
-    # 2. AQUI ESTÁ A CORREÇÃO FINAL:
-    # Forçamos este campo a usar a nossa classe PublicMediaStorage,
-    # ignorando completamente a configuração DEFAULT_FILE_STORAGE.
     foto = models.ImageField(
         upload_to=get_upload_path,
-        storage=PublicMediaStorage() # <-- FORÇA O UPLOAD PARA O MINIO
+        storage=PublicMediaStorage()
     )
 
     def __str__(self):
