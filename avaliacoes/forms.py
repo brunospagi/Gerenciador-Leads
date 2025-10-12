@@ -9,13 +9,10 @@ class AvaliacaoForm(forms.ModelForm):
             'observacao': forms.Textarea(attrs={'rows': 3}),
         }
 
-# CORREÇÃO: Usar um forms.Form simples para o campo de múltiplos uploads
+# CORREÇÃO DEFINITIVA: Simplifique o formulário ao máximo.
+# A lógica de 'múltiplo' será tratada no template.
 class FotoUploadForm(forms.Form):
-    # Este campo não está ligado a nenhum modelo, apenas gerencia o input
     fotos = forms.ImageField(
         required=False,
-        widget=forms.FileInput(attrs={
-            'multiple': True,
-            'class': 'form-control' # Adicionando uma classe para estilização
-        })
+        # Remova o widget daqui para evitar o erro do Django.
     )

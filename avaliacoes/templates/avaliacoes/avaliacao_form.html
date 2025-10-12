@@ -23,8 +23,8 @@
     <hr>
     <div class="row">
         <div class="col-md-12 mb-3">
-            <label for="{{ foto_form.fotos.id_for_label }}" class="form-label">Fotos do Veículo (até 20 fotos)</label>
-            {{ foto_form.fotos }}
+            <label for="id_fotos" class="form-label">Fotos do Veículo (até 20 fotos)</label>
+            <input type="file" name="fotos" class="form-control" id="id_fotos" multiple>
         </div>
     </div>
     {% endif %}
