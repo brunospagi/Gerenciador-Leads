@@ -91,7 +91,7 @@ MINIO_STORAGE_MEDIA_URL = f'http://{MINIO_STORAGE_ENDPOINT}/{MINIO_STORAGE_MEDIA
 MINIO_STORAGE_MEDIA_USE_PRESIGNED = False
 
 # Define o storage padrão para os arquivos de mídia.
-DEFAULT_FILE_STORAGE = 'minio_storage.storage.MinioMediaStorage'
+DEFAULT_FILE_STORAGE = 'crmspagi.storage_backends.PublicMediaStorage'
 
 ROOT_URLCONF = 'crmspagi.urls'
 
