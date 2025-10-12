@@ -78,7 +78,26 @@ MINIO_STORAGE_MEDIA_BUCKET_NAME = 'leads-spagi-media'
 MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
 MINIO_STORAGE_MEDIA_USE_PRESIGNED = True
 
+# --- CONFIGURAÇÕES PARA ARQUIVOS DE MÍDIA (UPLOADS) ---
+
+# Nome do bucket para os uploads dos usuários.
+MINIO_STORAGE_MEDIA_BUCKET_NAME = 'media'
+
+# CORREÇÃO 1: Garante que o bucket criado seja PÚBLICO.
+# Isso permite que qualquer pessoa com o link possa ver as imagens.
+MINIO_STORAGE_AUTO_CREATE_MEDIA_POLICY = 'public-read'
+
+# CORREÇÃO 2: Define a URL base para os arquivos de mídia.
+# Isso garante que o Django construa o link usando o endpoint correto,
+# que é acessível pelo navegador.
+MINIO_STORAGE_MEDIA_URL = f'http://{MINIO_STORAGE_ENDPOINT}/{MINIO_STORAGE_MEDIA_BUCKET_NAME}'
+
+# Remove o uso de URLs pré-assinadas, já que o bucket será público.
+MINIO_STORAGE_MEDIA_USE_PRESIGNED = False
+
+# Define o storage padrão para os arquivos de mídia.
 DEFAULT_FILE_STORAGE = 'minio_storage.storage.MinioMediaStorage'
+
 ROOT_URLCONF = 'crmspagi.urls'
 
 TEMPLATES = [
