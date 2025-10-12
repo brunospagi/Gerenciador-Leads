@@ -3,7 +3,7 @@
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView # 1. Adicione DeleteView
-from .models import Avaliacao, AvaliacoFoto
+from .models import Avaliacao, AvaliacaoFoto
 from .forms import AvaliacaoForm, FotoUploadForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from datetime import timedelta
