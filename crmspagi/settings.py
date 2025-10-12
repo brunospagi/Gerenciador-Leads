@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'leadge',
     'clientes',
+    'avaliacoes',
+    'minio_storage',
 ]
 
 MIDDLEWARE = [
@@ -66,6 +68,17 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Configurações do MinIO
+# Substitua pelos seus dados do MinIO
+MINIO_STORAGE_ENDPOINT = 'https://s3.spagisistemas.com.br'  # ou seu endpoint
+MINIO_STORAGE_ACCESS_KEY = 'evIJTBeXbpAx0m7ZDjC9'
+MINIO_STORAGE_SECRET_KEY = 'gO25VuhrrvrDmh7rigczJgRhx1uY9NVFJXJAyvo1'
+MINIO_STORAGE_USE_HTTPS = True
+MINIO_STORAGE_MEDIA_BUCKET_NAME = 'leads-spagi-media'
+MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
+MINIO_STORAGE_MEDIA_USE_PRESIGNED = True
+
+DEFAULT_FILE_STORAGE = 'minio_storage.storage.MinioMediaStorage'
 ROOT_URLCONF = 'crmspagi.urls'
 
 TEMPLATES = [

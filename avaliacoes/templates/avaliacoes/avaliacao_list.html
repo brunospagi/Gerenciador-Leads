@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Painel de Avaliações de Veículos</h1>
+    <a href="{% url 'avaliacao_create' %}" class="btn btn-primary">Nova Avaliação</a>
+</div>
+
+<div class="row">
+    {% for avaliacao in avaliacoes %}
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            {% if avaliacao.fotos.first %}
+                <img src="{{ avaliacao.fotos.first.foto.url }}" class="card-img-top" alt="Foto do veículo" style="height: 200px; object-fit: cover;">
+            {% endif %}
+            <div class="card-body">
+                <h5 class="card-title">{{ avaliacao.modelo }} - {{ avaliacao.placa }}</h5>
+                <p class="card-text">Valor Pretendido: R$ {{ avaliacao.valor_pretendido }}</p>
+                <p class="card-text">
+                    <small class="text-muted">Cadastrado em: {{ avaliacao.data_criacao|date:"d/m/Y" }}</small>
+                </p>
+                <a href="{% url 'avaliacao_detail' avaliacao.pk %}" class="btn btn-secondary">Ver Detalhes</a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col">
+        <p>Nenhuma avaliação de veículo disponível no momento.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

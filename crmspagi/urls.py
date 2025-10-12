@@ -7,4 +7,7 @@ urlpatterns = [
     path('contas/', include('django.contrib.auth.urls')),
     # URLs do seu app de clientes
     path('', include('clientes.urls')),
+    # URLs do app de avaliações
+    path('', include('avaliacoes.urls')),
+
 ]

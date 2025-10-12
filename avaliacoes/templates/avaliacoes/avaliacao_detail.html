@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>{{ avaliacao.modelo }} - Placa: {{ avaliacao.placa }}</h2>
+        <a href="{% url 'avaliacao_update' avaliacao.pk %}" class="btn btn-warning">Editar Avaliação</a>
+    </div>
+    <div class="card-body">
+        <p><strong>Telefone para contato:</strong> {{ avaliacao.telefone }}</p>
+        <p><strong>Valor Pretendido:</strong> R$ {{ avaliacao.valor_pretendido }}</p>
+        <p><strong>Valor Avaliado:</strong> R$ {{ avaliacao.valor_avaliado|default:"Ainda não avaliado" }}</p>
+        <hr>
+        <h5>Observações:</h5>
+        <p>{{ avaliacao.observacao|linebreaks|default:"Nenhuma observação." }}</p>
+        <hr>
+        <h5>Fotos do Veículo</h5>
+        <div class="row">
+            {% for foto in avaliacao.fotos.all %}
+            <div class="col-md-3 mb-3">
+                <a href="{{ foto.foto.url }}" target="_blank">
+                    <img src="{{ foto.foto.url }}" class="img-fluid rounded" alt="Foto do veículo">
+                </a>
+            </div>
+            {% empty %}
+            <p>Nenhuma foto cadastrada.</p>
+            {% endfor %}
+        </div>
+        <a href="{% url 'avaliacao_list' %}" class="btn btn-secondary mt-3">Voltar para o Painel</a>
+    </div>
+</div>
+{% endblock %}

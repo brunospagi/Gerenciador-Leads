@@ -1,0 +1,24 @@
+<ul class="navbar-nav me-auto mb-2 mb-lg-0">
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'cliente_list' %}">Dashboard</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'avaliacao_list' %}">Avaliações</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'cliente_atrasados_list' %}">
+            Contatos Atrasados
+            {% if clientes_atrasados_count > 0 %}
+                <span class="badge bg-danger rounded-pill">{{ clientes_atrasados_count }}</span>
+            {% endif %}
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'cliente_finalizados_list' %}">Finalizados</a>
+    </li>
+    {% if user.is_superuser %}
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'relatorios' %}">Relatórios</a>
+    </li>
+    {% endif %}
+</ul>
