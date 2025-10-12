@@ -1,35 +1,68 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1>{% if form.instance.pk %}Editar Avaliação{% else %}Cadastrar Nova Avaliação de Veículo{% endif %}</h1>
-<form method="post" enctype="multipart/form-data">
-    {% csrf_token %}
-    
-    <div class="row">
-        {% for field in form %}
-        <div class="col-md-6 mb-3">
-            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-            {{ field }}
-            {% if field.errors %}
-                <div class="text-danger">
-                    {{ field.errors.as_text }}
-                </div>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h4 class="mb-0">{% if form.instance.pk %}Editar Avaliação{% else %}Cadastrar Nova Avaliação de Veículo{% endif %}</h4>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <h5 class="mb-3 border-bottom pb-2">Dados do Veículo e Contato</h5>
+                    <div class="row">
+                        {% for field in form %}
+                            {% if field.name != 'valor_avaliado' and field.name != 'observacao' %}
+                                <div class="col-md-6 mb-3">
+                                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {{ field.errors.as_text }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
 
-    {% if not form.instance.pk %}
-    <hr>
-    <div class="row">
-        <div class="col-md-12 mb-3">
-            <label for="id_fotos" class="form-label">Fotos do Veículo (até 20 fotos)</label>
-            <input type="file" name="fotos" class="form-control" id="id_fotos" multiple>
+                    <h5 class="mt-3 mb-3 border-bottom pb-2">Observações e Valor Avaliado</h5>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.observacao.id_for_label }}" class="form-label">{{ form.observacao.label }}</label>
+                            {{ form.observacao }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.valor_avaliado.id_for_label }}" class="form-label">{{ form.valor_avaliado.label }}</label>
+                            {{ form.valor_avaliado }}
+                             {% if form.valor_avaliado.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ form.valor_avaliado.errors.as_text }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    {% if not form.instance.pk %}
+                    <h5 class="mt-3 mb-3 border-bottom pb-2">Fotos do Veículo</h5>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="id_fotos" class="form-label">Selecione as Fotos (até 20)</label>
+                            <input type="file" name="fotos" class="form-control" id="id_fotos" multiple>
+                            <div class="form-text">Você pode selecionar múltiplos arquivos de uma vez.</div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="card-footer bg-light text-end">
+                        <a href="{% if form.instance.pk %}{% url 'avaliacao_detail' form.instance.pk %}{% else %}{% url 'avaliacao_list' %}{% endif %}" class="btn btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-success">Salvar Avaliação</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-    {% endif %}
-
-    <button type="submit" class="btn btn-success">Salvar</button>
-    <a href="{% if form.instance.pk %}{% url 'avaliacao_detail' form.instance.pk %}{% else %}{% url 'avaliacao_list' %}{% endif %}" class="btn btn-secondary">Cancelar</a>
-</form>
+</div>
 {% endblock %}

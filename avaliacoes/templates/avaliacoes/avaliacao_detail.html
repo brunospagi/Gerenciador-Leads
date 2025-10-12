@@ -1,32 +1,45 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h2>{{ avaliacao.modelo }} - Placa: {{ avaliacao.placa }}</h2>
-        <a href="{% url 'avaliacao_update' avaliacao.pk %}" class="btn btn-warning">Editar Avaliação</a>
+<div class="card shadow-sm">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">{{ avaliacao.modelo }} - Placa: {{ avaliacao.placa }}</h4>
+        <a href="{% url 'avaliacao_update' avaliacao.pk %}" class="btn btn-warning btn-sm">Editar Avaliação</a>
     </div>
     <div class="card-body">
-        <p><strong>Telefone para contato:</strong> {{ avaliacao.telefone }}</p>
-        <p><strong>Valor Pretendido:</strong> R$ {{ avaliacao.valor_pretendido }}</p>
-        <p><strong>Valor Avaliado:</strong> R$ {{ avaliacao.valor_avaliado|default:"Ainda não avaliado" }}</p>
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Telefone para contato:</strong> {{ avaliacao.telefone }}</p>
+                <p><strong>Valor Pretendido:</strong> R$ {{ avaliacao.valor_pretendido }}</p>
+                <p><strong>Valor Avaliado:</strong> R$ {{ avaliacao.valor_avaliado|default:"Ainda não avaliado" }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Status:</strong> <span class="badge bg-primary">{{ avaliacao.get_status_display }}</span></p>
+                <p><strong>Data de Cadastro:</strong> {{ avaliacao.data_criacao|date:"d/m/Y H:i" }}</p>
+            </div>
+        </div>
         <hr>
         <h5>Observações:</h5>
         <p>{{ avaliacao.observacao|linebreaks|default:"Nenhuma observação." }}</p>
         <hr>
-        <h5>Fotos do Veículo</h5>
+        
+        <h5 class="mb-3">Fotos do Veículo</h5>
         <div class="row">
             {% for foto in avaliacao.fotos.all %}
-            <div class="col-md-3 mb-3">
-                <a href="{{ foto.foto.url }}" target="_blank">
-                    <img src="{{ foto.foto.url }}" class="img-fluid rounded" alt="Foto do veículo">
+            <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
+                <a href="{{ foto.foto.url }}" data-lightbox="vehicle-gallery" data-title="{{ avaliacao.modelo }} - {{ avaliacao.placa }}">
+                    <img src="{{ foto.foto.url }}" class="img-fluid rounded shadow-sm" alt="Foto do veículo" style="height: 150px; width: 100%; object-fit: cover;">
                 </a>
             </div>
             {% empty %}
-            <p>Nenhuma foto cadastrada.</p>
+            <div class="col">
+                <p>Nenhuma foto cadastrada para esta avaliação.</p>
+            </div>
             {% endfor %}
         </div>
-        <a href="{% url 'avaliacao_list' %}" class="btn btn-secondary mt-3">Voltar para o Painel</a>
+    </div>
+    <div class="card-footer bg-light">
+        <a href="{% url 'avaliacao_list' %}" class="btn btn-secondary">Voltar para o Painel</a>
     </div>
 </div>
 {% endblock %}

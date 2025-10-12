@@ -71,7 +71,7 @@ MIDDLEWARE = [
 # Configurações do MinIO
 # --- Configuração de Endpoints do MinIO ---
 MINIO_EXTERNAL_ENDPOINT = 's3.spagisistemas.com.br'
-MINIO_STORAGE_ENDPOINT = 's3.spagisistemas.com.br' # Este é o endereço que o Django usa para ENVIAR o ficheiro. Se o MinIO estiver noutro servidor, coloque o IP correto.
+MINIO_STORAGE_ENDPOINT = 's3.spagisistemas.com.br'
 
 # Credenciais
 MINIO_STORAGE_ACCESS_KEY = 'evIJTBeXbpAx0m7ZDjC9'
