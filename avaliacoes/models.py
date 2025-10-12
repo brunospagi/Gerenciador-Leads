@@ -22,10 +22,14 @@ class Avaliacao(models.Model):
 
     @property
     def is_expired(self):
-        return timezone.now() > self.data_criacao + timedelta(days=30)
+        # Garante que data_criacao não é None antes de comparar
+        if self.data_criacao:
+            return timezone.now() > self.data_criacao + timedelta(days=30)
+        return False
 
     def save(self, *args, **kwargs):
-        if self.is_expired:
+        # CORREÇÃO: Apenas checa a expiração se o objeto já foi criado (tem um pk)
+        if self.pk and self.is_expired:
             self.status = 'finalizado'
         super().save(*args, **kwargs)
 
