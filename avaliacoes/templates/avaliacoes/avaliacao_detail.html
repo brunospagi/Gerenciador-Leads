@@ -16,6 +16,7 @@
             <div class="col-md-6">
                 <p><strong>Status:</strong> <span class="badge bg-primary">{{ avaliacao.get_status_display }}</span></p>
                 <p><strong>Data de Cadastro:</strong> {{ avaliacao.data_criacao|date:"d/m/Y H:i" }}</p>
+                <p><strong>Cadastrado por:</strong> {{ avaliacao.cadastrado_por.username|default:"Usuário desconhecido" }}</p>
             </div>
         </div>
         <hr>

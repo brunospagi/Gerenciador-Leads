@@ -27,7 +27,7 @@
 </div>
 
 <div class="row">
-    {% for avaliacao in page_obj %} {# Mude de 'avaliacoes' para 'page_obj' por causa da paginação #}
+    {% for avaliacao in page_obj %}
     <div class="col-md-6 mb-4">
         <div class="card h-100 shadow-sm">
             <div class="row g-0">
@@ -52,7 +52,7 @@
                 </div>
             </div>
              <div class="card-footer text-muted">
-                Cadastrado em: {{ avaliacao.data_criacao|date:"d/m/Y" }}
+                Cadastrado por: <strong>{{ avaliacao.cadastrado_por.username|default:"-" }}</strong> em {{ avaliacao.data_criacao|date:"d/m/Y" }}
             </div>
         </div>
     </div>

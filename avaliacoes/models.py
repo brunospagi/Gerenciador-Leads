@@ -1,5 +1,3 @@
-# brunospagi/gerenciador-leads/Gerenciador-Leads-fecd02772f93afa4ca06347c8334383a86eb8295/avaliacoes/models.py
-
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
@@ -7,6 +5,7 @@ from django.utils.timezone import is_aware, make_aware
 import uuid
 import os
 from crmspagi.storage_backends import PublicMediaStorage
+from django.contrib.auth.models import User
 
 def get_upload_path(instance, filename):
     ext = os.path.splitext(filename)[1]
@@ -18,12 +17,9 @@ class Avaliacao(models.Model):
         ('disponivel', 'Disponível'),
         ('finalizado', 'Finalizado'),
     )
-    # --- Novos Campos ---
     marca = models.CharField(max_length=100, default='')
     modelo = models.CharField(max_length=100)
     ano = models.CharField(max_length=20, default='')
-    # --- Fim dos Novos Campos ---
-    
     placa = models.CharField(max_length=10, unique=True)
     telefone = models.CharField(max_length=20)
     valor_pretendido = models.DecimalField(max_digits=10, decimal_places=2)
@@ -31,6 +27,15 @@ class Avaliacao(models.Model):
     valor_avaliado = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     data_criacao = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='disponivel')
+
+    # Campo para armazenar o usuário que fez o cadastro
+    cadastrado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='avaliacoes_cadastradas'
+    )
 
     def __str__(self):
         return f"{self.marca} {self.modelo} {self.ano} - {self.placa}"
