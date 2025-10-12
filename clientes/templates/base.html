@@ -32,6 +32,9 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'cliente_finalizados_list' %}">Finalizados</a>
                     </li>
+                    <li>
+                        <a class="nav-link" href="{% url 'avaliacao_list' %}">Avaliações de Veiculos</a>
+                    </li>
                     {% if user.is_superuser %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'relatorios' %}">Relatórios</a>
