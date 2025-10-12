@@ -1,5 +1,3 @@
-# brunospagi/gerenciador-leads/Gerenciador-Leads-fecd02772f93afa4ca06347c8334383a86eb8295/avaliacoes/forms.py
-
 from django import forms
 from .models import Avaliacao
 
@@ -16,11 +14,10 @@ class AvaliacaoForm(forms.ModelForm):
             'ano': forms.HiddenInput(),
         }
 
+# CORREÇÃO DEFINITIVA: Simplifique o formulário ao máximo.
+# A lógica de 'múltiplo' será tratada no template.
 class FotoUploadForm(forms.Form):
     fotos = forms.ImageField(
         required=False,
-        widget=forms.ClearableFileInput(attrs={
-            'multiple': True,
-            'class': 'form-control'
-        })
+        # Remova o widget daqui para evitar o erro do Django.
     )
