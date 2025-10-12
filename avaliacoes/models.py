@@ -1,18 +1,19 @@
-# brunospagi/gerenciador-leads/Gerenciador-Leads-fecd02772f93afa4ca06347c8334383a86eb8295/avaliacoes/models.py
-
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
 from django.utils.timezone import is_aware, make_aware
 import uuid
 import os
+# 1. IMPORTE A NOSSA CLASSE DE STORAGE PERSONALIZADA
+from crmspagi.storage_backends import PublicMediaStorage
 
 def get_upload_path(instance, filename):
     ext = os.path.splitext(filename)[1]
     unique_filename = f"{uuid.uuid4()}{ext}"
-    return os.path.join('avaliacoes', instance.avaliacao.placa, unique_filename)
+    return f"avaliacoes/{instance.avaliacao.placa}/{unique_filename}"
 
 class Avaliacao(models.Model):
+    # ... (o seu modelo Avaliacao, que já está correto, permanece aqui) ...
     STATUS_CHOICES = (
         ('disponivel', 'Disponível'),
         ('finalizado', 'Finalizado'),
@@ -48,8 +49,13 @@ class Avaliacao(models.Model):
 class AvaliacaoFoto(models.Model):
     avaliacao = models.ForeignKey(Avaliacao, related_name='fotos', on_delete=models.CASCADE)
     
-    # O Django agora usará o DEFAULT_FILE_STORAGE definido no settings.py
-    foto = models.ImageField(upload_to=get_upload_path)
+    # 2. AQUI ESTÁ A CORREÇÃO FINAL:
+    # Forçamos este campo a usar a nossa classe PublicMediaStorage,
+    # ignorando completamente a configuração DEFAULT_FILE_STORAGE.
+    foto = models.ImageField(
+        upload_to=get_upload_path,
+        storage=PublicMediaStorage() # <-- FORÇA O UPLOAD PARA O MINIO
+    )
 
     def __str__(self):
         return f"Foto de {self.avaliacao.modelo}"
