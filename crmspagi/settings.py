@@ -71,6 +71,7 @@ MIDDLEWARE = [
 # Configurações do MinIO
 # Substitua pelos seus dados do MinIO
 MINIO_STORAGE_ENDPOINT = 'https://s3.spagisistemas.com.br'  # ou seu endpoint
+MINIO_EXTERNAL_ENDPOINT = 'https://s3.spagisistemas.com.br'
 MINIO_STORAGE_ACCESS_KEY = 'evIJTBeXbpAx0m7ZDjC9'
 MINIO_STORAGE_SECRET_KEY = 'gO25VuhrrvrDmh7rigczJgRhx1uY9NVFJXJAyvo1'
 MINIO_STORAGE_USE_HTTPS = True
