@@ -1,5 +1,5 @@
 from django import forms
-from .models import Avaliacao, AvaliacaoFoto
+from .models import Avaliacao
 
 class AvaliacaoForm(forms.ModelForm):
     class Meta:
@@ -9,11 +9,13 @@ class AvaliacaoForm(forms.ModelForm):
             'observacao': forms.Textarea(attrs={'rows': 3}),
         }
 
-class AvaliacaoFotoForm(forms.ModelForm):
-    class Meta:
-        model = AvaliacaoFoto
-        fields = ['foto']
-        widgets = {
-            # CORREÇÃO: Troque ClearableFileInput por FileInput para permitir múltiplos uploads
-            'foto': forms.FileInput(attrs={'multiple': True})
-        }
+# CORREÇÃO: Usar um forms.Form simples para o campo de múltiplos uploads
+class FotoUploadForm(forms.Form):
+    # Este campo não está ligado a nenhum modelo, apenas gerencia o input
+    fotos = forms.ImageField(
+        required=False,
+        widget=forms.FileInput(attrs={
+            'multiple': True,
+            'class': 'form-control' # Adicionando uma classe para estilização
+        })
+    )
