@@ -69,28 +69,21 @@ MIDDLEWARE = [
 ]
 
 # Configurações do MinIO
-# Substitua pelos seus dados do MinIO
-MINIO_STORAGE_ENDPOINT = 'https://s3.spagisistemas.com.br'  # ou seu endpoint
-MINIO_EXTERNAL_ENDPOINT = 'https://s3.spagisistemas.com.br'
+# --- Configuração de Endpoints do MinIO ---
+MINIO_EXTERNAL_ENDPOINT = 's3.spagisistemas.com.br'
+MINIO_STORAGE_ENDPOINT = '127.0.0.1:9000' # Este é o endereço que o Django usa para ENVIAR o ficheiro. Se o MinIO estiver noutro servidor, coloque o IP correto.
+
+# Credenciais
 MINIO_STORAGE_ACCESS_KEY = 'evIJTBeXbpAx0m7ZDjC9'
 MINIO_STORAGE_SECRET_KEY = 'gO25VuhrrvrDmh7rigczJgRhx1uY9NVFJXJAyvo1'
 MINIO_STORAGE_USE_HTTPS = True
+
+# --- Configuração de Storage ---
 MINIO_STORAGE_MEDIA_BUCKET_NAME = 'leads-spagi-media'
 MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
-MINIO_STORAGE_MEDIA_USE_PRESIGNED = True
-
-# Isso permite que qualquer pessoa com o link possa ver as imagens.
 MINIO_STORAGE_AUTO_CREATE_MEDIA_POLICY = 'public-read'
 
-# CORREÇÃO 2: Define a URL base para os arquivos de mídia.
-# Isso garante que o Django construa o link usando o endpoint correto,
-# que é acessível pelo navegador.
-MINIO_STORAGE_MEDIA_URL = f'http://{MINIO_STORAGE_ENDPOINT}/{MINIO_STORAGE_MEDIA_BUCKET_NAME}'
-
-# Remove o uso de URLs pré-assinadas, já que o bucket será público.
-MINIO_STORAGE_MEDIA_USE_PRESIGNED = False
-
-# Define o storage padrão para os arquivos de mídia.
+# Usar a nossa classe customizada
 DEFAULT_FILE_STORAGE = 'crmspagi.storage_backends.PublicMediaStorage'
 
 ROOT_URLCONF = 'crmspagi.urls'
