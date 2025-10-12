@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
+from django.utils.timezone import is_aware, make_aware
 
 class Avaliacao(models.Model):
     STATUS_CHOICES = (
@@ -22,15 +23,30 @@ class Avaliacao(models.Model):
 
     @property
     def is_expired(self):
-        # Garante que data_criacao não é None antes de comparar
-        if self.data_criacao:
-            return timezone.now() > self.data_criacao + timedelta(days=30)
-        return False
+        """
+        Verifica se a avaliação expirou (mais de 30 dias).
+        Garante que a comparação de datetimes é segura em relação a timezones.
+        """
+        if not self.data_criacao:
+            return False
+
+        # Pega a data/hora atual ciente do fuso horário
+        now = timezone.now()
+        
+        # Garante que a data_criacao também é ciente do fuso horário
+        data_criacao_aware = self.data_criacao
+        if not is_aware(data_criacao_aware):
+            # Se por algum motivo a data no banco for ingênua, torna ela ciente
+            data_criacao_aware = make_aware(data_criacao_aware, timezone.get_current_timezone())
+
+        return now > data_criacao_aware + timedelta(days=30)
 
     def save(self, *args, **kwargs):
-        # CORREÇÃO: Apenas checa a expiração se o objeto já foi criado (tem um pk)
+        # A lógica de expiração só deve ser aplicada em objetos que já existem (têm pk)
         if self.pk and self.is_expired:
             self.status = 'finalizado'
+        
+        # A chamada super().save() deve vir depois da lógica
         super().save(*args, **kwargs)
 
 def get_upload_path(instance, filename):
