@@ -42,16 +42,23 @@ class AvaliacaoCreateView(LoginRequiredMixin, CreateView):
             return self.form_invalid(form)
 
     def form_valid(self, form, foto_form):
-        # Salva o objeto Avaliacao primeiro
         self.object = form.save()
-        
-        # CORREÇÃO: Pega a lista de arquivos do campo 'fotos'
         files = self.request.FILES.getlist('fotos')
-        
-        # Limita o upload a 20 fotos
-        for f in files[:20]:
-            AvaliacaoFoto.objects.create(avaliacao=self.object, foto=f)
-            
+
+        # --- Bloco de diagnóstico ---
+        storage_em_uso = AvaliacaoFoto._meta.get_field('foto').storage
+        print("*************************************************")
+        print(f"DIAGNÓSTICO: A classe de storage em uso é: {storage_em_uso.__class__}")
+        print("*************************************************")
+        # --- Fim do bloco de diagnóstico ---
+
+        try:
+            for f in files[:20]:
+                AvaliacaoFoto.objects.create(avaliacao=self.object, foto=f)
+        except Exception as e:
+            print(f"ERRO AO SALVAR ARQUIVO: {e}")
+            pass
+
         return redirect(self.success_url)
 
 class AvaliacaoDetailView(LoginRequiredMixin, DetailView):
