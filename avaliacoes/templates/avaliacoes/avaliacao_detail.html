@@ -4,7 +4,12 @@
 <div class="card shadow-sm">
     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
         <h4 class="mb-0">{{ avaliacao.modelo }} - Placa: {{ avaliacao.placa }}</h4>
-        <a href="{% url 'avaliacao_update' avaliacao.pk %}" class="btn btn-warning btn-sm">Editar Avaliação</a>
+        <div>
+            <a href="{% url 'avaliacao_update' avaliacao.pk %}" class="btn btn-warning btn-sm">Editar</a>
+            {% if user.is_superuser %}
+            <a href="{% url 'avaliacao_delete' avaliacao.pk %}" class="btn btn-danger btn-sm">Excluir</a>
+            {% endif %}
+        </div>
     </div>
     <div class="card-body">
         <div class="row">

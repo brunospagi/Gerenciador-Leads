@@ -6,7 +6,7 @@ from .views import (
     AvaliacaoCreateView,
     AvaliacaoDetailView,
     AvaliacaoUpdateView,
-    # --- Importe as novas views da API ---
+    AvaliacaoDeleteView, # Importe a nova view
     get_fipe_marcas,
     get_fipe_modelos,
     get_fipe_anos,
@@ -17,6 +17,8 @@ urlpatterns = [
     path('avaliacoes/nova/', AvaliacaoCreateView.as_view(), name='avaliacao_create'),
     path('avaliacoes/<int:pk>/', AvaliacaoDetailView.as_view(), name='avaliacao_detail'),
     path('avaliacoes/<int:pk>/editar/', AvaliacaoUpdateView.as_view(), name='avaliacao_update'),
+    # Adicione a rota para excluir
+    path('avaliacoes/<int:pk>/excluir/', AvaliacaoDeleteView.as_view(), name='avaliacao_delete'),
 
     # --- URLs da API FIPE ---
     path('api/fipe/marcas/', get_fipe_marcas, name='api_fipe_marcas'),
