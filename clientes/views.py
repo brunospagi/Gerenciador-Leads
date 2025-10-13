@@ -8,34 +8,56 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import Avg, Count, F, ExpressionWrapper, fields
+# >> 1. IMPORTE O 'Q' PARA FAZER BUSCAS COMPLEXAS <<
+from django.db.models import Avg, Count, F, ExpressionWrapper, fields, Q
 from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from datetime import datetime
 
-# ... (outras views como ClienteListView, etc., continuam iguais) ...
+
 class ClienteListView(LoginRequiredMixin, ListView):
     model = Cliente
     template_name = 'clientes/cliente_list.html'
     context_object_name = 'clientes'
+    # >> 2. DEFINA O NÚMERO DE ITENS POR PÁGINA <<
+    paginate_by = 15
 
     def get_queryset(self):
+        # Define o queryset base (todos os clientes para admin, apenas os do vendedor para os demais)
         user = self.request.user
         queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
 
+        # >> 3. APLICA O FILTRO DE PESQUISA <<
+        # Pega o valor do parâmetro 'q' da URL (?q=valor)
+        query = self.request.GET.get('q')
+        if query:
+            # Filtra o queryset usando o 'Q' para buscar em múltiplos campos.
+            # 'icontains' significa que a busca não diferencia maiúsculas de minúsculas.
+            queryset = queryset.filter(
+                Q(nome_cliente__icontains=query) |
+                Q(modelo_veiculo__icontains=query) |
+                Q(fonte_cliente__icontains=query)
+            )
+
+        # Mantém o filtro de período de último contato
         periodo = self.request.GET.get('dias')
         if periodo and periodo.isdigit():
             dias = int(periodo)
             data_limite = timezone.now() - timedelta(days=dias)
             queryset = queryset.filter(data_ultimo_contato__gte=data_limite)
 
+        # Ordena pelo último contato e exclui os finalizados
         queryset = queryset.order_by('-data_ultimo_contato')
         return queryset.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
 
     def get_context_data(self, **kwargs):
+        # Passa os filtros para o template para que eles possam ser mantidos
+        # nos links de paginação e nos campos de formulário.
         context = super().get_context_data(**kwargs)
         context['periodo_selecionado'] = self.request.GET.get('dias', '')
+        # >> 4. PASSA O VALOR DA BUSCA DE VOLTA PARA O TEMPLATE <<
+        context['search_query'] = self.request.GET.get('q', '')
         
         user = self.request.user
         base_queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
@@ -46,6 +68,7 @@ class ClienteListView(LoginRequiredMixin, ListView):
         
         return context
 
+# ... (o restante do arquivo views.py continua igual) ...
 class ClienteAtrasadoListView(LoginRequiredMixin, ListView):
     model = Cliente
     template_name = 'clientes/cliente_atrasado_list.html'
@@ -96,9 +119,6 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
         return kwargs
 
     def form_valid(self, form):
-        # >> CORREÇÃO PARA CADASTRO <<
-        # Como o campo 'vendedor' não vem do formulário para não-admins,
-        # nós o definimos manualmente aqui, antes de salvar.
         if not self.request.user.is_superuser:
             form.instance.vendedor = self.request.user
         return super().form_valid(form)
@@ -118,11 +138,7 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
         kwargs['user'] = self.request.user
         return kwargs
 
-    # >> MÉTODO ADICIONADO PARA CORRIGIR EDIÇÃO <<
     def form_valid(self, form):
-        # Para um usuário normal, o campo 'vendedor' está desabilitado e não é enviado.
-        # Para evitar que o vendedor seja apagado (causando o IntegrityError),
-        # nós o restauramos para o valor que já existia no cliente antes de salvar.
         if not self.request.user.is_superuser:
             form.instance.vendedor = self.object.vendedor
         return super().form_valid(form)
@@ -146,7 +162,6 @@ def adicionar_historico(request, pk):
             
     return redirect('cliente_detail', pk=cliente.pk)
 
-# ... (views de relatório e PDF continuam iguais) ...
 @login_required
 def relatorio_dashboard(request):
     if not request.user.is_superuser:
@@ -264,7 +279,7 @@ def exportar_relatorio_pdf(request):
        html, dest=response)
 
     if pisa_status.err:
-       return HttpResponse('Ocorreram alguns erros <pre></pre>')
+       return HttpResponse('Ocorreram alguns erros <pre>' + html + '</pre>')
     return response
 
 class ClienteDeleteView(LoginRequiredMixin, DeleteView):

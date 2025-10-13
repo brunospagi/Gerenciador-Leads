@@ -6,23 +6,35 @@
     <a href="{% url 'cliente_create' %}" class="btn btn-primary">Adicionar Cliente</a>
 </div>
 
-<div class="mb-4">
-    <span class="me-2">Filtrar por último contato:</span>
-    <div class="btn-group" role="group" aria-label="Filtros de período">
-        <a href="{% url 'cliente_list' %}" class="btn btn-outline-secondary {% if not periodo_selecionado %}active{% endif %}">
-            Mais Recentes
-        </a>
-        <a href="?dias=15" class="btn btn-outline-secondary {% if periodo_selecionado == '15' %}active{% endif %}">
-            Últimos 15 dias
-        </a>
-        <a href="?dias=30" class="btn btn-outline-secondary {% if periodo_selecionado == '30' %}active{% endif %}">
-            Últimos 30 dias
-        </a>
-        <a href="?dias=45" class="btn btn-outline-secondary {% if periodo_selecionado == '45' %}active{% endif %}">
-            Últimos 45 dias
-        </a>
-    </div>
+<div class="card card-body mb-4">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-6">
+            <label for="q_id" class="form-label">Pesquisar por Nome, Veículo ou Fonte</label>
+            <input type="text" name="q" class="form-control" id="q_id" value="{{ search_query }}">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Filtrar por último contato</label>
+            <div class="btn-group w-100">
+                <a href="?q={{ search_query }}" class="btn btn-outline-secondary {% if not periodo_selecionado %}active{% endif %}">
+                    Todos
+                </a>
+                <a href="?q={{ search_query }}&dias=15" class="btn btn-outline-secondary {% if periodo_selecionado == '15' %}active{% endif %}">
+                    15d
+                </a>
+                <a href="?q={{ search_query }}&dias=30" class="btn btn-outline-secondary {% if periodo_selecionado == '30' %}active{% endif %}">
+                    30d
+                </a>
+                <a href="?q={{ search_query }}&dias=45" class="btn btn-outline-secondary {% if periodo_selecionado == '45' %}active{% endif %}">
+                    45d
+                </a>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+        </div>
+    </form>
 </div>
+
 
 <div class="table-responsive">
     <table class="table table-striped table-hover">
@@ -69,10 +81,45 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="9" class="text-center">Nenhum cliente encontrado.</td>
+                <td colspan="9" class="text-center">Nenhum cliente encontrado com os filtros atuais.</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+{% if is_paginated %}
+<nav aria-label="Navegação das páginas">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&dias={{ periodo_selecionado }}">&laquo;</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">&laquo;</span>
+            </li>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% else %}
+                <li class="page-item"><a class="page-link" href="?page={{ num }}&q={{ search_query }}&dias={{ periodo_selecionado }}">{{ num }}</a></li>
+            {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&dias={{ periodo_selecionado }}">&raquo;</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">&raquo;</span>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
 {% endblock %}
