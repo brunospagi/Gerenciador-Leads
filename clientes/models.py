@@ -19,6 +19,7 @@ class Cliente(models.Model):
         AGENDADO = 'Agendado', 'Agendado'
         FECHAMENTO = 'Fechamento', 'Fechamento'
         SEM_RESPOSTA = 'Sem resposta', 'Sem resposta'
+        VENDIDO = 'Vendido', 'Vendido'
         FINALIZADO = 'Finalizado', 'Finalizado'
 
     class ProximoPasso(models.TextChoices):
