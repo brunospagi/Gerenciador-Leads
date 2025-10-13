@@ -1,52 +1,59 @@
-# Use uma versão estável do Python (3.13 não existe ainda - use 3.12)
-FROM python:3.12
-
-# Cria o diretório da aplicação
-RUN mkdir /app
+# --- Estágio 1: Build ---
+# Usa uma imagem Python slim para um tamanho final menor
+FROM python:3.12-slim as builder
 
 # Define o diretório de trabalho
 WORKDIR /app
 
-# Recebe o valor do .env como argumento de build
-ARG DJANGO_SUPERUSER_PASSWORD
+# Variáveis de ambiente para otimizar o build
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
-# Variáveis de ambiente
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV DJANGO_SUPERUSER_PASSWORD=$DJANGO_SUPERUSER_PASSWORD
+# Instala dependências do sistema necessárias para compilar pacotes Python
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev
 
-# Atualiza o pip
-RUN pip install --upgrade pip
+# Instala o pip e as dependências
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
-RUN pip install psycopg
 
-RUN pip install psycopg2
-# Copia APENAS o requirements.txt primeiro (para cache de dependências)
-COPY requirements.txt /app/
+# --- Estágio 2: Final ---
+FROM python:3.12-slim
 
-# Instala dependências
-RUN pip install --no-cache-dir -r requirements.txt
+# Cria um usuário não-root para executar a aplicação
+RUN addgroup --system app && adduser --system --group app
 
-# Copia TODOS os arquivos do projeto DEPOIS das dependências
-COPY . /app/
+# Instala dependências do sistema
+RUN apt-get update && apt-get install -y --no-install-recommends libpq5 cron nano && rm -rf /var/lib/apt/lists/*
 
-# Copia o arquivo crontab para o diretório correto do sistema
+# Define o diretório de trabalho
+WORKDIR /app
+
+# Copia as dependências pré-compiladas do estágio de build
+COPY --from=builder /app/wheels /wheels
+COPY --from=builder /app/requirements.txt .
+RUN pip install --no-cache /wheels/*
+
+# Copia os arquivos da aplicação
+COPY . .
+
+# Define o proprietário dos arquivos para o usuário não-root
+RUN chown -R app:app /app
+
+# Muda para o usuário não-root
+USER app
+
+# Copia e configura o agendador de tarefas (cron)
 COPY crontab /etc/cron.d/my-cron-jobs
-
-# Dá a permissão correta para o arquivo crontab
 RUN chmod 0644 /etc/cron.d/my-cron-jobs
 
-# Copia o script de entrypoint para o contêiner
+# Copia e dá permissão de execução para o script de entrypoint
 COPY entrypoint.sh /app/entrypoint.sh
-
-# Dá permissão de execução para o script de entrypoint
 RUN chmod +x /app/entrypoint.sh
 
-# Expõe a porta do Django
+# Expõe a porta que o Gunicorn irá usar
 EXPOSE 8000
 
-# Define o entrypoint para o script
+# Define o entrypoint e o comando padrão
 ENTRYPOINT ["/app/entrypoint.sh"]
-
-# Inicia o servidor (APENAS para desenvolvimento)
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["gunicorn", "crmspagi.wsgi:application", "--bind", "0.0.0.0:8000"]
