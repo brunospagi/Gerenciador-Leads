@@ -8,7 +8,8 @@ from .views import (
     ClienteAtrasadoListView,
     ClienteFinalizadoListView,
     relatorio_dashboard,
-    exportar_relatorio_pdf
+    exportar_relatorio_pdf,
+    ClienteDeleteView 
 )
 
 urlpatterns = [
@@ -20,5 +21,6 @@ urlpatterns = [
     path('cliente/novo/', ClienteCreateView.as_view(), name='cliente_create'),
     path('cliente/<int:pk>/', ClienteDetailView.as_view(), name='cliente_detail'),
     path('cliente/<int:pk>/editar/', ClienteUpdateView.as_view(), name='cliente_update'),
+    path('cliente/<int:pk>/excluir/', ClienteDeleteView.as_view(), name='cliente_delete'),
     path('cliente/<int:pk>/adicionar_historico/', adicionar_historico, name='adicionar_historico'),
 ]

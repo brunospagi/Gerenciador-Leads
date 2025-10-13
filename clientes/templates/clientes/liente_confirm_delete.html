@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">Confirmar Exclusão de Cliente</h4>
+            </div>
+            <div class="card-body">
+                <p class="fs-5">Você tem certeza que deseja excluir permanentemente o cliente?</p>
+                <div class="alert alert-warning">
+                    <p class="fw-bold fs-4 mb-0">{{ object.nome_cliente }}</p>
+                    <p class="mb-0">Veículo: {{ object.modelo_veiculo }}</p>
+                </div>
+                <p><strong>Atenção:</strong> Esta ação não pode ser desfeita e todo o histórico de interações será perdido.</p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-end">
+                        <a href="{% url 'cliente_detail' object.pk %}" class="btn btn-secondary me-2">Cancelar</a>
+                        <button type="submit" class="btn btn-danger">Confirmar Exclusão</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
