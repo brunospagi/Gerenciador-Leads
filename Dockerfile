@@ -1,19 +1,13 @@
 # --- Estágio 1: Build ---
-# Usa uma imagem Python slim para um tamanho final menor
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
-# Define o diretório de trabalho
 WORKDIR /app
 
-# Variáveis de ambiente para otimizar o build
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Instala dependências do sistema necessárias para compilar pacotes Python
-# >> CORREÇÃO: Adicionado libfreetype6-dev para a compilação do xhtml2pdf <<
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev libfreetype6-dev
 
-# Instala o pip e as dependências
 COPY requirements.txt .
 RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
@@ -25,10 +19,8 @@ FROM python:3.12-slim
 RUN addgroup --system app && adduser --system --group app
 
 # Instala dependências do sistema
-# >> CORREÇÃO: Adicionado libfreetype6 para a execução em produção <<
 RUN apt-get update && apt-get install -y --no-install-recommends libpq5 cron nano libfreetype6 && rm -rf /var/lib/apt/lists/*
 
-# Define o diretório de trabalho
 WORKDIR /app
 
 # Copia as dependências pré-compiladas do estágio de build
@@ -39,19 +31,20 @@ RUN pip install --no-cache /wheels/*
 # Copia os arquivos da aplicação
 COPY . .
 
-# Define o proprietário dos arquivos para o usuário não-root
-RUN chown -R app:app /app
-
-# Muda para o usuário não-root
-USER app
-
-# Copia e configura o agendador de tarefas (cron)
+# >> CORREÇÃO: MOVEMOS A CONFIGURAÇÃO DO CRON PARA ANTES DE MUDAR DE USUÁRIO <<
+# Copia e configura o agendador de tarefas (cron) enquanto ainda somos 'root'
 COPY crontab /etc/cron.d/my-cron-jobs
 RUN chmod 0644 /etc/cron.d/my-cron-jobs
 
-# Copia e dá permissão de execução para o script de entrypoint
+# Copia o script de entrypoint
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
+
+# Define o proprietário dos arquivos da aplicação para o usuário não-root
+RUN chown -R app:app /app
+
+# >> AGORA SIM, MUDAMOS PARA O USUÁRIO NÃO-ROOT <<
+USER app
 
 # Expõe a porta que o Gunicorn irá usar
 EXPOSE 8000
