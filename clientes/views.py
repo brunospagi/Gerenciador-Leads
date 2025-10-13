@@ -86,16 +86,35 @@ class ClienteDetailView(LoginRequiredMixin, DetailView):
         context['historicos'] = self.object.historico.all()
         return context
 
+# --- View para Criar um Novo Cliente ---
 class ClienteCreateView(LoginRequiredMixin, CreateView):
     model = Cliente
     form_class = ClienteForm
     template_name = 'clientes/cliente_form.html'
     success_url = reverse_lazy('cliente_list')
 
+    # >> CORREÇÃO ADICIONADA <<
+    # Este método é usado para passar argumentos extras para o formulário.
+    # Aqui, passamos o objeto 'user' (usuário logado) para o __init__ do ClienteForm.
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    # Este método é chamado quando o formulário é enviado com dados válidos.
     def form_valid(self, form):
-        form.instance.vendedor = self.request.user
+        # >> LÓGICA DE ATRIBUIÇÃO DE VENDEDOR <<
+        # Se o usuário logado NÃO for um administrador...
+        if not self.request.user.is_superuser:
+            # ...atribuímos o próprio usuário como o vendedor do cliente.
+            # Isso acontece antes de salvar, garantindo que o cliente tenha um dono.
+            form.instance.vendedor = self.request.user
+        # Se o usuário FOR um administrador, não fazemos nada aqui.
+        # O valor do vendedor já terá sido escolhido por ele no formulário
+        # e será salvo automaticamente.
         return super().form_valid(form)
 
+# --- View para Atualizar um Cliente Existente ---
 class ClienteUpdateView(LoginRequiredMixin, UpdateView):
     model = Cliente
     form_class = ClienteForm
@@ -104,8 +123,11 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_queryset(self):
         user = self.request.user
+        # Garante que vendedores só possam editar seus próprios clientes. Admins podem editar todos.
         return Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
 
+    # Passa o 'user' para o formulário, da mesma forma que na CreateView.
+    # Isso permite que o formulário saiba se deve ou não mostrar o campo de vendedor.
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
