@@ -27,6 +27,8 @@ COPY requirements.txt /app/
 # Instala dependências
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN python python manage.py makemigrations clientes
+
 # Copia TODOS os arquivos do projeto DEPOIS das dependências
 COPY . /app/
 
