@@ -11,7 +11,7 @@ from django.contrib.auth.models import User
 # Mixin para garantir que apenas administradores acessem a view
 class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
-        return self.request.user.is_admin
+        return self.request.user.is_admin or self.request.user.is_superuser
 
 @login_required
 def profile_view(request):
