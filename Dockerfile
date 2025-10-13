@@ -15,39 +15,39 @@ RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 # --- Estágio 2: Final ---
 FROM python:3.12-slim
 
-# Cria um usuário não-root
+# Cria um usuário não-root para executar a aplicação
 RUN addgroup --system app && adduser --system --group app
 
-# Instala dependências
+# Instala dependências do sistema
 RUN apt-get update && apt-get install -y --no-install-recommends libpq5 cron nano libfreetype6 && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copia dependências pré-compiladas
+# Copia as dependências pré-compiladas do estágio de build
 COPY --from=builder /app/wheels /wheels
 COPY --from=builder /app/requirements.txt .
 RUN pip install --no-cache /wheels/*
 
-# Copia arquivos da aplicação
+# Copia os arquivos da aplicação
 COPY . .
 
-# Copia e configura o cron (como root)
+# Copia e configura o agendador de tarefas (cron) enquanto ainda somos 'root'
 COPY crontab /etc/cron.d/my-cron-jobs
 RUN chmod 0644 /etc/cron.d/my-cron-jobs
 
-# Copia e configura entrypoint (como root)
+# Copia o script de entrypoint
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Define o proprietário dos arquivos para o usuário não-root
+# Define o proprietário dos arquivos da aplicação para o usuário não-root
 RUN chown -R app:app /app
 
-# Expõe a porta
+# >> AGORA SIM, MUDAMOS PARA O USUÁRIO NÃO-ROOT <<
+USER app
+
+# Expõe a porta que o Gunicorn irá usar
 EXPOSE 8000
 
-# Define o entrypoint. O contêiner iniciará como ROOT para executar este script.
-# A linha "USER app" foi removida daqui.
+# Define o entrypoint e o comando padrão
 ENTRYPOINT ["/app/entrypoint.sh"]
-
-# O comando padrão que o entrypoint irá executar como o usuário 'app'
 CMD ["gunicorn", "crmspagi.wsgi:application", "--bind", "0.0.0.0:8000"]

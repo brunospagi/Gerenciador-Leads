@@ -1,19 +1,16 @@
 #!/bin/sh
 
-# Inicia o serviço cron (como root), o que agora funcionará.
-echo "Iniciando o serviço cron..."
+# Inicia o serviço cron em segundo plano
 cron
 
-# Aplica as migrações do banco de dados (como root)
+# Aplica as migrações do banco de dados
 echo "Aplicando migrações do banco de dados..."
 python manage.py migrate --noinput
 
-# Coleta os arquivos estáticos (como root) e garante que o usuário 'app' seja o dono
+# Coleta os arquivos estáticos
 echo "Coletando arquivos estáticos..."
-python manage.py collectstatic --noinput --clear
-chown -R app:app /app/staticfiles
+python manage.py collectstatic --noinput
 
-# Agora, executa o comando principal (passado do CMD do Dockerfile)
-# como o usuário 'app', preservando os argumentos de forma segura.
-echo "Iniciando a aplicação como usuário 'app'..."
-exec su app -s /bin/sh -c 'exec "$@"' -- "$@"
+# Inicia o servidor Gunicorn (ou o comando passado para o Docker)
+echo "Iniciando o servidor Gunicorn..."
+exec "$@"
