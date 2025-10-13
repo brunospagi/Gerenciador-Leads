@@ -29,7 +29,7 @@
             {% for cliente in clientes %}
             <tr class="table-danger">
                 <td>{{ cliente.nome_cliente }}</td>
-                <td>{{ cliente.modelo_veiculo }}</td>
+                <td>{{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }}</td>
                 <td>{{ cliente.data_proximo_contato|date:"d/m/Y" }}</td>
                 <td><span class="badge bg-info text-dark">{{ cliente.get_status_negociacao_display }}</span></td>
                 {% if user.is_superuser %}

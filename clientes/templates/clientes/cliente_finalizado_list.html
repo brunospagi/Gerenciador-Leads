@@ -23,7 +23,7 @@
             {% for cliente in clientes %}
             <tr class="table-secondary">
                 <td>{{ cliente.nome_cliente }}</td>
-                <td>{{ cliente.modelo_veiculo }}</td>
+                <td>{{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }}</td>
                 <td>{{ cliente.data_ultimo_contato|date:"d/m/Y" }}</td>
                 <td>{{ cliente.fonte_cliente|default:"N/A" }}</td>
                 {% if user.is_superuser %}

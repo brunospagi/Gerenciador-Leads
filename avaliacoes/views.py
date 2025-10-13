@@ -1,8 +1,6 @@
-# brunospagi/gerenciador-leads/Gerenciador-Leads-fecd02772f93afa4ca06347c8334383a86eb8295/avaliacoes/views.py
-
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView # 1. Adicione DeleteView
+from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView
 from .models import Avaliacao, AvaliacaoFoto
 from .forms import AvaliacaoForm, FotoUploadForm
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -11,9 +9,8 @@ from django.utils import timezone
 from django.http import JsonResponse
 import requests
 from django.db.models import Q
-from django.core.exceptions import PermissionDenied # 2. Importe PermissionDenied
+from django.core.exceptions import PermissionDenied
 
-# ... (Suas outras views como AvaliacaoListView, AvaliacaoCreateView, etc., continuam aqui) ...
 class AvaliacaoListView(LoginRequiredMixin, ListView):
     model = Avaliacao
     template_name = 'avaliacoes/avaliacao_list.html'
@@ -95,21 +92,17 @@ class AvaliacaoUpdateView(LoginRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse_lazy('avaliacao_detail', kwargs={'pk': self.object.pk})
 
-
-# 3. CRIE A VIEW PARA EXCLUIR A AVALIAÇÃO
 class AvaliacaoDeleteView(LoginRequiredMixin, DeleteView):
     model = Avaliacao
-    template_name = 'avaliacoes/avaliacao_confirm_delete.html' # Template de confirmação
-    success_url = reverse_lazy('avaliacao_list') # Para onde redirecionar após excluir
+    template_name = 'avaliacoes/avaliacao_confirm_delete.html'
+    success_url = reverse_lazy('avaliacao_list')
 
     def dispatch(self, request, *args, **kwargs):
-        # Garante que apenas superusuários possam acessar esta view
-        if not request.user.is_superuser:
+        if request.user.username != 'bruno.gabriel':
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
 
 
-# --- Views da API FIPE ---
 def get_fipe_marcas(request):
     try:
         response = requests.get('https://parallelum.com.br/fipe/api/v1/carros/marcas')

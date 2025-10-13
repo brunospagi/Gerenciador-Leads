@@ -4,8 +4,8 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h2>{{ cliente.nome_cliente }}</h2>
-        <div> <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-warning">Editar Cliente</a>
-
+        <div>
+            <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-warning">Editar Cliente</a>
             {% if user.username == 'bruno.gabriel' %}
                 <a href="{% url 'cliente_delete' cliente.pk %}" class="btn btn-danger">Excluir</a>
             {% endif %}
@@ -15,7 +15,7 @@
         <p><strong>WhatsApp:</strong> {{ cliente.whatsapp }}</p>
         <p><strong>Fonte do Cliente:</strong> {{ cliente.fonte_cliente|default:"Não informado" }}</p>
         <p><strong>Quantidade de Ligações:</strong> {{ cliente.quantidade_ligacoes }}</p>
-        <p><strong>Veículo:</strong> {{ cliente.modelo_veiculo }} (Valor Estimado: R$ {{ cliente.valor_estimado_veiculo }})</p>
+        <p><strong>Veículo:</strong> {{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }} (Valor Estimado: R$ {{ cliente.valor_estimado_veiculo }})</p>
         <hr>
         <p><strong>Status da Negociação:</strong> <span class="badge bg-primary">{{ cliente.get_status_negociacao_display }}</span></p>
         <p><strong>Tipo de Negociação:</strong> <span class="badge bg-success">{{ cliente.get_tipo_negociacao_display }}</span></p>
