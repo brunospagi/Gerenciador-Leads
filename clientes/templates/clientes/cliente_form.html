@@ -20,7 +20,7 @@
             {% endif %}
         {% endfor %}
     </div>
-    {% if user.is_superuser %}
+    {% if user.is_superuser and form.vendedor %}
     <hr>
     <div class="row">
         <div class="col-md-6 mb-3">
