@@ -6,7 +6,7 @@
         <h2>{{ cliente.nome_cliente }}</h2>
         <div>
             <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-warning">Editar Cliente</a>
-            {% if user.username == 'bruno.gabriel' %}
+            {% if user.is_superuser %}
                 <a href="{% url 'cliente_delete' cliente.pk %}" class="btn btn-danger">Excluir</a>
             {% endif %}
         </div>
