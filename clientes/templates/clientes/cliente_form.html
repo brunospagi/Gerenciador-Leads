@@ -7,6 +7,7 @@
     
     {{ form.marca_veiculo }}
     {{ form.modelo_veiculo }}
+    {{ form.ano_veiculo }}
 
     <h5 class="mb-3 border-bottom pb-2">1. Dados do Cliente</h5>
     <div class="row">
@@ -22,16 +23,22 @@
     
     <h5 class="mt-4 mb-3 border-bottom pb-2">2. Dados do Veículo (Busca FIPE)</h5>
     <div class="row">
-        <div class="col-md-6 mb-3">
+        <div class="col-md-4 mb-3">
             <label for="marca_select" class="form-label">Marca</label>
             <select id="marca_select" class="form-select" required>
                 <option value="" selected disabled>Carregando...</option>
             </select>
         </div>
-        <div class="col-md-6 mb-3">
+        <div class="col-md-4 mb-3">
             <label for="modelo_select" class="form-label">Modelo</label>
             <select id="modelo_select" class="form-select" disabled required>
                 <option value="" selected disabled>Selecione uma marca</option>
+            </select>
+        </div>
+        <div class="col-md-4 mb-3">
+            <label for="ano_select" class="form-label">Ano</label>
+            <select id="ano_select" class="form-select" disabled required>
+                <option value="" selected disabled>Selecione um modelo</option>
             </select>
         </div>
     </div>
@@ -45,7 +52,7 @@
     <h5 class="mt-4 mb-3 border-bottom pb-2">3. Detalhes da Negociação</h5>
     <div class="row">
         {% for field in form %}
-            {% if field.name not in "nome_cliente,whatsapp,marca_veiculo,modelo_veiculo,valor_estimado_veiculo" %}
+            {% if field.name not in "nome_cliente,whatsapp,marca_veiculo,modelo_veiculo,ano_veiculo,valor_estimado_veiculo" %}
                 <div class="col-md-6 mb-3">
                     <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
                     {{ field }}
@@ -83,8 +90,12 @@ document.addEventListener('DOMContentLoaded', (event) => {
 document.addEventListener('DOMContentLoaded', () => {
     const marcaSelect = document.getElementById('marca_select');
     const modeloSelect = document.getElementById('modelo_select');
+    const anoSelect = document.getElementById('ano_select');
+
     const marcaInput = document.getElementById('id_marca_veiculo');
     const modeloInput = document.getElementById('id_modelo_veiculo');
+    const anoInput = document.getElementById('id_ano_veiculo');
+
     const marcasUrl = "{% url 'api_fipe_marcas' %}";
 
     const resetSelect = (select, message) => {
@@ -98,9 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
             marcaSelect.innerHTML = '<option value="" selected disabled>Selecione uma marca</option>';
             data.forEach(marca => {
                 const option = new Option(marca.nome, marca.codigo);
-                if (marca.nome === marcaInput.value) {
-                    option.selected = true;
-                }
+                if (marca.nome === marcaInput.value) { option.selected = true; }
                 marcaSelect.add(option);
             });
         }).catch(error => console.error('Erro ao carregar marcas:', error));
@@ -109,9 +118,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const marcaId = marcaSelect.value;
         const marcaNome = marcaSelect.options[marcaSelect.selectedIndex].text;
         resetSelect(modeloSelect, 'Carregando...');
+        resetSelect(anoSelect, 'Selecione um modelo');
         if (!marcaId) return;
         marcaInput.value = marcaNome;
         modeloInput.value = '';
+        anoInput.value = '';
         fetch(`/api/fipe/marcas/${marcaId}/modelos/`)
             .then(response => response.json())
             .then(data => {
@@ -124,9 +135,31 @@ document.addEventListener('DOMContentLoaded', () => {
             }).catch(error => console.error('Erro ao carregar modelos:', error));
     });
 
+    // >> LÓGICA PARA CARREGAR O ANO <<
     modeloSelect.addEventListener('change', () => {
+        const marcaId = marcaSelect.value;
+        const modeloId = modeloSelect.value;
         const modeloNome = modeloSelect.options[modeloSelect.selectedIndex].text;
+        resetSelect(anoSelect, 'Carregando...');
+        if (!modeloId) return;
         modeloInput.value = modeloNome;
+        anoInput.value = '';
+        fetch(`/api/fipe/marcas/${marcaId}/modelos/${modeloId}/anos/`)
+            .then(response => response.json())
+            .then(data => {
+                anoSelect.innerHTML = '<option value="" selected disabled>Selecione o ano</option>';
+                data.forEach(ano => {
+                    const option = new Option(ano.nome, ano.codigo);
+                    anoSelect.add(option);
+                });
+                anoSelect.disabled = false;
+            }).catch(error => console.error('Erro ao carregar anos:', error));
+    });
+
+    // >> LÓGICA PARA SALVAR O ANO <<
+    anoSelect.addEventListener('change', () => {
+        const anoNome = anoSelect.options[anoSelect.selectedIndex].text;
+        anoInput.value = anoNome;
     });
 });
 </script>

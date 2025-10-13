@@ -1,10 +1,10 @@
-from django.db import models # type: ignore
-from django.utils import timezone # type: ignore
+from django.db import models
+from django.utils import timezone
 from datetime import timedelta
-from django.contrib.auth.models import User # type: ignore
+from django.contrib.auth.models import User
 
 class Cliente(models.Model):
-    # Opções para os campos de escolha
+    # ... (Classes de Choices continuam as mesmas)
     class TipoContato(models.TextChoices):
         MENSAGEM = 'Mensagem', 'Mensagem'
         AUDIO = 'Audio', 'Áudio'
@@ -17,9 +17,9 @@ class Cliente(models.Model):
         PENDENTE = 'Pendente', 'Pendente'
         EM_ATENDIMENTO = 'Em atendimento', 'Em atendimento'
         AGENDADO = 'Agendado', 'Agendado'
+        VENDIDO = 'Vendido', 'Vendido'
         FECHAMENTO = 'Fechamento', 'Fechamento'
         SEM_RESPOSTA = 'Sem resposta', 'Sem resposta'
-        VENDIDO = 'Vendido', 'Vendido'
         FINALIZADO = 'Finalizado', 'Finalizado'
 
     class ProximoPasso(models.TextChoices):
@@ -43,7 +43,9 @@ class Cliente(models.Model):
     whatsapp = models.CharField(max_length=20)
     nome_cliente = models.CharField(max_length=255)
     marca_veiculo = models.CharField(max_length=100, verbose_name="Marca do Veículo", blank=True)
-    modelo_veiculo = models.CharField(max_length=100)
+    modelo_veiculo = models.CharField(max_length=100, verbose_name="Modelo do Veículo")
+    ano_veiculo = models.CharField(max_length=20, verbose_name="Ano do Veículo", blank=True)
+    
     valor_estimado_veiculo = models.CharField(max_length=50, blank=True, null=True, verbose_name="Valor Estimado do Veículo")
     fonte_cliente = models.CharField(max_length=100, blank=True, null=True, verbose_name="Fonte do Cliente")
     quantidade_ligacoes = models.IntegerField(default=0, verbose_name="Quantidade de Ligações")
