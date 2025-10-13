@@ -1,0 +1,4 @@
+# Adicione uma linha em branco no final deste arquivo
+
+# Executa o comando check_inactivity todos os dias às 3 da manhã
+0 3 * * * /usr/local/bin/python /app/manage.py check_inactivity >> /app/cron.log 2>&1
