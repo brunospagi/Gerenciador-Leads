@@ -20,7 +20,7 @@
             {% endif %}
         {% endfor %}
     </div>
-    <!--{% if user.is_superuser %}
+    {% if user.is_superuser %}
     <hr>
     <div class="row">
         <div class="col-md-6 mb-3">
@@ -32,7 +32,6 @@
         </div>
     </div>
     {% endif %}
--->
     <button type="submit" class="btn btn-success">Salvar</button>
     <a href="{% url 'cliente_list' %}" class="btn btn-secondary">Cancelar</a>
 </form>
