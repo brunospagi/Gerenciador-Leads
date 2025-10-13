@@ -10,7 +10,8 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
 # Instala dependências do sistema necessárias para compilar pacotes Python
-RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev
+# >> CORREÇÃO: Adicionado libfreetype6-dev para a compilação do xhtml2pdf <<
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev libfreetype6-dev
 
 # Instala o pip e as dependências
 COPY requirements.txt .
@@ -24,7 +25,8 @@ FROM python:3.12-slim
 RUN addgroup --system app && adduser --system --group app
 
 # Instala dependências do sistema
-RUN apt-get update && apt-get install -y --no-install-recommends libpq5 cron nano && rm -rf /var/lib/apt/lists/*
+# >> CORREÇÃO: Adicionado libfreetype6 para a execução em produção <<
+RUN apt-get update && apt-get install -y --no-install-recommends libpq5 cron nano libfreetype6 && rm -rf /var/lib/apt/lists/*
 
 # Define o diretório de trabalho
 WORKDIR /app
