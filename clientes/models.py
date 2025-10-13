@@ -42,9 +42,9 @@ class Cliente(models.Model):
     vendedor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='clientes')
     whatsapp = models.CharField(max_length=20)
     nome_cliente = models.CharField(max_length=255)
-    marca_veiculo = models.CharField(max_length=100, verbose_name="Marca do Veículo", blank=True)
-    modelo_veiculo = models.CharField(max_length=100, verbose_name="Modelo do Veículo")
-    ano_veiculo = models.CharField(max_length=20, verbose_name="Ano do Veículo", blank=True)
+    marca_veiculo = models.CharField(max_length=100, verbose_name="Marca do Veículo", blank=True, null=True)
+    modelo_veiculo = models.CharField(max_length=100, verbose_name="Modelo do Veículo", blank=True, null=True)
+    ano_veiculo = models.CharField(max_length=20, verbose_name="Ano do Veículo", blank=True, null=True)
     
     valor_estimado_veiculo = models.CharField(max_length=50, blank=True, null=True, verbose_name="Valor Estimado do Veículo")
     fonte_cliente = models.CharField(max_length=100, blank=True, null=True, verbose_name="Fonte do Cliente")
