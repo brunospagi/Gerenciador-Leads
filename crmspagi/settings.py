@@ -30,6 +30,12 @@ SESSION_SAVE_EVERY_REQUEST = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Diretórios adicionais para arquivos estáticos
+STATICFILES_DIRS = [BASE_DIR / "static"]
+
+# Configuração do WhiteNoise para servir arquivos estáticos em produção
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
