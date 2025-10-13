@@ -4,7 +4,6 @@ from urllib.parse import urljoin
 
 class PublicMediaStorage(MinioMediaStorage):
     def __init__(self, *args, **kwargs):
-        print("!!! PublicMediaStorage FOI INICIADO !!!") # <-- Adicione esta linha
         super().__init__(*args, **kwargs)
 
     def url(self, name):
