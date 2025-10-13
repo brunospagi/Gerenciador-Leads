@@ -41,9 +41,9 @@
         <thead class="table-dark">
             <tr>
                 <th>Nome</th>
+                <th>Veículo</th>
                 <th>Fonte</th>
                 <th>Tipo de Contato</th>
-                <th>Negociação</th>
                 <th>Último Contato</th>
                 <th>Status</th>
                 {% if user.is_superuser %}
@@ -57,9 +57,9 @@
             {% for cliente in clientes %}
             <tr class="{% if cliente.contato_atrasado %}table-danger{% endif %}">
                 <td>{{ cliente.nome_cliente }}</td>
+                <td>{{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }} {{ cliente.ano_veiculo }}</td>
                 <td>{{ cliente.fonte_cliente|default:"N/A" }}</td>
                 <td>{{ cliente.get_tipo_contato_display }}</td>
-                <td>{{ cliente.get_tipo_negociacao_display }}</td>
                 <td>{{ cliente.data_ultimo_contato|date:"d/m/Y H:i" }}</td>
                 <td><span class="badge bg-info text-dark">{{ cliente.get_status_negociacao_display }}</span></td>
                 {% if user.is_superuser %}
@@ -81,7 +81,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="9" class="text-center">Nenhum cliente encontrado com os filtros atuais.</td>
+                <td colspan="10" class="text-center">Nenhum cliente encontrado com os filtros atuais.</td>
             </tr>
             {% endfor %}
         </tbody>
