@@ -34,6 +34,7 @@
                 </td>
                 <td>
                     <a href="{% url 'user_update' u.pk %}" class="btn btn-sm btn-info">Editar</a>
+                    <a href="{% url 'user_password_change' u.pk %}" class="btn btn-sm btn-warning">Alterar Senha</a>
                     {% if u.pk != user.pk %} <a href="{% url 'user_delete' u.pk %}" class="btn btn-sm btn-danger">Excluir</a>
                     {% endif %}
                 </td>
