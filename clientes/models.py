@@ -16,6 +16,7 @@ class Cliente(models.Model):
         NOVO = 'Novo', 'Novo'
         PENDENTE = 'Pendente', 'Pendente'
         EM_ATENDIMENTO = 'Em atendimento', 'Em atendimento'
+        AGENDADO = 'Agendado', 'Agendado'
         FECHAMENTO = 'Fechamento', 'Fechamento'
         SEM_RESPOSTA = 'Sem resposta', 'Sem resposta'
         FINALIZADO = 'Finalizado', 'Finalizado'
