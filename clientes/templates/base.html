@@ -44,13 +44,21 @@
 
                 <div class="ms-auto d-flex align-items-center">
                     {% if user.is_authenticated %}
-                        <span class="navbar-text text-white me-3">
-                            Olá, {{ user.username }}
-                        </span>
-                        <form action="{% url 'logout' %}" method="post">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-outline-light">Sair</button>
-                        </form>
+                        <div class="dropdown">
+                            <a class="nav-link dropdown-toggle text-white" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Olá, {{ user.username }}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
+                                <li><a class="dropdown-item" href="{% url 'profile' %}">Meu Perfil</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form action="{% url 'logout' %}" method="post" class="text-center">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-danger">Sair</button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </div>
                     {% else %}
                         <a href="{% url 'login' %}" class="btn btn-outline-light">Entrar</a>
                     {% endif %}
@@ -60,6 +68,14 @@
     </header>
 
     <main class="container my-4">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
         {% block content %}{% endblock %}
     </main>
 

@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'clientes',
     'avaliacoes',
     'minio_storage',
+    'usuarios',
 ]
 
 MIDDLEWARE = [
