@@ -27,10 +27,11 @@ COPY requirements.txt /app/
 # Instala dependências
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN python manage.py makemigrations clientes
-
 # Copia TODOS os arquivos do projeto DEPOIS das dependências
 COPY . /app/
+
+# Aplica migrações
+RUN python manage.py makemigrations clientes
 
 # Expõe a porta do Django
 EXPOSE 8000
