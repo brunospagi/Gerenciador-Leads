@@ -14,9 +14,8 @@ from django.template.loader import get_template
 from xhtml2pdf import pisa
 from datetime import datetime
 
-# --- Views existentes ---
+# ... (outras views como ClienteListView, etc., continuam iguais) ...
 class ClienteListView(LoginRequiredMixin, ListView):
-    # ... (código existente sem alterações)
     model = Cliente
     template_name = 'clientes/cliente_list.html'
     context_object_name = 'clientes'
@@ -47,7 +46,6 @@ class ClienteListView(LoginRequiredMixin, ListView):
         
         return context
 
-# ... (outras views existentes sem alterações)
 class ClienteAtrasadoListView(LoginRequiredMixin, ListView):
     model = Cliente
     template_name = 'clientes/cliente_atrasado_list.html'
@@ -98,6 +96,9 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
         return kwargs
 
     def form_valid(self, form):
+        # >> CORREÇÃO PARA CADASTRO <<
+        # Como o campo 'vendedor' não vem do formulário para não-admins,
+        # nós o definimos manualmente aqui, antes de salvar.
         if not self.request.user.is_superuser:
             form.instance.vendedor = self.request.user
         return super().form_valid(form)
@@ -116,6 +117,15 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+
+    # >> MÉTODO ADICIONADO PARA CORRIGIR EDIÇÃO <<
+    def form_valid(self, form):
+        # Para um usuário normal, o campo 'vendedor' está desabilitado e não é enviado.
+        # Para evitar que o vendedor seja apagado (causando o IntegrityError),
+        # nós o restauramos para o valor que já existia no cliente antes de salvar.
+        if not self.request.user.is_superuser:
+            form.instance.vendedor = self.object.vendedor
+        return super().form_valid(form)
 
 @login_required
 def adicionar_historico(request, pk):
@@ -136,7 +146,7 @@ def adicionar_historico(request, pk):
             
     return redirect('cliente_detail', pk=cliente.pk)
 
-# ... (código dos relatórios sem alterações)
+# ... (views de relatório e PDF continuam iguais) ...
 @login_required
 def relatorio_dashboard(request):
     if not request.user.is_superuser:
@@ -254,20 +264,15 @@ def exportar_relatorio_pdf(request):
        html, dest=response)
 
     if pisa_status.err:
-       return HttpResponse('Ocorreram alguns erros <pre>' + html + '</pre>')
+       return HttpResponse('Ocorreram alguns erros <pre>' a '</pre>')
     return response
 
-# >> 2. ADICIONE A VIEW DE EXCLUSÃO NO FINAL DO ARQUIVO <<
 class ClienteDeleteView(LoginRequiredMixin, DeleteView):
     model = Cliente
     template_name = 'clientes/cliente_confirm_delete.html'
     success_url = reverse_lazy('cliente_list')
 
-    # Este método é executado antes da view para verificar permissões.
     def dispatch(self, request, *args, **kwargs):
-        # A lógica verifica se o nome do usuário logado é 'bruno.gabriel'.
         if request.user.username != 'bruno.gabriel':
-            # Se não for, o acesso é negado.
             raise PermissionDenied
-        # Se for, o processo de exclusão continua.
         return super().dispatch(request, *args, **kwargs)

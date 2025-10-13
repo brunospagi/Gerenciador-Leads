@@ -1,6 +1,6 @@
+from django.contrib.auth.models import User
 from django import forms
 from .models import Cliente, Historico
-from django.contrib.auth.models import User
 
 class ClienteForm(forms.ModelForm):
     class Meta:
@@ -26,12 +26,12 @@ class ClienteForm(forms.ModelForm):
 
         # Se o usuário NÃO for um administrador...
         if user and not user.is_superuser:
-            # >> ESTA É A CORREÇÃO PRINCIPAL <<
-            # Desabilitamos o campo 'vendedor'. Isso o torna visível, mas não editável.
-            # O navegador enviará o valor do campo, evitando o erro de valor nulo.
+            # Desabilita o campo para que ele não possa ser editado.
             self.fields['vendedor'].disabled = True
-            self.fields['vendedor'].widget.attrs['title'] = 'Você não tem permissão para alterar o vendedor.'
-            self.fields['vendedor'].label = "Vendedor (não pode ser alterado)"
+            # >> CORREÇÃO CRÍTICA <<
+            # Define o campo como não-obrigatório NO FORMULÁRIO.
+            # Isso permite que a validação passe, para que a lógica na view possa ser executada.
+            self.fields['vendedor'].required = False
 
 class HistoricoForm(forms.ModelForm):
     class Meta:
