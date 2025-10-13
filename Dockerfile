@@ -1,53 +1,46 @@
-# --- Estágio 1: Build ---
-FROM python:3.12-slim AS builder
+# Usa uma imagem Python slim que já vem com ferramentas de build
+FROM python:3.12-slim
 
-WORKDIR /app
-
+# Define variáveis de ambiente
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev libfreetype6-dev
+# Instala as dependências do sistema necessárias
+# - libpq-dev: para compilar o psycopg2
+# - cron: para as tarefas agendadas
+# - libfreetype6-dev: para a compilação do xhtml2pdf
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    cron \
+    libfreetype6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
-
-
-# --- Estágio 2: Final ---
-FROM python:3.12-slim
-
-# Cria um usuário não-root para executar a aplicação
-RUN addgroup --system app && adduser --system --group app
-
-# Instala dependências do sistema
-RUN apt-get update && apt-get install -y --no-install-recommends libpq5 cron nano libfreetype6 && rm -rf /var/lib/apt/lists/*
-
+# Define o diretório de trabalho
 WORKDIR /app
 
-# Copia as dependências pré-compiladas do estágio de build
-COPY --from=builder /app/wheels /wheels
-COPY --from=builder /app/requirements.txt .
-RUN pip install --no-cache /wheels/*
+# Copia o arquivo de dependências
+COPY requirements.txt .
 
-# Copia os arquivos da aplicação
+# Instala as dependências Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copia todos os arquivos do projeto para o diretório de trabalho
 COPY . .
 
-# Copia e configura o agendador de tarefas (cron) enquanto ainda somos 'root'
+# Copia e configura o agendador de tarefas (cron)
 COPY crontab /etc/cron.d/my-cron-jobs
 RUN chmod 0644 /etc/cron.d/my-cron-jobs
 
-# Copia o script de entrypoint
+# Copia e dá permissão de execução para o script de entrypoint
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
-
-# Define o proprietário dos arquivos da aplicação para o usuário não-root
-RUN chown -R app:app /app
-
-# >> AGORA SIM, MUDAMOS PARA O USUÁRIO NÃO-ROOT <<
-USER app
 
 # Expõe a porta que o Gunicorn irá usar
 EXPOSE 8000
 
-# Define o entrypoint e o comando padrão
+# Define o entrypoint que será executado ao iniciar o contêiner
 ENTRYPOINT ["/app/entrypoint.sh"]
+
+# O comando padrão que o entrypoint irá executar no final
 CMD ["gunicorn", "crmspagi.wsgi:application", "--bind", "0.0.0.0:8000"]
