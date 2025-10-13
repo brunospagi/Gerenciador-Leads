@@ -20,9 +20,7 @@
             {% endif %}
         {% endfor %}
     </div>
-
-    {# SE o campo 'vendedor' existir no formulário (ou seja, se o usuário for admin)... #}
-    {% if user.is_superuser and form.vendedor %}
+    {% if user.is_superuser %}
     <hr>
     <div class="row">
         <div class="col-md-6 mb-3">
