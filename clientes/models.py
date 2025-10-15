@@ -4,7 +4,6 @@ from datetime import timedelta
 from django.contrib.auth.models import User
 
 class Cliente(models.Model):
-    # ... (Classes de Choices continuam as mesmas)
     class TipoContato(models.TextChoices):
         MENSAGEM = 'Mensagem', 'Mensagem'
         AUDIO = 'Audio', 'Áudio'
@@ -70,13 +69,26 @@ class Cliente(models.Model):
         is_new = self._state.adding
         if not is_new:
             original = Cliente.objects.get(pk=self.pk)
+            # Verifica se o status foi alterado
             if original.status_negociacao != self.status_negociacao:
-                Historico.objects.create(
-                    cliente=self,
-                    motivacao=f"Status alterado de '{original.get_status_negociacao_display()}' para '{self.get_status_negociacao_display()}'."
-                )
+                # Se o NOVO status for "Agendado", cria um histórico detalhado
+                if self.status_negociacao == self.StatusNegociacao.AGENDADO:
+                    data_formatada = self.data_proximo_contato.strftime('%d/%m/%Y às %H:%M')
+                    motivacao = f"Visita agendada para {data_formatada} pelo vendedor {self.vendedor.username}."
+                    Historico.objects.create(
+                        cliente=self,
+                        motivacao=motivacao
+                    )
+                else:  # Para qualquer outra mudança de status, mantém a mensagem padrão
+                    Historico.objects.create(
+                        cliente=self,
+                        motivacao=f"Status alterado de '{original.get_status_negociacao_display()}' para '{self.get_status_negociacao_display()}'."
+                    )
+        
+        # Define uma data de próximo contato padrão apenas se o cliente for novo
         if is_new:
             self.data_proximo_contato = timezone.now() + timedelta(days=5)
+            
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -85,7 +97,7 @@ class Cliente(models.Model):
     @property
     def contato_atrasado(self):
         if self.data_proximo_contato:
-            return timezone.now() >= self.data_proximo_contato
+            return timezone.now() > self.data_proximo_contato
         return False
 
 class Historico(models.Model):
