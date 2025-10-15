@@ -15,7 +15,7 @@
         to { opacity: 1; transform: translateY(0); }
     }
 
-    .card, .table {
+    .card, .table, .legend-card {
         animation: fadeIn 0.5s ease-in-out;
     }
 
@@ -50,7 +50,7 @@
         transform: scale(0.95);
     }
 
-    /* --- NOVAS CLASSES PARA STATUS --- */
+    /* Classes para Status com Cores */
     .status-badge {
         font-weight: 500;
         padding: .4em .7em;
@@ -97,6 +97,16 @@
     </div>
 </div>
 
+<div class="card mb-3 legend-card">
+    <div class="card-body p-2">
+        <div class="d-flex flex-wrap align-items-center small">
+            <strong class="me-3 ms-2">Legenda de Prioridade (borda):</strong>
+            <span class="d-flex align-items-center me-3"><span class="d-inline-block me-1" style="width: 4px; height: 15px; background-color: #dc3545; border-radius: 2px;"></span> Quente</span>
+            <span class="d-flex align-items-center me-3"><span class="d-inline-block me-1" style="width: 4px; height: 15px; background-color: #ffc107; border-radius: 2px;"></span> Morno</span>
+            <span class="d-flex align-items-center"><span class="d-inline-block me-1" style="width: 4px; height: 15px; background-color: #0d6efd; border-radius: 2px;"></span> Frio</span>
+        </div>
+    </div>
+</div>
 <div class="card shadow-sm">
     <div class="card-body">
         <div class="table-responsive">
