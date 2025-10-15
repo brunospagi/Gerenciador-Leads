@@ -1,3 +1,4 @@
+from datetime import timedelta, timezone
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import UserPassesTestMixin, LoginRequiredMixin
@@ -7,7 +8,7 @@ from django.urls import reverse_lazy
 from django.contrib import messages
 from .forms import CustomPasswordChangeForm, UserCreationFormByAdmin, UserUpdateFormByAdmin, AdminSetPasswordForm
 from django.contrib.auth.models import User
-from .models import Profile
+from .models import Profile, UserLoginActivity
 
 class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     # ... (código existente sem alterações)
