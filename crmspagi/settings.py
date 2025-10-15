@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'minio_storage',
     'usuarios',
     'notificacoes',
+    'pwa',
 ]
 
 MIDDLEWARE = [
@@ -62,6 +63,23 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+]
+
+
+# Configurações do PWA
+PWA_APP_NAME = 'Gestão de Leads'
+PWA_APP_DESCRIPTION = "Aplicativo de Gestão de Leads Spagi"
+PWA_APP_THEME_COLOR = '#000000'
+PWA_APP_BACKGROUND_COLOR = '#ffffff'
+PWA_APP_DISPLAY = 'standalone'
+PWA_APP_SCOPE = '/'
+PWA_APP_ORIENTATION = 'any'
+PWA_APP_START_URL = '/'
+PWA_APP_ICONS = [
+    {
+        'src': '/static/images/logo-spagi.png',
+        'sizes': '192x192'
+    }
 ]
 
 # --- Configurações do MinIO (LIDAS DO .ENV) ---

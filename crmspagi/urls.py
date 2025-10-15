@@ -8,4 +8,6 @@ urlpatterns = [
     path('', include('avaliacoes.urls')),
     path('', include('usuarios.urls')),
     path('', include('notificacoes.urls')),
+    path('', include('pwa.urls')),
+
 ]

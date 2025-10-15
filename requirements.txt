@@ -10,3 +10,4 @@ python-dotenv
 psycopg
 psycopg2
 whitenoise[brotli]
+django-pwa==1.0.12
