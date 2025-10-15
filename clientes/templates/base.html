@@ -75,7 +75,7 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'avaliacao_list' %}"><i class="bi bi-car-front-fill"></i> Avaliações</a>
                         </li>
-                        {% if user.profile.nivel_acesso == 'ADMIN' %}
+                        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarAdmin" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-shield-lock-fill"></i> Admin

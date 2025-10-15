@@ -209,7 +209,7 @@ class ClienteFinalizadoListView(LoginRequiredMixin, ListView):
 
 @login_required
 def relatorio_dashboard(request):
-    if not request.user.profile.nivel_acesso == 'ADMIN':
+    if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
         raise PermissionDenied("Você não tem permissão para acessar esta página.")
 
     start_date_str = request.GET.get('start_date')
@@ -285,7 +285,7 @@ def relatorio_dashboard(request):
 
 @login_required
 def exportar_relatorio_pdf(request):
-    if not request.user.profile.nivel_acesso == 'ADMIN':
+    if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
         raise PermissionDenied("Você não tem permissão para acessar esta página.")
 
     start_date_str = request.GET.get('start_date')
@@ -365,7 +365,7 @@ class ClienteDeleteView(LoginRequiredMixin, DeleteView):
     success_url = reverse_lazy('cliente_list')
 
     def dispatch(self, request, *args, **kwargs):
-        if request.user.is_superuser is False:
+        if not request.user.is_superuser:
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
 
