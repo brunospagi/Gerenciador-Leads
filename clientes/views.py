@@ -108,7 +108,6 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
         if not self.request.user.is_superuser:
             cliente.vendedor = self.request.user
 
-        # Se não for um agendamento, define uma data padrão.
         if cliente.status_negociacao != Cliente.StatusNegociacao.AGENDADO:
             cliente.data_proximo_contato = timezone.now() + timedelta(days=5)
             
@@ -132,20 +131,37 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
         return kwargs
 
     def form_valid(self, form):
-        # Acessa os dados do formulário antes de salvar
-        cliente_instance = form.save(commit=False)
+        # Pega o objeto original do banco de dados ANTES de qualquer alteração
+        original_cliente = self.get_object()
+        
+        # Pega a instância com os novos dados do formulário, mas ainda não salva
+        novo_cliente = form.save(commit=False)
 
-        # Se o campo de data não veio no formulário (ou seja, o modal não foi usado),
-        # nós explicitamente restauramos a data que já existia no banco de dados.
+        # 1. LÓGICA DE CRIAÇÃO DE HISTÓRICO
+        # Compara o status antigo com o novo para ver se houve mudança
+        if original_cliente.status_negociacao != novo_cliente.status_negociacao:
+            # Se o novo status for "Agendado", cria o histórico detalhado
+            if novo_cliente.status_negociacao == Cliente.StatusNegociacao.AGENDADO:
+                data_formatada = novo_cliente.data_proximo_contato.strftime('%d/%m/%Y às %H:%M')
+                motivacao = f"Visita agendada para {data_formatada} pelo vendedor {novo_cliente.vendedor.username}."
+                Historico.objects.create(cliente=original_cliente, motivacao=motivacao)
+            else: # Para qualquer outra mudança, cria o histórico padrão
+                motivacao = f"Status alterado de '{original_cliente.get_status_negociacao_display()}' para '{novo_cliente.get_status_negociacao_display()}'."
+                Historico.objects.create(cliente=original_cliente, motivacao=motivacao)
+
+        # 2. LÓGICA PARA EVITAR ERRO 500
+        # Se o campo de data não veio no formulário (o modal não foi usado),
+        # restaura a data que já existia no banco de dados.
         if not form.cleaned_data.get('data_proximo_contato'):
-            cliente_instance.data_proximo_contato = self.get_object().data_proximo_contato
+            novo_cliente.data_proximo_contato = original_cliente.data_proximo_contato
 
+        # 3. LÓGICA DE PERMISSÃO
         # Garante que o vendedor não seja alterado por não-superusuários
         if not self.request.user.is_superuser:
-            cliente_instance.vendedor = self.get_object().vendedor
-
-        # Agora salva a instância com a data garantida
-        cliente_instance.save()
+            novo_cliente.vendedor = original_cliente.vendedor
+        
+        # Salva o cliente com todos os dados corretos
+        novo_cliente.save()
         
         return redirect(self.get_success_url())
 
@@ -172,6 +188,7 @@ def adicionar_historico(request, pk):
             
     return redirect('cliente_detail', pk=cliente.pk)
     
+
 # ... (Restante do arquivo como relatorios, delete, etc. permanece o mesmo)
 class ClienteAtrasadoListView(LoginRequiredMixin, ListView):
     model = Cliente
@@ -346,7 +363,7 @@ def exportar_relatorio_pdf(request):
        html, dest=response)
 
     if pisa_status.err:
-       return HttpResponse('Ocorreram alguns erros <pre>' + html + '</pre>')
+       return HttpResponse('Ocorreram alguns erros <pre>' o html o '</pre>')
     return response
 
 class ClienteDeleteView(LoginRequiredMixin, DeleteView):
