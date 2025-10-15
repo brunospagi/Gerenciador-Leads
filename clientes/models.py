@@ -66,27 +66,11 @@ class Cliente(models.Model):
     observacao = models.TextField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
-        is_new = self._state.adding
-        if not is_new:
-            original = Cliente.objects.get(pk=self.pk)
-            if original.status_negociacao != self.status_negociacao:
-                if self.status_negociacao == self.StatusNegociacao.AGENDADO:
-                    data_formatada = self.data_proximo_contato.strftime('%d/%m/%Y às %H:%M')
-                    motivacao = f"Visita agendada para {data_formatada} pelo vendedor {self.vendedor.username}."
-                    Historico.objects.create(
-                        cliente=self,
-                        motivacao=motivacao
-                    )
-                else:  # Para qualquer outra mudança de status, mantém a mensagem padrão
-                    Historico.objects.create(
-                        cliente=self,
-                        motivacao=f"Status alterado de '{original.get_status_negociacao_display()}' para '{self.get_status_negociacao_display()}'."
-                    )
-        
-        # Define uma data de próximo contato padrão apenas se o cliente for novo
-        if is_new:
+        # Se for um cliente novo, define uma data de próximo contato padrão
+        if self._state.adding:
             self.data_proximo_contato = timezone.now() + timedelta(days=5)
-            
+        
+        # Salva o objeto
         super().save(*args, **kwargs)
 
     def __str__(self):
