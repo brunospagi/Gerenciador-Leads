@@ -89,7 +89,7 @@
                 <span class="metric-value">{{ total_clientes_ativos }}</span>
             </td>
             <td>
-                <span class="metric-label">Taxa de Conversão</span>
+                <span class="metric-label">Taxa de Conversão (Vendidos)</span>
                 <span class="metric-value">{{ taxa_conversao }}%</span>
             </td>
             <td>
@@ -97,7 +97,7 @@
                 <span class="metric-value">{{ tempo_medio_fechamento_dias }} dias</span>
             </td>
             <td>
-                <span class="metric-label">Total de Leads</span>
+                <span class="metric-label">Total de Leads (Período)</span>
                 <span class="metric-value">{{ total_clientes }}</span>
             </td>
         </tr>
@@ -127,7 +127,7 @@
 
     <table class="data-table">
         <thead>
-            <tr><th colspan="2">Desempenho por Vendedor</th></tr>
+            <tr><th colspan="2">Desempenho Geral por Vendedor (Todos Leads)</th></tr>
             <tr>
                 <th>Vendedor</th>
                 <th>Total de Clientes</th>
@@ -147,7 +147,7 @@
 
     <table class="data-table">
         <thead>
-            <tr><th colspan="2">Tipos de Negociação</th></tr>
+            <tr><th colspan="2">Tipos de Negociação (Todos Leads)</th></tr>
             <tr>
                 <th>Tipo</th>
                 <th>Total</th>
@@ -164,5 +164,47 @@
             {% endfor %}
         </tbody>
     </table>
+
+    <h2 style="margin-top: 40px;">Relatórios de Negócios Concluídos (Status "Vendido")</h2>
+    <table class="data-table">
+        <thead>
+            <tr><th colspan="2">Vendas Concluídas por Vendedor</th></tr>
+            <tr>
+                <th>Vendedor</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for label, value in vendas_por_vendedor_data.items %}
+            <tr>
+                <td>{{ label }}</td>
+                <td>{{ value }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2">Nenhuma venda concluída no período.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="data-table">
+        <thead>
+            <tr><th colspan="2">Consignações Concluídas por Vendedor</th></tr>
+            <tr>
+                <th>Vendedor</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for label, value in consignacao_por_vendedor_data.items %}
+            <tr>
+                <td>{{ label }}</td>
+                <td>{{ value }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2">Nenhuma consignação concluída no período.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
 </body>
 </html>

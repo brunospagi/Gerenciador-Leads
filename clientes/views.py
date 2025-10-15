@@ -36,7 +36,9 @@ class ClienteListView(LoginRequiredMixin, ListView):
             # 'icontains' significa que a busca não diferencia maiúsculas de minúsculas.
             queryset = queryset.filter(
                 Q(nome_cliente__icontains=query) |
+                Q(marca_veiculo__icontains=query) | # Adicionado
                 Q(modelo_veiculo__icontains=query) |
+                Q(ano_veiculo__icontains=query) |   # Adicionado
                 Q(fonte_cliente__icontains=query)
             )
 
@@ -180,11 +182,13 @@ def relatorio_dashboard(request):
     clientes_todos = Cliente.objects.filter(data_primeiro_contato__date__range=[start_date, end_date])
     total_clientes = clientes_todos.count()
     clientes_ativos = clientes_todos.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
-    clientes_finalizados = clientes_todos.filter(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
+    
+    # Alterado para filtrar por 'Vendido' para métricas de conclusão
+    clientes_concluidos = clientes_todos.filter(status_negociacao=Cliente.StatusNegociacao.VENDIDO)
 
-    taxa_conversao = (clientes_finalizados.count() / total_clientes) * 100 if total_clientes > 0 else 0
+    taxa_conversao = (clientes_concluidos.count() / total_clientes) * 100 if total_clientes > 0 else 0
 
-    tempo_medio_fechamento_delta = clientes_finalizados.annotate(
+    tempo_medio_fechamento_delta = clientes_concluidos.annotate(
         duracao=ExpressionWrapper(F('data_ultimo_contato') - F('data_primeiro_contato'), output_field=fields.DurationField())
     ).aggregate(tempo_medio=Avg('duracao'))['tempo_medio']
     
@@ -202,6 +206,24 @@ def relatorio_dashboard(request):
     vendedor_labels = [item['vendedor__username'] for item in vendedor_data]
     vendedor_values = [item['total'] for item in vendedor_data]
 
+    # --- NOVAS QUERIES ---
+    # 1. Vendas Concluídas por Vendedor
+    vendas_data = clientes_concluidos.filter(
+        tipo_negociacao=Cliente.TipoNegociacao.VENDA
+    ).values('vendedor__username').annotate(total=Count('id')).order_by('-total')
+    
+    vendas_por_vendedor_labels = [item['vendedor__username'] for item in vendas_data]
+    vendas_por_vendedor_values = [item['total'] for item in vendas_data]
+
+    # 2. Consignações Concluídas por Vendedor
+    consignacao_data = clientes_concluidos.filter(
+        tipo_negociacao=Cliente.TipoNegociacao.CONSIGNACAO
+    ).values('vendedor__username').annotate(total=Count('id')).order_by('-total')
+
+    consignacao_por_vendedor_labels = [item['vendedor__username'] for item in consignacao_data]
+    consignacao_por_vendedor_values = [item['total'] for item in consignacao_data]
+    # --- FIM NOVAS QUERIES ---
+
     context = {
         'total_clientes': total_clientes,
         'total_clientes_ativos': clientes_ativos.count(),
@@ -215,6 +237,10 @@ def relatorio_dashboard(request):
         'vendedor_values': vendedor_values,
         'start_date': start_date,
         'end_date': end_date,
+        'vendas_por_vendedor_labels': vendas_por_vendedor_labels,
+        'vendas_por_vendedor_values': vendas_por_vendedor_values,
+        'consignacao_por_vendedor_labels': consignacao_por_vendedor_labels,
+        'consignacao_por_vendedor_values': consignacao_por_vendedor_values,
     }
     
     return render(request, 'clientes/relatorios.html', context)
@@ -237,11 +263,13 @@ def exportar_relatorio_pdf(request):
     clientes_todos = Cliente.objects.filter(data_primeiro_contato__date__range=[start_date, end_date])
     total_clientes = clientes_todos.count()
     clientes_ativos = clientes_todos.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
-    clientes_finalizados = clientes_todos.filter(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
+    
+    # Alterado para filtrar por 'Vendido'
+    clientes_concluidos = clientes_todos.filter(status_negociacao=Cliente.StatusNegociacao.VENDIDO)
 
-    taxa_conversao = (clientes_finalizados.count() / total_clientes) * 100 if total_clientes > 0 else 0
+    taxa_conversao = (clientes_concluidos.count() / total_clientes) * 100 if total_clientes > 0 else 0
 
-    tempo_medio_fechamento_delta = clientes_finalizados.annotate(
+    tempo_medio_fechamento_delta = clientes_concluidos.annotate(
         duracao=ExpressionWrapper(F('data_ultimo_contato') - F('data_primeiro_contato'), output_field=fields.DurationField())
     ).aggregate(tempo_medio=Avg('duracao'))['tempo_medio']
     
@@ -256,6 +284,19 @@ def exportar_relatorio_pdf(request):
     vendedor_list = clientes_todos.values('vendedor__username').annotate(total=Count('id')).order_by('-total')
     vendedor_dict = {item['vendedor__username']: item['total'] for item in vendedor_list}
 
+    # --- NOVAS QUERIES PARA PDF ---
+    # 1. Vendas por Vendedor
+    vendas_list = clientes_concluidos.filter(
+        tipo_negociacao=Cliente.TipoNegociacao.VENDA
+    ).values('vendedor__username').annotate(total=Count('id')).order_by('-total')
+    vendas_por_vendedor_dict = {item['vendedor__username']: item['total'] for item in vendas_list}
+
+    # 2. Consignações por Vendedor
+    consignacao_list = clientes_concluidos.filter(
+        tipo_negociacao=Cliente.TipoNegociacao.CONSIGNACAO
+    ).values('vendedor__username').annotate(total=Count('id')).order_by('-total')
+    consignacao_por_vendedor_dict = {item['vendedor__username']: item['total'] for item in consignacao_list}
+    # --- FIM NOVAS QUERIES PARA PDF ---
     context = {
         'total_clientes': total_clientes,
         'total_clientes_ativos': clientes_ativos.count(),
@@ -266,6 +307,8 @@ def exportar_relatorio_pdf(request):
         'vendedor_data': vendedor_dict,
         'start_date': start_date,
         'end_date': end_date,
+        'vendas_por_vendedor_data': vendas_por_vendedor_dict,
+        'consignacao_por_vendedor_data': consignacao_por_vendedor_dict,
     }
     
     template_path = 'clientes/relatorio_pdf.html' # Utiliza o novo template

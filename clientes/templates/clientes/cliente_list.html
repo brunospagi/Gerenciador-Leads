@@ -8,8 +8,12 @@
 
 <div class="card card-body mb-4">
     <form method="get" class="row g-3 align-items-end">
+        {% if periodo_selecionado %}
+            <input type="hidden" name="dias" value="{{ periodo_selecionado }}">
+        {% endif %}
+
         <div class="col-md-6">
-            <label for="q_id" class="form-label">Pesquisar por Nome, Veículo ou Fonte</label>
+            <label for="q_id" class="form-label">Pesquisar por Nome, Veículo, Ano ou Fonte</label>
             <input type="text" name="q" class="form-control" id="q_id" value="{{ search_query }}">
         </div>
         <div class="col-md-4">

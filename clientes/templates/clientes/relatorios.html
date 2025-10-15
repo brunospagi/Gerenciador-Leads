@@ -35,7 +35,7 @@
     <div class="col-md-3">
         <div class="card text-center h-100">
             <div class="card-body">
-                <h6 class="card-title text-muted">Taxa de Conversão</h6>
+                <h6 class="card-title text-muted">Taxa de Conversão (Vendidos)</h6>
                 <p class="card-text fs-2 fw-bold">{{ taxa_conversao }}%</p>
                 <small class="text-muted">Meta: > 25%</small>
             </div>
@@ -53,7 +53,7 @@
     <div class="col-md-3">
         <div class="card text-center h-100">
             <div class="card-body">
-                <h6 class="card-title text-muted">Total de Leads</h6>
+                <h6 class="card-title text-muted">Total de Leads (Período)</h6>
                 <p class="card-text fs-2 fw-bold">{{ total_clientes }}</p>
             </div>
         </div>
@@ -71,7 +71,7 @@
     </div>
     <div class="col-lg-6 mb-4">
         <div class="card">
-            <div class="card-header">Desempenho por Vendedor</div>
+            <div class="card-header">Desempenho Geral por Vendedor (Todos Leads)</div>
             <div class="card-body">
                 <canvas id="vendedorChart"></canvas>
             </div>
@@ -79,9 +79,30 @@
     </div>
     <div class="col-lg-6 mb-4">
         <div class="card">
-            <div class="card-header">Tipos de Negociação</div>
+            <div class="card-header">Tipos de Negociação (Todos Leads)</div>
             <div class="card-body">
                 <canvas id="tipoNegociacaoChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<hr class="my-4">
+<h3 class="mb-3">Relatórios de Negócios Concluídos (Status "Vendido")</h3>
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">Vendas Concluídas por Vendedor</div>
+            <div class="card-body">
+                <canvas id="vendasVendedorChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">Consignações Concluídas por Vendedor</div>
+            <div class="card-body">
+                <canvas id="consignacaoVendedorChart"></canvas>
             </div>
         </div>
     </div>
@@ -93,6 +114,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // Gráfico de Status
     const ctxStatus = document.getElementById('statusChart');
     new Chart(ctxStatus, {
         type: 'doughnut',
@@ -115,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Gráfico de Tipo de Negociação
     const ctxTipoNegociacao = document.getElementById('tipoNegociacaoChart');
     new Chart(ctxTipoNegociacao, {
         type: 'bar',
@@ -138,6 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Gráfico de Vendedor (Geral)
     const ctxVendedor = document.getElementById('vendedorChart');
     new Chart(ctxVendedor, {
         type: 'bar',
@@ -158,6 +182,48 @@ document.addEventListener('DOMContentLoaded', () => {
                     beginAtZero: true
                 }
             },
+            responsive: true,
+        }
+    });
+
+    // --- NOVOS GRÁFICOS ---
+
+    // NOVO GRÁFICO: Vendas por Vendedor
+    const ctxVendasVendedor = document.getElementById('vendasVendedorChart');
+    new Chart(ctxVendasVendedor, {
+        type: 'bar',
+        data: {
+            labels: {{ vendas_por_vendedor_labels|safe }},
+            datasets: [{
+                label: 'Total de Vendas',
+                data: {{ vendas_por_vendedor_values|safe }},
+                backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                borderColor: 'rgba(40, 167, 69, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: { y: { beginAtZero: true } },
+            responsive: true,
+        }
+    });
+
+    // NOVO GRÁFICO: Consignações por Vendedor
+    const ctxConsignacaoVendedor = document.getElementById('consignacaoVendedorChart');
+    new Chart(ctxConsignacaoVendedor, {
+        type: 'bar',
+        data: {
+            labels: {{ consignacao_por_vendedor_labels|safe }},
+            datasets: [{
+                label: 'Total de Consignações',
+                data: {{ consignacao_por_vendedor_values|safe }},
+                backgroundColor: 'rgba(23, 162, 184, 0.7)',
+                borderColor: 'rgba(23, 162, 184, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: { y: { beginAtZero: true } },
             responsive: true,
         }
     });
