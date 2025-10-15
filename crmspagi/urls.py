@@ -9,5 +9,4 @@ urlpatterns = [
     path('', include('usuarios.urls')),
     path('', include('notificacoes.urls')),
     path('', include('pwa.urls')),
-
 ]
