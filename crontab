@@ -1,2 +1,5 @@
 # Executa o comando check_inactivity todos os dias às 3 da manhã
 0 3 * * * /usr/local/bin/python /app/manage.py check_inactivity >> /app/cron.log 2>&1
+
+# Verifica clientes com contato atrasado todos os dias às 8h da manhã
+0 8 * * * /usr/local/bin/python /app/manage.py check_overdue_clients >> /app/cron.log 2>&1
