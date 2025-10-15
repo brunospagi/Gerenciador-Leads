@@ -1,16 +1,36 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="card">
-    <div class="card-header">
-        <h1>Perfil de Usuário</h1>
-    </div>
-    <div class="card-body">
-        <p><strong>Nome de Usuário:</strong> {{ user.username }}</p>
-        <p><strong>Email:</strong> {{ user.email }}</p>
-        <p><strong>Nível de Acesso:</strong> {{ user.profile.get_nivel_acesso_display }}</p>
-        <hr>
-        <a href="{% url 'password_change' %}" class="btn btn-primary">Trocar Senha</a>
+<style>
+    .profile-card .list-group-item {
+        border: none;
+        padding: 1rem 1.25rem;
+    }
+    .profile-card .list-group-item i {
+        width: 24px;
+        text-align: center;
+        margin-right: 15px;
+        color: #6c757d;
+    }
+</style>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm profile-card">
+            <div class="card-header bg-dark text-white">
+                <h4 class="mb-0"><i class="bi bi-person-circle me-2"></i>Perfil de Usuário</h4>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item fs-5"><i class="bi bi-person-fill"></i><strong>Nome de Usuário:</strong> {{ user.username }}</li>
+                    <li class="list-group-item fs-5"><i class="bi bi-envelope-fill"></i><strong>Email:</strong> {{ user.email }}</li>
+                    <li class="list-group-item fs-5"><i class="bi bi-shield-check"></i><strong>Nível de Acesso:</strong> <span class="badge bg-primary">{{ user.profile.get_nivel_acesso_display }}</span></li>
+                </ul>
+            </div>
+            <div class="card-footer bg-light text-end">
+                <a href="{% url 'password_change' %}" class="btn btn-primary"><i class="bi bi-key-fill me-1"></i>Trocar Senha</a>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

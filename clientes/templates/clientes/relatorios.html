@@ -1,68 +1,116 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<style>
+    .metric-card {
+        border: none;
+        border-left: 5px solid #0d6efd;
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+    .metric-card .card-body {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .metric-card i {
+        font-size: 2.5rem;
+        color: #0d6efd;
+        opacity: 0.3;
+    }
+    .metric-card .metric-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+    }
+    .metric-card .metric-label {
+        font-weight: 500;
+        color: #6c757d;
+    }
+    .chart-card .card-header {
+        background-color: #f8f9fa;
+        font-weight: 500;
+    }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Relatórios e Métricas</h1>
+    <h1 class="mb-0"><i class="bi bi-bar-chart-line-fill me-2"></i>Relatórios e Métricas</h1>
 </div>
-<div class="card mb-4">
+
+<div class="card shadow-sm mb-4">
     <div class="card-body">
         <form method="get" action="{% url 'relatorios' %}" class="row g-3 align-items-center">
             <div class="col-md-5">
-                <label for="start_date" class="form-label">Data de Início</label>
+                <label for="start_date" class="form-label fw-bold">Data de Início</label>
                 <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}">
             </div>
             <div class="col-md-5">
-                <label for="end_date" class="form-label">Data Final</label>
+                <label for="end_date" class="form-label fw-bold">Data Final</label>
                 <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}">
             </div>
             <div class="col-md-2 d-flex align-items-end">
-                <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-funnel-fill me-1"></i>Filtrar</button>
             </div>
         </form>
-        <a href="{% url 'exportar_relatorio_pdf' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="btn btn-secondary mt-3">Exportar para PDF</a>
+        <a href="{% url 'exportar_relatorio_pdf' %}?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}" class="btn btn-secondary mt-3">
+            <i class="bi bi-file-earmark-pdf-fill me-1"></i>Exportar para PDF
+        </a>
     </div>
 </div>
 
 <div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card text-center h-100">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card metric-card shadow-sm" style="border-color: #198754;">
             <div class="card-body">
-                <h6 class="card-title text-muted">Clientes Ativos</h6>
-                <p class="card-text fs-2 fw-bold">{{ total_clientes_ativos }}</p>
+                <div>
+                    <div class="metric-value">{{ total_clientes_ativos }}</div>
+                    <div class="metric-label">Clientes Ativos</div>
+                </div>
+                <i class="bi bi-person-check-fill" style="color: #198754;"></i>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center h-100">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card metric-card shadow-sm" style="border-color: #0dcaf0;">
             <div class="card-body">
-                <h6 class="card-title text-muted">Taxa de Conversão (Vendidos)</h6>
-                <p class="card-text fs-2 fw-bold">{{ taxa_conversao }}%</p>
-                <small class="text-muted">Meta: > 25%</small>
+                <div>
+                    <div class="metric-value">{{ taxa_conversao }}%</div>
+                    <div class="metric-label">Taxa de Conversão</div>
+                </div>
+                <i class="bi bi-graph-up-arrow" style="color: #0dcaf0;"></i>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center h-100">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card metric-card shadow-sm" style="border-color: #ffc107;">
             <div class="card-body">
-                <h6 class="card-title text-muted">Tempo Médio de Fechamento</h6>
-                <p class="card-text fs-2 fw-bold">{{ tempo_medio_fechamento_dias }} dias</p>
-                <small class="text-muted">Meta: < 15 dias</small>
+                <div>
+                    <div class="metric-value">{{ tempo_medio_fechamento_dias }}</div>
+                    <div class="metric-label">Dias p/ Fechamento</div>
+                </div>
+                <i class="bi bi-clock-history" style="color: #ffc107;"></i>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center h-100">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card metric-card shadow-sm">
             <div class="card-body">
-                <h6 class="card-title text-muted">Total de Leads (Período)</h6>
-                <p class="card-text fs-2 fw-bold">{{ total_clientes }}</p>
+                <div>
+                    <div class="metric-value">{{ total_clientes }}</div>
+                    <div class="metric-label">Total de Leads</div>
+                </div>
+                <i class="bi bi-people-fill"></i>
             </div>
         </div>
     </div>
 </div>
 
+
 <div class="row">
     <div class="col-lg-6 mb-4">
-        <div class="card">
+        <div class="card shadow-sm chart-card">
             <div class="card-header">Status das Negociações Ativas</div>
             <div class="card-body">
                 <canvas id="statusChart"></canvas>
@@ -70,7 +118,7 @@
         </div>
     </div>
     <div class="col-lg-6 mb-4">
-        <div class="card">
+        <div class="card shadow-sm chart-card">
             <div class="card-header">Desempenho Geral por Vendedor (Todos Leads)</div>
             <div class="card-body">
                 <canvas id="vendedorChart"></canvas>
@@ -78,20 +126,7 @@
         </div>
     </div>
     <div class="col-lg-6 mb-4">
-        <div class="card">
-            <div class="card-header">Tipos de Negociação (Todos Leads)</div>
-            <div class="card-body">
-                <canvas id="tipoNegociacaoChart"></canvas>
-            </div>
-        </div>
-    </div>
-</div>
-
-<hr class="my-4">
-<h3 class="mb-3">Relatórios de Negócios Concluídos (Status "Vendido")</h3>
-<div class="row">
-    <div class="col-lg-6 mb-4">
-        <div class="card">
+        <div class="card shadow-sm chart-card">
             <div class="card-header">Vendas Concluídas por Vendedor</div>
             <div class="card-body">
                 <canvas id="vendasVendedorChart"></canvas>
@@ -99,7 +134,7 @@
         </div>
     </div>
     <div class="col-lg-6 mb-4">
-        <div class="card">
+        <div class="card shadow-sm chart-card">
             <div class="card-header">Consignações Concluídas por Vendedor</div>
             <div class="card-body">
                 <canvas id="consignacaoVendedorChart"></canvas>
@@ -111,11 +146,20 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // Opções comuns para os gráficos
+    const commonChartOptions = {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'top',
+            }
+        }
+    };
+
     // Gráfico de Status
-    const ctxStatus = document.getElementById('statusChart');
+    const ctxStatus = document.getElementById('statusChart').getContext('2d');
     new Chart(ctxStatus, {
         type: 'doughnut',
         data: {
@@ -123,109 +167,62 @@ document.addEventListener('DOMContentLoaded', () => {
             datasets: [{
                 label: 'Total',
                 data: {{ status_values|safe }},
-                backgroundColor: ['#0d6efd', '#6c757d', '#198754', '#ffc107', '#dc3545', '#0dcaf0'],
+                backgroundColor: ['#0d6efd', '#6c757d', '#198754', '#ffc107', '#dc3545', '#0dcaf0', '#fd7e14'],
                 hoverOffset: 4
             }]
         },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'top',
-                }
-            }
-        }
-    });
-
-    // Gráfico de Tipo de Negociação
-    const ctxTipoNegociacao = document.getElementById('tipoNegociacaoChart');
-    new Chart(ctxTipoNegociacao, {
-        type: 'bar',
-        data: {
-            labels: {{ tipo_negociacao_labels|safe }},
-            datasets: [{
-                label: 'Total de Clientes',
-                data: {{ tipo_negociacao_values|safe }},
-                backgroundColor: 'rgba(25, 135, 84, 0.7)',
-                borderColor: 'rgba(25, 135, 84, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            },
-            responsive: true,
-        }
+        options: commonChartOptions
     });
 
     // Gráfico de Vendedor (Geral)
-    const ctxVendedor = document.getElementById('vendedorChart');
+    const ctxVendedor = document.getElementById('vendedorChart').getContext('2d');
     new Chart(ctxVendedor, {
         type: 'bar',
         data: {
             labels: {{ vendedor_labels|safe }},
             datasets: [{
-                label: 'Clientes por Vendedor',
+                label: 'Leads por Vendedor',
                 data: {{ vendedor_values|safe }},
                 backgroundColor: 'rgba(13, 110, 253, 0.7)',
                 borderColor: 'rgba(13, 110, 253, 1)',
                 borderWidth: 1
             }]
         },
-        options: {
-            indexAxis: 'y', // Deixa as barras na horizontal para melhor leitura
-            scales: {
-                x: {
-                    beginAtZero: true
-                }
-            },
-            responsive: true,
-        }
+        options: { ...commonChartOptions, indexAxis: 'y', scales: { x: { beginAtZero: true } } }
     });
-
-    // --- NOVOS GRÁFICOS ---
-
-    // NOVO GRÁFICO: Vendas por Vendedor
-    const ctxVendasVendedor = document.getElementById('vendasVendedorChart');
+    
+    // Gráfico: Vendas por Vendedor
+    const ctxVendasVendedor = document.getElementById('vendasVendedorChart').getContext('2d');
     new Chart(ctxVendasVendedor, {
         type: 'bar',
         data: {
             labels: {{ vendas_por_vendedor_labels|safe }},
             datasets: [{
-                label: 'Total de Vendas',
+                label: 'Vendas Concluídas',
                 data: {{ vendas_por_vendedor_values|safe }},
-                backgroundColor: 'rgba(40, 167, 69, 0.7)',
-                borderColor: 'rgba(40, 167, 69, 1)',
+                backgroundColor: 'rgba(25, 135, 84, 0.7)',
+                borderColor: 'rgba(25, 135, 84, 1)',
                 borderWidth: 1
             }]
         },
-        options: {
-            scales: { y: { beginAtZero: true } },
-            responsive: true,
-        }
+        options: { ...commonChartOptions, scales: { y: { beginAtZero: true } } }
     });
 
-    // NOVO GRÁFICO: Consignações por Vendedor
-    const ctxConsignacaoVendedor = document.getElementById('consignacaoVendedorChart');
+    // Gráfico: Consignações por Vendedor
+    const ctxConsignacaoVendedor = document.getElementById('consignacaoVendedorChart').getContext('2d');
     new Chart(ctxConsignacaoVendedor, {
         type: 'bar',
         data: {
             labels: {{ consignacao_por_vendedor_labels|safe }},
             datasets: [{
-                label: 'Total de Consignações',
+                label: 'Consignações Concluídas',
                 data: {{ consignacao_por_vendedor_values|safe }},
-                backgroundColor: 'rgba(23, 162, 184, 0.7)',
-                borderColor: 'rgba(23, 162, 184, 1)',
+                backgroundColor: 'rgba(255, 193, 7, 0.7)',
+                borderColor: 'rgba(255, 193, 7, 1)',
                 borderWidth: 1
             }]
         },
-        options: {
-            scales: { y: { beginAtZero: true } },
-            responsive: true,
-        }
+        options: { ...commonChartOptions, scales: { y: { beginAtZero: true } } }
     });
 });
 </script>
