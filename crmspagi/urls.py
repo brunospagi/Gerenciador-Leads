@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic import TemplateView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -8,5 +9,12 @@ urlpatterns = [
     path('', include('avaliacoes.urls')),
     path('', include('usuarios.urls')),
     path('', include('notificacoes.urls')),
-    path('', include('pwa.urls')),
+    path(
+        "serviceworker.js",
+        TemplateView.as_view(
+            template_name="serviceworker.js",
+            content_type="application/javascript",
+        ),
+        name="serviceworker",
+    ),
 ]

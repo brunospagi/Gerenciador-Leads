@@ -51,7 +51,6 @@ INSTALLED_APPS = [
     'minio_storage',
     'usuarios',
     'notificacoes',
-    'pwa',
 ]
 
 MIDDLEWARE = [
@@ -65,34 +64,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-
-# --- PWA CONFIGURATION ---
-PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'static/js', 'serviceworker.js')
-
-# Adicione estas duas linhas para apontar para as novas URLs
-PWA_APP_MANIFEST_URL = '/pwa/manifest.json'
-PWA_SERVICE_WORKER_URL = '/pwa/serviceworker.js'
-
-PWA_APP_NAME = 'Gestão de Leads'
-PWA_APP_DESCRIPTION = "Aplicativo de Gestão de Leads Spagi"
-PWA_APP_THEME_COLOR = '#0d6efd'
-PWA_APP_BACKGROUND_COLOR = '#ffffff'
-PWA_APP_DISPLAY = 'standalone'
-PWA_APP_SCOPE = '/'
-PWA_APP_ORIENTATION = 'any'
-PWA_APP_START_URL = '/'
-PWA_APP_ICONS = [
-    {
-        'src': '/static/images/logo-spagi.png',
-        'sizes': '192x192'
-    }
-]
-PWA_APP_ICONS_APPLE = [
-    {
-        'src': '/static/images/logo-spagi.png',
-        'sizes': '192x192'
-    }
-]
 # --- Configurações do MinIO (LIDAS DO .ENV) ---
 MINIO_EXTERNAL_ENDPOINT = os.getenv('MINIO_EXTERNAL_ENDPOINT', 's3.spagisistemas.com.br')
 MINIO_STORAGE_ENDPOINT = os.getenv('MINIO_STORAGE_ENDPOINT', 's3.spagisistemas.com.br')
@@ -108,7 +79,7 @@ ROOT_URLCONF = 'crmspagi.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
