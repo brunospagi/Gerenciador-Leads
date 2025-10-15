@@ -23,6 +23,14 @@
                     <h5 class="mb-3 border-bottom pb-2"><i class="bi bi-car-front-fill me-2"></i>1. Seleção do Veículo (API FIPE)</h5>
                     <div class="row">
                         <div class="col-md-4 mb-3">
+                            <label for="tipo_veiculo_select" class="form-label">Tipo de Veículo</label>
+                            <select id="tipo_veiculo_select" name="tipo_veiculo" class="form-select" required>
+                                <option value="carros" {% if form.instance.tipo_veiculo == 'carros' %}selected{% endif %}>Carro</option>
+                                <option value="motos" {% if form.instance.tipo_veiculo == 'motos' %}selected{% endif %}>Moto</option>
+                                <option value="caminhoes" {% if form.instance.tipo_veiculo == 'caminhoes' %}selected{% endif %}>Caminhão</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
                             <label for="marca_select" class="form-label">Marca</label>
                             <select id="marca_select" class="form-select" required>
                                 <option value="" selected disabled>Carregando...</option>
@@ -92,6 +100,7 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    const tipoVeiculoSelect = document.getElementById('tipo_veiculo_select');
     const marcaSelect = document.getElementById('marca_select');
     const modeloSelect = document.getElementById('modelo_select');
     const anoSelect = document.getElementById('ano_select');
@@ -100,25 +109,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const modeloInput = document.getElementById('id_modelo');
     const anoInput = document.getElementById('id_ano');
 
-    const marcasUrl = "{% url 'api_fipe_marcas' %}";
-
     const resetSelect = (select, message) => {
         select.innerHTML = `<option value="" selected disabled>${message}</option>`;
         select.disabled = true;
     };
 
-    fetch(marcasUrl)
-        .then(response => response.json())
-        .then(data => {
-            marcaSelect.innerHTML = '<option value="" selected disabled>Selecione uma marca</option>';
-            data.forEach(marca => {
-                const option = new Option(marca.nome, marca.codigo);
-                marcaSelect.add(option);
-            });
-        })
-        .catch(error => console.error('Erro ao carregar marcas:', error));
+    function carregarMarcas() {
+        const tipoVeiculo = tipoVeiculoSelect.value;
+        if (!tipoVeiculo) return;
+
+        resetSelect(marcaSelect, 'Carregando...');
+        resetSelect(modeloSelect, 'Selecione a marca');
+        resetSelect(anoSelect, 'Selecione o modelo');
+        
+        const marcasUrl = `/api/fipe/${tipoVeiculo}/marcas/`;
+
+        fetch(marcasUrl)
+            .then(response => response.json())
+            .then(data => {
+                marcaSelect.innerHTML = '<option value="" selected disabled>Selecione uma marca</option>';
+                data.forEach(marca => {
+                    const option = new Option(marca.nome, marca.codigo);
+                    marcaSelect.add(option);
+                });
+                marcaSelect.disabled = false;
+            })
+            .catch(error => console.error('Erro ao carregar marcas:', error));
+    }
+
+    tipoVeiculoSelect.addEventListener('change', carregarMarcas);
+    // Carrega as marcas iniciais
+    carregarMarcas();
 
     marcaSelect.addEventListener('change', () => {
+        const tipoVeiculo = tipoVeiculoSelect.value;
         const marcaId = marcaSelect.value;
         const marcaNome = marcaSelect.options[marcaSelect.selectedIndex].text;
         resetSelect(modeloSelect, 'Carregando modelos...');
@@ -127,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         marcaInput.value = marcaNome;
         modeloInput.value = '';
         anoInput.value = '';
-        fetch(`/api/fipe/marcas/${marcaId}/modelos/`)
+        fetch(`/api/fipe/${tipoVeiculo}/marcas/${marcaId}/modelos/`)
             .then(response => response.json())
             .then(data => {
                 modeloSelect.innerHTML = '<option value="" selected disabled>Selecione um modelo</option>';
@@ -141,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     modeloSelect.addEventListener('change', () => {
+        const tipoVeiculo = tipoVeiculoSelect.value;
         const marcaId = marcaSelect.value;
         const modeloId = modeloSelect.value;
         const modeloNome = modeloSelect.options[modeloSelect.selectedIndex].text;
@@ -148,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!modeloId) return;
         modeloInput.value = modeloNome;
         anoInput.value = '';
-        fetch(`/api/fipe/marcas/${marcaId}/modelos/${modeloId}/anos/`)
+        fetch(`/api/fipe/${tipoVeiculo}/marcas/${marcaId}/modelos/${modeloId}/anos/`)
             .then(response => response.json())
             .then(data => {
                 anoSelect.innerHTML = '<option value="" selected disabled>Selecione o ano</option>';

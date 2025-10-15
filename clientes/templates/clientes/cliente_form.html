@@ -36,9 +36,17 @@
                     <h5 class="mt-4 mb-3 border-bottom pb-2"><i class="bi bi-car-front-fill me-2"></i>2. Dados do Veículo (Busca FIPE)</h5>
                     <div class="row">
                         <div class="col-md-4 mb-3">
+                            <label for="tipo_veiculo_select" class="form-label">Tipo de Veículo</label>
+                            <select id="tipo_veiculo_select" class="form-select" required>
+                                <option value="carros" selected>Carro</option>
+                                <option value="motos">Moto</option>
+                                <option value="caminhoes">Caminhão</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
                             <label for="marca_select" class="form-label">Marca</label>
                             <select id="marca_select" class="form-select" required>
-                                <option value="" selected disabled>Carregando...</option>
+                                <option value="" selected disabled>Selecione o tipo de veículo</option>
                             </select>
                         </div>
                         <div class="col-md-4 mb-3">
@@ -64,7 +72,7 @@
                     <h5 class="mt-4 mb-3 border-bottom pb-2"><i class="bi bi-graph-up-arrow me-2"></i>3. Detalhes da Negociação</h5>
                     <div class="row">
                         {% for field in form %}
-                            {% if field.name not in "nome_cliente,whatsapp,marca_veiculo,modelo_veiculo,ano_veiculo,valor_estimado_veiculo" %}
+                            {% if field.name not in "nome_cliente,whatsapp,marca_veiculo,modelo_veiculo,ano_veiculo,valor_estimado_veiculo,tipo_veiculo" %}
                                 <div class="col-md-6 mb-3">
                                     <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
                                     {{ field }}
@@ -145,6 +153,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
 
 
     // --- Lógica da API FIPE ---
+    const tipoVeiculoSelect = document.getElementById('tipo_veiculo_select');
     const marcaSelect = document.getElementById('marca_select');
     const modeloSelect = document.getElementById('modelo_select');
     const anoSelect = document.getElementById('ano_select');
@@ -153,25 +162,39 @@ document.addEventListener('DOMContentLoaded', (event) => {
     const modeloInput = document.getElementById('id_modelo_veiculo');
     const anoInput = document.getElementById('id_ano_veiculo');
 
-    const marcasUrl = "{% url 'api_fipe_marcas' %}";
-
     const resetSelect = (select, message) => {
         select.innerHTML = `<option value="" selected disabled>${message}</option>`;
         select.disabled = true;
     };
 
-    fetch(marcasUrl)
-        .then(response => response.json())
-        .then(data => {
-            marcaSelect.innerHTML = '<option value="" selected disabled>Selecione uma marca</option>';
-            data.forEach(marca => {
-                const option = new Option(marca.nome, marca.codigo);
-                if (marca.nome === marcaInput.value) { option.selected = true; }
-                marcaSelect.add(option);
-            });
-        }).catch(error => console.error('Erro ao carregar marcas:', error));
+    function carregarMarcas() {
+        const tipoVeiculo = tipoVeiculoSelect.value;
+        if (!tipoVeiculo) return;
+
+        resetSelect(marcaSelect, 'Carregando...');
+        resetSelect(modeloSelect, 'Selecione a marca');
+        resetSelect(anoSelect, 'Selecione o modelo');
+        
+        const marcasUrl = `/api/fipe/${tipoVeiculo}/marcas/`;
+
+        fetch(marcasUrl)
+            .then(response => response.json())
+            .then(data => {
+                marcaSelect.innerHTML = '<option value="" selected disabled>Selecione uma marca</option>';
+                data.forEach(marca => {
+                    const option = new Option(marca.nome, marca.codigo);
+                    if (marca.nome === marcaInput.value) { option.selected = true; }
+                    marcaSelect.add(option);
+                });
+                marcaSelect.disabled = false;
+            }).catch(error => console.error('Erro ao carregar marcas:', error));
+    }
+    
+    tipoVeiculoSelect.addEventListener('change', carregarMarcas);
+    carregarMarcas();
 
     marcaSelect.addEventListener('change', () => {
+        const tipoVeiculo = tipoVeiculoSelect.value;
         const marcaId = marcaSelect.value;
         const marcaNome = marcaSelect.options[marcaSelect.selectedIndex].text;
         resetSelect(modeloSelect, 'Carregando...');
@@ -180,7 +203,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
         marcaInput.value = marcaNome;
         modeloInput.value = '';
         anoInput.value = '';
-        fetch(`/api/fipe/marcas/${marcaId}/modelos/`)
+        fetch(`/api/fipe/${tipoVeiculo}/marcas/${marcaId}/modelos/`)
             .then(response => response.json())
             .then(data => {
                 modeloSelect.innerHTML = '<option value="" selected disabled>Selecione um modelo</option>';
@@ -193,6 +216,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
     });
 
     modeloSelect.addEventListener('change', () => {
+        const tipoVeiculo = tipoVeiculoSelect.value;
         const marcaId = marcaSelect.value;
         const modeloId = modeloSelect.value;
         const modeloNome = modeloSelect.options[modeloSelect.selectedIndex].text;
@@ -200,7 +224,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
         if (!modeloId) return;
         modeloInput.value = modeloNome;
         anoInput.value = '';
-        fetch(`/api/fipe/marcas/${marcaId}/modelos/${modeloId}/anos/`)
+        fetch(`/api/fipe/${tipoVeiculo}/marcas/${marcaId}/modelos/${modeloId}/anos/`)
             .then(response => response.json())
             .then(data => {
                 anoSelect.innerHTML = '<option value="" selected disabled>Selecione o ano</option>';

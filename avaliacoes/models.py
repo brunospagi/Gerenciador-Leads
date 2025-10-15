@@ -17,6 +17,12 @@ class Avaliacao(models.Model):
         ('disponivel', 'Disponível'),
         ('finalizado', 'Finalizado'),
     )
+    TIPO_VEICULO_CHOICES = (
+        ('carros', 'Carro'),
+        ('motos', 'Moto'),
+        ('caminhoes', 'Caminhão'),
+    )
+    tipo_veiculo = models.CharField(max_length=10, choices=TIPO_VEICULO_CHOICES, default='carros', verbose_name="Tipo de Veículo")
     marca = models.CharField(max_length=100, default='')
     modelo = models.CharField(max_length=100)
     ano = models.CharField(max_length=20, default='')

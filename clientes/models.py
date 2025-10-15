@@ -38,9 +38,16 @@ class Cliente(models.Model):
         CONSIGNACAO = 'Consignacao', 'Consignação'
         OUTRO = 'Outro', 'Outro'
 
+    TIPO_VEICULO_CHOICES = (
+        ('carros', 'Carro'),
+        ('motos', 'Moto'),
+        ('caminhoes', 'Caminhão'),
+    )
+
     vendedor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='clientes')
     whatsapp = models.CharField(max_length=20)
     nome_cliente = models.CharField(max_length=255)
+    tipo_veiculo = models.CharField(max_length=10, choices=TIPO_VEICULO_CHOICES, default='carros', verbose_name="Tipo de Veículo")
     marca_veiculo = models.CharField(max_length=100, verbose_name="Marca do Veículo", blank=True, null=True)
     modelo_veiculo = models.CharField(max_length=100, verbose_name="Modelo do Veículo", blank=True, null=True)
     ano_veiculo = models.CharField(max_length=20, verbose_name="Ano do Veículo", blank=True, null=True)

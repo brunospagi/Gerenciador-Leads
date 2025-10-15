@@ -103,25 +103,25 @@ class AvaliacaoDeleteView(LoginRequiredMixin, DeleteView):
         return super().dispatch(request, *args, **kwargs)
 
 
-def get_fipe_marcas(request):
+def get_fipe_marcas(request, tipo_veiculo):
     try:
-        response = requests.get('https://parallelum.com.br/fipe/api/v1/carros/marcas')
+        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas')
         response.raise_for_status()
         return JsonResponse(response.json(), safe=False)
     except requests.RequestException:
         return JsonResponse({'error': 'Erro ao buscar marcas'}, status=500)
 
-def get_fipe_modelos(request, marca_id):
+def get_fipe_modelos(request, tipo_veiculo, marca_id):
     try:
-        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/carros/marcas/{marca_id}/modelos')
+        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas/{marca_id}/modelos')
         response.raise_for_status()
         return JsonResponse(response.json().get('modelos', []), safe=False)
     except requests.RequestException:
         return JsonResponse({'error': 'Erro ao buscar modelos'}, status=500)
 
-def get_fipe_anos(request, marca_id, modelo_id):
+def get_fipe_anos(request, tipo_veiculo, marca_id, modelo_id):
     try:
-        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/carros/marcas/{marca_id}/modelos/{modelo_id}/anos')
+        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas/{marca_id}/modelos/{modelo_id}/anos')
         response.raise_for_status()
         return JsonResponse(response.json(), safe=False)
     except requests.RequestException:

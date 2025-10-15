@@ -5,7 +5,7 @@ class AvaliacaoForm(forms.ModelForm):
     class Meta:
         model = Avaliacao
         # Atualize os campos para incluir os novos
-        fields = ['marca', 'modelo', 'ano', 'placa', 'telefone', 'valor_pretendido', 'observacao', 'valor_avaliado']
+        fields = ['tipo_veiculo', 'marca', 'modelo', 'ano', 'placa', 'telefone', 'valor_pretendido', 'observacao', 'valor_avaliado']
         widgets = {
             'observacao': forms.Textarea(attrs={'rows': 3}),
             # Esconde os campos que serão preenchidos pela API via JavaScript

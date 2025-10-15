@@ -11,7 +11,7 @@ class ClienteForm(forms.ModelForm):
     class Meta:
         model = Cliente
         fields = [
-            'whatsapp', 'nome_cliente',
+            'whatsapp', 'nome_cliente', 'tipo_veiculo',
             'marca_veiculo', 'modelo_veiculo', 'ano_veiculo', 'valor_estimado_veiculo',
             'fonte_cliente', 'quantidade_ligacoes', 'tipo_negociacao', 'tipo_contato',
             'status_negociacao', 'proximo_passo', 'prioridade', 'observacao', 'vendedor',
