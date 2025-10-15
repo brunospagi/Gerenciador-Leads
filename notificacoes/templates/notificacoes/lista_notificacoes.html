@@ -4,7 +4,11 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Minhas Notificações</h1>
 </div>
-
+ <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+            <div>
+                <a href="{% url 'deletar_notificacao_todas' notificacao.id %}" class="btn btn-sm btn-outline-danger">&times;</a>
+            </div>
+        </div>
 <div class="list-group">
     {% for notificacao in notificacoes %}
         <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">

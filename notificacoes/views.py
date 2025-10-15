@@ -14,3 +14,8 @@ def deletar_notificacao(request, notificacao_id):
     notificacao = Notificacao.objects.get(id=notificacao_id, usuario=request.user)
     notificacao.delete()
     return redirect('lista_notificacoes')
+
+@login_required
+def deletar_todas_notificacoes(request):
+    Notificacao.objects.filter(usuario=request.user).delete()
+    return redirect('lista_notificacoes')
