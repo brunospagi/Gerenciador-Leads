@@ -1,77 +1,176 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.urls import reverse_lazy , reverse
-from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView
+from django.urls import reverse_lazy, reverse
+from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView, TemplateView
 from .models import Cliente, Historico
 from .forms import ClienteForm, HistoricoForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
 from django.db.models import Avg, Count, F, ExpressionWrapper, fields, Q
 from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
-from datetime import datetime
-from django.views.generic import TemplateView 
 import json
 
+class CalendarioView(LoginRequiredMixin, TemplateView):
+    template_name = 'clientes/calendario.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        base_queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
+        agendamentos_qs = base_queryset.filter(status_negociacao=Cliente.StatusNegociacao.AGENDADO)
+        
+        eventos_calendario = []
+        for agendamento in agendamentos_qs:
+            eventos_calendario.append({
+                'title': agendamento.nome_cliente,
+                'start': agendamento.data_proximo_contato.isoformat(),
+                'url': reverse('cliente_detail', args=[agendamento.pk]),
+                'color': '#6f42c1',
+            })
+            
+        context['agendamentos_json'] = json.dumps(eventos_calendario)
+        return context
 
 class ClienteListView(LoginRequiredMixin, ListView):
     model = Cliente
     template_name = 'clientes/cliente_list.html'
     context_object_name = 'clientes'
-    # >> 2. DEFINA O NÚMERO DE ITENS POR PÁGINA <<
     paginate_by = 15
 
     def get_queryset(self):
-        # Define o queryset base (todos os clientes para admin, apenas os do vendedor para os demais)
         user = self.request.user
         queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
-
-        # >> 3. APLICA O FILTRO DE PESQUISA <<
-        # Pega o valor do parâmetro 'q' da URL (?q=valor)
         query = self.request.GET.get('q')
         if query:
-            # Filtra o queryset usando o 'Q' para buscar em múltiplos campos.
-            # 'icontains' significa que a busca não diferencia maiúsculas de minúsculas.
             queryset = queryset.filter(
                 Q(nome_cliente__icontains=query) |
-                Q(marca_veiculo__icontains=query) | # Adicionado
+                Q(marca_veiculo__icontains=query) |
                 Q(modelo_veiculo__icontains=query) |
-                Q(ano_veiculo__icontains=query) |   # Adicionado
+                Q(ano_veiculo__icontains=query) |
                 Q(fonte_cliente__icontains=query)
             )
-
-        # Mantém o filtro de período de último contato
         periodo = self.request.GET.get('dias')
         if periodo and periodo.isdigit():
             dias = int(periodo)
             data_limite = timezone.now() - timedelta(days=dias)
             queryset = queryset.filter(data_ultimo_contato__gte=data_limite)
-
-        # Ordena pelo último contato e exclui os finalizados
         queryset = queryset.order_by('-data_ultimo_contato')
         return queryset.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
 
     def get_context_data(self, **kwargs):
-        # Passa os filtros para o template para que eles possam ser mantidos
-        # nos links de paginação e nos campos de formulário.
         context = super().get_context_data(**kwargs)
         context['periodo_selecionado'] = self.request.GET.get('dias', '')
-        # >> 4. PASSA O VALOR DA BUSCA DE VOLTA PARA O TEMPLATE <<
         context['search_query'] = self.request.GET.get('q', '')
-        
         user = self.request.user
         base_queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
-        
         context['clientes_atrasados_count'] = base_queryset.filter(
             data_proximo_contato__lte=timezone.now()
         ).exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO).count()
-        
         return context
 
-# ... (o restante do arquivo views.py continua igual) ...
+class ClienteDetailView(LoginRequiredMixin, DetailView):
+    model = Cliente
+    template_name = 'clientes/cliente_detail.html'
+    context_object_name = 'cliente'
+
+    def get_queryset(self):
+        user = self.request.user
+        return Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['historico_form'] = HistoricoForm()
+        context['historicos'] = self.object.historico.all()
+        return context
+
+# --- CORREÇÃO APLICADA NAS VIEWS DE CREATE E UPDATE ---
+
+class ClienteCreateView(LoginRequiredMixin, CreateView):
+    model = Cliente
+    form_class = ClienteForm
+    template_name = 'clientes/cliente_form.html'
+    success_url = reverse_lazy('cliente_list')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        cliente = form.save(commit=False)
+        
+        # Define o vendedor se não for superusuário
+        if not self.request.user.is_superuser:
+            cliente.vendedor = self.request.user
+
+        # Se o status NÃO for 'Agendado' e a data não foi definida,
+        # define uma data padrão para o próximo contato.
+        if cliente.status_negociacao != Cliente.StatusNegociacao.AGENDADO and not cliente.data_proximo_contato:
+            cliente.data_proximo_contato = timezone.now() + timedelta(days=5)
+            
+        cliente.save()
+        return redirect(self.success_url)
+
+
+class ClienteUpdateView(LoginRequiredMixin, UpdateView):
+    model = Cliente
+    form_class = ClienteForm
+    template_name = 'clientes/cliente_form.html'
+    success_url = reverse_lazy('cliente_list')
+
+    def get_queryset(self):
+        user = self.request.user
+        return Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        cliente = form.save(commit=False)
+
+        # Garante que o vendedor não seja alterado por não-superusuários
+        if not self.request.user.is_superuser:
+            cliente.vendedor = self.get_object().vendedor
+
+        # Se o status NÃO for 'Agendado' e a data não foi definida via modal,
+        # mantém a data original ou define uma nova para evitar erros.
+        if cliente.status_negociacao != Cliente.StatusNegociacao.AGENDADO:
+            if not form.cleaned_data.get('data_proximo_contato'):
+                 cliente.data_proximo_contato = self.get_object().data_proximo_contato
+
+        cliente.save()
+        return redirect(self.get_success_url())
+
+# --- RESTANTE DO ARQUIVO ---
+
+@login_required
+def adicionar_historico(request, pk):
+    cliente = get_object_or_404(Cliente, pk=pk)
+    if not request.user.is_superuser and cliente.vendedor != request.user:
+        raise PermissionDenied("Você não tem permissão para adicionar histórico a este cliente.")
+
+    if request.method == 'POST':
+        form = HistoricoForm(request.POST)
+        if form.is_valid():
+            historico = form.save(commit=False)
+            historico.cliente = cliente
+            historico.save()
+            
+            cliente.data_ultimo_contato = timezone.now()
+            
+            if cliente.status_negociacao != Cliente.StatusNegociacao.AGENDADO:
+                cliente.data_proximo_contato = timezone.now() + timedelta(days=5)
+            
+            cliente.save()
+            
+    return redirect('cliente_detail', pk=cliente.pk)
+    
 class ClienteAtrasadoListView(LoginRequiredMixin, ListView):
     model = Cliente
     template_name = 'clientes/cliente_atrasado_list.html'
@@ -95,84 +194,10 @@ class ClienteFinalizadoListView(LoginRequiredMixin, ListView):
         queryset = queryset.filter(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
         return queryset.order_by('-data_ultimo_contato')
 
-class ClienteDetailView(LoginRequiredMixin, DetailView):
-    model = Cliente
-    template_name = 'clientes/cliente_detail.html'
-    context_object_name = 'cliente'
-
-    def get_queryset(self):
-        user = self.request.user
-        return Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['historico_form'] = HistoricoForm()
-        context['historicos'] = self.object.historico.all()
-        return context
-
-class ClienteCreateView(LoginRequiredMixin, CreateView):
-    model = Cliente
-    form_class = ClienteForm
-    template_name = 'clientes/cliente_form.html'
-    success_url = reverse_lazy('cliente_list')
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
-        return kwargs
-
-    def form_valid(self, form):
-        if not self.request.user.is_superuser:
-            form.instance.vendedor = self.request.user
-        return super().form_valid(form)
-
-class ClienteUpdateView(LoginRequiredMixin, UpdateView):
-    model = Cliente
-    form_class = ClienteForm
-    template_name = 'clientes/cliente_form.html'
-    success_url = reverse_lazy('cliente_list')
-
-    def get_queryset(self):
-        user = self.request.user
-        return Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
-        return kwargs
-
-    def form_valid(self, form):
-        if not self.request.user.is_superuser:
-            form.instance.vendedor = self.get_object().vendedor
-        return super().form_valid(form)
-
-@login_required
-def adicionar_historico(request, pk):
-    cliente = get_object_or_404(Cliente, pk=pk)
-    if not request.user.is_superuser and cliente.vendedor != request.user:
-        raise PermissionDenied("Você não tem permissão para adicionar histórico a este cliente.")
-
-    if request.method == 'POST':
-        form = HistoricoForm(request.POST)
-        if form.is_valid():
-            historico = form.save(commit=False)
-            historico.cliente = cliente
-            historico.save()
-            
-            # ATUALIZA A DATA DO ÚLTIMO CONTATO
-            cliente.data_ultimo_contato = timezone.now()
-            # Só define a próxima data de contato automaticamente se o cliente NÃO estiver agendado.
-            # Isso preserva a data que foi definida manualmente pelo modal.
-            if cliente.status_negociacao != Cliente.StatusNegociacao.AGENDADO:
-                cliente.data_proximo_contato = timezone.now() + timedelta(days=5)
-            
-            cliente.save()
-            
-    return redirect('cliente_detail', pk=cliente.pk)
 
 @login_required
 def relatorio_dashboard(request):
-    if not request.user.is_superuser:
+    if not request.user.profile.nivel_acesso == 'ADMIN':
         raise PermissionDenied("Você não tem permissão para acessar esta página.")
 
     start_date_str = request.GET.get('start_date')
@@ -253,7 +278,7 @@ def relatorio_dashboard(request):
 
 @login_required
 def exportar_relatorio_pdf(request):
-    if not request.user.is_superuser:
+    if not request.user.profile.nivel_acesso == 'ADMIN':
         raise PermissionDenied("Você não tem permissão para acessar esta página.")
 
     start_date_str = request.GET.get('start_date')
@@ -340,72 +365,6 @@ class ClienteDeleteView(LoginRequiredMixin, DeleteView):
         if request.user.is_superuser is False:
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
-
-class CalendarioView(LoginRequiredMixin, TemplateView):
-    template_name = 'clientes/calendario.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        user = self.request.user
-        
-        # Filtra agendamentos por vendedor ou mostra todos para o admin
-        base_queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
-        agendamentos_qs = base_queryset.filter(status_negociacao=Cliente.StatusNegociacao.AGENDADO)
-        
-        eventos_calendario = []
-        for agendamento in agendamentos_qs:
-            eventos_calendario.append({
-                'title': agendamento.nome_cliente,
-                'start': agendamento.data_proximo_contato.isoformat(),
-                'url': reverse('cliente_detail', args=[agendamento.pk]),
-                'color': '#6f42c1',
-            })
-            
-        context['agendamentos_json'] = json.dumps(eventos_calendario)
-        return context
-
-class ClienteListView(LoginRequiredMixin, ListView):
-    model = Cliente
-    template_name = 'clientes/cliente_list.html'
-    context_object_name = 'clientes'
-    paginate_by = 15
-
-    def get_queryset(self):
-        user = self.request.user
-        queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
-
-        query = self.request.GET.get('q')
-        if query:
-            queryset = queryset.filter(
-                Q(nome_cliente__icontains=query) |
-                Q(marca_veiculo__icontains=query) |
-                Q(modelo_veiculo__icontains=query) |
-                Q(ano_veiculo__icontains=query) |
-                Q(fonte_cliente__icontains=query)
-            )
-
-        periodo = self.request.GET.get('dias')
-        if periodo and periodo.isdigit():
-            dias = int(periodo)
-            data_limite = timezone.now() - timedelta(days=dias)
-            queryset = queryset.filter(data_ultimo_contato__gte=data_limite)
-
-        queryset = queryset.order_by('-data_ultimo_contato')
-        return queryset.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['periodo_selecionado'] = self.request.GET.get('dias', '')
-        context['search_query'] = self.request.GET.get('q', '')
-        
-        user = self.request.user
-        base_queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
-        
-        context['clientes_atrasados_count'] = base_queryset.filter(
-            data_proximo_contato__lte=timezone.now()
-        ).exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO).count()
-        
-        return context
 
 def offline_view(request):
     return render(request, "clientes/offline.html")
