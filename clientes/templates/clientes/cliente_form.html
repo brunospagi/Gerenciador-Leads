@@ -37,7 +37,6 @@
                     <div class="row align-items-end">
                         <div class="col-md-4 mb-3">
                             <label for="{{ form.tipo_veiculo.id_for_label }}" class="form-label">{{ form.tipo_veiculo.label }}</label>
-                            {# O campo do formulário já renderiza o select corretamente #}
                             {{ form.tipo_veiculo }}
                         </div>
                         <div class="col-md-4 mb-3">
@@ -121,6 +120,23 @@ document.addEventListener('DOMContentLoaded', (event) => {
         IMask(phoneInput, { mask: [{ mask: '(00) 0000-0000' }, { mask: '(00) 0 0000-0000' }] });
     }
 
+    // --- ADIÇÃO DA MÁSCARA DE VALOR ---
+    const valorEstimadoInput = document.getElementById('id_valor_estimado_veiculo');
+    if (valorEstimadoInput) {
+        IMask(valorEstimadoInput, {
+            mask: 'R$ num',
+            blocks: {
+                num: {
+                    mask: Number,
+                    scale: 2,
+                    radix: ',',
+                    thousandsSeparator: '.',
+                    padFractionalZeros: true
+                }
+            }
+        });
+    }
+
     // --- LÓGICA DO MODAL DE AGENDAMENTO ---
     const statusSelect = document.getElementById('id_status_negociacao');
     const proximoContatoInput = document.getElementById('id_data_proximo_contato');
@@ -154,7 +170,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
 
 
     // --- Lógica da API FIPE ---
-    const tipoVeiculoSelect = document.getElementById('id_tipo_veiculo'); // CORRIGIDO: Usar o ID do campo do Django
+    const tipoVeiculoSelect = document.getElementById('id_tipo_veiculo');
     const marcaSelect = document.getElementById('marca_select');
     const modeloSelect = document.getElementById('modelo_select');
     const anoSelect = document.getElementById('ano_select');

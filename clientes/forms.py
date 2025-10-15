@@ -30,7 +30,6 @@ class ClienteForm(forms.ModelForm):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        # Omitimos o campo de data do loop para não sobrescrever nosso widget customizado
         for field_name, field in self.fields.items():
             if field_name != 'data_proximo_contato':
                  field.widget.attrs.update({'class': 'form-control'})
