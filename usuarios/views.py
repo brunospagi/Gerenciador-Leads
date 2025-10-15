@@ -1,4 +1,5 @@
 from datetime import timedelta, timezone
+import json
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import UserPassesTestMixin, LoginRequiredMixin
@@ -9,6 +10,9 @@ from django.contrib import messages
 from .forms import CustomPasswordChangeForm, UserCreationFormByAdmin, UserUpdateFormByAdmin, AdminSetPasswordForm
 from django.contrib.auth.models import User
 from .models import Profile, UserLoginActivity
+from django.core.exceptions import PermissionDenied
+from django.db.models import Count
+
 
 class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     # ... (código existente sem alterações)
@@ -88,7 +92,7 @@ class UserPasswordChangeView(AdminRequiredMixin, FormView):
 @login_required
 def admin_dashboard_view(request):
     if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
-        raise PermissionDenied("Você não tem permissão para acessar esta página.")
+        return PermissionDenied("Você não tem permissão para acessar esta página.")
 
     # 1. Gráfico de logins nos últimos 15 dias
     today = timezone.now().date()
