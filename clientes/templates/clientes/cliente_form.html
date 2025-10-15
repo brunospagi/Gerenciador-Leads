@@ -34,36 +34,31 @@
                     </div>
                     
                     <h5 class="mt-4 mb-3 border-bottom pb-2"><i class="bi bi-car-front-fill me-2"></i>2. Dados do Veículo (Busca FIPE)</h5>
-                    <div class="row">
+                    <div class="row align-items-end">
                         <div class="col-md-4 mb-3">
-                            <label for="tipo_veiculo_select" class="form-label">Tipo de Veículo</label>
-                            <select id="tipo_veiculo_select" class="form-select" required>
-                                <option value="carros" selected>Carro</option>
-                                <option value="motos">Moto</option>
-                                <option value="caminhoes">Caminhão</option>
-                            </select>
+                            <label for="{{ form.tipo_veiculo.id_for_label }}" class="form-label">{{ form.tipo_veiculo.label }}</label>
+                            {# O campo do formulário já renderiza o select corretamente #}
+                            {{ form.tipo_veiculo }}
                         </div>
                         <div class="col-md-4 mb-3">
                             <label for="marca_select" class="form-label">Marca</label>
                             <select id="marca_select" class="form-select" required>
-                                <option value="" selected disabled>Selecione o tipo de veículo</option>
+                                <option value="" selected disabled>Selecione o tipo</option>
                             </select>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label for="modelo_select" class="form-label">Modelo</label>
                             <select id="modelo_select" class="form-select" disabled required>
-                                <option value="" selected disabled>Selecione uma marca</option>
+                                <option value="" selected disabled>Selecione a marca</option>
                             </select>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label for="ano_select" class="form-label">Ano</label>
                             <select id="ano_select" class="form-select" disabled required>
-                                <option value="" selected disabled>Selecione um modelo</option>
+                                <option value="" selected disabled>Selecione o modelo</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
+                         <div class="col-md-6 mb-3">
                             <label for="{{ form.valor_estimado_veiculo.id_for_label }}" class="form-label">{{ form.valor_estimado_veiculo.label }}</label>
                             {{ form.valor_estimado_veiculo }}
                         </div>
@@ -134,26 +129,32 @@ document.addEventListener('DOMContentLoaded', (event) => {
     const confirmarBtn = document.getElementById('confirmarAgendamentoBtn');
     
     // Esconde o campo de data por padrão
-    proximoContatoInput.closest('.col-md-6').style.display = 'none';
+    if(proximoContatoInput) {
+        proximoContatoInput.closest('.col-md-6').style.display = 'none';
+    }
 
-    statusSelect.addEventListener('change', function() {
-        if (this.value === 'Agendado') {
-            agendamentoModal.show();
-        }
-    });
+    if(statusSelect) {
+        statusSelect.addEventListener('change', function() {
+            if (this.value === 'Agendado') {
+                agendamentoModal.show();
+            }
+        });
+    }
 
-    confirmarBtn.addEventListener('click', function() {
-        if (modalInput.value) {
-            proximoContatoInput.value = modalInput.value;
-            agendamentoModal.hide();
-        } else {
-            alert('Por favor, selecione uma data e hora.');
-        }
-    });
+    if(confirmarBtn){
+        confirmarBtn.addEventListener('click', function() {
+            if (modalInput.value) {
+                proximoContatoInput.value = modalInput.value;
+                agendamentoModal.hide();
+            } else {
+                alert('Por favor, selecione uma data e hora.');
+            }
+        });
+    }
 
 
     // --- Lógica da API FIPE ---
-    const tipoVeiculoSelect = document.getElementById('tipo_veiculo_select');
+    const tipoVeiculoSelect = document.getElementById('id_tipo_veiculo'); // CORRIGIDO: Usar o ID do campo do Django
     const marcaSelect = document.getElementById('marca_select');
     const modeloSelect = document.getElementById('modelo_select');
     const anoSelect = document.getElementById('ano_select');
@@ -197,12 +198,16 @@ document.addEventListener('DOMContentLoaded', (event) => {
         const tipoVeiculo = tipoVeiculoSelect.value;
         const marcaId = marcaSelect.value;
         const marcaNome = marcaSelect.options[marcaSelect.selectedIndex].text;
+        
         resetSelect(modeloSelect, 'Carregando...');
         resetSelect(anoSelect, 'Selecione um modelo');
+        
         if (!marcaId) return;
+        
         marcaInput.value = marcaNome;
         modeloInput.value = '';
         anoInput.value = '';
+        
         fetch(`/api/fipe/${tipoVeiculo}/marcas/${marcaId}/modelos/`)
             .then(response => response.json())
             .then(data => {
@@ -220,10 +225,14 @@ document.addEventListener('DOMContentLoaded', (event) => {
         const marcaId = marcaSelect.value;
         const modeloId = modeloSelect.value;
         const modeloNome = modeloSelect.options[modeloSelect.selectedIndex].text;
+        
         resetSelect(anoSelect, 'Carregando...');
+        
         if (!modeloId) return;
+        
         modeloInput.value = modeloNome;
         anoInput.value = '';
+
         fetch(`/api/fipe/${tipoVeiculo}/marcas/${marcaId}/modelos/${modeloId}/anos/`)
             .then(response => response.json())
             .then(data => {

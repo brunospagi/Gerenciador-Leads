@@ -124,7 +124,8 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
         if not self.request.user.is_superuser:
             cliente.vendedor = self.request.user
 
-        cliente.data_proximo_contato = timezone.now() + timedelta(days=5)
+        if not cliente.data_proximo_contato:
+            cliente.data_proximo_contato = timezone.now() + timedelta(days=5)
             
         cliente.save()
         return redirect(self.success_url)
