@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from .models import Notificacao
 
 @login_required
@@ -15,7 +16,8 @@ def deletar_notificacao(request, notificacao_id):
     notificacao.delete()
     return redirect('lista_notificacoes')
 
-@login_required
 def deletar_todas_notificacoes(request):
-    Notificacao.objects.filter(usuario=request.user).delete()
+    if request.method == 'POST':
+        Notificacao.objects.filter(usuario=request.user).delete()
+        messages.success(request, 'Todas as notificações foram removidas com sucesso.')
     return redirect('lista_notificacoes')
