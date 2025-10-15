@@ -88,6 +88,25 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="agendamentoModal" tabindex="-1" aria-labelledby="agendamentoModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="agendamentoModalLabel">Definir Data do Agendamento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Por favor, selecione a data e a hora para o próximo contato.</p>
+        <input type="datetime-local" id="modalAgendamentoInput" class="form-control">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="confirmarAgendamentoBtn">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -99,7 +118,33 @@ document.addEventListener('DOMContentLoaded', (event) => {
         IMask(phoneInput, { mask: [{ mask: '(00) 0000-0000' }, { mask: '(00) 0 0000-0000' }] });
     }
 
-    // Lógica da API FIPE
+    // --- LÓGICA DO MODAL DE AGENDAMENTO ---
+    const statusSelect = document.getElementById('id_status_negociacao');
+    const proximoContatoInput = document.getElementById('id_data_proximo_contato');
+    const agendamentoModal = new bootstrap.Modal(document.getElementById('agendamentoModal'));
+    const modalInput = document.getElementById('modalAgendamentoInput');
+    const confirmarBtn = document.getElementById('confirmarAgendamentoBtn');
+    
+    // Esconde o campo de data por padrão
+    proximoContatoInput.closest('.col-md-6').style.display = 'none';
+
+    statusSelect.addEventListener('change', function() {
+        if (this.value === 'Agendado') {
+            agendamentoModal.show();
+        }
+    });
+
+    confirmarBtn.addEventListener('click', function() {
+        if (modalInput.value) {
+            proximoContatoInput.value = modalInput.value;
+            agendamentoModal.hide();
+        } else {
+            alert('Por favor, selecione uma data e hora.');
+        }
+    });
+
+
+    // --- Lógica da API FIPE ---
     const marcaSelect = document.getElementById('marca_select');
     const modeloSelect = document.getElementById('modelo_select');
     const anoSelect = document.getElementById('ano_select');

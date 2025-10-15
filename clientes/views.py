@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy , reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView
 from .models import Cliente
 from .forms import ClienteForm, HistoricoForm
@@ -8,12 +8,13 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 from datetime import timedelta
-# >> 1. IMPORTE O 'Q' PARA FAZER BUSCAS COMPLEXAS <<
 from django.db.models import Avg, Count, F, ExpressionWrapper, fields, Q
 from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from datetime import datetime
+from django.views.generic import TemplateView 
+import json
 
 
 class ClienteListView(LoginRequiredMixin, ListView):
@@ -334,6 +335,72 @@ class ClienteDeleteView(LoginRequiredMixin, DeleteView):
         if request.user.is_superuser is False:
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
+
+class CalendarioView(LoginRequiredMixin, TemplateView):
+    template_name = 'clientes/calendario.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        
+        # Filtra agendamentos por vendedor ou mostra todos para o admin
+        base_queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
+        agendamentos_qs = base_queryset.filter(status_negociacao=Cliente.StatusNegociacao.AGENDADO)
+        
+        eventos_calendario = []
+        for agendamento in agendamentos_qs:
+            eventos_calendario.append({
+                'title': agendamento.nome_cliente,
+                'start': agendamento.data_proximo_contato.isoformat(),
+                'url': reverse('cliente_detail', args=[agendamento.pk]),
+                'color': '#6f42c1',
+            })
+            
+        context['agendamentos_json'] = json.dumps(eventos_calendario)
+        return context
+
+class ClienteListView(LoginRequiredMixin, ListView):
+    model = Cliente
+    template_name = 'clientes/cliente_list.html'
+    context_object_name = 'clientes'
+    paginate_by = 15
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
+
+        query = self.request.GET.get('q')
+        if query:
+            queryset = queryset.filter(
+                Q(nome_cliente__icontains=query) |
+                Q(marca_veiculo__icontains=query) |
+                Q(modelo_veiculo__icontains=query) |
+                Q(ano_veiculo__icontains=query) |
+                Q(fonte_cliente__icontains=query)
+            )
+
+        periodo = self.request.GET.get('dias')
+        if periodo and periodo.isdigit():
+            dias = int(periodo)
+            data_limite = timezone.now() - timedelta(days=dias)
+            queryset = queryset.filter(data_ultimo_contato__gte=data_limite)
+
+        queryset = queryset.order_by('-data_ultimo_contato')
+        return queryset.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['periodo_selecionado'] = self.request.GET.get('dias', '')
+        context['search_query'] = self.request.GET.get('q', '')
+        
+        user = self.request.user
+        base_queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
+        
+        context['clientes_atrasados_count'] = base_queryset.filter(
+            data_proximo_contato__lte=timezone.now()
+        ).exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO).count()
+        
+        return context
 
 def offline_view(request):
     return render(request, "clientes/offline.html")

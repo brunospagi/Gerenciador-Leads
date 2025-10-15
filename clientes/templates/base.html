@@ -28,7 +28,7 @@
         }
         .nav-link {
             display: flex;
-            align-items-center;
+            align-items: center;
         }
         .nav-link i, .dropdown-item i {
             margin-right: 8px;
@@ -56,6 +56,9 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'cliente_list' %}"><i class="bi bi-speedometer2"></i> Dashboard</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'calendario' %}"><i class="bi bi-calendar-week-fill"></i> Calendário</a>
+                        </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarClientes" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-person-lines-fill"></i> Clientes
@@ -72,7 +75,7 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'avaliacao_list' %}"><i class="bi bi-car-front-fill"></i> Avaliações</a>
                         </li>
-                        {% if user.is_superuser %}
+                        {% if user.profile.nivel_acesso == 'ADMIN' %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarAdmin" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-shield-lock-fill"></i> Admin

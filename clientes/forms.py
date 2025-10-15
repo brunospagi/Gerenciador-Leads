@@ -9,7 +9,8 @@ class ClienteForm(forms.ModelForm):
             'whatsapp', 'nome_cliente',
             'marca_veiculo', 'modelo_veiculo', 'ano_veiculo', 'valor_estimado_veiculo',
             'fonte_cliente', 'quantidade_ligacoes', 'tipo_negociacao', 'tipo_contato',
-            'status_negociacao', 'proximo_passo', 'prioridade', 'observacao', 'vendedor'
+            'status_negociacao', 'proximo_passo', 'prioridade', 'observacao', 'vendedor',
+            'data_proximo_contato' # Adicionado para controle
         ]
         widgets = {
             'observacao': forms.Textarea(attrs={'rows': 3}),
@@ -18,6 +19,7 @@ class ClienteForm(forms.ModelForm):
             'marca_veiculo': forms.HiddenInput(),
             'modelo_veiculo': forms.HiddenInput(),
             'ano_veiculo': forms.HiddenInput(),
+            'data_proximo_contato': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
         }
 
     def __init__(self, *args, **kwargs):

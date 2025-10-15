@@ -10,11 +10,13 @@ from .views import (
     offline_view,
     relatorio_dashboard,
     exportar_relatorio_pdf,
-    ClienteDeleteView 
+    ClienteDeleteView ,
+    CalendarioView
 )
 
 urlpatterns = [
     path('', ClienteListView.as_view(), name='cliente_list'),
+    path('calendario/', CalendarioView.as_view(), name='calendario'),
     path('relatorios/exportar/', exportar_relatorio_pdf, name='exportar_relatorio_pdf'),
     path('relatorios/', relatorio_dashboard, name='relatorios'),
     path('clientes/atrasados/', ClienteAtrasadoListView.as_view(), name='cliente_atrasados_list'),
