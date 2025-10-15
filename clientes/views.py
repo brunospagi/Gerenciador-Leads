@@ -14,6 +14,7 @@ from django.template.loader import get_template
 from xhtml2pdf import pisa
 import json
 
+
 class CalendarioView(LoginRequiredMixin, TemplateView):
     template_name = 'clientes/calendario.html'
 
@@ -34,6 +35,7 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
             
         context['agendamentos_json'] = json.dumps(eventos_calendario)
         return context
+
 
 class ClienteListView(LoginRequiredMixin, ListView):
     model = Cliente
@@ -72,6 +74,7 @@ class ClienteListView(LoginRequiredMixin, ListView):
         ).exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO).count()
         return context
 
+
 class ClienteDetailView(LoginRequiredMixin, DetailView):
     model = Cliente
     template_name = 'clientes/cliente_detail.html'
@@ -87,7 +90,6 @@ class ClienteDetailView(LoginRequiredMixin, DetailView):
         context['historicos'] = self.object.historico.all()
         return context
 
-# --- CORREÇÃO APLICADA NAS VIEWS DE CREATE E UPDATE ---
 
 class ClienteCreateView(LoginRequiredMixin, CreateView):
     model = Cliente
@@ -103,13 +105,11 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         cliente = form.save(commit=False)
         
-        # Define o vendedor se não for superusuário
         if not self.request.user.is_superuser:
             cliente.vendedor = self.request.user
 
-        # Se o status NÃO for 'Agendado' e a data não foi definida,
-        # define uma data padrão para o próximo contato.
-        if cliente.status_negociacao != Cliente.StatusNegociacao.AGENDADO and not cliente.data_proximo_contato:
+        # Se não for um agendamento, define uma data padrão.
+        if cliente.status_negociacao != Cliente.StatusNegociacao.AGENDADO:
             cliente.data_proximo_contato = timezone.now() + timedelta(days=5)
             
         cliente.save()
@@ -132,22 +132,23 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
         return kwargs
 
     def form_valid(self, form):
-        cliente = form.save(commit=False)
+        # Acessa os dados do formulário antes de salvar
+        cliente_instance = form.save(commit=False)
+
+        # Se o campo de data não veio no formulário (ou seja, o modal não foi usado),
+        # nós explicitamente restauramos a data que já existia no banco de dados.
+        if not form.cleaned_data.get('data_proximo_contato'):
+            cliente_instance.data_proximo_contato = self.get_object().data_proximo_contato
 
         # Garante que o vendedor não seja alterado por não-superusuários
         if not self.request.user.is_superuser:
-            cliente.vendedor = self.get_object().vendedor
+            cliente_instance.vendedor = self.get_object().vendedor
 
-        # Se o status NÃO for 'Agendado' e a data não foi definida via modal,
-        # mantém a data original ou define uma nova para evitar erros.
-        if cliente.status_negociacao != Cliente.StatusNegociacao.AGENDADO:
-            if not form.cleaned_data.get('data_proximo_contato'):
-                 cliente.data_proximo_contato = self.get_object().data_proximo_contato
-
-        cliente.save()
+        # Agora salva a instância com a data garantida
+        cliente_instance.save()
+        
         return redirect(self.get_success_url())
 
-# --- RESTANTE DO ARQUIVO ---
 
 @login_required
 def adicionar_historico(request, pk):
@@ -171,6 +172,7 @@ def adicionar_historico(request, pk):
             
     return redirect('cliente_detail', pk=cliente.pk)
     
+# ... (Restante do arquivo como relatorios, delete, etc. permanece o mesmo)
 class ClienteAtrasadoListView(LoginRequiredMixin, ListView):
     model = Cliente
     template_name = 'clientes/cliente_atrasado_list.html'
@@ -214,7 +216,6 @@ def relatorio_dashboard(request):
     total_clientes = clientes_todos.count()
     clientes_ativos = clientes_todos.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
     
-    # Alterado para filtrar por 'Vendido' para métricas de conclusão
     clientes_concluidos = clientes_todos.filter(status_negociacao=Cliente.StatusNegociacao.VENDIDO)
 
     taxa_conversao = (clientes_concluidos.count() / total_clientes) * 100 if total_clientes > 0 else 0
@@ -237,8 +238,6 @@ def relatorio_dashboard(request):
     vendedor_labels = [item['vendedor__username'] for item in vendedor_data]
     vendedor_values = [item['total'] for item in vendedor_data]
 
-    # --- NOVAS QUERIES ---
-    # 1. Vendas Concluídas por Vendedor
     vendas_data = clientes_concluidos.filter(
         tipo_negociacao=Cliente.TipoNegociacao.VENDA
     ).values('vendedor__username').annotate(total=Count('id')).order_by('-total')
@@ -246,14 +245,12 @@ def relatorio_dashboard(request):
     vendas_por_vendedor_labels = [item['vendedor__username'] for item in vendas_data]
     vendas_por_vendedor_values = [item['total'] for item in vendas_data]
 
-    # 2. Consignações Concluídas por Vendedor
     consignacao_data = clientes_concluidos.filter(
         tipo_negociacao=Cliente.TipoNegociacao.CONSIGNACAO
     ).values('vendedor__username').annotate(total=Count('id')).order_by('-total')
 
     consignacao_por_vendedor_labels = [item['vendedor__username'] for item in consignacao_data]
     consignacao_por_vendedor_values = [item['total'] for item in consignacao_data]
-    # --- FIM NOVAS QUERIES ---
 
     context = {
         'total_clientes': total_clientes,
@@ -295,7 +292,6 @@ def exportar_relatorio_pdf(request):
     total_clientes = clientes_todos.count()
     clientes_ativos = clientes_todos.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
     
-    # Alterado para filtrar por 'Vendido'
     clientes_concluidos = clientes_todos.filter(status_negociacao=Cliente.StatusNegociacao.VENDIDO)
 
     taxa_conversao = (clientes_concluidos.count() / total_clientes) * 100 if total_clientes > 0 else 0
@@ -315,19 +311,16 @@ def exportar_relatorio_pdf(request):
     vendedor_list = clientes_todos.values('vendedor__username').annotate(total=Count('id')).order_by('-total')
     vendedor_dict = {item['vendedor__username']: item['total'] for item in vendedor_list}
 
-    # --- NOVAS QUERIES PARA PDF ---
-    # 1. Vendas por Vendedor
     vendas_list = clientes_concluidos.filter(
         tipo_negociacao=Cliente.TipoNegociacao.VENDA
     ).values('vendedor__username').annotate(total=Count('id')).order_by('-total')
     vendas_por_vendedor_dict = {item['vendedor__username']: item['total'] for item in vendas_list}
 
-    # 2. Consignações por Vendedor
     consignacao_list = clientes_concluidos.filter(
         tipo_negociacao=Cliente.TipoNegociacao.CONSIGNACAO
     ).values('vendedor__username').annotate(total=Count('id')).order_by('-total')
     consignacao_por_vendedor_dict = {item['vendedor__username']: item['total'] for item in consignacao_list}
-    # --- FIM NOVAS QUERIES PARA PDF ---
+
     context = {
         'total_clientes': total_clientes,
         'total_clientes_ativos': clientes_ativos.count(),
@@ -342,7 +335,7 @@ def exportar_relatorio_pdf(request):
         'consignacao_por_vendedor_data': consignacao_por_vendedor_dict,
     }
     
-    template_path = 'clientes/relatorio_pdf.html' # Utiliza o novo template
+    template_path = 'clientes/relatorio_pdf.html'
     template = get_template(template_path)
     html = template.render(context)
 
