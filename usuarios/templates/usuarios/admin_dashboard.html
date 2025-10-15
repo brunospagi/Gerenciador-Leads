@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .metric-card {
+        border: none;
+        border-left: 5px solid #0d6efd;
+    }
+    .metric-card .card-body {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .metric-card i {
+        font-size: 2.5rem;
+        color: #0d6efd;
+        opacity: 0.3;
+    }
+    .chart-card .card-header {
+        background-color: #f8f9fa;
+        font-weight: 500;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Painel do Administrador</h1>
+</div>
+
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card shadow-sm chart-card">
+            <div class="card-header">Logins nos Últimos 15 Dias</div>
+            <div class="card-body">
+                <canvas id="loginsChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header">Usuários Mais Ativos</div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    {% for user in usuarios_ativos %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-person-circle me-2"></i>{{ user.username }}</span>
+                        <span class="badge bg-primary rounded-pill">{{ user.total_logins }} logins</span>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-center">Nenhuma atividade registrada.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header">Últimos Acessos</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <tbody>
+                            {% for login in ultimos_logins %}
+                            <tr>
+                                <td><i class="bi bi-box-arrow-in-right text-success me-2"></i><strong>{{ login.user.username }}</strong></td>
+                                <td class="text-muted">{{ login.login_timestamp|date:"d/m/Y H:i" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td class="text-center">Nenhum login recente.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Gráfico de Logins
+    const ctxLogins = document.getElementById('loginsChart').getContext('2d');
+    new Chart(ctxLogins, {
+        type: 'line',
+        data: {
+            labels: {{ labels_grafico|safe }},
+            datasets: [{
+                label: 'Total de Logins',
+                data: {{ data_grafico|safe }},
+                backgroundColor: 'rgba(13, 110, 253, 0.2)',
+                borderColor: 'rgba(13, 110, 253, 1)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

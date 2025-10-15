@@ -83,3 +83,50 @@ class UserPasswordChangeView(AdminRequiredMixin, FormView):
         # Passa o usuário alvo para o template, para exibir seu nome
         context['target_user'] = User.objects.get(pk=self.kwargs['pk'])
         return context
+
+@login_required
+def admin_dashboard_view(request):
+    if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
+        raise PermissionDenied("Você não tem permissão para acessar esta página.")
+
+    # 1. Gráfico de logins nos últimos 15 dias
+    today = timezone.now().date()
+    start_date = today - timedelta(days=14)
+    
+    logins_por_dia = UserLoginActivity.objects.filter(
+        login_timestamp__date__gte=start_date
+    ).extra(
+        {'dia': "date(login_timestamp)"}
+    ).values('dia').annotate(
+        total=Count('id')
+    ).order_by('dia')
+
+    # Prepara os dados para o Chart.js
+    datas = [d['dia'] for d in logins_por_dia]
+    totais = [d['total'] for d in logins_por_dia]
+    
+    # Garante que todos os 15 dias estejam no gráfico, mesmo que com 0 logins
+    dias_grafico = [(start_date + timedelta(days=i)).strftime('%d/%m') for i in range(15)]
+    logins_grafico = [0] * 15
+    
+    for i, data_formatada in enumerate(dias_grafico):
+        for login_data in logins_por_dia:
+            if login_data['dia'].strftime('%d/%m') == data_formatada:
+                logins_grafico[i] = login_data['total']
+                break
+
+    # 2. Usuários mais ativos (top 5)
+    usuarios_ativos = User.objects.annotate(
+        total_logins=Count('login_activities')
+    ).filter(total_logins__gt=0).order_by('-total_logins')[:5]
+
+    # 3. Últimos 10 logins
+    ultimos_logins = UserLoginActivity.objects.all()[:10]
+
+    context = {
+        'labels_grafico': json.dumps(dias_grafico),
+        'data_grafico': json.dumps(logins_grafico),
+        'usuarios_ativos': usuarios_ativos,
+        'ultimos_logins': ultimos_logins,
+    }
+    return render(request, 'usuarios/admin_dashboard.html', context)
