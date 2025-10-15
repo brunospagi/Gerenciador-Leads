@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import Notificacao
@@ -12,10 +12,13 @@ def lista_notificacoes(request):
 
 @login_required
 def deletar_notificacao(request, notificacao_id):
-    notificacao = Notificacao.objects.get(id=notificacao_id, usuario=request.user)
+    # Utiliza get_object_or_404 para mais robustez
+    notificacao = get_object_or_404(Notificacao, id=notificacao_id, usuario=request.user)
     notificacao.delete()
+    messages.success(request, 'Notificação removida.') # Adiciona uma mensagem de sucesso
     return redirect('lista_notificacoes')
 
+@login_required
 def deletar_todas_notificacoes(request):
     if request.method == 'POST':
         Notificacao.objects.filter(usuario=request.user).delete()
