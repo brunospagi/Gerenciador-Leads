@@ -288,6 +288,6 @@ class ClienteDeleteView(LoginRequiredMixin, DeleteView):
     success_url = reverse_lazy('cliente_list')
 
     def dispatch(self, request, *args, **kwargs):
-        if request.user.username != 'bruno.gabriel':
+        if request.user.is_superuser is False:
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
