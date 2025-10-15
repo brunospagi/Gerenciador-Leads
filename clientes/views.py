@@ -159,8 +159,13 @@ def adicionar_historico(request, pk):
             historico.cliente = cliente
             historico.save()
             
+            # ATUALIZA A DATA DO ÚLTIMO CONTATO
             cliente.data_ultimo_contato = timezone.now()
-            cliente.data_proximo_contato = timezone.now() + timedelta(days=5)
+            # Só define a próxima data de contato automaticamente se o cliente NÃO estiver agendado.
+            # Isso preserva a data que foi definida manualmente pelo modal.
+            if cliente.status_negociacao != Cliente.StatusNegociacao.AGENDADO:
+                cliente.data_proximo_contato = timezone.now() + timedelta(days=5)
+            
             cliente.save()
             
     return redirect('cliente_detail', pk=cliente.pk)
