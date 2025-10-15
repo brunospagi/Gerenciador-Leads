@@ -32,6 +32,7 @@
         vertical-align: middle;
     }
 
+    /* Bordas de Prioridade */
     .priority-frio { border-left: 4px solid #0d6efd; }
     .priority-morno { border-left: 4px solid #ffc107; }
     .priority-quente { border-left: 4px solid #dc3545; }
@@ -49,9 +50,20 @@
         transform: scale(0.95);
     }
 
+    /* --- NOVAS CLASSES PARA STATUS --- */
     .status-badge {
         font-weight: 500;
+        padding: .4em .7em;
+        border-radius: 20px;
+        font-size: 0.8em;
     }
+    .status-novo { background-color: #0dcaf0 !important; color: #000 !important; }
+    .status-pendente { background-color: #ffc107 !important; color: #000 !important; }
+    .status-em-atendimento { background-color: #0d6efd !important; color: #fff !important; }
+    .status-agendado { background-color: #6f42c1 !important; color: #fff !important; }
+    .status-vendido { background-color: #198754 !important; color: #fff !important; }
+    .status-fechamento { background-color: #fd7e14 !important; color: #fff !important; }
+    .status-sem-resposta { background-color: #6c757d !important; color: #fff !important; }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -112,7 +124,19 @@
                         <td>{{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }} <span class="text-muted">{{ cliente.ano_veiculo }}</span></td>
                         <td>{{ cliente.fonte_cliente|default:"N/A" }}</td>
                         <td>{{ cliente.data_ultimo_contato|date:"d/m/Y H:i" }}</td>
-                        <td><span class="badge bg-light text-dark status-badge">{{ cliente.get_status_negociacao_display }}</span></td>
+                        <td>
+                            <span class="badge status-badge 
+                                {% if cliente.status_negociacao == 'Novo' %}status-novo
+                                {% elif cliente.status_negociacao == 'Pendente' %}status-pendente
+                                {% elif cliente.status_negociacao == 'Em atendimento' %}status-em-atendimento
+                                {% elif cliente.status_negociacao == 'Agendado' %}status-agendado
+                                {% elif cliente.status_negociacao == 'Vendido' %}status-vendido
+                                {% elif cliente.status_negociacao == 'Fechamento' %}status-fechamento
+                                {% elif cliente.status_negociacao == 'Sem resposta' %}status-sem-resposta
+                                {% endif %}">
+                                {{ cliente.get_status_negociacao_display }}
+                            </span>
+                        </td>
                         {% if user.is_superuser %}
                             <td>{{ cliente.vendedor.username }}</td>
                         {% endif %}
