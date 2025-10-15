@@ -4,21 +4,73 @@
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.14/index.global.min.js'></script>
 
 <style>
-    /* Estilos para o Calendário */
-    #calendario {
+    /* Estilos gerais e melhorias de design */
+    #calendario-container {
         border-radius: 0.75rem;
-        padding: 1.5rem;
         background-color: #fff;
+        padding: 1rem;
     }
     .fc .fc-button-primary {
         background-color: #0d6efd;
         border-color: #0d6efd;
+        transition: background-color 0.2s;
+    }
+    .fc .fc-button-primary:hover {
+        background-color: #0b5ed7;
     }
     .fc .fc-daygrid-day.fc-day-today {
         background-color: rgba(13, 110, 253, 0.1);
     }
     .fc-event {
         cursor: pointer;
+        border: none !important;
+        padding: 5px 8px !important;
+        font-weight: 500;
+    }
+
+    /* Lista de Impressão */
+    #lista-impressao h5 {
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+    }
+    #lista-impressao .list-group-item {
+        border-right: none;
+        border-left: none;
+    }
+
+    /* --- ESTILOS PARA IMPRESSÃO --- */
+    @media print {
+        /* Esconde tudo que não for a lista de impressão */
+        body * {
+            visibility: hidden;
+        }
+        #lista-impressao, #lista-impressao * {
+            visibility: visible;
+        }
+        #lista-impressao {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .btn, .navbar, footer {
+            display: none;
+        }
+    }
+
+    /* --- MELHORIAS PARA CELULAR (RESPONSIVIDADE) --- */
+    @media (max-width: 768px) {
+        #calendario-container {
+            padding: 0.5rem;
+        }
+        /* Altera o cabeçalho do calendário para uma visualização mais compacta */
+        .fc-header-toolbar {
+            flex-direction: column;
+            gap: 10px;
+        }
+        .fc .fc-toolbar-title {
+            font-size: 1.25em;
+        }
     }
 </style>
 
@@ -27,10 +79,42 @@
 </div>
 
 <div class="card shadow-sm">
-    <div class="card-body">
+    <div class="card-body" id="calendario-container">
         <div id='calendario'></div>
     </div>
 </div>
+
+<div class="card shadow-sm mt-4" id="lista-impressao">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="bi bi-list-week me-2"></i>
+            Agendamentos da Semana ({{ inicio_semana|date:"d/m" }} - {{ fim_semana|date:"d/m" }})
+        </h5>
+        <button onclick="window.print()" class="btn btn-secondary btn-sm print-button">
+            <i class="bi bi-printer-fill me-1"></i>Imprimir Lista
+        </button>
+    </div>
+    <div class="card-body">
+        {% if agendamentos_da_semana %}
+            <ul class="list-group list-group-flush">
+                {% for agendamento in agendamentos_da_semana %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong class="text-primary">{{ agendamento.data_proximo_contato|date:"d/m/Y, H:i" }}</strong> - {{ agendamento.nome_cliente }}
+                            <small class="d-block text-muted">Vendedor: {{ agendamento.vendedor.username }}</small>
+                        </div>
+                        <a href="{% url 'cliente_detail' agendamento.pk %}" class="btn btn-outline-secondary btn-sm print-button">
+                           Ver Cliente <i class="bi bi-arrow-right-short"></i>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-center text-muted mb-0">Nenhum agendamento para esta semana.</p>
+        {% endif %}
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}

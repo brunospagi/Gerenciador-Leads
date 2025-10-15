@@ -21,9 +21,11 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
+        
         base_queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
         agendamentos_qs = base_queryset.filter(status_negociacao=Cliente.StatusNegociacao.AGENDADO)
         
+        # Lógica para o JSON do FullCalendar (sem alterações)
         eventos_calendario = []
         for agendamento in agendamentos_qs:
             eventos_calendario.append({
@@ -32,9 +34,23 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
                 'url': reverse('cliente_detail', args=[agendamento.pk]),
                 'color': '#6f42c1',
             })
-            
         context['agendamentos_json'] = json.dumps(eventos_calendario)
+
+        today = timezone.now().date()
+        start_of_week = today - timedelta(days=today.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+
+        # Filtra os agendamentos que caem na semana atual e os ordena por data
+        agendamentos_da_semana = agendamentos_qs.filter(
+            data_proximo_contato__date__range=[start_of_week, end_of_week]
+        ).order_by('data_proximo_contato')
+
+        context['agendamentos_da_semana'] = agendamentos_da_semana
+        context['inicio_semana'] = start_of_week
+        context['fim_semana'] = end_of_week
+        
         return context
+
 
 
 class ClienteListView(LoginRequiredMixin, ListView):
