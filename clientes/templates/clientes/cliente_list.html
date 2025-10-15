@@ -1,95 +1,134 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<style>
+    .card {
+        border: none;
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+    .table-hover tbody tr:hover {
+        background-color: #f1f1f1;
+    }
+    .table th {
+        border-top: none;
+    }
+    .table td, .table th {
+        vertical-align: middle;
+    }
+    .priority-badge {
+        font-size: 0.9em;
+        padding: .4em .7em;
+    }
+    .actions-btn a {
+        margin: 0 4px;
+    }
+</style>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Meus Clientes</h1>
-    <a href="{% url 'cliente_create' %}" class="btn btn-primary">Adicionar Cliente</a>
+    <h1 class="mb-0"><i class="bi bi-people-fill me-2"></i>Meus Clientes</h1>
+    <a href="{% url 'cliente_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-1"></i>Adicionar Cliente</a>
 </div>
 
-<div class="card card-body mb-4">
-    <form method="get" class="row g-3 align-items-end">
-        <div class="col-md-6">
-            <label for="q_id" class="form-label">Pesquisar por Nome, Veículo ou Fonte</label>
-            <input type="text" name="q" class="form-control" id="q_id" value="{{ search_query }}">
-        </div>
-        <div class="col-md-4">
-            <label class="form-label">Filtrar por último contato</label>
-            <div class="btn-group w-100">
-                <a href="?q={{ search_query }}" class="btn btn-outline-secondary {% if not periodo_selecionado %}active{% endif %}">
-                    Todos
-                </a>
-                <a href="?q={{ search_query }}&dias=15" class="btn btn-outline-secondary {% if periodo_selecionado == '15' %}active{% endif %}">
-                    15d
-                </a>
-                <a href="?q={{ search_query }}&dias=30" class="btn btn-outline-secondary {% if periodo_selecionado == '30' %}active{% endif %}">
-                    30d
-                </a>
-                <a href="?q={{ search_query }}&dias=45" class="btn btn-outline-secondary {% if periodo_selecionado == '45' %}active{% endif %}">
-                    45d
-                </a>
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label for="q_id" class="form-label fw-bold">Pesquisar por Nome, Veículo ou Fonte</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" class="form-control" id="q_id" value="{{ search_query }}">
+                </div>
             </div>
-        </div>
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-primary w-100">Filtrar</button>
-        </div>
-    </form>
+            <div class="col-md-4">
+                <label class="form-label fw-bold">Filtrar por último contato</label>
+                <div class="btn-group w-100">
+                    <a href="?q={{ search_query }}" class="btn btn-outline-secondary {% if not periodo_selecionado %}active{% endif %}">
+                        Todos
+                    </a>
+                    <a href="?q={{ search_query }}&dias=15" class="btn btn-outline-secondary {% if periodo_selecionado == '15' %}active{% endif %}">
+                        15d
+                    </a>
+                    <a href="?q={{ search_query }}&dias=30" class="btn btn-outline-secondary {% if periodo_selecionado == '30' %}active{% endif %}">
+                        30d
+                    </a>
+                    <a href="?q={{ search_query }}&dias=45" class="btn btn-outline-secondary {% if periodo_selecionado == '45' %}active{% endif %}">
+                        45d
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-funnel-fill me-1"></i>Filtrar</button>
+            </div>
+        </form>
+    </div>
 </div>
 
-
-<div class="table-responsive">
-    <table class="table table-striped table-hover">
-        <thead class="table-dark">
-            <tr>
-                <th>Nome</th>
-                <th>Veículo</th>
-                <th>Fonte</th>
-                <th>Tipo de Contato</th>
-                <th>Último Contato</th>
-                <th>Status</th>
-                {% if user.is_superuser %}
-                    <th>Vendedor</th>
-                {% endif %}
-                <th>Prioridade</th>
-                <th>Ações</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for cliente in clientes %}
-            <tr class="{% if cliente.contato_atrasado %}table-danger{% endif %}">
-                <td>{{ cliente.nome_cliente }}</td>
-                <td>{{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }} {{ cliente.ano_veiculo }}</td>
-                <td>{{ cliente.fonte_cliente|default:"N/A" }}</td>
-                <td>{{ cliente.get_tipo_contato_display }}</td>
-                <td>{{ cliente.data_ultimo_contato|date:"d/m/Y H:i" }}</td>
-                <td><span class="badge bg-info text-dark">{{ cliente.get_status_negociacao_display }}</span></td>
-                {% if user.is_superuser %}
-                    <td>{{ cliente.vendedor.username }}</td>
-                {% endif %}
-                <td>
-                    {% if cliente.prioridade == 'Quente' %}
-                        <span class="badge bg-danger">{{ cliente.get_prioridade_display }}</span>
-                    {% elif cliente.prioridade == 'Morno' %}
-                        <span class="badge bg-warning text-dark">{{ cliente.get_prioridade_display }}</span>
-                    {% else %}
-                        <span class="badge bg-primary">{{ cliente.get_prioridade_display }}</span>
-                    {% endif %}
-                </td>
-                <td>
-                    <a href="{% url 'cliente_detail' cliente.pk %}" class="btn btn-sm btn-secondary">Detalhes</a>
-                    <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-sm btn-info">Editar</a>
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="10" class="text-center">Nenhum cliente encontrado com os filtros atuais.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nome</th>
+                        <th>Veículo</th>
+                        <th>Fonte</th>
+                        <th>Tipo de Contato</th>
+                        <th>Último Contato</th>
+                        <th>Status</th>
+                        {% if user.is_superuser %}
+                            <th>Vendedor</th>
+                        {% endif %}
+                        <th class="text-center">Prioridade</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cliente in clientes %}
+                    <tr class="{% if cliente.contato_atrasado %}table-danger{% endif %}">
+                        <td><strong>{{ cliente.nome_cliente }}</strong></td>
+                        <td>{{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }} {{ cliente.ano_veiculo }}</td>
+                        <td>{{ cliente.fonte_cliente|default:"N/A" }}</td>
+                        <td>{{ cliente.get_tipo_contato_display }}</td>
+                        <td>{{ cliente.data_ultimo_contato|date:"d/m/Y H:i" }}</td>
+                        <td><span class="badge bg-info text-dark">{{ cliente.get_status_negociacao_display }}</span></td>
+                        {% if user.is_superuser %}
+                            <td>{{ cliente.vendedor.username }}</td>
+                        {% endif %}
+                        <td class="text-center">
+                            {% if cliente.prioridade == 'Quente' %}
+                                <span class="badge bg-danger priority-badge">{{ cliente.get_prioridade_display }}</span>
+                            {% elif cliente.prioridade == 'Morno' %}
+                                <span class="badge bg-warning text-dark priority-badge">{{ cliente.get_prioridade_display }}</span>
+                            {% else %}
+                                <span class="badge bg-primary priority-badge">{{ cliente.get_prioridade_display }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center actions-btn">
+                            <a href="{% url 'cliente_detail' cliente.pk %}" class="btn btn-sm btn-outline-secondary" title="Ver Detalhes"><i class="bi bi-eye-fill"></i></a>
+                            <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-sm btn-outline-info" title="Editar Cliente"><i class="bi bi-pencil-fill"></i></a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="text-center p-4">
+                            <i class="bi bi-exclamation-circle-fill fs-3 text-muted"></i>
+                            <p class="mb-0 mt-2">Nenhum cliente encontrado com os filtros atuais.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
+
 
 {% if is_paginated %}
-<nav aria-label="Navegação das páginas">
+<nav aria-label="Navegação das páginas" class="mt-4">
     <ul class="pagination justify-content-center">
         {% if page_obj.has_previous %}
             <li class="page-item">
