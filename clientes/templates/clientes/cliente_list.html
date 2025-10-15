@@ -1,67 +1,85 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
 <style>
+    body {
+        font-family: 'Inter', sans-serif;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card, .table {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+
     .card {
-        border: none;
-        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        border: 1px solid #e9ecef;
+        border-radius: 0.75rem;
     }
-    .card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+
+    .table-hover tbody tr {
+        transition: background-color 0.2s ease-in-out;
     }
-    .table-hover tbody tr:hover {
-        background-color: #f1f1f1;
-    }
-    .table th {
-        border-top: none;
-    }
+
     .table td, .table th {
         vertical-align: middle;
     }
-    .priority-badge {
-        font-size: 0.9em;
-        padding: .4em .7em;
+
+    .priority-frio { border-left: 4px solid #0d6efd; }
+    .priority-morno { border-left: 4px solid #ffc107; }
+    .priority-quente { border-left: 4px solid #dc3545; }
+    
+    .actions-btn .btn {
+        transition: transform 0.1s ease-in-out, box-shadow 0.2s ease;
     }
-    .actions-btn a {
-        margin: 0 4px;
+
+    .actions-btn .btn:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    .actions-btn .btn:active {
+        transform: scale(0.95);
+    }
+
+    .status-badge {
+        font-weight: 500;
     }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="mb-0"><i class="bi bi-people-fill me-2"></i>Meus Clientes</h1>
-    <a href="{% url 'cliente_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle-fill me-1"></i>Adicionar Cliente</a>
+    <h1 class="mb-0 h2"><i class="bi bi-people-fill me-2"></i>Meus Clientes</h1>
+    <a href="{% url 'cliente_create' %}" class="btn btn-primary rounded-pill px-3"><i class="bi bi-plus-lg me-1"></i>Adicionar Cliente</a>
 </div>
 
 <div class="card shadow-sm mb-4">
-    <div class="card-body">
+    <div class="card-body p-4">
         <form method="get" class="row g-3 align-items-end">
-            <div class="col-md-6">
-                <label for="q_id" class="form-label fw-bold">Pesquisar por Nome, Veículo ou Fonte</label>
+            <div class="col-lg-6">
+                <label for="q_id" class="form-label fw-bold">Pesquisar</label>
                 <div class="input-group">
-                    <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input type="text" name="q" class="form-control" id="q_id" value="{{ search_query }}">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" class="form-control border-start-0" id="q_id" value="{{ search_query }}" placeholder="Nome, veículo ou fonte...">
                 </div>
             </div>
-            <div class="col-md-4">
-                <label class="form-label fw-bold">Filtrar por último contato</label>
+            <div class="col-lg-4">
+                <label class="form-label fw-bold">Último contato</label>
                 <div class="btn-group w-100">
-                    <a href="?q={{ search_query }}" class="btn btn-outline-secondary {% if not periodo_selecionado %}active{% endif %}">
-                        Todos
-                    </a>
-                    <a href="?q={{ search_query }}&dias=15" class="btn btn-outline-secondary {% if periodo_selecionado == '15' %}active{% endif %}">
-                        15d
-                    </a>
-                    <a href="?q={{ search_query }}&dias=30" class="btn btn-outline-secondary {% if periodo_selecionado == '30' %}active{% endif %}">
-                        30d
-                    </a>
-                    <a href="?q={{ search_query }}&dias=45" class="btn btn-outline-secondary {% if periodo_selecionado == '45' %}active{% endif %}">
-                        45d
-                    </a>
+                    <a href="?q={{ search_query }}" class="btn btn-outline-secondary {% if not periodo_selecionado %}active{% endif %}">Todos</a>
+                    <a href="?q={{ search_query }}&dias=15" class="btn btn-outline-secondary {% if periodo_selecionado == '15' %}active{% endif %}">15d</a>
+                    <a href="?q={{ search_query }}&dias=30" class="btn btn-outline-secondary {% if periodo_selecionado == '30' %}active{% endif %}">30d</a>
+                    <a href="?q={{ search_query }}&dias=45" class="btn btn-outline-secondary {% if periodo_selecionado == '45' %}active{% endif %}">45d</a>
                 </div>
             </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-funnel-fill me-1"></i>Filtrar</button>
+            <div class="col-lg-2">
+                <button type="submit" class="btn btn-dark w-100"><i class="bi bi-funnel-fill me-1"></i>Filtrar</button>
             </div>
         </form>
     </div>
@@ -71,52 +89,44 @@
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-hover">
-                <thead class="table-dark">
+                <thead class="table-light">
                     <tr>
-                        <th>Nome</th>
+                        <th>Nome do Cliente</th>
                         <th>Veículo</th>
                         <th>Fonte</th>
-                        <th>Tipo de Contato</th>
                         <th>Último Contato</th>
                         <th>Status</th>
                         {% if user.is_superuser %}
                             <th>Vendedor</th>
                         {% endif %}
-                        <th class="text-center">Prioridade</th>
                         <th class="text-center">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for cliente in clientes %}
-                    <tr class="{% if cliente.contato_atrasado %}table-danger{% endif %}">
-                        <td><strong>{{ cliente.nome_cliente }}</strong></td>
-                        <td>{{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }} {{ cliente.ano_veiculo }}</td>
+                    <tr class="{% if cliente.contato_atrasado %}table-danger{% endif %} priority-{{ cliente.prioridade|lower }}">
+                        <td>
+                            <strong>{{ cliente.nome_cliente }}</strong>
+                            <div class="text-muted small">{{ cliente.get_tipo_contato_display }}</div>
+                        </td>
+                        <td>{{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }} <span class="text-muted">{{ cliente.ano_veiculo }}</span></td>
                         <td>{{ cliente.fonte_cliente|default:"N/A" }}</td>
-                        <td>{{ cliente.get_tipo_contato_display }}</td>
                         <td>{{ cliente.data_ultimo_contato|date:"d/m/Y H:i" }}</td>
-                        <td><span class="badge bg-info text-dark">{{ cliente.get_status_negociacao_display }}</span></td>
+                        <td><span class="badge bg-light text-dark status-badge">{{ cliente.get_status_negociacao_display }}</span></td>
                         {% if user.is_superuser %}
                             <td>{{ cliente.vendedor.username }}</td>
                         {% endif %}
-                        <td class="text-center">
-                            {% if cliente.prioridade == 'Quente' %}
-                                <span class="badge bg-danger priority-badge">{{ cliente.get_prioridade_display }}</span>
-                            {% elif cliente.prioridade == 'Morno' %}
-                                <span class="badge bg-warning text-dark priority-badge">{{ cliente.get_prioridade_display }}</span>
-                            {% else %}
-                                <span class="badge bg-primary priority-badge">{{ cliente.get_prioridade_display }}</span>
-                            {% endif %}
-                        </td>
                         <td class="text-center actions-btn">
-                            <a href="{% url 'cliente_detail' cliente.pk %}" class="btn btn-sm btn-outline-secondary" title="Ver Detalhes"><i class="bi bi-eye-fill"></i></a>
-                            <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-sm btn-outline-info" title="Editar Cliente"><i class="bi bi-pencil-fill"></i></a>
+                            <a href="{% url 'cliente_detail' cliente.pk %}" class="btn btn-sm btn-outline-secondary rounded-circle" style="width: 32px; height: 32px; line-height: 1.5;" title="Ver Detalhes"><i class="bi bi-eye"></i></a>
+                            <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-sm btn-outline-primary rounded-circle" style="width: 32px; height: 32px; line-height: 1.5;" title="Editar Cliente"><i class="bi bi-pencil"></i></a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="text-center p-4">
-                            <i class="bi bi-exclamation-circle-fill fs-3 text-muted"></i>
-                            <p class="mb-0 mt-2">Nenhum cliente encontrado com os filtros atuais.</p>
+                        <td colspan="10" class="text-center p-5">
+                            <i class="bi bi-emoji-smile fs-1 text-muted"></i>
+                            <h5 class="mt-3">Nenhum cliente encontrado</h5>
+                            <p class="text-muted">Tente ajustar seus filtros ou adicione um novo cliente.</p>
                         </td>
                     </tr>
                     {% endfor %}
@@ -126,36 +136,23 @@
     </div>
 </div>
 
-
 {% if is_paginated %}
 <nav aria-label="Navegação das páginas" class="mt-4">
     <ul class="pagination justify-content-center">
         {% if page_obj.has_previous %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&dias={{ periodo_selecionado }}">&laquo;</a>
-            </li>
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&dias={{ periodo_selecionado }}">&laquo;</a></li>
         {% else %}
-            <li class="page-item disabled">
-                <span class="page-link">&laquo;</span>
-            </li>
+            <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
         {% endif %}
 
         {% for num in page_obj.paginator.page_range %}
-            {% if page_obj.number == num %}
-                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-            {% else %}
-                <li class="page-item"><a class="page-link" href="?page={{ num }}&q={{ search_query }}&dias={{ periodo_selecionado }}">{{ num }}</a></li>
-            {% endif %}
+            <li class="page-item {% if page_obj.number == num %}active{% endif %}"><a class="page-link" href="?page={{ num }}&q={{ search_query }}&dias={{ periodo_selecionado }}">{{ num }}</a></li>
         {% endfor %}
 
         {% if page_obj.has_next %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&dias={{ periodo_selecionado }}">&raquo;</a>
-            </li>
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&dias={{ periodo_selecionado }}">&raquo;</a></li>
         {% else %}
-            <li class="page-item disabled">
-                <span class="page-link">&raquo;</span>
-            </li>
+            <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
         {% endif %}
     </ul>
 </nav>
