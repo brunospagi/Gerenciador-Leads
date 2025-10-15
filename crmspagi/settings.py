@@ -67,6 +67,7 @@ MIDDLEWARE = [
 
 
 # Configurações do PWA
+PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'static/js', 'serviceworker.js')
 PWA_APP_NAME = 'Gestão de Leads'
 PWA_APP_DESCRIPTION = "Aplicativo de Gestão de Leads Spagi"
 PWA_APP_THEME_COLOR = '#000000'

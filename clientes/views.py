@@ -291,3 +291,6 @@ class ClienteDeleteView(LoginRequiredMixin, DeleteView):
         if request.user.is_superuser is False:
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
+
+def offline_view(request):
+    return render(request, "clientes/offline.html")
