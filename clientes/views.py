@@ -363,7 +363,7 @@ def exportar_relatorio_pdf(request):
        html, dest=response)
 
     if pisa_status.err:
-       return HttpResponse('Ocorreram alguns erros <pre>' o html o '</pre>')
+       return HttpResponse('Ocorreram alguns erros <pre>' + html + '</pre>')
     return response
 
 class ClienteDeleteView(LoginRequiredMixin, DeleteView):
