@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy , reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView
-from .models import Cliente
+from .models import Cliente, Historico
 from .forms import ClienteForm, HistoricoForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
@@ -142,9 +142,33 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
         return kwargs
 
     def form_valid(self, form):
+        # Pega o objeto original do banco de dados ANTES de qualquer alteração
+        original_cliente = self.get_object()
+        
+        # Pega a instância com os novos dados do formulário, mas ainda não salva
+        novo_cliente = form.save(commit=False)
+
+        # Verifica se o status foi alterado
+        if 'status_negociacao' in form.changed_data:
+            novo_status = novo_cliente.status_negociacao
+            
+            # Se o novo status for "Agendado", cria o histórico detalhado
+            if novo_status == Cliente.StatusNegociacao.AGENDADO:
+                data_formatada = novo_cliente.data_proximo_contato.strftime('%d/%m/%Y às %H:%M')
+                motivacao = f"Visita agendada para {data_formatada} pelo vendedor {novo_cliente.vendedor.username}."
+                Historico.objects.create(cliente=original_cliente, motivacao=motivacao)
+            else: # Para qualquer outra mudança, cria o histórico padrão
+                motivacao = f"Status alterado de '{original_cliente.get_status_negociacao_display()}' para '{novo_cliente.get_status_negociacao_display()}'."
+                Historico.objects.create(cliente=original_cliente, motivacao=motivacao)
+
+        # Garante que o vendedor não seja alterado por não-superusuários
         if not self.request.user.is_superuser:
-            form.instance.vendedor = self.object.vendedor
-        return super().form_valid(form)
+            novo_cliente.vendedor = original_cliente.vendedor
+        
+        # Salva o cliente com os novos dados
+        novo_cliente.save()
+        
+        return redirect(self.get_success_url())
 
 @login_required
 def adicionar_historico(request, pk):

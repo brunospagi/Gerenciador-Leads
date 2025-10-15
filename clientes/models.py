@@ -69,9 +69,7 @@ class Cliente(models.Model):
         is_new = self._state.adding
         if not is_new:
             original = Cliente.objects.get(pk=self.pk)
-            # Verifica se o status foi alterado
             if original.status_negociacao != self.status_negociacao:
-                # Se o NOVO status for "Agendado", cria um histórico detalhado
                 if self.status_negociacao == self.StatusNegociacao.AGENDADO:
                     data_formatada = self.data_proximo_contato.strftime('%d/%m/%Y às %H:%M')
                     motivacao = f"Visita agendada para {data_formatada} pelo vendedor {self.vendedor.username}."
