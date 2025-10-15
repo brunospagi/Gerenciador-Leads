@@ -1,6 +1,6 @@
 {
     "name": "Gestão de Leads",
-    "short_name": "Leads",
+    "short_name": "Spagi Leads",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#ffffff",
@@ -8,12 +8,12 @@
     "orientation": "portrait-primary",
     "icons": [
         {
-            "src": "/static/images/logo-spagi.png",
+            "src": "/static/images/logo-spagi-192x192.png",
             "type": "image/png",
             "sizes": "192x192"
         },
         {
-            "src": "/static/images/logo-spagi.png",
+            "src": "/static/images/logo-spagi-512x512.png",
             "type": "image/png",
             "sizes": "512x512"
         }

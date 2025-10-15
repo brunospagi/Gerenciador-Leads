@@ -25,11 +25,12 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
         base_queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
         agendamentos_qs = base_queryset.filter(status_negociacao=Cliente.StatusNegociacao.AGENDADO)
         
-        # Lógica para o JSON do FullCalendar (sem alterações)
+        # Lógica para o JSON do FullCalendar
         eventos_calendario = []
         for agendamento in agendamentos_qs:
             eventos_calendario.append({
-                'title': agendamento.nome_cliente,
+                # --- ALTERAÇÃO AQUI ---
+                'title': f'{agendamento.nome_cliente} - {agendamento.modelo_veiculo} ({agendamento.ano_veiculo})',
                 'start': agendamento.data_proximo_contato.isoformat(),
                 'url': reverse('cliente_detail', args=[agendamento.pk]),
                 'color': '#6f42c1',
@@ -124,7 +125,8 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
         if not self.request.user.is_superuser:
             cliente.vendedor = self.request.user
 
-        if not cliente.data_proximo_contato:
+        # Define a data do próximo contato apenas se não foi definida manualmente (ex: agendamento)
+        if not form.cleaned_data.get('data_proximo_contato'):
             cliente.data_proximo_contato = timezone.now() + timedelta(days=5)
             
         cliente.save()
