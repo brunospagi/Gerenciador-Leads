@@ -1,5 +1,3 @@
-from datetime import timedelta, timezone
-import json
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import UserPassesTestMixin, LoginRequiredMixin
@@ -12,14 +10,16 @@ from django.contrib.auth.models import User
 from .models import Profile, UserLoginActivity
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count
+from django.db.models.functions import TruncDate
+from django.utils import timezone
+from datetime import timedelta
+import json
 
 
 class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
-    # ... (código existente sem alterações)
     def test_func(self):
-        return hasattr(self.request.user, 'profile') and self.request.user.profile.nivel_acesso == Profile.NivelAcesso.ADMIN
+        return self.request.user.is_superuser or (hasattr(self.request.user, 'profile') and self.request.user.profile.nivel_acesso == Profile.NivelAcesso.ADMIN)
 
-# ... (outras views existentes)
 @login_required
 def profile_view(request):
     return render(request, 'usuarios/profile.html')
@@ -66,7 +66,6 @@ class UserDeleteView(AdminRequiredMixin, DeleteView):
     success_url = reverse_lazy('user_list')
 
 
-# >> NOVA VIEW PARA ADMIN ALTERAR SENHA DE OUTRO USUÁRIO <<
 class UserPasswordChangeView(AdminRequiredMixin, FormView):
     form_class = AdminSetPasswordForm
     template_name = 'usuarios/user_password_change.html'
@@ -74,7 +73,6 @@ class UserPasswordChangeView(AdminRequiredMixin, FormView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        # Passa o usuário alvo (obtido da URL) para o formulário
         kwargs['user'] = User.objects.get(pk=self.kwargs['pk'])
         return kwargs
 
@@ -85,40 +83,34 @@ class UserPasswordChangeView(AdminRequiredMixin, FormView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Passa o usuário alvo para o template, para exibir seu nome
         context['target_user'] = User.objects.get(pk=self.kwargs['pk'])
         return context
 
+
+# --- VIEW DO PAINEL DO ADMIN CORRIGIDA ---
 @login_required
 def admin_dashboard_view(request):
     if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
-        return PermissionDenied("Você não tem permissão para acessar esta página.")
+        raise PermissionDenied("Você não tem permissão para acessar esta página.")
 
     # 1. Gráfico de logins nos últimos 15 dias
-    today = timezone.now().date()
-    start_date = today - timedelta(days=14)
+    start_date = timezone.now().date() - timedelta(days=14)
     
+    # Consulta moderna e segura para agrupar logins por dia
     logins_por_dia = UserLoginActivity.objects.filter(
         login_timestamp__date__gte=start_date
-    ).extra(
-        {'dia': "date(login_timestamp)"}
+    ).annotate(
+        dia=TruncDate('login_timestamp')
     ).values('dia').annotate(
         total=Count('id')
     ).order_by('dia')
 
-    # Prepara os dados para o Chart.js
-    datas = [d['dia'] for d in logins_por_dia]
-    totais = [d['total'] for d in logins_por_dia]
-    
-    # Garante que todos os 15 dias estejam no gráfico, mesmo que com 0 logins
+    # Mapeia os resultados para uma busca mais fácil
+    logins_map = {item['dia'].strftime('%d/%m'): item['total'] for item in logins_por_dia}
+
+    # Gera os dados para o gráfico, preenchendo dias sem login com 0
     dias_grafico = [(start_date + timedelta(days=i)).strftime('%d/%m') for i in range(15)]
-    logins_grafico = [0] * 15
-    
-    for i, data_formatada in enumerate(dias_grafico):
-        for login_data in logins_por_dia:
-            if login_data['dia'].strftime('%d/%m') == data_formatada:
-                logins_grafico[i] = login_data['total']
-                break
+    logins_grafico = [logins_map.get(dia, 0) for dia in dias_grafico]
 
     # 2. Usuários mais ativos (top 5)
     usuarios_ativos = User.objects.annotate(
@@ -126,7 +118,7 @@ def admin_dashboard_view(request):
     ).filter(total_logins__gt=0).order_by('-total_logins')[:5]
 
     # 3. Últimos 10 logins
-    ultimos_logins = UserLoginActivity.objects.all()[:10]
+    ultimos_logins = UserLoginActivity.objects.select_related('user').all()[:10]
 
     context = {
         'labels_grafico': json.dumps(dias_grafico),
