@@ -1,4 +1,3 @@
-import requests
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView
@@ -8,6 +7,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from datetime import timedelta
 from django.utils import timezone
 from django.http import JsonResponse
+import requests
 from django.db.models import Q
 from django.core.exceptions import PermissionDenied
 from django.contrib.auth.decorators import login_required
@@ -15,24 +15,21 @@ from django.contrib import messages
 import json 
 import re 
 from bs4 import BeautifulSoup 
-from requests.exceptions import RequestException
+from requests.exceptions import RequestException, Timeout 
 
 # --- MÓDULOS GEMINI ---
 from django.conf import settings
 try:
     from google import genai
     from google.genai.errors import APIError
-    # Inicializa o cliente com a chave das configurações
     GEMINI_CLIENT = genai.Client(api_key=settings.GEMINI_API_KEY) if settings.GEMINI_API_KEY else None
 except ImportError:
-    # Caso a dependência google-genai não esteja instalada
     GEMINI_CLIENT = None
 except ValueError:
-    # Caso a chave da API não esteja configurada corretamente
     GEMINI_CLIENT = None
 
 
-# --- LÓGICA DE EXTRAÇÃO WEB (SCRAPER ROBUSTO) ---
+# --- LÓGICA DE EXTRAÇÃO WEB (SCRAPER ROBUSTO COM TRATAMENTO DE TIMEOUT) ---
 def scrape_multipla_url(url):
     """
     Extrai a lista de descrições dos veículos da URL, utilizando os seletores
@@ -44,56 +41,48 @@ def scrape_multipla_url(url):
         url = 'https://' + url
         
     try:
-        # 1. Faz a requisição HTTP com timeout e user-agent para evitar bloqueio
+        # 1. Faz a requisição HTTP com timeout AUMENTADO (30s)
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        response = requests.get(url, timeout=15, headers=headers)
+        response = requests.get(url, timeout=300, headers=headers) 
         response.raise_for_status() # Lança erro se o status code for 4xx ou 5xx
         
         # 2. Parseia o conteúdo HTML
         soup = BeautifulSoup(response.content, 'html.parser')
         
+    except Timeout as e:
+        # TRATAMENTO ESPECÍFICO PARA TIMEOUT (EVITA O ERRO 500)
+        raise Exception(f"ERRO DE TEMPO LIMITE (Timeout): O servidor demorou demais para responder após 30 segundos. Verifique sua conexão ou a disponibilidade do site de destino. Detalhes: {e}") 
     except RequestException as e:
-        # Levanta exceção de rede/HTTP
+        # Tratamento para outros erros de rede/HTTP (ex: 404, 503)
         raise Exception(f"Falha de Rede ou HTTP ao acessar o estoque: {e}") 
     except Exception as e:
-        # Levanta exceções de parsing do BeautifulSoup ou outras
+        # Tratamento para erros de parsing do BeautifulSoup ou outros
         raise Exception(f"Erro ao processar o HTML da página: {e}")
 
     # 3. ENCONTRA TODAS AS LISTAGENS DE CARROS
-    # Seletor: <div class="carro col-md-3 col-result-pact" ...>
     car_listings = soup.find_all('div', class_='carro', recursive=True)
     
-    # Se não houver listagens, retorna lista vazia
     if not car_listings:
         return []
     
     for car in car_listings:
         try:
             # 4. EXTRAÇÃO DE DADOS POR ITEM (COM CHECAGEM ROBUSTA DE NONE)
-            
-            # Use get_text(strip=True) em combinação com select_one
             first_name = car.select_one('.first-name').get_text(strip=True) if car.select_one('.first-name') else ''
             last_name = car.select_one('.last-name').get_text(strip=True) if car.select_one('.last-name') else ''
             model_year = car.select_one('.year').get_text(strip=True) if car.select_one('.year') else ''
             
-            # Localização
             city_tag = car.select_one('.vitrine-cidade')
             city_location_full = city_tag.get_text(strip=True) if city_tag else 'Cidade Não Informada'
-            
-            # Opcionais (KM e Combustível)
-            optionals = car.select('.opicionais .text-none.grey-text10')
-            
-            # Extração segura de KM
-            km_text = next((opt.get_text().strip() for opt in optionals if 'km' in opt.get_text().lower()), 'KM Não Informado')
-            # Extração segura de Combustível
-            fuel_text = next((opt.get_text().strip() for opt in optionals if any(f in opt.get_text().lower() for f in ['flex', 'gasolina', 'diesel', 'álcool'])), 'Combustível Não Informado')
-            
-            # Limpeza do texto da Cidade (remove o estado entre parênteses)
             city_location = re.sub(r'\s*\([A-Z]{2}\)$', '', city_location_full, flags=re.IGNORECASE).strip()
 
+            optionals = car.select('.opicionais .text-none.grey-text10')
+            
+            km_text = next((opt.get_text().strip() for opt in optionals if 'km' in opt.get_text().lower()), 'KM Não Informado')
+            fuel_text = next((opt.get_text().strip() for opt in optionals if any(f in opt.get_text().lower() for f in ['flex', 'gasolina', 'diesel', 'álcool'])), 'Combustível Não Informado')
+            
             model_name = f"{first_name} {last_name}".strip()
             
-            # Se faltar informações críticas, pule este item
             if not model_name or not model_year:
                 continue
 
@@ -105,7 +94,7 @@ def scrape_multipla_url(url):
             car_descriptions.append(full_description)
 
         except Exception:
-            # Captura exceções para este item específico (ex: tag unexpected), 
+            # Captura exceções para este item específico (e.g., tag inesperada), 
             # e garante que o loop continue para o próximo item
             continue
 
