@@ -1,3 +1,4 @@
+import requests
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView
@@ -7,14 +8,16 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from datetime import timedelta
 from django.utils import timezone
 from django.http import JsonResponse
-import requests
 from django.db.models import Q
 from django.core.exceptions import PermissionDenied
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 import json 
 import re 
-from bs4 import BeautifulSoup # NOVO: Importa BeautifulSoup
+
+# --- WEB SCRAPING LIBRARIES ---
+from bs4 import BeautifulSoup
+from requests.exceptions import RequestException
 
 # --- MÓDULOS GEMINI ---
 from django.conf import settings
@@ -34,59 +37,81 @@ except ValueError:
 # --- LÓGICA DE EXTRAÇÃO WEB (IMPLEMENTAÇÃO DO SCRAPER) ---
 def scrape_multipla_url(url):
     """
-    Tenta extrair a lista de descrições completas dos veículos da URL usando requests e BeautifulSoup.
-    
-    A T E N Ç Ã O: O seletor CSS é um PLACEHOLDER e PRECISA ser verificado.
+    Extrai a lista de descrições completas dos veículos da URL, utilizando os seletores
+    identificados no código-fonte do Spagi Motors.
     """
-    if not url.startswith('http'):
-        url = 'https://' + url
+    car_descriptions = []
         
     try:
-        # 1. Faz a requisição HTTP
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()  # Levanta exceção para códigos de erro (4xx ou 5xx)
-    except requests.exceptions.RequestException as e:
-        print(f"Erro ao acessar a URL {url}: {e}")
-        return []
-
-    try:
-        # 2. Parseia o conteúdo HTML
+        # 1. Realiza a requisição HTTP
+        # Adiciona header para simular um navegador e evitar bloqueio
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+        response = requests.get(url, timeout=10, headers=headers)
+        response.raise_for_status()
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # 3. ENCONTRA TODAS AS LISTAGENS DE CARROS
-        # --- PLACEHOLDER CRÍTICO: SUBSTITUA O VALOR DA CLASSE PELA REAL NO SITE ---
-        # Exemplo: Se cada item do carro estiver em uma div com classe 'car-card'
-        car_listings = soup.find_all('div', class_='listing-item') 
-        # Outra opção: car_listings = soup.select('.listagem-de-carros .item')
-        
-        car_descriptions = []
-        
-        for car in car_listings:
-            # 4. EXTRAI O TEXTO BRUTO NECESSÁRIO
-            # O objetivo é recriar o formato: "MARCA MODELO ANO/ANO DETALHES em CIDADE - Spagi Motors"
-            
-            # --- PLACEHOLDER DE EXTRAÇÃO DE DADOS POR ITEM ---
-            try:
-                # Adapte a busca por tags e classes conforme o HTML de Spagi Motors
-                title = car.find('h5', class_='car-title').text.strip() if car.find('h5', class_='car-title') else ''
-                summary = car.find('p', class_='car-details-summary').text.strip() if car.find('p', class_='car-details-summary') else ''
-                location = car.find('span', class_='car-location').text.strip() if car.find('span', class_='car-location') else 'local não informado'
-                
-                # Combina os dados no formato que o Gemini espera
-                if title:
-                    description = f"{title.upper()} {summary.upper()} em {location.upper()} - Spagi Motors"
-                    car_descriptions.append(description)
-                    
-            except AttributeError:
-                # Ignora itens incompletos ou mal formatados
-                continue
-            # --- FIM DO PLACEHOLDER DE EXTRAÇÃO ---
-
-        return car_descriptions
-        
-    except Exception as e:
-        print(f"Erro ao processar o HTML: {e}")
+    except RequestException as e:
+        print(f"Erro ao acessar a URL {url}: {e}")
         return []
+    except Exception as e:
+        print(f"Erro inesperado no scraping: {e}")
+        return []
+
+    # Seletor do item principal: div com a classe 'carro' (contém todos os dados do veículo)
+    # Baseado na estrutura: <div class="carro col-md-3 col-result-pact" ...>
+    car_listings = soup.find_all('div', class_='carro', recursive=True)
+
+    for car in car_listings:
+        try:
+            # 1. Extração de Componentes do Título e Dados Principais
+            # A informação do veículo está em h2.tit-marca > a > div.first-name e div.last-name
+            
+            first_name_tag = car.select_one('.first-name')
+            last_name_tag = car.select_one('.last-name')
+            year_tag = car.select_one('.year')
+            city_tag = car.select_one('.vitrine-cidade')
+            
+            # 2. Opcionais (Km e Combustível) - Busca pelos textos nos blocos de opcionais
+            optionals = car.select('.opicionais .text-none.grey-text10')
+            
+            km_text = ''
+            fuel_text = ''
+            
+            # Percorre os blocos de opcionais para extrair KM e Combustível
+            for opt in optionals:
+                text = opt.get_text().strip()
+                # A quilometragem geralmente contém 'km'
+                if 'km' in text.lower():
+                    km_text = text
+                # O combustível é uma palavra como 'FLEX', 'GASOLINA', 'DIESEL'
+                elif 'flex' in text.lower() or 'gasolina' in text.lower() or 'diesel' in text.lower():
+                    fuel_text = text
+            
+            # Limpa e formata os dados
+            model_name = f"{first_name_tag.text.strip()} {last_name_tag.text.strip()}" if first_name_tag and last_name_tag else ''
+            model_year = year_tag.text.strip() if year_tag else ''
+            
+            # Tenta extrair apenas o nome da cidade, removendo (PR) ou outros estados
+            city_location_full = city_tag.get_text().strip() if city_tag else ''
+            city_location = re.sub(r'\s*\([A-Z]{2}\)$', '', city_location_full, flags=re.IGNORECASE).strip()
+            
+            if not model_name:
+                continue
+
+            # 3. Monta a string no formato que o Gemini processará melhor:
+            # "MARCA MODELO DETALHES ANO/ANO | COMBUSTÍVEL | KM em CIDADE - Spagi Motors"
+            full_description = (
+                f"{model_name.upper()} {model_year} | {fuel_text.upper()} | {km_text.upper()} em {city_location.title()} - Spagi Motors"
+            )
+            
+            car_descriptions.append(full_description)
+
+        except Exception as e:
+            # Loga o erro, mas continua processando os outros carros
+            print(f"Erro ao processar item: {e}")
+            continue
+
+    return car_descriptions
 
 # --- LÓGICA CENTRAL DE GERAÇÃO (COM GEMINI) ---
 def generate_high_conversion_description(vehicle_description, marketplace='Facebook Marketplace'):
@@ -181,12 +206,14 @@ def bulk_gerador_anuncio_view(request):
     """
     context = {}
     
-    # Prioriza a URL fornecida no POST. Se não houver, usa a URL do prompt como fallback/exemplo.
-    external_url = request.POST.get('external_url')
-    if not external_url:
-         external_url = "https://spagimotors.com.br/multipla"
+    # Define a URL padrão para o scraping
+    external_url = "https://spagimotors.com.br/multipla"
          
     if request.method == 'POST':
+        # Captura a URL fornecida pelo usuário, se houver
+        user_provided_url = request.POST.get('external_url')
+        if user_provided_url:
+            external_url = user_provided_url
         
         # 1. EXTRAÇÃO DOS DADOS (Chamada à função de scraping REAL)
         car_list = scrape_multipla_url(external_url)
