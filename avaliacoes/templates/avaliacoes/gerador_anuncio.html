@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="bi bi-megaphone-fill me-2"></i>Gerador de Anúncios Profissionais (IA Gemini)</h1>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">Descrição do Veículo (Geração Simples)</h5>
+    </div>
+    <div class="card-body">
+        <form method="get" action="{% url 'gerador_anuncio' %}" class="row g-3">
+            <div class="col-12">
+                <label for="id_vehicle_description" class="form-label">Cole o link do anúncio ou escreva os detalhes do veículo</label>
+                <textarea class="form-control" id="id_vehicle_description" name="vehicle_description" rows="3" required placeholder="Ex: HYUNDAI HB20 LIMITED 1.0 FLEX 12V MEC. 2024/2025 FLEX em sao jose dos pinhais - Spagi Motors">{{ input_text }}</textarea>
+            </div>
+            <div class="col-12 text-end">
+                <button type="submit" class="btn btn-success"><i class="bi bi-magic me-1"></i> Gerar Anúncio de Conversão</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if generated_description and "⚠️ Erro" not in generated_description %}
+<div class="card shadow-lg border-success">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0">Resultado da Descrição para Facebook Marketplace (Regras de Exclusão Aplicadas)</h5>
+    </div>
+    <div class="card-body">
+        <div class="p-3 bg-light rounded mb-3 border">
+            <pre id="generated_text" style="white-space: pre-wrap; font-family: sans-serif;">{{ generated_description }}</pre>
+        </div>
+        <button class="btn btn-outline-primary" onclick="copyText('generated_text')"><i class="bi bi-clipboard me-1"></i> Copiar para o Anúncio</button>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function copyText(elementId) {
+        const textToCopy = document.getElementById(elementId).textContent;
+        
+        // Cria um elemento de textarea temporário para a cópia
+        const tempInput = document.createElement('textarea');
+        tempInput.value = textToCopy;
+        document.body.appendChild(tempInput);
+        
+        // Seleciona e copia o texto
+        tempInput.select();
+        document.execCommand('copy');
+        
+        // Remove o elemento temporário
+        document.body.removeChild(tempInput);
+        
+        alert('Descrição copiada para a área de transferência!');
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="bi bi-tools me-2"></i>Gerador de Anúncios em Massa (IA Gemini)</h1>
+</div>
+
+<div class="alert alert-warning">
+    <strong>Atenção:</strong> A extração de dados de websites externos é apenas uma **simulação** neste ambiente. Em sua aplicação real, você deve implementar o scraper (com `Selenium`, `requests` ou similar) para ler a URL fornecida e obter a lista de veículos. A geração de anúncios pela IA com a regra de exclusão está implementada.
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0">Extrair Dados para Geração em Massa</h5>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{% url 'bulk_gerador_anuncio' %}" class="row g-3">
+            {% csrf_token %}
+            <div class="col-12">
+                <label for="id_external_url" class="form-label">Link da Página de Estoque/Listagem de Veículos</label>
+                <input type="url" class="form-control" id="id_external_url" name="external_url" required placeholder="Ex: https://www.spagimotors.com.br/estoque">
+                <div class="form-text">Cole a URL da página que contém a lista de todos os carros.</div>
+            </div>
+            <div class="col-12 text-end">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-robot me-1"></i> Iniciar Geração em Massa (Simulado)</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

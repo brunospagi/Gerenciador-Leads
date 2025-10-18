@@ -72,8 +72,17 @@
                                 <li><a class="dropdown-item" href="{% url 'cliente_finalizados_list' %}"><i class="bi bi-check-circle"></i> Finalizados</a></li>
                             </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'avaliacao_list' %}"><i class="bi bi-car-front-fill"></i> Avaliações</a>
+                         <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarAvaliacoes" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-car-front-fill"></i> Avaliações
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navbarAvaliacoes">
+                                <li><a class="dropdown-item" href="{% url 'avaliacao_list' %}"><i class="bi bi-list-columns"></i> Lista de Avaliações</a></li>
+                                <li><a class="dropdown-item" href="{% url 'avaliacao_create' %}"><i class="bi bi-plus-circle"></i> Nova Avaliação</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'gerador_anuncio' %}"><i class="bi bi-megaphone-fill"></i> Gerador Simples (IA)</a></li>
+                                <li><a class="dropdown-item" href="{% url 'bulk_gerador_anuncio' %}"><i class="bi bi-tools"></i> Gerador em Massa (IA)</a></li>
+                            </ul>
                         </li>
                         
                         {# --- CORREÇÃO AQUI --- #}

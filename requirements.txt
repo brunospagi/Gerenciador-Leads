@@ -10,3 +10,5 @@ python-dotenv
 psycopg
 psycopg2
 whitenoise[brotli]
+google-genai
+beautifulsoup4

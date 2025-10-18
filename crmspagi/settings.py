@@ -63,6 +63,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+#--- Configuração da API Gemini (LIDA DO .ENV) ---
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') 
 
 # --- Configurações do MinIO (LIDAS DO .ENV) ---
 MINIO_EXTERNAL_ENDPOINT = os.getenv('MINIO_EXTERNAL_ENDPOINT', 's3.spagisistemas.com.br')

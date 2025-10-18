@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="bi bi-check-circle-fill me-2"></i>Resultados da Geração em Massa</h1>
+</div>
+
+<div class="alert alert-info">
+    Total de {{ total_generated }} anúncios processados (Simulado) a partir da URL: <strong>{{ external_url }}</strong>.
+</div>
+
+{% for announcement in generated_announcements %}
+<div class="card shadow-sm mb-4 {% if '⚠️ Erro' in announcement.description %}border-danger{% else %}border-success{% endif %}">
+    <div class="card-header bg-light">
+        <h5 class="mb-0 text-primary">{{ forloop.counter }}. {{ announcement.title }}</h5>
+    </div>
+    <div class="card-body">
+        <label class="form-label fw-bold">Descrição do Anúncio (Pronto para Copiar)</label>
+        <div class="p-3 bg-light rounded border">
+            {% if '⚠️ Erro' in announcement.description %}
+            <div class="text-danger fw-bold">{{ announcement.description }}</div>
+            {% else %}
+            <pre id="announcement_{{ forloop.counter }}" style="white-space: pre-wrap; font-family: sans-serif; font-size: 0.9rem;">{{ announcement.description }}</pre>
+            {% endif %}
+        </div>
+        {% if '⚠️ Erro' not in announcement.description %}
+        <button class="btn btn-sm btn-outline-primary mt-2" onclick="copyText('announcement_{{ forloop.counter }}')"><i class="bi bi-clipboard me-1"></i> Copiar Este Anúncio</button>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+<a href="{% url 'bulk_gerador_anuncio' %}" class="btn btn-secondary mt-3"><i class="bi bi-arrow-left me-1"></i> Voltar para o Gerador</a>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function copyText(elementId) {
+        const textToCopy = document.getElementById(elementId).textContent;
+        
+        const tempInput = document.createElement('textarea');
+        tempInput.value = textToCopy;
+        document.body.appendChild(tempInput);
+        
+        tempInput.select();
+        document.execCommand('copy');
+        
+        document.body.removeChild(tempInput);
+        
+        alert(`Anúncio ${elementId.split('_')[1]} copiado para a área de transferência!`);
+    }
+</script>
+{% endblock %}
