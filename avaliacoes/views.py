@@ -1,3 +1,4 @@
+import requests
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView
@@ -7,15 +8,14 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from datetime import timedelta
 from django.utils import timezone
 from django.http import JsonResponse
-import requests
 from django.db.models import Q
 from django.core.exceptions import PermissionDenied
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 import json 
 import re 
-from bs4 import BeautifulSoup # Importa BeautifulSoup
-from requests.exceptions import RequestException # Importa exceção de requisição
+from bs4 import BeautifulSoup 
+from requests.exceptions import RequestException
 
 # --- MÓDULOS GEMINI ---
 from django.conf import settings
@@ -35,7 +35,8 @@ except ValueError:
 # --- LÓGICA DE EXTRAÇÃO WEB (SCRAPER ROBUSTO) ---
 def scrape_multipla_url(url):
     """
-    Extrai a lista de descrições dos veículos da URL, levantando exceções em caso de falha.
+    Extrai a lista de descrições dos veículos da URL, utilizando os seletores
+    identificados no código-fonte do Spagi Motors, com tratamento de erros robusto.
     """
     car_descriptions = []
     
@@ -43,7 +44,7 @@ def scrape_multipla_url(url):
         url = 'https://' + url
         
     try:
-        # 1. Faz a requisição HTTP com timeout e user-agent
+        # 1. Faz a requisição HTTP com timeout e user-agent para evitar bloqueio
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
         response = requests.get(url, timeout=15, headers=headers)
         response.raise_for_status() # Lança erro se o status code for 4xx ou 5xx
@@ -52,7 +53,7 @@ def scrape_multipla_url(url):
         soup = BeautifulSoup(response.content, 'html.parser')
         
     except RequestException as e:
-        # Levanta exceção de rede/HTTP (que a View captura para evitar o 500)
+        # Levanta exceção de rede/HTTP
         raise Exception(f"Falha de Rede ou HTTP ao acessar o estoque: {e}") 
     except Exception as e:
         # Levanta exceções de parsing do BeautifulSoup ou outras
@@ -61,31 +62,39 @@ def scrape_multipla_url(url):
     # 3. ENCONTRA TODAS AS LISTAGENS DE CARROS
     # Seletor: <div class="carro col-md-3 col-result-pact" ...>
     car_listings = soup.find_all('div', class_='carro', recursive=True)
-
+    
+    # Se não houver listagens, retorna lista vazia
     if not car_listings:
         return []
     
     for car in car_listings:
-        # 4. EXTRAÇÃO DE DADOS POR ITEM
         try:
-            # Seletores baseados no HTML de Spagi Motors
-            first_name = car.select_one('.first-name').text.strip()
-            last_name = car.select_one('.last-name').text.strip()
-            model_year = car.select_one('.year').text.strip()
-            # Localização (remove o estado no parênteses: (PR))
+            # 4. EXTRAÇÃO DE DADOS POR ITEM (COM CHECAGEM ROBUSTA DE NONE)
+            
+            # Use get_text(strip=True) em combinação com select_one
+            first_name = car.select_one('.first-name').get_text(strip=True) if car.select_one('.first-name') else ''
+            last_name = car.select_one('.last-name').get_text(strip=True) if car.select_one('.last-name') else ''
+            model_year = car.select_one('.year').get_text(strip=True) if car.select_one('.year') else ''
+            
+            # Localização
             city_tag = car.select_one('.vitrine-cidade')
-            city_location_full = city_tag.get_text().strip() if city_tag else ''
-            # Regex para limpar o estado (PR) ou (SC) do final da string
-            city_location = re.sub(r'\s*\([A-Z]{2}\)$', '', city_location_full, flags=re.IGNORECASE).strip()
-            # Opcionais (Km e Combustível)
+            city_location_full = city_tag.get_text(strip=True) if city_tag else 'Cidade Não Informada'
+            
+            # Opcionais (KM e Combustível)
             optionals = car.select('.opicionais .text-none.grey-text10')
-            # Usa 'next' com valor padrão para evitar AttributeError se a tag não existir
+            
+            # Extração segura de KM
             km_text = next((opt.get_text().strip() for opt in optionals if 'km' in opt.get_text().lower()), 'KM Não Informado')
+            # Extração segura de Combustível
             fuel_text = next((opt.get_text().strip() for opt in optionals if any(f in opt.get_text().lower() for f in ['flex', 'gasolina', 'diesel', 'álcool'])), 'Combustível Não Informado')
+            
+            # Limpeza do texto da Cidade (remove o estado entre parênteses)
+            city_location = re.sub(r'\s*\([A-Z]{2}\)$', '', city_location_full, flags=re.IGNORECASE).strip()
 
             model_name = f"{first_name} {last_name}".strip()
             
-            if not model_name:
+            # Se faltar informações críticas, pule este item
+            if not model_name or not model_year:
                 continue
 
             # 5. Monta a string
@@ -95,11 +104,9 @@ def scrape_multipla_url(url):
             
             car_descriptions.append(full_description)
 
-        except AttributeError:
-            # Ignora item malformado e continua
-            continue
         except Exception:
-            # Captura qualquer outro erro inesperado no processamento do item
+            # Captura exceções para este item específico (ex: tag unexpected), 
+            # e garante que o loop continue para o próximo item
             continue
 
     return car_descriptions
@@ -208,13 +215,13 @@ def bulk_gerador_anuncio_view(request):
         
         car_list = []
         try:
-            # 1. EXTRAÇÃO DOS DADOS (Chamada à função de scraping)
+            # 1. EXTRAÇÃO DOS DADOS (Chamada à função de scraping com tratamento de erro)
             car_list = scrape_multipla_url(external_url)
             
         except Exception as e:
             # Captura a exceção levantada pela função de scraping e a exibe
             messages.error(request, f"Erro fatal de scraping: Não foi possível processar a página. Detalhes: {e}")
-            # Retorna o formulário com a mensagem de erro
+            # Retorna o formulário com a mensagem de erro (EVITA O ERRO 500)
             return render(request, 'avaliacoes/bulk_gerador_anuncio_form.html', context)
 
 
