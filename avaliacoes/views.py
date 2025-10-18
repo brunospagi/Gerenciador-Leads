@@ -1,4 +1,3 @@
-import requests
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView
@@ -8,16 +7,15 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from datetime import timedelta
 from django.utils import timezone
 from django.http import JsonResponse
+import requests
 from django.db.models import Q
 from django.core.exceptions import PermissionDenied
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 import json 
 import re 
-
-# --- WEB SCRAPING LIBRARIES ---
-from bs4 import BeautifulSoup
-from requests.exceptions import RequestException
+from bs4 import BeautifulSoup # Importa BeautifulSoup
+from requests.exceptions import RequestException # Importa exceção de requisição
 
 # --- MÓDULOS GEMINI ---
 from django.conf import settings
@@ -34,81 +32,74 @@ except ValueError:
     GEMINI_CLIENT = None
 
 
-# --- LÓGICA DE EXTRAÇÃO WEB (IMPLEMENTAÇÃO DO SCRAPER) ---
+# --- LÓGICA DE EXTRAÇÃO WEB (SCRAPER ROBUSTO) ---
 def scrape_multipla_url(url):
     """
-    Extrai a lista de descrições completas dos veículos da URL, utilizando os seletores
-    identificados no código-fonte do Spagi Motors.
+    Extrai a lista de descrições dos veículos da URL, levantando exceções em caso de falha.
     """
     car_descriptions = []
+    
+    if not url.startswith('http'):
+        url = 'https://' + url
         
     try:
-        # 1. Realiza a requisição HTTP
-        # Adiciona header para simular um navegador e evitar bloqueio
+        # 1. Faz a requisição HTTP com timeout e user-agent
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        response = requests.get(url, timeout=10, headers=headers)
-        response.raise_for_status()
+        response = requests.get(url, timeout=15, headers=headers)
+        response.raise_for_status() # Lança erro se o status code for 4xx ou 5xx
+        
+        # 2. Parseia o conteúdo HTML
         soup = BeautifulSoup(response.content, 'html.parser')
         
     except RequestException as e:
-        print(f"Erro ao acessar a URL {url}: {e}")
-        return []
+        # Levanta exceção de rede/HTTP (que a View captura para evitar o 500)
+        raise Exception(f"Falha de Rede ou HTTP ao acessar o estoque: {e}") 
     except Exception as e:
-        print(f"Erro inesperado no scraping: {e}")
-        return []
+        # Levanta exceções de parsing do BeautifulSoup ou outras
+        raise Exception(f"Erro ao processar o HTML da página: {e}")
 
-    # Seletor do item principal: div com a classe 'carro' (contém todos os dados do veículo)
-    # Baseado na estrutura: <div class="carro col-md-3 col-result-pact" ...>
+    # 3. ENCONTRA TODAS AS LISTAGENS DE CARROS
+    # Seletor: <div class="carro col-md-3 col-result-pact" ...>
     car_listings = soup.find_all('div', class_='carro', recursive=True)
 
+    if not car_listings:
+        return []
+    
     for car in car_listings:
+        # 4. EXTRAÇÃO DE DADOS POR ITEM
         try:
-            # 1. Extração de Componentes do Título e Dados Principais
-            # A informação do veículo está em h2.tit-marca > a > div.first-name e div.last-name
-            
-            first_name_tag = car.select_one('.first-name')
-            last_name_tag = car.select_one('.last-name')
-            year_tag = car.select_one('.year')
+            # Seletores baseados no HTML de Spagi Motors
+            first_name = car.select_one('.first-name').text.strip()
+            last_name = car.select_one('.last-name').text.strip()
+            model_year = car.select_one('.year').text.strip()
+            # Localização (remove o estado no parênteses: (PR))
             city_tag = car.select_one('.vitrine-cidade')
-            
-            # 2. Opcionais (Km e Combustível) - Busca pelos textos nos blocos de opcionais
-            optionals = car.select('.opicionais .text-none.grey-text10')
-            
-            km_text = ''
-            fuel_text = ''
-            
-            # Percorre os blocos de opcionais para extrair KM e Combustível
-            for opt in optionals:
-                text = opt.get_text().strip()
-                # A quilometragem geralmente contém 'km'
-                if 'km' in text.lower():
-                    km_text = text
-                # O combustível é uma palavra como 'FLEX', 'GASOLINA', 'DIESEL'
-                elif 'flex' in text.lower() or 'gasolina' in text.lower() or 'diesel' in text.lower():
-                    fuel_text = text
-            
-            # Limpa e formata os dados
-            model_name = f"{first_name_tag.text.strip()} {last_name_tag.text.strip()}" if first_name_tag and last_name_tag else ''
-            model_year = year_tag.text.strip() if year_tag else ''
-            
-            # Tenta extrair apenas o nome da cidade, removendo (PR) ou outros estados
             city_location_full = city_tag.get_text().strip() if city_tag else ''
+            # Regex para limpar o estado (PR) ou (SC) do final da string
             city_location = re.sub(r'\s*\([A-Z]{2}\)$', '', city_location_full, flags=re.IGNORECASE).strip()
+            # Opcionais (Km e Combustível)
+            optionals = car.select('.opicionais .text-none.grey-text10')
+            # Usa 'next' com valor padrão para evitar AttributeError se a tag não existir
+            km_text = next((opt.get_text().strip() for opt in optionals if 'km' in opt.get_text().lower()), 'KM Não Informado')
+            fuel_text = next((opt.get_text().strip() for opt in optionals if any(f in opt.get_text().lower() for f in ['flex', 'gasolina', 'diesel', 'álcool'])), 'Combustível Não Informado')
+
+            model_name = f"{first_name} {last_name}".strip()
             
             if not model_name:
                 continue
 
-            # 3. Monta a string no formato que o Gemini processará melhor:
-            # "MARCA MODELO DETALHES ANO/ANO | COMBUSTÍVEL | KM em CIDADE - Spagi Motors"
+            # 5. Monta a string
             full_description = (
                 f"{model_name.upper()} {model_year} | {fuel_text.upper()} | {km_text.upper()} em {city_location.title()} - Spagi Motors"
             )
             
             car_descriptions.append(full_description)
 
-        except Exception as e:
-            # Loga o erro, mas continua processando os outros carros
-            print(f"Erro ao processar item: {e}")
+        except AttributeError:
+            # Ignora item malformado e continua
+            continue
+        except Exception:
+            # Captura qualquer outro erro inesperado no processamento do item
             continue
 
     return car_descriptions
@@ -202,24 +193,33 @@ def gerador_anuncio_view(request):
 @login_required
 def bulk_gerador_anuncio_view(request):
     """
-    View para a geração em massa de anúncios, que chama a função de scraping.
+    View para a geração em massa de anúncios, que agora trata as exceções de scraping.
     """
     context = {}
     
-    # Define a URL padrão para o scraping
+    # Define a URL padrão (e fallback) para o scraping
     external_url = "https://spagimotors.com.br/multipla"
-         
+    
     if request.method == 'POST':
         # Captura a URL fornecida pelo usuário, se houver
         user_provided_url = request.POST.get('external_url')
         if user_provided_url:
             external_url = user_provided_url
         
-        # 1. EXTRAÇÃO DOS DADOS (Chamada à função de scraping REAL)
-        car_list = scrape_multipla_url(external_url)
-        
+        car_list = []
+        try:
+            # 1. EXTRAÇÃO DOS DADOS (Chamada à função de scraping)
+            car_list = scrape_multipla_url(external_url)
+            
+        except Exception as e:
+            # Captura a exceção levantada pela função de scraping e a exibe
+            messages.error(request, f"Erro fatal de scraping: Não foi possível processar a página. Detalhes: {e}")
+            # Retorna o formulário com a mensagem de erro
+            return render(request, 'avaliacoes/bulk_gerador_anuncio_form.html', context)
+
+
         if not car_list:
-             messages.error(request, f"Não foi possível extrair dados da URL: {external_url}. Verifique se o scraper ('scrape_multipla_url') foi implementado com os seletores corretos.")
+             messages.error(request, f"Não foi possível encontrar nenhum veículo na URL: {external_url}. Verifique o link e se a página carrega corretamente.")
              return render(request, 'avaliacoes/bulk_gerador_anuncio_form.html', context)
 
         generated_announcements = []
