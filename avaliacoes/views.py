@@ -22,13 +22,10 @@ from django.conf import settings
 try:
     from google import genai
     from google.genai.errors import APIError
-    # Inicializa o cliente com a chave das configurações
     GEMINI_CLIENT = genai.Client(api_key=settings.GEMINI_API_KEY) if settings.GEMINI_API_KEY else None
 except ImportError:
-    # Caso a dependência google-genai não esteja instalada
     GEMINI_CLIENT = None
 except ValueError:
-    # Caso a chave da API não esteja configurada corretamente
     GEMINI_CLIENT = None
 
 
@@ -46,8 +43,7 @@ def scrape_multipla_url(url):
     try:
         # 1. Faz a requisição HTTP com timeout AUMENTADO (30s)
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        # Aumenta o timeout para 30 segundos
-        response = requests.get(url, timeout=300, headers=headers) 
+        response = requests.get(url, timeout=30, headers=headers) 
         response.raise_for_status() # Lança erro se o status code for 4xx ou 5xx
         
         # 2. Parseia o conteúdo HTML
@@ -108,7 +104,7 @@ def scrape_multipla_url(url):
 # --- LÓGICA CENTRAL DE GERAÇÃO (COM GEMINI) ---
 def generate_high_conversion_description(vehicle_description, marketplace='Facebook Marketplace'):
     """
-    Usa o Gemini API para gerar uma descrição de alta conversão, com timeout na chamada.
+    Usa o Gemini API para gerar uma descrição de alta conversão.
     Assegura a remoção de "novo" e "garantia de fábrica".
     """
     if not GEMINI_CLIENT:
@@ -127,14 +123,12 @@ def generate_high_conversion_description(vehicle_description, marketplace='Faceb
     
     user_prompt = f"Gere o anúncio com base na seguinte descrição do veículo e contexto da concessionária:\n\n{vehicle_description}"
     
-    # 2. Chama a API do Gemini com timeout de 30 segundos
+    # 2. Chama a API do Gemini
     try:
         response = GEMINI_CLIENT.models.generate_content(
             model='gemini-2.5-flash',
             contents=user_prompt,
             config={"system_instruction": system_instruction},
-            # NOVO: Adiciona timeout de requisição para evitar travamento do worker
-            request_options={"timeout": 600.0}
         )
         
         descricao_bruta = response.text
@@ -143,9 +137,9 @@ def generate_high_conversion_description(vehicle_description, marketplace='Faceb
         print(f"Erro na API do Gemini: {e}")
         return f"⚠️ Erro ao chamar a IA (API Error): {e}. Verifique o status da chave."
     except Exception as e:
-        # Este handler irá capturar timeouts de HTTP/biblioteca, que causam o SystemExit
+        # Este handler irá capturar timeouts ou outros erros de comunicação da biblioteca.
         print(f"Erro inesperado no Gemini request: {e}")
-        return f"⚠️ Erro de Comunicação com a IA (Provável Timeout): O serviço Gemini não respondeu a tempo ou ocorreu um erro de conexão. Tente novamente. Detalhes: {type(e).__name__}"
+        return f"⚠️ Erro de Comunicação com a IA: O serviço Gemini falhou ao responder. Detalhes: {type(e).__name__}"
 
     # 3. LÓGICA DE EXCLUSÃO OBRIGATÓRIA (Pós-processamento de segurança)
     descricao_limpa = descricao_bruta
