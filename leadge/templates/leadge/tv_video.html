@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ video_config.titulo }}</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Remove barras de rolagem */
+            background-color: #000;
+            height: 100%;
+            width: 100%;
+        }
+        #video-container {
+            width: 100%;
+            height: 100%;
+        }
+        /* Estilização para o Iframe do YouTube (para cobrir 100% e ser responsivo) */
+        .responsive-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        /* Aviso de Erro (caso o vídeo não carregue ou não esteja configurado) */
+        .error-message {
+            color: white;
+            text-align: center;
+            padding-top: 50vh;
+            transform: translateY(-50%);
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="video-container">
+        {% if video_config.video_url %}
+            <iframe 
+                class="responsive-video"
+                src="{{ video_config.video_url }}"
+                allow="autoplay; fullscreen"
+                autoplay
+                loop
+                muted
+                frameborder="0"
+                allowfullscreen>
+            </iframe>
+        {% else %}
+            <div class="error-message">
+                <h1>⚠️ Erro de Configuração</h1>
+                <p>Nenhuma URL de vídeo foi configurada. Por favor, peça ao Administrador para configurar a URL no Painel Admin.</p>
+                <p>A página irá recarregar automaticamente para tentar novamente.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        const VIDEO_URL = "{{ video_config.video_url|escapejs }}";
+        const LAST_UPDATED_STR = "{{ video_config.last_updated|date:'U' }}"; // Data de atualização em timestamp UNIX
+        const CHECK_INTERVAL_MS = 60000; // Intervalo de 1 minuto para checagem (60000 ms)
+        const REFRESH_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 horas em milissegundos
+
+        let lastUpdatedTimestamp = parseInt(LAST_UPDATED_STR) * 1000; // Converte para milissegundos
+
+        // Garante que a data base não seja no futuro
+        if (Date.now() < lastUpdatedTimestamp || isNaN(lastUpdatedTimestamp)) {
+             lastUpdatedTimestamp = Date.now();
+        }
+
+        function checkRefreshNeeded() {
+            const currentTime = Date.now();
+
+            // 1. Lógica de Recarga (24 horas)
+            if ((currentTime - lastUpdatedTimestamp) >= REFRESH_THRESHOLD_MS) {
+                console.log("Limite de 24 horas excedido. Recarregando a página para buscar novo vídeo ou nova URL.");
+                // Recarrega do servidor, ignorando o cache do navegador
+                window.location.reload(true); 
+                return;
+            }
+            
+            // 2. Lógica de Recarga de Segurança (se não houver vídeo)
+            if (!VIDEO_URL) {
+                console.log("Vídeo não configurado. Recarregando em 5 minutos para tentar buscar uma configuração.");
+                setTimeout(() => window.location.reload(true), 5 * 60 * 1000); // 5 minutos
+                return;
+            }
+        }
+        
+        // Inicia a checagem no intervalo
+        setInterval(checkRefreshNeeded, CHECK_INTERVAL_MS);
+        
+        console.log("Player de TV Inicializado. Próxima checagem de 24h em background.");
+
+    </script>
+</body>
+</html>
