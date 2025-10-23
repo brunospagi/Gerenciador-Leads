@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     
     <style>
+        /* ... (Estilos omitidos por brevidade) ... */
         body, html {
             margin: 0;
             padding: 0;
@@ -123,6 +124,7 @@
         const MANUAL_NEWS = "{{ MANUAL_NEWS|escapejs }}";
 
         // Coordenadas padrão (São José dos Pinhais)
+        const CIDADE = "São José dos Pinhais";
         const LATITUDE = -25.5358; 
         const LONGITUDE = -49.2046; 
         
@@ -133,29 +135,50 @@
         const NEWS_SCROLLER = document.getElementById('noticias-scroller');
 
         // --- LÓGICA DO CLIMA (GOOGLE WEATHER) ---
-        function getWeatherIconClass(condition) {
-            const map = {
-                'CLEAR': 'bi-sun-fill', // Mapeado de 'CLEAR' no JSON para 'bi-sun-fill'
-                'CLEAR_DAY': 'bi-sun-fill',
-                'RAIN': 'bi-cloud-rain-fill',
-                'CLOUDY': 'bi-cloud-fill',
+        function getWeatherTranslation(conditionCode) {
+            const translations = {
+                'CLEAR': 'Céu Limpo',
+                'MOSTLY_CLEAR': 'Quase Limpo',
+                'PARTLY_CLOUDY': 'Parcialmente Nublado',
+                'MOSTLY_CLOUDY': 'Predominantemente Nublado',
+                'CLOUDY': 'Nublado',
+                'OVERCAST': 'Encoberto',
+                'RAIN': 'Chuva',
+                'SNOW': 'Neve',
+                'THUNDERSTORM': 'Tempestade',
+                'FOG': 'Nevoeiro',
+                'WINDY': 'Ventania',
+                'HAZE': 'Névoa',
+                'SMOKE': 'Fumaça',
+            };
+            return translations[conditionCode] || conditionCode;
+        }
+
+        function getWeatherIconClass(conditionCode) {
+            const iconMap = {
+                'CLEAR': 'bi-sun-fill',
+                'MOSTLY_CLEAR': 'bi-sun-fill',
                 'PARTLY_CLOUDY': 'bi-cloud-sun-fill',
+                'MOSTLY_CLOUDY': 'bi-cloud-fill',
+                'CLOUDY': 'bi-cloud-fill',
+                'OVERCAST': 'bi-cloud-fill',
+                'RAIN': 'bi-cloud-rain-fill',
                 'SNOW': 'bi-cloud-snow-fill',
                 'THUNDERSTORM': 'bi-cloud-lightning-fill',
                 'FOG': 'bi-cloud-haze2-fill',
-                'WINDY': 'bi-wind'
+                'WINDY': 'bi-wind',
             };
-            return map[condition] || 'bi-cloud-sun-fill';
+            return iconMap[conditionCode] || 'bi-cloud-sun-fill';
         }
+
 
         async function fetchWeather() {
             if (!API_KEY_GOOGLE || API_KEY_GOOGLE.trim() === '') {
-                CLIMA_ELEMENT.textContent = "Erro: API Key Google Maps não configurada.";
+                CLIMA_ELEMENT.textContent = `Erro: API Key Google Maps não configurada para ${CIDADE}.`;
                 CLIMA_ICON_ELEMENT.className = 'bi bi-exclamation-triangle-fill me-2';
                 return;
             }
 
-            // Endpoint: v1/currentConditions:lookup com location.latitude/longitude
             const weatherUrl = `https://weather.googleapis.com/v1/currentConditions:lookup?key=${API_KEY_GOOGLE}&location.latitude=${LATITUDE}&location.longitude=${LONGITUDE}`;
             
             try {
@@ -168,13 +191,13 @@
                 });
                 
                 if (response.status === 404) {
-                    CLIMA_ELEMENT.textContent = "Erro 404: Verifique se a API Weather está habilitada no Console do Google Cloud.";
+                    CLIMA_ELEMENT.textContent = `Erro 404 para ${CIDADE}: Verifique se a API Weather está habilitada.`;
                     CLIMA_ICON_ELEMENT.className = 'bi bi-exclamation-octagon-fill me-2';
                     return;
                 }
                 if (!response.ok) {
                     const errorData = await response.json();
-                    CLIMA_ELEMENT.textContent = `Erro API: ${response.status} - ${errorData.error.message || 'Falha ao buscar.'}`;
+                    CLIMA_ELEMENT.textContent = `Erro API para ${CIDADE}: ${response.status} - ${errorData.error.message || 'Falha ao buscar.'}`;
                     CLIMA_ICON_ELEMENT.className = 'bi bi-x-circle-fill me-2';
                     console.error("Erro na resposta da API Google Weather:", errorData);
                     return; 
@@ -182,22 +205,23 @@
 
                 const data = await response.json();
                 
-                // CORREÇÃO DE PARSING: Acessando .degrees, .weatherCondition.description.text e .weatherCondition.type
+                // --- CORREÇÃO DE PARSING ---
                 if (data.temperature && data.weatherCondition) {
                     const temp = Math.round(data.temperature.degrees); 
-                    const conditionText = data.weatherCondition.description.text;
                     const conditionCode = data.weatherCondition.type; 
+                    const conditionTranslated = getWeatherTranslation(conditionCode);
                     
-                    CLIMA_ELEMENT.textContent = `${temp}°C, ${conditionText}`;
+                    // Inclui o nome da cidade
+                    CLIMA_ELEMENT.textContent = `${CIDADE}: ${temp}°C, ${conditionTranslated}`; 
                     CLIMA_ICON_ELEMENT.className = `bi ${getWeatherIconClass(conditionCode)} me-2`; 
                 } else {
-                    CLIMA_ELEMENT.textContent = "Dados climáticos incompletos ou não encontrados.";
+                    CLIMA_ELEMENT.textContent = `Dados climáticos incompletos ou não encontrados para ${CIDADE}.`;
                     CLIMA_ICON_ELEMENT.className = 'bi bi-info-circle-fill me-2';
                 }
 
             } catch (error) {
                 console.error("Erro de rede/API ao carregar o clima:", error);
-                CLIMA_ELEMENT.textContent = "Erro de rede/API ao carregar o clima. (Verifique sua chave e faturamento)";
+                CLIMA_ELEMENT.textContent = `Erro de rede/API ao carregar o clima para ${CIDADE}.`;
                 CLIMA_ICON_ELEMENT.className = 'bi bi-wifi-off me-2';
             }
         }
