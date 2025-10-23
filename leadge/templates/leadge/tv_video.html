@@ -78,10 +78,6 @@
             white-space: nowrap;
             /* A animação é iniciada via JS para calcular a duração */
         }
-        @keyframes moveText {
-            0% { transform: translateX(100%); }
-            100% { transform: translateX(-100%); }
-        }
     </style>
 </head>
 <body>
@@ -159,19 +155,28 @@
                 return;
             }
 
-            const weatherUrl = `https://weather.googleapis.com/v1/currentConditions:${LATITUDE},${LONGITUDE}?key=${API_KEY_GOOGLE}`;
+            // CORREÇÃO DO 404: Usando o formato correto de location parameter
+            const weatherUrl = `https://weather.googleapis.com/v1/currentConditions:get?location=${LATITUDE},${LONGITUDE}&key=${API_KEY_GOOGLE}`;
             
             try {
                 const response = await fetch(weatherUrl, {
-                     method: 'GET',
-                     headers: {
+                    method: 'GET',
+                    headers: {
                         'X-Goog-Api-Key': API_KEY_GOOGLE, 
                         'Content-Type': 'application/json'
                     }
                 });
                 
+                if (response.status === 404) {
+                    CLIMA_ELEMENT.textContent = "Erro 404: Verifique a URL ou se a API Weather está habilitada.";
+                    CLIMA_ICON_ELEMENT.className = 'bi bi-exclamation-octagon-fill me-2';
+                    return;
+                }
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorData = await response.json();
+                    CLIMA_ELEMENT.textContent = `Erro API: ${response.status} - ${errorData.error.message || 'Falha ao buscar.'}`;
+                    CLIMA_ICON_ELEMENT.className = 'bi bi-x-circle-fill me-2';
+                    throw new Error(`Google Weather API Error: ${response.status}`);
                 }
 
                 const data = await response.json();
@@ -189,44 +194,57 @@
 
             } catch (error) {
                 console.error("Erro na API do Google Weather:", error);
-                CLIMA_ELEMENT.textContent = "Erro de rede/API ao carregar o clima.";
+                CLIMA_ELEMENT.textContent = "Erro de rede/API ao carregar o clima. (Verifique sua chave e faturamento)";
                 CLIMA_ICON_ELEMENT.className = 'bi bi-wifi-off me-2';
             }
         }
 
-        // --- LÓGICA DE NOTÍCIAS (Newsdata.io) ---
+        // --- LÓGICA DE NOTÍCIAS (Newsdata.io) e CORREÇÃO DO SCROLLER ---
 
         function startNewsScroller() {
-            // Remove animações antigas
-            NEWS_SCROLLER.style.animation = 'none';
-            // Força um reflow para reiniciar
-            void NEWS_SCROLLER.offsetWidth;
-
+            const newsContainer = NEWS_SCROLLER.parentElement;
+            
+            // Força o reflow para garantir que o scrollWidth seja atualizado
+            void NEWS_TEXT_ELEMENT.offsetWidth;
             const textWidth = NEWS_TEXT_ELEMENT.scrollWidth;
-            const containerWidth = NEWS_SCROLLER.parentElement.clientWidth;
+            const containerWidth = newsContainer.clientWidth;
+
+            // Remove qualquer estilo de animação anterior
+            NEWS_SCROLLER.style.animation = 'none';
             
             if (textWidth > containerWidth) {
-                const duration = textWidth / 50;
-                
-                // Remove a regra de keyframes anterior para evitar duplicação/conflito
-                const styleSheet = document.styleSheets[0];
-                for (let i = 0; i < styleSheet.cssRules.length; i++) {
-                    if (styleSheet.cssRules[i].name === 'moveText') {
-                        styleSheet.deleteRule(i);
-                        break;
-                    }
-                }
-                
-                // Recria a regra de keyframes
-                const keyframesRule = `@keyframes moveText { 0% { transform: translateX(100%); } 100% { transform: translateX(-${textWidth}px); } }`;
-                styleSheet.insertRule(keyframesRule, styleSheet.cssRules.length);
+                // Cálculo da distância e duração
+                const travelDistance = textWidth + containerWidth;
+                const speed = 70; // 70 pixels por segundo
+                const duration = travelDistance / speed;
 
-                NEWS_SCROLLER.style.animation = `moveText ${duration}s linear infinite`;
+                // 1. Garante que o elemento scroller seja do tamanho do texto
+                NEWS_SCROLLER.style.width = `${textWidth}px`; 
+
+                // 2. Cria a regra de keyframes dinamicamente
+                const style = document.createElement('style');
+                document.head.appendChild(style);
+                const sheet = style.sheet;
+                const animationName = 'moveText-' + Date.now(); 
+
+                // Adiciona a regra de keyframes: Começa na borda direita do container (100% da largura do container)
+                // e termina quando o último caractere do texto (largura do texto) sai da borda esquerda.
+                sheet.insertRule(`
+                    @keyframes ${animationName} {
+                        0% { transform: translateX(${containerWidth}px); }
+                        100% { transform: translateX(-${textWidth}px); }
+                    }
+                `, 0);
+
+                // 3. Aplica a animação
+                NEWS_SCROLLER.style.animation = `${animationName} ${duration}s linear infinite`;
+                NEWS_SCROLLER.style.position = 'absolute';
+
             } else {
-                // Centraliza se o texto for pequeno
+                // Texto cabe, desliga a animação e centraliza (opcionalmente)
                 NEWS_SCROLLER.style.animation = 'none';
                 NEWS_SCROLLER.style.position = 'static';
-                NEWS_SCROLLER.style.textAlign = 'center';
+                NEWS_SCROLLER.style.width = 'auto';
             }
         }
 
@@ -243,7 +261,6 @@
                 return;
             }
 
-            // URL da API Newsdata.io (q=g1, pt-br)
             const newsUrl = `https://newsdata.io/api/1/latest?apikey=${API_KEY_NEWS}&q=g1&language=pt&country=br`;
             
             try {
