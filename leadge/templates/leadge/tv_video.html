@@ -76,7 +76,7 @@
         .noticias-scroller {
             position: absolute;
             white-space: nowrap;
-            /* A animação é iniciada via JS para calcular a duração */
+            /* A animação é definida via JS */
         }
     </style>
 </head>
@@ -155,8 +155,8 @@
                 return;
             }
 
-            // CORREÇÃO DO 404: Usando o formato correto de location parameter
-            const weatherUrl = `https://weather.googleapis.com/v1/currentConditions:get?location=${LATITUDE},${LONGITUDE}&key=${API_KEY_GOOGLE}`;
+            // CORREÇÃO DO 404: Usando o endpoint e parâmetros de localização corretos (location.latitude e location.longitude)
+            const weatherUrl = `https://weather.googleapis.com/v1/currentConditions:lookup?key=${API_KEY_GOOGLE}&location.latitude=${LATITUDE}&location.longitude=${LONGITUDE}`;
             
             try {
                 const response = await fetch(weatherUrl, {
@@ -168,7 +168,7 @@
                 });
                 
                 if (response.status === 404) {
-                    CLIMA_ELEMENT.textContent = "Erro 404: Verifique a URL ou se a API Weather está habilitada.";
+                    CLIMA_ELEMENT.textContent = "Erro 404: Verifique se a API Weather está habilitada no Console do Google Cloud.";
                     CLIMA_ICON_ELEMENT.className = 'bi bi-exclamation-octagon-fill me-2';
                     return;
                 }
@@ -181,6 +181,7 @@
 
                 const data = await response.json();
                 
+                // Ajuste o parsing dos dados conforme a resposta real da API
                 if (data.temperature && data.condition) {
                     const temp = Math.round(data.temperature.value);
                     const condition = data.condition.text;
@@ -204,47 +205,53 @@
         function startNewsScroller() {
             const newsContainer = NEWS_SCROLLER.parentElement;
             
-            // Força o reflow para garantir que o scrollWidth seja atualizado
-            void NEWS_TEXT_ELEMENT.offsetWidth;
-            const textWidth = NEWS_TEXT_ELEMENT.scrollWidth;
-            const containerWidth = newsContainer.clientWidth;
-
-            // Remove qualquer estilo de animação anterior
+            // 1. Reset width for correct measurement and force reflow
+            NEWS_SCROLLER.style.width = 'max-content';
             NEWS_SCROLLER.style.animation = 'none';
+            void NEWS_SCROLLER.offsetWidth;
+
+            const textWidth = NEWS_SCROLLER.scrollWidth;
+            const containerWidth = newsContainer.clientWidth;
             
             if (textWidth > containerWidth) {
-                // Cálculo da distância e duração
-                const travelDistance = textWidth + containerWidth;
-                const speed = 70; // 70 pixels por segundo
-                const duration = travelDistance / speed;
-
-                // 1. Garante que o elemento scroller seja do tamanho do texto
-                NEWS_SCROLLER.style.width = `${textWidth}px`; 
-
-                // 2. Cria a regra de keyframes dinamicamente
+                // 2. Cálculo da duração (70 pixels por segundo para velocidade constante)
+                const totalDistance = textWidth + containerWidth;
+                const duration = totalDistance / 70;
+                
                 const style = document.createElement('style');
                 document.head.appendChild(style);
                 const sheet = style.sheet;
                 const animationName = 'moveText-' + Date.now(); 
 
-                // Adiciona a regra de keyframes: Começa na borda direita do container (100% da largura do container)
-                // e termina quando o último caractere do texto (largura do texto) sai da borda esquerda.
+                // 3. Limpa keyframes dinâmicos anteriores
+                for (let i = 0; i < document.styleSheets.length; i++) {
+                    try {
+                        const sheet = document.styleSheets[i];
+                        for (let j = 0; j < sheet.cssRules.length; j++) {
+                            if (sheet.cssRules[j].name && sheet.cssRules[j].name.startsWith('moveText-')) {
+                                sheet.deleteRule(j);
+                            }
+                        }
+                    } catch(e) { /* ignora erros de segurança em folhas externas */ }
+                }
+
+                // 4. Cria a nova regra de keyframe
                 sheet.insertRule(`
                     @keyframes ${animationName} {
-                        0% { transform: translateX(${containerWidth}px); }
-                        100% { transform: translateX(-${textWidth}px); }
+                        0% { transform: translateX(${containerWidth}px); } /* Começa na borda direita do container */
+                        100% { transform: translateX(-${textWidth}px); } /* Termina quando o texto sai da borda esquerda */
                     }
                 `, 0);
 
-                // 3. Aplica a animação
+                // 5. Aplica a animação
+                NEWS_SCROLLER.style.width = `${textWidth}px`; 
                 NEWS_SCROLLER.style.animation = `${animationName} ${duration}s linear infinite`;
                 NEWS_SCROLLER.style.position = 'absolute';
-
             } else {
-                // Texto cabe, desliga a animação e centraliza (opcionalmente)
-                NEWS_SCROLLER.style.animation = 'none';
+                // Texto cabe, desliga a animação
                 NEWS_SCROLLER.style.position = 'static';
                 NEWS_SCROLLER.style.width = 'auto';
+                NEWS_SCROLLER.style.textAlign = 'center';
             }
         }
 
