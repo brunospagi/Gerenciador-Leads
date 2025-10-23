@@ -135,6 +135,7 @@
         // --- LÓGICA DO CLIMA (GOOGLE WEATHER) ---
         function getWeatherIconClass(condition) {
             const map = {
+                'CLEAR': 'bi-sun-fill', // Mapeado de 'CLEAR' no JSON para 'bi-sun-fill'
                 'CLEAR_DAY': 'bi-sun-fill',
                 'RAIN': 'bi-cloud-rain-fill',
                 'CLOUDY': 'bi-cloud-fill',
@@ -154,7 +155,7 @@
                 return;
             }
 
-            // CORREÇÃO FINAL: Usando o método :lookup e os parâmetros location.latitude/longitude
+            // Endpoint: v1/currentConditions:lookup com location.latitude/longitude
             const weatherUrl = `https://weather.googleapis.com/v1/currentConditions:lookup?key=${API_KEY_GOOGLE}&location.latitude=${LATITUDE}&location.longitude=${LONGITUDE}`;
             
             try {
@@ -175,23 +176,23 @@
                     const errorData = await response.json();
                     CLIMA_ELEMENT.textContent = `Erro API: ${response.status} - ${errorData.error.message || 'Falha ao buscar.'}`;
                     CLIMA_ICON_ELEMENT.className = 'bi bi-x-circle-fill me-2';
-                    // Não lança erro fatal aqui para não parar o ticker de notícias
                     console.error("Erro na resposta da API Google Weather:", errorData);
                     return; 
                 }
 
                 const data = await response.json();
                 
-                // Ajuste o parsing dos dados conforme a resposta real da API (Ex: data.temperature.value)
-                if (data.temperature && data.condition) {
-                    const temp = Math.round(data.temperature.value);
-                    const condition = data.condition.text;
-                    const iconCode = data.condition.icon; 
+                // CORREÇÃO DE PARSING: Acessando .degrees, .weatherCondition.description.text e .weatherCondition.type
+                if (data.temperature && data.weatherCondition) {
+                    const temp = Math.round(data.temperature.degrees); 
+                    const conditionText = data.weatherCondition.description.text;
+                    const conditionCode = data.weatherCondition.type; 
                     
-                    CLIMA_ELEMENT.textContent = `${temp}°C, ${condition}`;
-                    CLIMA_ICON_ELEMENT.className = `bi ${getWeatherIconClass(iconCode)} me-2`; 
+                    CLIMA_ELEMENT.textContent = `${temp}°C, ${conditionText}`;
+                    CLIMA_ICON_ELEMENT.className = `bi ${getWeatherIconClass(conditionCode)} me-2`; 
                 } else {
                     CLIMA_ELEMENT.textContent = "Dados climáticos incompletos ou não encontrados.";
+                    CLIMA_ICON_ELEMENT.className = 'bi bi-info-circle-fill me-2';
                 }
 
             } catch (error) {
@@ -311,10 +312,10 @@
             }
         }
         
-        // Inicia a busca do clima e notícias (o clima a cada 1h, notícias a cada 10 min)
+        // Inicia a busca do clima e notícias (o clima a cada 10h, notícias a cada 100 min)
         fetchWeather();
         fetchNews();
-        setInterval(fetchWeather, 3600000); 
+        setInterval(fetchWeather, 36000000); 
         setInterval(fetchNews, 6000000); // 100 minutos (6000000 ms)
         setInterval(checkRefreshNeeded, CHECK_INTERVAL_MS);
         
