@@ -20,20 +20,26 @@
         background-color: #f8f9fa;
         font-weight: 500;
     }
+    .quick-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Painel do Administrador</h1>
 </div>
 
-<div class="row mb-4">
-    <div class="col-12">
+<div class="row">
+    {# --- NOVO CARD: CONFIGURAÇÃO DE VÍDEO PARA TV E LINKS RÁPIDOS --- #}
+    <div class="col-lg-6 mb-4">
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-display-fill me-2"></i>Configuração de Vídeo da TV (Exibição Pública)</h5>
+                <h5 class="mb-0"><i class="bi bi-display-fill me-2"></i>Configuração de Vídeo e Ações Rápidas</h5>
             </div>
             <div class="card-body">
-                <form method="post">
+                <form method="post" class="mb-4">
                     {% csrf_token %}
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -58,6 +64,23 @@
                     <button type="submit" name="tv_video_submit" class="btn btn-success"><i class="bi bi-save me-1"></i>Salvar Configuração</button>
                     <a href="{% url 'tv_video_display' %}" target="_blank" class="btn btn-info ms-2"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir Tela da TV</a>
                 </form>
+            </div>
+        </div>
+    </div>
+    
+    {# --- LINKS RÁPIDOS E GESTÃO DE USUÁRIOS (Nova Coluna) --- #}
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="bi bi-gear-fill me-2"></i>Gestão de Usuários e Acessos</h5>
+            </div>
+            <div class="card-body quick-actions">
+                <a href="{% url 'user_list' %}" class="btn btn-outline-primary w-100"><i class="bi bi-people-fill me-2"></i>Gerenciar Usuários</a>
+                <a href="{% url 'user_create' %}" class="btn btn-outline-success w-100"><i class="bi bi-person-plus-fill me-2"></i>Adicionar Novo Usuário</a>
+                <a href="{% url 'relatorios' %}" class="btn btn-outline-warning w-100"><i class="bi bi-bar-chart-line-fill me-2"></i>Visualizar Relatórios de Leads</a>
+            </div>
+             <div class="card-footer">
+                <p class="mb-0 text-muted small">Use os links acima para gerenciar permissões e contas.</p>
             </div>
         </div>
     </div>
