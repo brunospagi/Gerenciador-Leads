@@ -10,7 +10,6 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     
     <style>
-        /* ... (Estilos omitidos por brevidade) ... */
         body, html {
             margin: 0;
             padding: 0;
@@ -49,9 +48,10 @@
             height: 80px;
             background-color: rgba(0, 0, 0, 0.8); /* Fundo mais escuro */
             color: white;
-            display: flex;
+            /* Alterado para usar grid ou flexbox com espaçamento */
+            display: grid; 
+            grid-template-columns: 1fr 1fr 1fr; /* Três colunas: Esquerda, Centro, Direita */
             align-items: center;
-            justify-content: space-between;
             padding: 0 20px;
             font-family: sans-serif;
             z-index: 1000;
@@ -62,21 +62,54 @@
             align-items: center;
             font-size: 1.2rem;
         }
+        .info-box.time-weather-group {
+            display: flex;
+            flex-direction: column; 
+            align-items: flex-start;
+            min-width: 350px;
+        }
         .clima {
-            min-width: 300px; /* Garante que o widget do clima tenha espaço */
             color: #0dcaf0;
             font-weight: bold;
+            display: flex;
+            align-items: center;
         }
+        #date-time-line {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 5px;
+            white-space: nowrap;
+        }
+        #hora-atual {
+            margin-left: 10px;
+            font-weight: normal;
+        }
+        
+        /* --- CRÉDITOS CENTRALIZADOS --- */
+        #credits {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #ccc;
+        }
+        #credits strong {
+            color: #fff;
+        }
+        
+        /* --- NOTÍCIAS (Terceira Coluna) --- */
         .noticias {
-            flex-grow: 1;
-            margin-left: 50px;
+            /* Alinhado à direita do grid */
+            justify-self: end;
             overflow: hidden;
             position: relative;
             height: 1.2rem;
+            width: 100%; /* Ocupa todo o espaço da terceira coluna */
+            text-align: right;
         }
         .noticias-scroller {
             position: absolute;
             white-space: nowrap;
+            /* A animação será aplicada aqui */
         }
     </style>
 </head>
@@ -104,12 +137,22 @@
     </div>
 
     <div id="footer-tv">
-        <div class="info-box clima me-5">
-            <i class="bi bi-cloud-sun-fill me-2" id="clima-icon"></i>
-            <span id="clima-info">Carregando clima...</span>
+        <div class="info-box time-weather-group">
+            <div id="date-time-line">
+                <span id="dia-data"></span>
+                <span id="hora-atual"></span>
+            </div>
+            <div class="clima">
+                <i class="bi bi-cloud-sun-fill me-2" id="clima-icon"></i>
+                <span id="clima-info">Carregando clima...</span>
+            </div>
         </div>
         
-        <div class="info-box noticias">
+        <div id="credits">
+            Powered by <strong>Spagi Sistemas</strong>
+        </div>
+        
+        <div class="noticias">
             <div class="noticias-scroller" id="noticias-scroller">
                 <i class="bi bi-newspaper me-2"></i>
                 <span id="news-text">Carregando notícias...</span>
@@ -129,10 +172,43 @@
         const LONGITUDE = -49.2046; 
         
         // Elementos HTML
+        const DIA_DATA_ELEMENT = document.getElementById('dia-data');
+        const HORA_ELEMENT = document.getElementById('hora-atual');
         const CLIMA_ELEMENT = document.getElementById('clima-info');
         const CLIMA_ICON_ELEMENT = document.getElementById('clima-icon');
         const NEWS_TEXT_ELEMENT = document.getElementById('news-text');
         const NEWS_SCROLLER = document.getElementById('noticias-scroller');
+
+        // --- LÓGICA DA HORA E DATA ---
+        function updateTime() {
+            const now = new Date();
+            
+            // Opções para Hora
+            const timeOptions = { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit',
+                hour12: false
+            };
+            // Opções para Data (Dia da semana, dia, mês)
+            const dateOptions = {
+                weekday: 'long', 
+                day: 'numeric', 
+                month: 'long'
+            };
+
+            const formattedTime = now.toLocaleTimeString('pt-BR', timeOptions);
+            
+            // Formata e Capitaliza a primeira letra do dia da semana e do mês
+            const formattedDateRaw = now.toLocaleDateString('pt-BR', dateOptions);
+            const formattedDate = formattedDateRaw.charAt(0).toUpperCase() + formattedDateRaw.slice(1);
+            
+            DIA_DATA_ELEMENT.textContent = formattedDate + ",";
+            HORA_ELEMENT.textContent = formattedTime;
+        }
+        setInterval(updateTime, 1000); // Atualiza a cada segundo
+        updateTime(); // Chama imediatamente para evitar atraso inicial
+
 
         // --- LÓGICA DO CLIMA (GOOGLE WEATHER) ---
         function getWeatherTranslation(conditionCode) {
@@ -174,7 +250,7 @@
 
         async function fetchWeather() {
             if (!API_KEY_GOOGLE || API_KEY_GOOGLE.trim() === '') {
-                CLIMA_ELEMENT.textContent = `Erro: API Key Google Maps não configurada para ${CIDADE}.`;
+                CLIMA_ELEMENT.textContent = `${CIDADE}: Erro - API Key não configurada.`;
                 CLIMA_ICON_ELEMENT.className = 'bi bi-exclamation-triangle-fill me-2';
                 return;
             }
@@ -191,13 +267,13 @@
                 });
                 
                 if (response.status === 404) {
-                    CLIMA_ELEMENT.textContent = `Erro 404 para ${CIDADE}: Verifique se a API Weather está habilitada.`;
+                    CLIMA_ELEMENT.textContent = `${CIDADE}: Erro 404. Verifique se a API Weather está habilitada.`;
                     CLIMA_ICON_ELEMENT.className = 'bi bi-exclamation-octagon-fill me-2';
                     return;
                 }
                 if (!response.ok) {
                     const errorData = await response.json();
-                    CLIMA_ELEMENT.textContent = `Erro API para ${CIDADE}: ${response.status} - ${errorData.error.message || 'Falha ao buscar.'}`;
+                    CLIMA_ELEMENT.textContent = `${CIDADE}: Erro API ${response.status}.`;
                     CLIMA_ICON_ELEMENT.className = 'bi bi-x-circle-fill me-2';
                     console.error("Erro na resposta da API Google Weather:", errorData);
                     return; 
@@ -205,28 +281,26 @@
 
                 const data = await response.json();
                 
-                // --- CORREÇÃO DE PARSING ---
                 if (data.temperature && data.weatherCondition) {
                     const temp = Math.round(data.temperature.degrees); 
                     const conditionCode = data.weatherCondition.type; 
                     const conditionTranslated = getWeatherTranslation(conditionCode);
                     
-                    // Inclui o nome da cidade
                     CLIMA_ELEMENT.textContent = `${CIDADE}: ${temp}°C, ${conditionTranslated}`; 
                     CLIMA_ICON_ELEMENT.className = `bi ${getWeatherIconClass(conditionCode)} me-2`; 
                 } else {
-                    CLIMA_ELEMENT.textContent = `Dados climáticos incompletos ou não encontrados para ${CIDADE}.`;
+                    CLIMA_ELEMENT.textContent = `${CIDADE}: Dados climáticos incompletos.`;
                     CLIMA_ICON_ELEMENT.className = 'bi bi-info-circle-fill me-2';
                 }
 
             } catch (error) {
                 console.error("Erro de rede/API ao carregar o clima:", error);
-                CLIMA_ELEMENT.textContent = `Erro de rede/API ao carregar o clima para ${CIDADE}.`;
+                CLIMA_ELEMENT.textContent = `${CIDADE}: Erro de rede/API.`;
                 CLIMA_ICON_ELEMENT.className = 'bi bi-wifi-off me-2';
             }
         }
 
-        // --- LÓGICA DE NOTÍCIAS (Newsdata.io) e CORREÇÃO DO SCROLLER ---
+        // --- LÓGICA DE NOTÍCIAS (Newsdata.io) e SCROLLER ---
 
         function startNewsScroller() {
             const newsContainer = NEWS_SCROLLER.parentElement;
@@ -336,11 +410,11 @@
             }
         }
         
-        // Inicia a busca do clima e notícias (o clima a cada 3h, notícias a cada 100 min)
+        // Inicia a busca do clima e notícias (o clima a cada 1h, notícias a cada 10 min)
         fetchWeather();
         fetchNews();
         setInterval(fetchWeather, 10800000); 
-        setInterval(fetchNews, 6000000); // 100 minutos (6000000 ms)
+        setInterval(fetchNews, 10800000); // 10 minutos (600000 ms)
         setInterval(checkRefreshNeeded, CHECK_INTERVAL_MS);
         
         console.log("Player de TV Inicializado. Clima, notícias e auto-refresh ativos.");
