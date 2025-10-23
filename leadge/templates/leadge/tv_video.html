@@ -336,10 +336,10 @@
             }
         }
         
-        // Inicia a busca do clima e notícias (o clima a cada 10h, notícias a cada 100 min)
+        // Inicia a busca do clima e notícias (o clima a cada 3h, notícias a cada 100 min)
         fetchWeather();
         fetchNews();
-        setInterval(fetchWeather, 36000000); 
+        setInterval(fetchWeather, 10800000); 
         setInterval(fetchNews, 6000000); // 100 minutos (6000000 ms)
         setInterval(checkRefreshNeeded, CHECK_INTERVAL_MS);
         
