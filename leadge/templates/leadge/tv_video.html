@@ -76,7 +76,6 @@
         .noticias-scroller {
             position: absolute;
             white-space: nowrap;
-            /* A animação é definida via JS */
         }
     </style>
 </head>
@@ -155,7 +154,7 @@
                 return;
             }
 
-            // CORREÇÃO DO 404: Usando o endpoint e parâmetros de localização corretos (location.latitude e location.longitude)
+            // CORREÇÃO FINAL: Usando o método :lookup e os parâmetros location.latitude/longitude
             const weatherUrl = `https://weather.googleapis.com/v1/currentConditions:lookup?key=${API_KEY_GOOGLE}&location.latitude=${LATITUDE}&location.longitude=${LONGITUDE}`;
             
             try {
@@ -176,12 +175,14 @@
                     const errorData = await response.json();
                     CLIMA_ELEMENT.textContent = `Erro API: ${response.status} - ${errorData.error.message || 'Falha ao buscar.'}`;
                     CLIMA_ICON_ELEMENT.className = 'bi bi-x-circle-fill me-2';
-                    throw new Error(`Google Weather API Error: ${response.status}`);
+                    // Não lança erro fatal aqui para não parar o ticker de notícias
+                    console.error("Erro na resposta da API Google Weather:", errorData);
+                    return; 
                 }
 
                 const data = await response.json();
                 
-                // Ajuste o parsing dos dados conforme a resposta real da API
+                // Ajuste o parsing dos dados conforme a resposta real da API (Ex: data.temperature.value)
                 if (data.temperature && data.condition) {
                     const temp = Math.round(data.temperature.value);
                     const condition = data.condition.text;
@@ -194,7 +195,7 @@
                 }
 
             } catch (error) {
-                console.error("Erro na API do Google Weather:", error);
+                console.error("Erro de rede/API ao carregar o clima:", error);
                 CLIMA_ELEMENT.textContent = "Erro de rede/API ao carregar o clima. (Verifique sua chave e faturamento)";
                 CLIMA_ICON_ELEMENT.className = 'bi bi-wifi-off me-2';
             }
