@@ -7,20 +7,22 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
     <style>
         body, html {
             margin: 0;
             padding: 0;
-            overflow: hidden; /* Remove barras de rolagem */
+            overflow: hidden;
             background-color: #000;
             height: 100%;
             width: 100%;
         }
         #video-container {
             width: 100%;
-            height: 100%;
+            height: calc(100% - 80px); /* Ajuste para o rodapé */
+            position: relative;
         }
-        /* Estilização para o Iframe do YouTube (para cobrir 100% e ser responsivo) */
         .responsive-video {
             position: absolute;
             top: 0;
@@ -29,13 +31,56 @@
             height: 100%;
             border: none;
         }
-        /* Aviso de Erro (caso o vídeo não carregue ou não esteja configurado) */
         .error-message {
             color: white;
             text-align: center;
             padding-top: 50vh;
             transform: translateY(-50%);
             font-family: sans-serif;
+        }
+        
+        /* --- RODAPÉ --- */
+        #footer-tv {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 80px;
+            background-color: rgba(0, 0, 0, 0.8); /* Fundo mais escuro */
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            font-family: sans-serif;
+            z-index: 1000;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.5);
+        }
+        .info-box {
+            display: flex;
+            align-items: center;
+            font-size: 1.2rem;
+        }
+        .clima {
+            min-width: 300px; /* Garante que o widget do clima tenha espaço */
+            color: #0dcaf0;
+            font-weight: bold;
+        }
+        .noticias {
+            flex-grow: 1;
+            margin-left: 50px;
+            overflow: hidden;
+            position: relative;
+            height: 1.2rem;
+        }
+        .noticias-scroller {
+            position: absolute;
+            white-space: nowrap;
+            /* A animação é iniciada via JS para calcular a duração */
+        }
+        @keyframes moveText {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
         }
     </style>
 </head>
@@ -62,43 +107,193 @@
         {% endif %}
     </div>
 
+    <div id="footer-tv">
+        <div class="info-box clima me-5">
+            <i class="bi bi-cloud-sun-fill me-2" id="clima-icon"></i>
+            <span id="clima-info">Carregando clima...</span>
+        </div>
+        
+        <div class="info-box noticias">
+            <div class="noticias-scroller" id="noticias-scroller">
+                <i class="bi bi-newspaper me-2"></i>
+                <span id="news-text">Carregando notícias...</span>
+            </div>
+        </div>
+    </div>
+    
     <script>
+        // --- VARIÁVEIS DO DJANGO ---
+        const API_KEY_GOOGLE = "{{ GOOGLE_MAPS_API_KEY }}"; 
+        const API_KEY_NEWS = "{{ NEWS_API_KEY }}";
+        const MANUAL_NEWS = "{{ MANUAL_NEWS|escapejs }}";
+
+        // Coordenadas padrão (São José dos Pinhais)
+        const LATITUDE = -25.5358; 
+        const LONGITUDE = -49.2046; 
+        
+        // Elementos HTML
+        const CLIMA_ELEMENT = document.getElementById('clima-info');
+        const CLIMA_ICON_ELEMENT = document.getElementById('clima-icon');
+        const NEWS_TEXT_ELEMENT = document.getElementById('news-text');
+        const NEWS_SCROLLER = document.getElementById('noticias-scroller');
+
+        // --- LÓGICA DO CLIMA (GOOGLE WEATHER) ---
+        function getWeatherIconClass(condition) {
+            const map = {
+                'CLEAR_DAY': 'bi-sun-fill',
+                'RAIN': 'bi-cloud-rain-fill',
+                'CLOUDY': 'bi-cloud-fill',
+                'PARTLY_CLOUDY': 'bi-cloud-sun-fill',
+                'SNOW': 'bi-cloud-snow-fill',
+                'THUNDERSTORM': 'bi-cloud-lightning-fill',
+                'FOG': 'bi-cloud-haze2-fill',
+                'WINDY': 'bi-wind'
+            };
+            return map[condition] || 'bi-cloud-sun-fill';
+        }
+
+        async function fetchWeather() {
+            if (!API_KEY_GOOGLE || API_KEY_GOOGLE.trim() === '') {
+                CLIMA_ELEMENT.textContent = "Erro: API Key Google Maps não configurada.";
+                CLIMA_ICON_ELEMENT.className = 'bi bi-exclamation-triangle-fill me-2';
+                return;
+            }
+
+            const weatherUrl = `https://weather.googleapis.com/v1/currentConditions:${LATITUDE},${LONGITUDE}?key=${API_KEY_GOOGLE}`;
+            
+            try {
+                const response = await fetch(weatherUrl, {
+                     method: 'GET',
+                     headers: {
+                        'X-Goog-Api-Key': API_KEY_GOOGLE, 
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.temperature && data.condition) {
+                    const temp = Math.round(data.temperature.value);
+                    const condition = data.condition.text;
+                    const iconCode = data.condition.icon; 
+                    
+                    CLIMA_ELEMENT.textContent = `${temp}°C, ${condition}`;
+                    CLIMA_ICON_ELEMENT.className = `bi ${getWeatherIconClass(iconCode)} me-2`; 
+                } else {
+                    CLIMA_ELEMENT.textContent = "Dados climáticos incompletos ou não encontrados.";
+                }
+
+            } catch (error) {
+                console.error("Erro na API do Google Weather:", error);
+                CLIMA_ELEMENT.textContent = "Erro de rede/API ao carregar o clima.";
+                CLIMA_ICON_ELEMENT.className = 'bi bi-wifi-off me-2';
+            }
+        }
+
+        // --- LÓGICA DE NOTÍCIAS (Newsdata.io) ---
+
+        function startNewsScroller() {
+            // Remove animações antigas
+            NEWS_SCROLLER.style.animation = 'none';
+            // Força um reflow para reiniciar
+            void NEWS_SCROLLER.offsetWidth;
+
+            const textWidth = NEWS_TEXT_ELEMENT.scrollWidth;
+            const containerWidth = NEWS_SCROLLER.parentElement.clientWidth;
+            
+            if (textWidth > containerWidth) {
+                const duration = textWidth / 50;
+                
+                // Remove a regra de keyframes anterior para evitar duplicação/conflito
+                const styleSheet = document.styleSheets[0];
+                for (let i = 0; i < styleSheet.cssRules.length; i++) {
+                    if (styleSheet.cssRules[i].name === 'moveText') {
+                        styleSheet.deleteRule(i);
+                        break;
+                    }
+                }
+                
+                // Recria a regra de keyframes
+                const keyframesRule = `@keyframes moveText { 0% { transform: translateX(100%); } 100% { transform: translateX(-${textWidth}px); } }`;
+                styleSheet.insertRule(keyframesRule, styleSheet.cssRules.length);
+
+                NEWS_SCROLLER.style.animation = `moveText ${duration}s linear infinite`;
+            } else {
+                // Centraliza se o texto for pequeno
+                NEWS_SCROLLER.style.animation = 'none';
+                NEWS_SCROLLER.style.position = 'static';
+                NEWS_SCROLLER.style.textAlign = 'center';
+            }
+        }
+
+        async function fetchNews() {
+            if (MANUAL_NEWS && MANUAL_NEWS.trim() !== 'None' && MANUAL_NEWS.trim() !== '') {
+                // 1. PRIORIDADE: NOTÍCIAS MANUAIS
+                NEWS_TEXT_ELEMENT.textContent = MANUAL_NEWS.replace(/None/g, '').trim();
+                startNewsScroller();
+                return;
+            }
+
+            if (!API_KEY_NEWS || API_KEY_NEWS.trim() === '') {
+                NEWS_TEXT_ELEMENT.textContent = "Erro: API Key Newsdata.io não configurada. Use o campo manual.";
+                return;
+            }
+
+            // URL da API Newsdata.io (q=g1, pt-br)
+            const newsUrl = `https://newsdata.io/api/1/latest?apikey=${API_KEY_NEWS}&q=g1&language=pt&country=br`;
+            
+            try {
+                const response = await fetch(newsUrl);
+                const data = await response.json();
+                
+                if (data.results && data.results.length > 0) {
+                    const headlines = data.results.slice(0, 10).map(item => `📰 ${item.title}`).join(' | ');
+                    NEWS_TEXT_ELEMENT.textContent = headlines;
+                } else {
+                    NEWS_TEXT_ELEMENT.textContent = "Nenhuma notícia do G1 encontrada. Verifique a chave da API ou insira um ticker manual.";
+                }
+
+            } catch (error) {
+                console.error("Erro na API Newsdata.io:", error);
+                NEWS_TEXT_ELEMENT.textContent = "Erro de rede/API ao carregar notícias.";
+            }
+
+            // 3. Inicia o scroller após carregar as notícias
+            startNewsScroller();
+        }
+
+        // --- LÓGICA DE RECARGA DE 24H ---
         const VIDEO_URL = "{{ video_config.video_url|escapejs }}";
-        const LAST_UPDATED_STR = "{{ video_config.last_updated|date:'U' }}"; // Data de atualização em timestamp UNIX
-        const CHECK_INTERVAL_MS = 60000; // Intervalo de 1 minuto para checagem (60000 ms)
-        const REFRESH_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 horas em milissegundos
+        const LAST_UPDATED_STR = "{{ video_config.last_updated|date:'U' }}";
+        const CHECK_INTERVAL_MS = 60000;
+        const REFRESH_THRESHOLD_MS = 24 * 60 * 60 * 1000;
+        let lastUpdatedTimestamp = parseInt(LAST_UPDATED_STR) * 1000;
 
-        let lastUpdatedTimestamp = parseInt(LAST_UPDATED_STR) * 1000; // Converte para milissegundos
-
-        // Garante que a data base não seja no futuro
         if (Date.now() < lastUpdatedTimestamp || isNaN(lastUpdatedTimestamp)) {
              lastUpdatedTimestamp = Date.now();
         }
 
         function checkRefreshNeeded() {
             const currentTime = Date.now();
-
-            // 1. Lógica de Recarga (24 horas)
             if ((currentTime - lastUpdatedTimestamp) >= REFRESH_THRESHOLD_MS) {
-                console.log("Limite de 24 horas excedido. Recarregando a página para buscar novo vídeo ou nova URL.");
-                // Recarrega do servidor, ignorando o cache do navegador
+                console.log("Limite de 24 horas excedido. Recarregando a página.");
                 window.location.reload(true); 
-                return;
-            }
-            
-            // 2. Lógica de Recarga de Segurança (se não houver vídeo)
-            if (!VIDEO_URL) {
-                console.log("Vídeo não configurado. Recarregando em 5 minutos para tentar buscar uma configuração.");
-                setTimeout(() => window.location.reload(true), 5 * 60 * 1000); // 5 minutos
                 return;
             }
         }
         
-        // Inicia a checagem no intervalo
+        // Inicia a busca do clima e notícias (o clima a cada 1h, notícias a cada 10 min)
+        fetchWeather();
+        fetchNews();
+        setInterval(fetchWeather, 3600000); 
+        setInterval(fetchNews, 6000000); // 100 minutos (6000000 ms)
         setInterval(checkRefreshNeeded, CHECK_INTERVAL_MS);
         
-        console.log("Player de TV Inicializado. Próxima checagem de 24h em background.");
-
+        console.log("Player de TV Inicializado. Clima, notícias e auto-refresh ativos.");
     </script>
 </body>
 </html>

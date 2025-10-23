@@ -13,6 +13,20 @@ class TVVideo(models.Model):
         verbose_name="Título do Vídeo",
         default="Vídeo Promocional"
     )
+    manual_news_ticker = models.TextField(
+        verbose_name="Ticker de Notícias Manual (Opcional)",
+        help_text="Texto que será exibido no rodapé da TV, substituindo as notícias da API. Separe as notícias com ' | ' (barra vertical).",
+        blank=True,
+        null=True
+    )
+    newsdata_api_key = models.CharField(
+        max_length=50,
+        verbose_name="Chave API NewsData.io",
+        help_text="Chave de acesso para buscar notícias externas (Ex: pub_...)",
+        default='pub_9a838f4c10ea441382a5a65d67601949',
+        blank=True,
+        null=True
+    )
     last_updated = models.DateTimeField(
         auto_now=True,
         verbose_name="Última Atualização"

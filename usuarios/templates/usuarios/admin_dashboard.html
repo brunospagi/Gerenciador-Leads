@@ -26,6 +26,43 @@
     <h1 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Painel do Administrador</h1>
 </div>
 
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-display-fill me-2"></i>Configuração de Vídeo da TV (Exibição Pública)</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ tv_video_form.titulo.id_for_label }}" class="form-label">{{ tv_video_form.titulo.label }}</label>
+                            {{ tv_video_form.titulo }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ tv_video_form.video_url.id_for_label }}" class="form-label">{{ tv_video_form.video_url.label }}</label>
+                            {{ tv_video_form.video_url }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ tv_video_form.newsdata_api_key.id_for_label }}" class="form-label">{{ tv_video_form.newsdata_api_key.label }}</label>
+                            {{ tv_video_form.newsdata_api_key }}
+                            <div class="form-text">Usado para buscar notícias do G1.</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ tv_video_form.manual_news_ticker.id_for_label }}" class="form-label">{{ tv_video_form.manual_news_ticker.label }}</label>
+                            {{ tv_video_form.manual_news_ticker }}
+                            <div class="form-text">Se preenchido, este texto terá prioridade sobre as notícias da API.</div>
+                        </div>
+                    </div>
+                    <button type="submit" name="tv_video_submit" class="btn btn-success"><i class="bi bi-save me-1"></i>Salvar Configuração</button>
+                    <a href="{% url 'tv_video_display' %}" target="_blank" class="btn btn-info ms-2"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir Tela da TV</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row">
     <div class="col-12 mb-4">
         <div class="card shadow-sm chart-card">

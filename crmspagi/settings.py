@@ -66,6 +66,10 @@ MIDDLEWARE = [
 #--- Configuração da API Gemini (LIDA DO .ENV) ---
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') 
 
+# --- Configuração da API do Google Maps (Necessária para a API Weather) ---
+# Você precisa criar esta variável no seu .env para usar o weather.googleapis.com
+GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY') 
+
 # --- Configurações do MinIO (LIDAS DO .ENV) ---
 MINIO_EXTERNAL_ENDPOINT = os.getenv('MINIO_EXTERNAL_ENDPOINT', 's3.spagisistemas.com.br')
 MINIO_STORAGE_ENDPOINT = os.getenv('MINIO_STORAGE_ENDPOINT', 's3.spagisistemas.com.br')

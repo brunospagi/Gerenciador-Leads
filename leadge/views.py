@@ -1,8 +1,10 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views import View
 from .models import TVVideo
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings 
+
 
 # Usamos csrf_exempt para evitar problemas de CSRF em telas de exibição pública,
 # mas mantenha o CSRF ativo nas demais partes do sistema.
@@ -19,5 +21,8 @@ class TVVideoView(View):
         
         context = {
             'video_config': video_config,
+            'GOOGLE_MAPS_API_KEY': settings.GOOGLE_MAPS_API_KEY, 
+            'NEWS_API_KEY': video_config.newsdata_api_key,
+            'MANUAL_NEWS': video_config.manual_news_ticker,
         }
         return render(request, 'leadge/tv_video.html', context)
