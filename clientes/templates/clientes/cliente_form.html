@@ -14,7 +14,7 @@
                 </h4>
             </div>
             <div class="card-body p-4">
-                <form method="post">
+                <form method="post" id="clienteForm">
                     {% csrf_token %}
                     
                     {{ form.marca_veiculo }}
@@ -105,6 +105,28 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
         <button type="button" class="btn btn-primary" id="confirmarAgendamentoBtn">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="confirmDuplicateModal" tabindex="-1" aria-labelledby="confirmDuplicateModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content border-warning">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="confirmDuplicateModalLabel"><i class="bi bi-exclamation-triangle-fill me-2"></i>Cliente Duplicado Encontrado</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Este número de WhatsApp já está cadastrado para outro cliente ativo:</p>
+        <div class="alert alert-secondary">
+            <strong>{{ existing_client_details }}</strong>
+        </div>
+        <p class="mt-3">Deseja mesmo assim criar um <strong>novo registro</strong> para este contato?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar e Corrigir</button>
+        <button type="button" class="btn btn-warning" id="confirmForceCreateBtn">Sim, Criar Novo Registro</button>
       </div>
     </div>
   </div>
@@ -265,6 +287,38 @@ document.addEventListener('DOMContentLoaded', (event) => {
         const anoNome = anoSelect.options[anoSelect.selectedIndex].text;
         anoInput.value = anoNome;
     });
+
+    // --- 3. JAVASCRIPT DO MODAL DE DUPLICIDADE (NOVO) ---
+    {% if show_confirmation %}
+    // Este código só é executado se a view detetar uma duplicidade
+    try {
+        const confirmModalElement = document.getElementById('confirmDuplicateModal');
+        const confirmModal = new bootstrap.Modal(confirmModalElement);
+        const mainForm = document.getElementById('clienteForm');
+        const confirmButton = document.getElementById('confirmForceCreateBtn');
+
+        if (confirmModal && mainForm && confirmButton) {
+            // Mostra o modal
+            confirmModal.show();
+
+            // Adiciona o evento ao botão de confirmação
+            confirmButton.addEventListener('click', () => {
+                // Cria o input oculto
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'force_create';
+                hiddenInput.value = 'true';
+                
+                // Adiciona ao formulário e envia
+                mainForm.appendChild(hiddenInput);
+                mainForm.submit();
+            });
+        }
+    } catch (e) {
+        console.error("Erro ao inicializar o modal de duplicidade:", e);
+    }
+    {% endif %}
+
 });
 </script>
 {% endblock %}
