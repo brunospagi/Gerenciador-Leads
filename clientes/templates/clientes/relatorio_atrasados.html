@@ -69,7 +69,7 @@
                         <th>Nome do Cliente</th>
                         <th>Veículo</th>
                         <th>Data do Próximo Contato</th>
-                        <th>Dias em Atraso</th>
+                        <th>Tempo em Atraso</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
@@ -80,9 +80,7 @@
                         <td>{{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }} ({{ cliente.ano_veiculo }})</td>
                         <td>{{ cliente.data_proximo_contato|date:"d/m/Y H:i" }}</td>
                         <td>
-                            {% with dias_atraso=cliente.data_proximo_contato|timesince|cut:" " %}
-                                {{ dias_atraso|split:","|first }}
-                            {% endwith %}
+                            {{ cliente.data_proximo_contato|timesince }}
                         </td>
                         <td>
                             <a href="{% url 'cliente_detail' cliente.pk %}" class="btn btn-sm btn-secondary" target="_blank">Ver Detalhes</a>
