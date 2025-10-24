@@ -14,7 +14,6 @@ from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 import json
-import io
 from django.contrib.auth.models import User
 
 
@@ -375,6 +374,8 @@ class ClienteDeleteView(LoginRequiredMixin, DeleteView):
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
     
+# ADICIONE ESTAS DUAS NOVAS VIEWS NO FINAL DE clientes/views.py
+
 @login_required
 def relatorio_atrasados_por_vendedor(request):
     if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
@@ -417,6 +418,7 @@ def relatorio_atrasados_por_vendedor(request):
     }
     return render(request, 'clientes/relatorio_atrasados.html', context)
 
+
 @login_required
 def exportar_relatorio_atrasados_pdf(request):
     if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
@@ -430,15 +432,12 @@ def exportar_relatorio_atrasados_pdf(request):
     ).select_related('vendedor').order_by('vendedor__username', 'data_proximo_contato')
 
     selected_vendedores_ids_str = request.GET.getlist('vendedores')
-    selected_vendedores_ids = []
-    query_params = "" # Para o link no template
     
     if selected_vendedores_ids_str:
         try:
             selected_vendedores_ids = [int(id_str) for id_str in selected_vendedores_ids_str if id_str.isdigit()]
             if selected_vendedores_ids:
                 clientes_atrasados_qs = clientes_atrasados_qs.filter(vendedor_id__in=selected_vendedores_ids)
-                query_params = "?" + "&".join(f"vendedores={id_val}" for id_val in selected_vendedores_ids)
         except ValueError:
             pass
 
@@ -462,12 +461,11 @@ def exportar_relatorio_atrasados_pdf(request):
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="relatorio_atrasados_por_vendedor.pdf"'
 
-    # Criar PDF
-    buffer = io.BytesIO()
+    # --- CORREÇÃO AQUI ---
+    # Chamando o pisa.CreatePDF da mesma forma que a sua função original
+    # (sem .encode() e sem 'encoding='), pois sabemos que isso funciona.
     pisa_status = pisa.CreatePDF(
-       html.encode('UTF-8'), # Garante encoding correto
-       dest=response,
-       encoding='UTF-8'
+       html, dest=response
     )
 
     if pisa_status.err:
