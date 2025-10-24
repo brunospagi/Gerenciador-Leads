@@ -1,5 +1,3 @@
-# brunospagi/gerenciador-leads/Gerenciador-Leads-fd9faa0cb7e1a3e670b0fe8e133a00e95db785de/clientes/views.py
-
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView, TemplateView
@@ -17,6 +15,7 @@ from xhtml2pdf import pisa
 import json
 from django.contrib.auth.models import User
 from collections import defaultdict
+from django.contrib import messages 
 
 
 class CalendarioView(LoginRequiredMixin, TemplateView):
@@ -55,8 +54,6 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
         context['fim_semana'] = end_of_week
         
         return context
-
-
 
 class ClienteListView(LoginRequiredMixin, ListView):
     model = Cliente
@@ -112,6 +109,7 @@ class ClienteDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
+# --- INÍCIO DA VIEW MODIFICADA ---
 class ClienteCreateView(LoginRequiredMixin, CreateView):
     model = Cliente
     form_class = ClienteForm
@@ -122,6 +120,45 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+
+    def post(self, request, *args, **kwargs):
+        """
+        Sobrescreve o método POST para verificar duplicidade de WhatsApp.
+        """
+        form = self.get_form()
+        
+        if form.is_valid():
+            whatsapp = form.cleaned_data.get('whatsapp')
+            force_create = request.POST.get('force_create') == 'true'
+
+            # Se não for uma criação forçada, faz a verificação
+            if not force_create:
+                # Verifica se existe um cliente ATIVO (não finalizado) com este número
+                existing_client = Cliente.objects.filter(
+                    whatsapp=whatsapp
+                ).exclude(
+                    status_negociacao=Cliente.StatusNegociacao.FINALIZADO
+                ).select_related('vendedor').first() # select_related para otimizar
+
+                if existing_client:
+                    # Cliente duplicado encontrado. Re-renderiza o form com o modal.
+                    context = self.get_context_data(form=form)
+                    context['show_confirmation'] = True
+                    context['existing_client_details'] = (
+                        f"Vendedor: {existing_client.vendedor.username}, "
+                        f"Veículo: {existing_client.marca_veiculo or ''} {existing_client.modelo_veiculo or ''} "
+                        f"({existing_client.ano_veiculo or ''})"
+                    )
+                    
+                    messages.warning(request, f"Atenção: O WhatsApp {whatsapp} já está em uso por um cliente ativo.")
+                    
+                    return self.render_to_response(context)
+            
+            # Se force_create=true ou se não houver existing_client, salva.
+            return self.form_valid(form)
+        else:
+            # Form é inválido
+            return self.form_invalid(form)
 
     def form_valid(self, form):
         cliente = form.save(commit=False)
@@ -134,7 +171,9 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
             cliente.data_proximo_contato = timezone.now() + timedelta(days=5)
             
         cliente.save()
+        messages.success(self.request, "Cliente cadastrado com sucesso!") # Adiciona mensagem de sucesso
         return redirect(self.success_url)
+# --- FIM DA VIEW MODIFICADA ---
 
 
 class ClienteUpdateView(LoginRequiredMixin, UpdateView):
@@ -379,7 +418,6 @@ class ClienteDeleteView(LoginRequiredMixin, DeleteView):
 def offline_view(request):
     return render(request, "clientes/offline.html")
 
-# --- INÍCIO DAS NOVAS FUNÇÕES CORRIGIDAS ---
 
 @login_required
 def relatorio_atrasados_por_vendedor(request):
@@ -480,6 +518,5 @@ def exportar_relatorio_atrasados_pdf(request):
        return HttpResponse('Ocorreram alguns erros <pre>' + html + '</pre>')
     return response
 
-# --- FIM DAS NOVAS FUNÇÕES ---
 def offline_view(request):
     return render(request, "clientes/offline.html")
