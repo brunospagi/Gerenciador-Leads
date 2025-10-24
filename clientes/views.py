@@ -374,8 +374,6 @@ class ClienteDeleteView(LoginRequiredMixin, DeleteView):
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
     
-# ADICIONE ESTAS DUAS NOVAS VIEWS NO FINAL DE clientes/views.py
-
 @login_required
 def relatorio_atrasados_por_vendedor(request):
     if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
@@ -403,13 +401,14 @@ def relatorio_atrasados_por_vendedor(request):
         except ValueError:
             pass # Ignora IDs inválidos
 
-    # 4. Agrupar os resultados
+    # 4. Agrupar os resultados (LÓGICA CORRIGIDA)
     relatorio_agrupado = defaultdict(list)
     for cliente in clientes_atrasados_qs:
+        nome_vendedor = "Sem Vendedor"
         if cliente.vendedor:
-            relatorio_agrupado[cliente.vendedor.username].append(cliente)
-        else:
-            relatorio_agrupado["Sem Vendedor"].append(cliente)
+            nome_vendedor = cliente.vendedor.username
+        
+        relatorio_agrupado[nome_vendedor].append(cliente)
 
     context = {
         'relatorio_agrupado': dict(relatorio_agrupado),
@@ -424,29 +423,31 @@ def exportar_relatorio_atrasados_pdf(request):
     if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
         raise PermissionDenied("Você não tem permissão para acessar esta página.")
 
-    # Lógica de filtragem e agrupamento (idêntica à view HTML)
+    # 1. Base de clientes atrasados
     clientes_atrasados_qs = Cliente.objects.filter(
         data_proximo_contato__lte=timezone.now()
     ).exclude(
         status_negociacao=Cliente.StatusNegociacao.FINALIZADO
     ).select_related('vendedor').order_by('vendedor__username', 'data_proximo_contato')
 
+    # 2. Filtrar pelos vendedores selecionados (se houver)
     selected_vendedores_ids_str = request.GET.getlist('vendedores')
-    
     if selected_vendedores_ids_str:
         try:
             selected_vendedores_ids = [int(id_str) for id_str in selected_vendedores_ids_str if id_str.isdigit()]
             if selected_vendedores_ids:
                 clientes_atrasados_qs = clientes_atrasados_qs.filter(vendedor_id__in=selected_vendedores_ids)
         except ValueError:
-            pass
+            pass # Ignora IDs inválidos
 
+    # 3. Agrupar os resultados (LÓGICA CORRIGIDA)
     relatorio_agrupado = defaultdict(list)
     for cliente in clientes_atrasados_qs:
+        nome_vendedor = "Sem Vendedor"
         if cliente.vendedor:
-            relatorio_agrupado[cliente.vendedor.username].append(cliente)
-        else:
-            relatorio_agrupado["Sem Vendedor"].append(cliente)
+            nome_vendedor = cliente.vendedor.username
+        
+        relatorio_agrupado[nome_vendedor].append(cliente)
 
     context = {
         'relatorio_agrupado': dict(relatorio_agrupado),
@@ -461,16 +462,14 @@ def exportar_relatorio_atrasados_pdf(request):
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="relatorio_atrasados_por_vendedor.pdf"'
 
-    # --- CORREÇÃO AQUI ---
-    # Chamando o pisa.CreatePDF da mesma forma que a sua função original
-    # (sem .encode() e sem 'encoding='), pois sabemos que isso funciona.
+    # Chamada de geração de PDF (igual à sua função original)
     pisa_status = pisa.CreatePDF(
-       html, dest=response
-    )
+       html, dest=response)
 
     if pisa_status.err:
        return HttpResponse('Ocorreram alguns erros <pre>' + html + '</pre>')
     return response
+
 
 def offline_view(request):
     return render(request, "clientes/offline.html")
