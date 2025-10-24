@@ -1,123 +1,116 @@
-{% extends 'base.html' %}
-
-{% block content %}
-<style>
-    .select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__rendered {
-        white-space: normal !important;
-    }
-    .form-check-input[type=checkbox] {
-        border-radius: .25em;
-    }
-    .vendedor-bloco {
-        page-break-inside: avoid;
-    }
-</style>
-
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="mb-0"><i class="bi bi-person-exclamation-fill me-2"></i>Relatório de Atrasados por Vendedor</h1>
-</div>
-
-<div class="card shadow-sm mb-4">
-    <div class="card-body">
-        <form method="get" id="filtroForm">
-            <div class="row g-3 align-items-end">
-                <div class="col-lg-10">
-                    <label for="vendedores_select" class="form-label fw-bold">Filtrar por Vendedor(es)</label>
-                    <small class="text-muted d-block mb-2">Deixe em branco para incluir todos os vendedores.</small>
-                    
-                    <div class="list-group list-group-horizontal-md flex-wrap" style="max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: .375rem; padding: 10px;">
-                        {% for vendedor in todos_vendedores %}
-                        <div class="list-group-item border-0 py-1" style="flex-basis: 250px;">
-                            <div class="form-check">
-                                <input class="form-check-input" 
-                                       type="checkbox" 
-                                       name="vendedores" 
-                                       value="{{ vendedor.id }}" 
-                                       id="vendedor_{{ vendedor.id }}"
-                                       {% if vendedor.id in selected_vendedores_ids %}checked{% endif %}>
-                                <label class="form-check-label" for="vendedor_{{ vendedor.id }}">
-                                    {{ vendedor.username }}
-                                </label>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                <div class="col-lg-2 d-flex flex-column">
-                    <button type="submit" class="btn btn-primary w-100 mb-2"><i class="bi bi-funnel-fill me-1"></i>Filtrar</button>
-                    <a href="{% url 'exportar_relatorio_atrasados_pdf' %}{% if selected_vendedores_ids %}?{% for id in selected_vendedores_ids %}vendedores={{ id }}&{% endfor %}{% endif %}" 
-                       class="btn btn-secondary w-100" 
-                       id="exportPdfBtn">
-                        <i class="bi bi-file-earmark-pdf-fill me-1"></i>Exportar PDF
-                    </a>
-                </div>
-            </div>
-        </form>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Leads Atrasados por Vendedor</title>
+    <style>
+        @page {
+            size: a4 portrait;
+            margin: 1.5cm;
+        }
+        body {
+            font-family: "Helvetica", sans-serif;
+            color: #333;
+            font-size: 10px;
+        }
+        h1 {
+            text-align: center;
+            color: #111;
+            font-size: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        .report-header p {
+            text-align: center;
+            font-size: 12px;
+            margin: 0;
+            padding: 0;
+        }
+        h2 {
+            font-size: 16px;
+            color: #333;
+            background-color: #f2f2f2;
+            padding: 8px;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            page-break-inside: auto;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: left;
+        }
+        .data-table th {
+            background-color: #333;
+            color: #fff;
+            font-weight: bold;
+        }
+        .data-table tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+        .vendedor-bloco {
+            page-break-inside: avoid;
+            margin-bottom: 20px;
+        }
+        .footer {
+            position: fixed;
+            bottom: -30px;
+            left: 0;
+            right: 0;
+            height: 50px;
+            text-align: center;
+            font-size: 9px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="footer">
+        Gerado em: {{ data_geracao|date:"d/m/Y H:i" }}
     </div>
-</div>
 
-{% for vendedor, clientes in relatorio_agrupado.items %}
-<div class="card shadow-sm mb-4 vendedor-bloco">
-    <div class="card-header bg-light">
-        <h4 class="mb-0">{{ vendedor }} - <span class="text-danger">Total Atrasado: {{ clientes|length }}</span></h4>
+    <div class="report-header">
+        <h1>Relatório de Leads Atrasados por Vendedor</h1>
+        <p>Este relatório lista todos os clientes cujo próximo contato está vencido.</p>
     </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover table-striped">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Nome do Cliente</th>
-                        <th>Veículo</th>
-                        <th>Data do Próximo Contato</th>
-                        <th>Tempo em Atraso</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for cliente in clientes %}
-                    <tr class="table-danger">
-                        <td><strong>{{ cliente.nome_cliente }}</strong></td>
-                        <td>{{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }} ({{ cliente.ano_veiculo }})</td>
-                        <td>{{ cliente.data_proximo_contato|date:"d/m/Y H:i" }}</td>
-                        <td>
-                            {{ cliente.data_proximo_contato|timesince }}
-                        </td>
-                        <td>
-                            <a href="{% url 'cliente_detail' cliente.pk %}" class="btn btn-sm btn-secondary" target="_blank">Ver Detalhes</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+
+    {% for vendedor, clientes in relatorio_agrupado.items %}
+    <div class="vendedor-bloco">
+        <h2>{{ vendedor }} - Total Atrasado: {{ clientes|length }}</h2>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 30%;">Nome do Cliente</th>
+                    <th style="width: 30%;">Veículo</th>
+                    <th style="width: 20%;">Venceu em</th>
+                    <th style="width: 20%;">Tempo em Atraso</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cliente in clientes %}
+                <tr>
+                    <td>{{ cliente.nome_cliente }}</td>
+                    <td>{{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }} ({{ cliente.ano_veiculo }})</td>
+                    <td>{{ cliente.data_proximo_contato|date:"d/m/Y H:i" }}</td>
+                    <td>{{ cliente.data_proximo_contato|timesince }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-</div>
-{% empty %}
-<div class="alert alert-success text-center">
-    <h4 class="alert-heading">Tudo em ordem!</h4>
-    <p class="mb-0">Nenhum cliente com contato atrasado foi encontrado para os filtros selecionados.</p>
-</div>
-{% endfor %}
+    {% empty %}
+    <p style="text-align: center; font-size: 14px; margin-top: 30px;">
+        <strong>Nenhum cliente com contato atrasado encontrado.</strong>
+    </p>
+    {% endfor %}
 
-{% endblock %}
-
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Atualiza o link do PDF dinamicamente quando o formulário é alterado
-    const form = document.getElementById('filtroForm');
-    const pdfButton = document.getElementById('exportPdfBtn');
-    
-    function updatePdfLink() {
-        const formData = new FormData(form);
-        const params = new URLSearchParams(formData).toString();
-        const baseUrl = "{% url 'exportar_relatorio_atrasados_pdf' %}";
-        pdfButton.href = baseUrl + (params ? '?' + params : '');
-    }
-
-    form.addEventListener('change', updatePdfLink);
-    // Chama uma vez no carregamento para garantir que o link esteja correto se a página for recarregada
-    updatePdfLink();
-});
-</script>
-{% endblock %}
+</body>
+</html>
