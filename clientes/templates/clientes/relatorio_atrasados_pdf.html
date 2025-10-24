@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Leads Atrasados por Vendedor</title>
+    <style>
+        @page {
+            size: a4 portrait;
+            margin: 1.5cm;
+        }
+        body {
+            font-family: "Helvetica", sans-serif;
+            color: #333;
+            font-size: 10px;
+        }
+        h1 {
+            text-align: center;
+            color: #111;
+            font-size: 20px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        .report-header p {
+            text-align: center;
+            font-size: 12px;
+            margin: 0;
+            padding: 0;
+        }
+        h2 {
+            font-size: 16px;
+            color: #333;
+            background-color: #f2f2f2;
+            padding: 8px;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            page-break-inside: auto;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: left;
+        }
+        .data-table th {
+            background-color: #333;
+            color: #fff;
+            font-weight: bold;
+        }
+        .data-table tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+        .vendedor-bloco {
+            page-break-inside: avoid;
+            margin-bottom: 20px;
+        }
+        .footer {
+            position: fixed;
+            bottom: -30px;
+            left: 0;
+            right: 0;
+            height: 50px;
+            text-align: center;
+            font-size: 9px;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="footer">
+        Gerado em: {{ data_geracao|date:"d/m/Y H:i" }}
+    </div>
+
+    <div class="report-header">
+        <h1>Relatório de Leads Atrasados por Vendedor</h1>
+        <p>Este relatório lista todos os clientes cujo próximo contato está vencido.</p>
+    </div>
+
+    {% for vendedor, clientes in relatorio_agrupado.items %}
+    <div class="vendedor-bloco">
+        <h2>{{ vendedor }} - Total Atrasado: {{ clientes|length }}</h2>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 35%;">Nome do Cliente</th>
+                    <th style="width: 35%;">Veículo</th>
+                    <th style="width: 30%;">Próximo Contato Venceu em</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cliente in clientes %}
+                <tr>
+                    <td>{{ cliente.nome_cliente }}</td>
+                    <td>{{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }} ({{ cliente.ano_veiculo }})</td>
+                    <td>{{ cliente.data_proximo_contato|date:"d/m/Y H:i" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% empty %}
+    <p style="text-align: center; font-size: 14px; margin-top: 30px;">
+        <strong>Nenhum cliente com contato atrasado encontrado.</strong>
+    </p>
+    {% endfor %}
+
+</body>
+</html>

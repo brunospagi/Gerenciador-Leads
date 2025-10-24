@@ -1,3 +1,4 @@
+from collections import defaultdict
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView, TemplateView
@@ -371,6 +372,105 @@ class ClienteDeleteView(LoginRequiredMixin, DeleteView):
         if not request.user.is_superuser:
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
+    
+@login_required
+def relatorio_atrasados_por_vendedor(request):
+    if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
+        raise PermissionDenied("Você não tem permissão para acessar esta página.")
+
+    # 1. Base de clientes atrasados
+    clientes_atrasados_qs = Cliente.objects.filter(
+        data_proximo_contato__lte=timezone.now()
+    ).exclude(
+        status_negociacao=Cliente.StatusNegociacao.FINALIZADO
+    ).select_related('vendedor').order_by('vendedor__username', 'data_proximo_contato')
+
+    # 2. Obter todos os vendedores (para o filtro)
+    vendedor_ids = Cliente.objects.values_list('vendedor_id', flat=True).distinct()
+    todos_vendedores = User.objects.filter(id__in=vendedor_ids).order_by('username')
+
+    # 3. Filtrar pelos vendedores selecionados (se houver)
+    selected_vendedores_ids_str = request.GET.getlist('vendedores')
+    selected_vendedores_ids = []
+    if selected_vendedores_ids_str:
+        try:
+            selected_vendedores_ids = [int(id_str) for id_str in selected_vendedores_ids_str if id_str.isdigit()]
+            if selected_vendedores_ids:
+                clientes_atrasados_qs = clientes_atrasados_qs.filter(vendedor_id__in=selected_vendedores_ids)
+        except ValueError:
+            pass # Ignora IDs inválidos
+
+    # 4. Agrupar os resultados
+    relatorio_agrupado = defaultdict(list)
+    for cliente in clientes_atrasados_qs:
+        if cliente.vendedor:
+            relatorio_agrupado[cliente.vendedor.username].append(cliente)
+        else:
+            relatorio_agrupado["Sem Vendedor"].append(cliente)
+
+    context = {
+        'relatorio_agrupado': dict(relatorio_agrupado),
+        'todos_vendedores': todos_vendedores,
+        'selected_vendedores_ids': selected_vendedores_ids,
+    }
+    return render(request, 'clientes/relatorio_atrasados.html', context)
+
+@login_required
+def exportar_relatorio_atrasados_pdf(request):
+    if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
+        raise PermissionDenied("Você não tem permissão para acessar esta página.")
+
+    # Lógica de filtragem e agrupamento (idêntica à view HTML)
+    clientes_atrasados_qs = Cliente.objects.filter(
+        data_proximo_contato__lte=timezone.now()
+    ).exclude(
+        status_negociacao=Cliente.StatusNegociacao.FINALIZADO
+    ).select_related('vendedor').order_by('vendedor__username', 'data_proximo_contato')
+
+    selected_vendedores_ids_str = request.GET.getlist('vendedores')
+    selected_vendedores_ids = []
+    query_params = "" # Para o link no template
+    
+    if selected_vendedores_ids_str:
+        try:
+            selected_vendedores_ids = [int(id_str) for id_str in selected_vendedores_ids_str if id_str.isdigit()]
+            if selected_vendedores_ids:
+                clientes_atrasados_qs = clientes_atrasados_qs.filter(vendedor_id__in=selected_vendedores_ids)
+                query_params = "?" + "&".join(f"vendedores={id_val}" for id_val in selected_vendedores_ids)
+        except ValueError:
+            pass
+
+    relatorio_agrupado = defaultdict(list)
+    for cliente in clientes_atrasados_qs:
+        if cliente.vendedor:
+            relatorio_agrupado[cliente.vendedor.username].append(cliente)
+        else:
+            relatorio_agrupado["Sem Vendedor"].append(cliente)
+
+    context = {
+        'relatorio_agrupado': dict(relatorio_agrupado),
+        'data_geracao': timezone.now(),
+    }
+    
+    # Renderização do PDF
+    template_path = 'clientes/relatorio_atrasados_pdf.html'
+    template = get_template(template_path)
+    html = template.render(context)
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="relatorio_atrasados_por_vendedor.pdf"'
+
+    # Criar PDF
+    buffer = io.BytesIO()
+    pisa_status = pisa.CreatePDF(
+       html.encode('UTF-8'), # Garante encoding correto
+       dest=response,
+       encoding='UTF-8'
+    )
+
+    if pisa_status.err:
+       return HttpResponse('Ocorreram alguns erros <pre>' + html + '</pre>')
+    return response
 
 def offline_view(request):
     return render(request, "clientes/offline.html")

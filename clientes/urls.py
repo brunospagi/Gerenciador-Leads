@@ -7,7 +7,9 @@ from .views import (
     adicionar_historico,
     ClienteAtrasadoListView,
     ClienteFinalizadoListView,
+    exportar_relatorio_atrasados_pdf,
     offline_view,
+    relatorio_atrasados_por_vendedor,
     relatorio_dashboard,
     exportar_relatorio_pdf,
     ClienteDeleteView ,
@@ -26,6 +28,8 @@ urlpatterns = [
     path('cliente/<int:pk>/editar/', ClienteUpdateView.as_view(), name='cliente_update'),
     path('cliente/<int:pk>/excluir/', ClienteDeleteView.as_view(), name='cliente_delete'),
     path('cliente/<int:pk>/adicionar_historico/', adicionar_historico, name='adicionar_historico'),
-    path('offline/', offline_view, name='offline'), # Adicione esta linha
+    path('relatorios/atrasados/', relatorio_atrasados_por_vendedor, name='relatorio_atrasados'),
+    path('relatorios/atrasados/exportar/', exportar_relatorio_atrasados_pdf, name='exportar_relatorio_atrasados_pdf'),
+    path('offline/', offline_view, name='offline'),
 
 ]
