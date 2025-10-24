@@ -1,4 +1,5 @@
-from collections import defaultdict
+# brunospagi/gerenciador-leads/Gerenciador-Leads-fd9faa0cb7e1a3e670b0fe8e133a00e95db785de/clientes/views.py
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView, TemplateView
@@ -15,6 +16,7 @@ from django.template.loader import get_template
 from xhtml2pdf import pisa
 import json
 from django.contrib.auth.models import User
+from collections import defaultdict
 
 
 class CalendarioView(LoginRequiredMixin, TemplateView):
@@ -373,7 +375,12 @@ class ClienteDeleteView(LoginRequiredMixin, DeleteView):
         if not request.user.is_superuser:
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
-    
+
+def offline_view(request):
+    return render(request, "clientes/offline.html")
+
+# --- INÍCIO DAS NOVAS FUNÇÕES CORRIGIDAS ---
+
 @login_required
 def relatorio_atrasados_por_vendedor(request):
     if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
@@ -387,8 +394,12 @@ def relatorio_atrasados_por_vendedor(request):
     ).select_related('vendedor').order_by('vendedor__username', 'data_proximo_contato')
 
     # 2. Obter todos os vendedores (para o filtro)
+    # --- CORREÇÃO APLICADA AQUI ---
     vendedor_ids = Cliente.objects.values_list('vendedor_id', flat=True).distinct()
-    todos_vendedores = User.objects.filter(id__in=vendedor_ids).order_by('username')
+    # Filtra o valor None da lista de IDs ANTES de fazer a query
+    ids_filtrados = [vid for vid in vendedor_ids if vid is not None]
+    todos_vendedores = User.objects.filter(id__in=ids_filtrados).order_by('username')
+    # --- FIM DA CORREÇÃO ---
 
     # 3. Filtrar pelos vendedores selecionados (se houver)
     selected_vendedores_ids_str = request.GET.getlist('vendedores')
@@ -401,7 +412,7 @@ def relatorio_atrasados_por_vendedor(request):
         except ValueError:
             pass # Ignora IDs inválidos
 
-    # 4. Agrupar os resultados (LÓGICA CORRIGIDA)
+    # 4. Agrupar os resultados
     relatorio_agrupado = defaultdict(list)
     for cliente in clientes_atrasados_qs:
         nome_vendedor = "Sem Vendedor"
@@ -440,7 +451,7 @@ def exportar_relatorio_atrasados_pdf(request):
         except ValueError:
             pass # Ignora IDs inválidos
 
-    # 3. Agrupar os resultados (LÓGICA CORRIGIDA)
+    # 3. Agrupar os resultados
     relatorio_agrupado = defaultdict(list)
     for cliente in clientes_atrasados_qs:
         nome_vendedor = "Sem Vendedor"
@@ -462,7 +473,6 @@ def exportar_relatorio_atrasados_pdf(request):
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="relatorio_atrasados_por_vendedor.pdf"'
 
-    # Chamada de geração de PDF (igual à sua função original)
     pisa_status = pisa.CreatePDF(
        html, dest=response)
 
@@ -470,6 +480,6 @@ def exportar_relatorio_atrasados_pdf(request):
        return HttpResponse('Ocorreram alguns erros <pre>' + html + '</pre>')
     return response
 
-
+# --- FIM DAS NOVAS FUNÇÕES ---
 def offline_view(request):
     return render(request, "clientes/offline.html")
