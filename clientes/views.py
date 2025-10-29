@@ -15,7 +15,7 @@ from xhtml2pdf import pisa
 import json
 from django.contrib.auth.models import User
 from collections import defaultdict
-from django.contrib import messages 
+from django.contrib import messages # Import para as mensagens
 
 
 class CalendarioView(LoginRequiredMixin, TemplateView):
@@ -32,7 +32,6 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
         eventos_calendario = []
         for agendamento in agendamentos_qs:
             eventos_calendario.append({
-                # --- ALTERAÇÃO AQUI ---
                 'title': f'{agendamento.nome_cliente} - {agendamento.modelo_veiculo} ({agendamento.ano_veiculo})',
                 'start': agendamento.data_proximo_contato.isoformat(),
                 'url': reverse('cliente_detail', args=[agendamento.pk]),
@@ -54,6 +53,8 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
         context['fim_semana'] = end_of_week
         
         return context
+
+
 
 class ClienteListView(LoginRequiredMixin, ListView):
     model = Cliente
@@ -109,7 +110,7 @@ class ClienteDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
-# --- INÍCIO DA VIEW MODIFICADA ---
+# --- VIEW DE CRIAÇÃO COM VERIFICAÇÃO DE DUPLICIDADE (VERSÃO CORRIGIDA) ---
 class ClienteCreateView(LoginRequiredMixin, CreateView):
     model = Cliente
     form_class = ClienteForm
@@ -125,6 +126,8 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
         """
         Sobrescreve o método POST para verificar duplicidade de WhatsApp.
         """
+        # Necessário definir self.object = None para CreateView funcionar corretamente no POST
+        self.object = None 
         form = self.get_form()
         
         if form.is_valid():
@@ -138,11 +141,14 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
                     whatsapp=whatsapp
                 ).exclude(
                     status_negociacao=Cliente.StatusNegociacao.FINALIZADO
-                ).select_related('vendedor').first() # select_related para otimizar
+                ).select_related('vendedor').first() 
 
                 if existing_client:
-                    # Cliente duplicado encontrado. Re-renderiza o form com o modal.
-                    context = self.get_context_data(form=form)
+                    # --- CORREÇÃO AQUI ---
+                    # Cliente duplicado encontrado. 
+                    # 1. Obtém o contexto completo que a view normalmente geraria.
+                    context = self.get_context_data(form=form) 
+                    # 2. Adiciona as variáveis específicas para o modal.
                     context['show_confirmation'] = True
                     context['existing_client_details'] = (
                         f"Vendedor: {existing_client.vendedor.username}, "
@@ -152,7 +158,9 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
                     
                     messages.warning(request, f"Atenção: O WhatsApp {whatsapp} já está em uso por um cliente ativo.")
                     
+                    # 3. Renderiza a resposta usando o contexto completo.
                     return self.render_to_response(context)
+                    # --- FIM DA CORREÇÃO ---
             
             # Se force_create=true ou se não houver existing_client, salva.
             return self.form_valid(form)
@@ -161,19 +169,20 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
             return self.form_invalid(form)
 
     def form_valid(self, form):
-        cliente = form.save(commit=False)
+        # Define self.object antes de salvar para CreateView
+        self.object = form.save(commit=False) 
         
         if not self.request.user.is_superuser:
-            cliente.vendedor = self.request.user
+            self.object.vendedor = self.request.user
 
         # Define a data do próximo contato apenas se não foi definida manualmente (ex: agendamento)
         if not form.cleaned_data.get('data_proximo_contato'):
-            cliente.data_proximo_contato = timezone.now() + timedelta(days=5)
+            self.object.data_proximo_contato = timezone.now() + timedelta(days=5)
             
-        cliente.save()
-        messages.success(self.request, "Cliente cadastrado com sucesso!") # Adiciona mensagem de sucesso
+        self.object.save()
+        messages.success(self.request, "Cliente cadastrado com sucesso!") 
         return redirect(self.success_url)
-# --- FIM DA VIEW MODIFICADA ---
+# --- FIM DA VIEW DE CRIAÇÃO ---
 
 
 class ClienteUpdateView(LoginRequiredMixin, UpdateView):
@@ -201,7 +210,7 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
             cliente_instance.vendedor = self.get_object().vendedor
 
         cliente_instance.save()
-        
+        messages.success(self.request, "Cliente atualizado com sucesso!") # Adiciona mensagem de sucesso
         return redirect(self.get_success_url())
 
 
@@ -418,28 +427,23 @@ class ClienteDeleteView(LoginRequiredMixin, DeleteView):
 def offline_view(request):
     return render(request, "clientes/offline.html")
 
+# --- RELATÓRIOS DE ATRASADOS (JÁ CORRIGIDOS ANTERIORMENTE) ---
 
 @login_required
 def relatorio_atrasados_por_vendedor(request):
     if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
         raise PermissionDenied("Você não tem permissão para acessar esta página.")
 
-    # 1. Base de clientes atrasados
     clientes_atrasados_qs = Cliente.objects.filter(
         data_proximo_contato__lte=timezone.now()
     ).exclude(
         status_negociacao=Cliente.StatusNegociacao.FINALIZADO
     ).select_related('vendedor').order_by('vendedor__username', 'data_proximo_contato')
 
-    # 2. Obter todos os vendedores (para o filtro)
-    # --- CORREÇÃO APLICADA AQUI ---
     vendedor_ids = Cliente.objects.values_list('vendedor_id', flat=True).distinct()
-    # Filtra o valor None da lista de IDs ANTES de fazer a query
     ids_filtrados = [vid for vid in vendedor_ids if vid is not None]
     todos_vendedores = User.objects.filter(id__in=ids_filtrados).order_by('username')
-    # --- FIM DA CORREÇÃO ---
 
-    # 3. Filtrar pelos vendedores selecionados (se houver)
     selected_vendedores_ids_str = request.GET.getlist('vendedores')
     selected_vendedores_ids = []
     if selected_vendedores_ids_str:
@@ -448,9 +452,8 @@ def relatorio_atrasados_por_vendedor(request):
             if selected_vendedores_ids:
                 clientes_atrasados_qs = clientes_atrasados_qs.filter(vendedor_id__in=selected_vendedores_ids)
         except ValueError:
-            pass # Ignora IDs inválidos
+            pass 
 
-    # 4. Agrupar os resultados
     relatorio_agrupado = defaultdict(list)
     for cliente in clientes_atrasados_qs:
         nome_vendedor = "Sem Vendedor"
@@ -472,14 +475,12 @@ def exportar_relatorio_atrasados_pdf(request):
     if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
         raise PermissionDenied("Você não tem permissão para acessar esta página.")
 
-    # 1. Base de clientes atrasados
     clientes_atrasados_qs = Cliente.objects.filter(
         data_proximo_contato__lte=timezone.now()
     ).exclude(
         status_negociacao=Cliente.StatusNegociacao.FINALIZADO
     ).select_related('vendedor').order_by('vendedor__username', 'data_proximo_contato')
 
-    # 2. Filtrar pelos vendedores selecionados (se houver)
     selected_vendedores_ids_str = request.GET.getlist('vendedores')
     if selected_vendedores_ids_str:
         try:
@@ -487,9 +488,8 @@ def exportar_relatorio_atrasados_pdf(request):
             if selected_vendedores_ids:
                 clientes_atrasados_qs = clientes_atrasados_qs.filter(vendedor_id__in=selected_vendedores_ids)
         except ValueError:
-            pass # Ignora IDs inválidos
+            pass 
 
-    # 3. Agrupar os resultados
     relatorio_agrupado = defaultdict(list)
     for cliente in clientes_atrasados_qs:
         nome_vendedor = "Sem Vendedor"
@@ -503,7 +503,6 @@ def exportar_relatorio_atrasados_pdf(request):
         'data_geracao': timezone.now(),
     }
     
-    # Renderização do PDF
     template_path = 'clientes/relatorio_atrasados_pdf.html'
     template = get_template(template_path)
     html = template.render(context)
