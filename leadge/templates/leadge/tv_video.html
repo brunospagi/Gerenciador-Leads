@@ -30,6 +30,8 @@
             width: 100%;
             height: 100%;
             border: none;
+            /* Garante que o vídeo MP4 cubra a área */
+            object-fit: cover; 
         }
         .error-message {
             color: white;
@@ -116,7 +118,13 @@
 <body>
 
     <div id="video-container">
-        {% if video_config.video_url %}
+        {% if video_config.video_mp4 and video_config.video_mp4.url %}
+            <video class="responsive-video" autoplay muted loop playsinline>
+                <source src="{{ video_config.video_mp4.url }}" type="video/mp4">
+                Seu navegador não suporta a tag de vídeo.
+            </video>
+        
+        {% elif video_config.video_url %}
             <iframe 
                 class="responsive-video"
                 src="{{ video_config.video_url }}"
@@ -127,14 +135,15 @@
                 frameborder="0"
                 allowfullscreen>
             </iframe>
+        
         {% else %}
             <div class="error-message">
                 <h1>⚠️ Erro de Configuração</h1>
-                <p>Nenhuma URL de vídeo foi configurada. Por favor, peça ao Administrador para configurar a URL no Painel Admin.</p>
+                <p>Nenhuma URL de YouTube ou vídeo MP4 foi configurado. Por favor, peça ao Administrador para configurar no Painel Admin.</p>
                 <p>A página irá recarregar automaticamente para tentar novamente.</p>
             </div>
         {% endif %}
-    </div>
+        </div>
 
     <div id="footer-tv">
         <div class="info-box time-weather-group">

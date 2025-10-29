@@ -14,6 +14,8 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 from datetime import timedelta
 import json
+from leadge.forms import TVVideoForm # --- IMPORT ADICIONADO ---
+from leadge.models import TVVideo # --- IMPORT ADICIONADO ---
 
 
 class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -87,11 +89,29 @@ class UserPasswordChangeView(AdminRequiredMixin, FormView):
         return context
 
 
-# --- VIEW DO PAINEL DO ADMIN CORRIGIDA ---
+# --- VIEW DO PAINEL DO ADMIN CORRIGIDA (COM LÓGICA DE POST) ---
 @login_required
 def admin_dashboard_view(request):
     if not (request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')):
         raise PermissionDenied("Você não tem permissão para acessar esta página.")
+
+    # Obter ou criar a instância de configuração da TV
+    tv_config, created = TVVideo.objects.get_or_create()
+
+    if request.method == 'POST':
+        # Verificar se o submit é do formulário da TV
+        if 'tv_video_submit' in request.POST:
+            # Passa request.FILES para lidar com o upload do MP4
+            tv_video_form = TVVideoForm(request.POST, request.FILES, instance=tv_config)
+            if tv_video_form.is_valid():
+                tv_video_form.save()
+                messages.success(request, 'Configuração da TV atualizada com sucesso!')
+                return redirect('admin_dashboard')
+        # (Se houvesse outros forms POST, seriam tratados aqui)
+    else:
+        # Método GET
+        tv_video_form = TVVideoForm(instance=tv_config)
+
 
     # 1. Gráfico de logins nos últimos 15 dias
     start_date = timezone.now().date() - timedelta(days=14)
@@ -121,6 +141,7 @@ def admin_dashboard_view(request):
     ultimos_logins = UserLoginActivity.objects.select_related('user').all()[:10]
 
     context = {
+        'tv_video_form': tv_video_form, # Adiciona o formulário ao contexto
         'labels_grafico': json.dumps(dias_grafico),
         'data_grafico': json.dumps(logins_grafico),
         'usuarios_ativos': usuarios_ativos,

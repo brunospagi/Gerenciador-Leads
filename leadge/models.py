@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+from crmspagi.storage_backends import PublicMediaStorage # Importa o storage customizado
 
 # Singleton pattern for the TV Video settings
 class TVVideo(models.Model):
@@ -8,6 +9,16 @@ class TVVideo(models.Model):
         help_text="O link do vídeo para exibição na TV. Para YouTube, use o link de embed (ex: https://www.youtube.com/embed/SEU_ID?autoplay=1&mute=1&loop=1&playlist=SEU_ID).",
         default='https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&mute=1&loop=1&playlist=dQw4w9WgXcQ'
     )
+    
+    video_mp4 = models.FileField(
+        upload_to='tv_videos/',
+        storage=PublicMediaStorage(),
+        verbose_name="Upload de Vídeo MP4 (Alternativo)",
+        help_text="Use este campo para carregar um arquivo MP4. Se preenchido, terá prioridade sobre a URL do YouTube.",
+        blank=True,
+        null=True
+    )
+    
     titulo = models.CharField(
         max_length=100,
         verbose_name="Título do Vídeo",
