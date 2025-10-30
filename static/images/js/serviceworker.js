@@ -19,6 +19,13 @@ var filesToCache = [
     'https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/js/lightbox.min.js'
 ];
 
+// Função para atualizar o cache
+const updateCache = () => {
+    return caches.open(staticCacheName).then(cache => {
+        return cache.addAll(filesToCache);
+    });
+};
+
 // Cache on install
 self.addEventListener("install", event => {
     this.skipWaiting();
@@ -55,4 +62,12 @@ self.addEventListener("fetch", event => {
                 return caches.match('offline');
             })
     )
+});
+
+// --- NOVO EVENTO: Periodic Sync ---
+self.addEventListener('periodicsync', (event) => {
+    if (event.tag === 'update-cache-daily') {
+        console.log('Periodic Sync: Atualizando cache...');
+        event.waitUntil(updateCache());
+    }
 });

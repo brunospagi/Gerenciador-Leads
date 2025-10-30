@@ -438,11 +438,44 @@
          navigator.serviceWorker.register("{% static 'images/js/serviceworker.js' %}")
              .then(function (registration) {
                  console.log("Service Worker registrado com sucesso (TV):", registration);
+                 
+                // --- NOVO: Registrar Periodic Sync ---
+                if ('periodicSync' in registration) {
+                    requestPeriodicSyncPermission(registration);
+                }
+                // --- FIM NOVO ---
+                 
              })
              .catch(function (error) {
                  console.log("Falha ao registrar Service Worker (TV):", error);
              });
      }
+     
+    // --- NOVO: Função para pedir permissão e registrar o sync (copiado do base.html) ---
+    async function requestPeriodicSyncPermission(registration) {
+        try {
+            const status = await navigator.permissions.query({name: 'periodic-background-sync'});
+            if (status.state === 'granted') {
+                await registerPeriodicSync(registration);
+            } else {
+                console.log('Permissão para Periodic Sync não está "granted". Estado: ' + status.state);
+            }
+        } catch (error) {
+            console.error('Falha ao verificar permissão de Periodic Sync:', error);
+        }
+    }
+
+    async function registerPeriodicSync(registration) {
+        try {
+            await registration.periodicSync.unregister('update-cache-daily');
+            await registration.periodicSync.register('update-cache-daily', {
+                minInterval: 24 * 60 * 60 * 1000, // 1 dia
+            });
+            console.log('Periodic Sync (update-cache-daily) registrado com sucesso.');
+        } catch (error) {
+            console.error('Falha ao registrar Periodic Sync:', error);
+        }
+    }
  </script>
 </body>
 </html>
