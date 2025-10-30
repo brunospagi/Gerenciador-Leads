@@ -58,7 +58,7 @@ class ClienteListView(LoginRequiredMixin, ListView):
     model = Cliente
     template_name = 'clientes/cliente_list.html'
     context_object_name = 'clientes'
-    paginate_by = 15
+    paginate_by = 10 # <-- ALTERADO DE 15 PARA 10
 
     def get_queryset(self):
         user = self.request.user
@@ -207,8 +207,6 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
         self.object.save()
         messages.success(self.request, "Cliente cadastrado com sucesso!") 
         return redirect(self.success_url)
-# --- FIM DA VIEW DE CRIAÇÃO ---
-
 
 class ClienteUpdateView(LoginRequiredMixin, UpdateView):
     model = Cliente
@@ -261,8 +259,6 @@ def adicionar_historico(request, pk):
             
     return redirect('cliente_detail', pk=cliente.pk)
     
-
-# ... (Restante do arquivo como relatorios, delete, etc. permanece o mesmo)
 class ClienteAtrasadoListView(LoginRequiredMixin, ListView):
     model = Cliente
     template_name = 'clientes/cliente_atrasado_list.html'
@@ -279,6 +275,7 @@ class ClienteFinalizadoListView(LoginRequiredMixin, ListView):
     model = Cliente
     template_name = 'clientes/cliente_finalizado_list.html'
     context_object_name = 'clientes'
+    paginate_by = 10
 
     def get_queryset(self):
         user = self.request.user
