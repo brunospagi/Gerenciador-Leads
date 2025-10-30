@@ -1,13 +1,26 @@
 {
     "name": "Gestão de Leads Spagi",
     "short_name": "Spagi Leads",
+    "description": "Sistema de Gerenciamento de Leads e Clientes (CRM) da Spagi.",
     "start_url": "/",
     "id": "/",
+    "scope": "/",
     "display": "standalone",
+    "display_override": ["standalone", "minimal-ui"],
     "background_color": "#ffffff",
     "theme_color": "#0d6efd",
     "orientation": "portrait-primary",
-    "description": "Sistema de Gerenciamento de Leads e Clientes (CRM) da Spagi.",
+    "lang": "pt-BR",
+    "dir": "ltr",
+    "prefer_related_applications": false,
+    "launch_handler": {
+        "client_mode": "navigate-existing"
+    },
+    "categories": [
+        "business",
+        "productivity",
+        "utilities"
+    ],
     "icons": [
         {
             "src": "/static/images/logo-spagi-192x192.png",
