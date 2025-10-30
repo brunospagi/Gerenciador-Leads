@@ -13,3 +13,4 @@ whitenoise[brotli]
 google-genai
 beautifulsoup4
 bs4
+django-webpush

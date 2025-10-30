@@ -105,6 +105,7 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
                                 <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person-vcard"></i> Meu Perfil</a></li>
+                                <li><a class="dropdown-item" href="#" id="enable-push-notifications"><i class="bi bi-bell-plus-fill"></i> Ativar Notificações</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
                                     <form action="{% url 'logout' %}" method="post" class="px-3 py-2">
@@ -161,6 +162,22 @@
     <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
 
     <script>
+        // Função utilitária para converter a chave VAPID
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding)
+                .replace(/-/g, '+')
+                .replace(/_/g, '/');
+
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+    
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("{% static 'images/js/serviceworker.js' %}")
                 .then(function (registration) {
@@ -170,6 +187,11 @@
                     if ('periodicSync' in registration) {
                         requestPeriodicSyncPermission(registration);
                     }
+                    
+                    // --- NOVO: Lógica de Push ---
+                    // Expõe a 'registration' globalmente para o script de push usar
+                    window.swRegistration = registration;
+                    // --- FIM NOVO ---
                     
                 })
                 .catch(function (error) {
@@ -206,6 +228,71 @@
                 console.log('Periodic Sync (update-cache-daily) registrado com sucesso.');
             } catch (error) {
                 console.error('Falha ao registrar Periodic Sync:', error);
+            }
+        }
+
+        // --- NOVO: Lógica de Inscrição no Push ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const pushButton = document.getElementById('enable-push-notifications');
+            if (pushButton) {
+                pushButton.addEventListener('click', askForPushPermission);
+            }
+        });
+
+        async function askForPushPermission() {
+            if (!('Notification' in window) || !('PushManager' in window) || !window.swRegistration) {
+                alert('Seu navegador não suporta Notificações Push.');
+                return;
+            }
+
+            const permission = await Notification.requestPermission();
+            
+            if (permission === 'granted') {
+                console.log('Permissão de notificação concedida.');
+                await subscribeUserToPush();
+            } else {
+                console.warn('Permissão de notificação negada.');
+            }
+        }
+
+        async function subscribeUserToPush() {
+            try {
+                // 1. Obter a Chave VAPID pública do servidor
+                const response = await fetch("{% url 'get_vapid_public_key' %}");
+                if (!response.ok) {
+                    throw new Error('Falha ao buscar a chave VAPID do servidor.');
+                }
+                const data = await response.json();
+                const vapidPublicKey = data.vapid_public_key;
+                const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
+
+                // 2. Inscrever o usuário
+                const subscription = await window.swRegistration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: applicationServerKey
+                });
+                
+                console.log('Inscrição PUSH obtida:', JSON.stringify(subscription));
+
+                // 3. Enviar a inscrição para o servidor
+                const saveResponse = await fetch("{% url 'save_webpush_subscription' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(subscription.toJSON())
+                });
+
+                if (saveResponse.ok) {
+                    alert('Notificações ativadas com sucesso!');
+                } else {
+                    const errorData = await saveResponse.json();
+                    throw new Error(errorData.error || 'Falha ao salvar inscrição no servidor.');
+                }
+                
+            } catch (error) {
+                console.error('Falha ao se inscrever no Push:', error);
+                alert('Erro ao ativar notificações: ' + error.message);
             }
         }
     </script>

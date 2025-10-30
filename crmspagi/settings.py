@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'minio_storage',
     'usuarios',
     'notificacoes',
+    'webpush',
 ]
 
 MIDDLEWARE = [
@@ -79,6 +80,13 @@ MINIO_STORAGE_USE_HTTPS = os.getenv('MINIO_STORAGE_USE_HTTPS', 'True') == 'True'
 MINIO_STORAGE_MEDIA_BUCKET_NAME = os.getenv('MINIO_STORAGE_MEDIA_BUCKET_NAME', 'leads-spagi-media')
 MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
 DEFAULT_FILE_STORAGE = 'crmspagi.storage_backends.PublicMediaStorage'
+
+# --- Configurações do django-webpush (LIDAS DO .ENV) ---
+WEBPUSH_SETTINGS = {
+    "VAPID_PUBLIC_KEY": os.getenv("VAPID_PUBLIC_KEY"),
+    "VAPID_PRIVATE_KEY": os.getenv("VAPID_PRIVATE_KEY"),
+    "VAPID_ADMIN_EMAIL": os.getenv("VAPID_ADMIN_EMAIL", "admin@example.com")
+}
 
 ROOT_URLCONF = 'crmspagi.urls'
 

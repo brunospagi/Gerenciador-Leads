@@ -76,7 +76,7 @@ self.addEventListener('periodicsync', (event) => {
     }
 });
 
-// --- NOVO EVENTO: Background Sync (para enviar dados offline) ---
+// Evento: Background Sync (para enviar dados offline)
 self.addEventListener('sync', (event) => {
     if (event.tag === 'sync-new-client') {
         console.log('Sync: Tentando enviar clientes offline...');
@@ -151,3 +151,56 @@ async function sendOfflineClients() {
         console.error('Sync: Erro ao processar resultados do outbox.', error);
     }
 }
+
+
+// --- NOVO: Listener para PUSH NOTIFICATIONS ---
+self.addEventListener('push', (event) => {
+    console.log('Push recebido!');
+    let data = {};
+    if (event.data) {
+        try {
+            data = event.data.json();
+        } catch (e) {
+            data = { head: 'Notificação', body: event.data.text() };
+        }
+    }
+
+    const title = data.head || "Nova Notificação";
+    const options = {
+        body: data.body || "Você tem uma nova atualização.",
+        icon: data.icon || "/static/images/logo-spagi-192x192.png",
+        badge: data.badge || "/static/images/logo-spagi-192x192.png",
+        data: {
+            url: data.url || '/'
+        }
+    };
+
+    event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// --- NOVO: Listener para CLIQUE NA NOTIFICAÇÃO ---
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+
+    const urlToOpen = event.notification.data.url || '/';
+    
+    event.waitUntil(
+        clients.matchAll({
+            type: 'window',
+            includeUncontrolled: true
+        }).then((clientList) => {
+            // Se o PWA já estiver aberto, foca nele
+            if (clientList.length > 0) {
+                let client = clientList[0];
+                for (let i = 0; i < clientList.length; i++) {
+                    if (clientList[i].focused) {
+                        client = clientList[i];
+                    }
+                }
+                return client.focus().then(c => c.navigate(urlToOpen));
+            }
+            // Se o PWA não estiver aberto, abre uma nova janela
+            return clients.openWindow(urlToOpen);
+        })
+    );
+});
