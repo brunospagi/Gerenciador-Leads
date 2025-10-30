@@ -58,7 +58,7 @@ class ClienteListView(LoginRequiredMixin, ListView):
     model = Cliente
     template_name = 'clientes/cliente_list.html'
     context_object_name = 'clientes'
-    paginate_by = 10 # <-- ALTERADO DE 15 PARA 10
+    paginate_by = 10 
 
     def get_queryset(self):
         user = self.request.user
@@ -78,7 +78,13 @@ class ClienteListView(LoginRequiredMixin, ListView):
             data_limite = timezone.now() - timedelta(days=dias)
             queryset = queryset.filter(data_ultimo_contato__gte=data_limite)
         queryset = queryset.order_by('-data_ultimo_contato')
-        return queryset.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
+        
+        # --- ALTERAÇÃO AQUI ---
+        # Exclui todos os status que significam "fechado"
+        return queryset.exclude(
+            Q(status_negociacao=Cliente.StatusNegociacao.FINALIZADO) |
+            Q(status_negociacao=Cliente.StatusNegociacao.VENDIDO)
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -207,6 +213,8 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
         self.object.save()
         messages.success(self.request, "Cliente cadastrado com sucesso!") 
         return redirect(self.success_url)
+# --- FIM DA VIEW DE CRIAÇÃO ---
+
 
 class ClienteUpdateView(LoginRequiredMixin, UpdateView):
     model = Cliente
@@ -259,6 +267,8 @@ def adicionar_historico(request, pk):
             
     return redirect('cliente_detail', pk=cliente.pk)
     
+
+# ... (Restante do arquivo como relatorios, delete, etc. permanece o mesmo)
 class ClienteAtrasadoListView(LoginRequiredMixin, ListView):
     model = Cliente
     template_name = 'clientes/cliente_atrasado_list.html'
@@ -275,12 +285,19 @@ class ClienteFinalizadoListView(LoginRequiredMixin, ListView):
     model = Cliente
     template_name = 'clientes/cliente_finalizado_list.html'
     context_object_name = 'clientes'
-    paginate_by = 10
+    paginate_by = 10 
 
     def get_queryset(self):
         user = self.request.user
         queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
-        queryset = queryset.filter(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
+        
+        # --- ALTERAÇÃO AQUI ---
+        # Inclui todos os status que significam "fechado"
+        queryset = queryset.filter(
+            Q(status_negociacao=Cliente.StatusNegociacao.FINALIZADO) |
+            Q(status_negociacao=Cliente.StatusNegociacao.VENDIDO)
+        )
+        
         return queryset.order_by('-data_ultimo_contato')
 
 
@@ -448,8 +465,6 @@ class ClienteDeleteView(LoginRequiredMixin, DeleteView):
 
 def offline_view(request):
     return render(request, "clientes/offline.html")
-
-# --- RELATÓRIOS DE ATRASADOS (JÁ CORRIGIDOS ANTERIORMENTE) ---
 
 @login_required
 def relatorio_atrasados_por_vendedor(request):
