@@ -10,12 +10,4 @@ urlpatterns = [
     path('', include('avaliacoes.urls')),
     path('', include('usuarios.urls')),
     path('', include('notificacoes.urls')),
-    path(
-        "serviceworker.js",
-        TemplateView.as_view(
-            template_name="serviceworker.js",
-            content_type="application/javascript",
-        ),
-        name="serviceworker",
-    ),
 ]

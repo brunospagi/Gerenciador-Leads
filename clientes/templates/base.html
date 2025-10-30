@@ -144,7 +144,7 @@
             {% for message in messages %}
                 <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
                     {{ message }}
-                    <button typebutton" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             {% endfor %}
         {% endif %}
@@ -174,7 +174,7 @@
 
     <script>
         if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.register("{% url 'serviceworker' %}")
+            navigator.serviceWorker.register("{% static 'images/js/serviceworker.js' %}")
                 .then(function (registration) {
                     console.log("Service Worker registrado com sucesso:", registration);
                 })

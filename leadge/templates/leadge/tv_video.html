@@ -435,7 +435,7 @@
     </script>
     <script>
      if ("serviceWorker" in navigator) {
-         navigator.serviceWorker.register("{% url 'serviceworker' %}")
+         navigator.serviceWorker.register("{% static 'images/js/serviceworker.js' %}")
              .then(function (registration) {
                  console.log("Service Worker registrado com sucesso (TV):", registration);
              })

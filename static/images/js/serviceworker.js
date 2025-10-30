@@ -1,9 +1,22 @@
 var staticCacheName = "django-pwa-v" + new Date().getTime();
 var filesToCache = [
+    // URLs da Aplicação
+    '/',
     '/offline',
-    '/static/css/bootstrap.min.css', // Adapte para os seus arquivos CSS e JS
-    '/static/js/bootstrap.bundle.min.js',
-    '/static/images/logo-spagi.png', // Adicione suas imagens e logos
+    
+    // Manifest e Ícones
+    '/static/manifest.json',
+    '/static/images/logo-spagi.png',
+    
+    // CSS (CDNs)
+    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
+    'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/css/lightbox.min.css',
+    
+    // JS (CDNs)
+    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js',
+    'https://unpkg.com/imask',
+    'https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/js/lightbox.min.js'
 ];
 
 // Cache on install
