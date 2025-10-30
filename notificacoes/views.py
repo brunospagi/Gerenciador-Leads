@@ -6,7 +6,7 @@ import json
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from webpush.models import WebPushDevice
+from webpush.models import PushInformation  
 from django.conf import settings
 
 @login_required
@@ -31,40 +31,35 @@ def deletar_todas_notificacoes(request):
         messages.success(request, 'Todas as notificações foram removidas com sucesso.')
     return redirect('lista_notificacoes')
 
+
+# --- VIEWS PARA WEBPUSH (CORRIGIDAS) ---
+
 @login_required
 @require_POST
-@csrf_exempt # O CSRF é tratado de outra forma em APIs PWA, mas para simplificar usamos exempt
+@csrf_exempt
 def save_webpush_subscription(request):
     try:
         data = json.loads(request.body.decode('utf-8'))
         
         # Validação simples
-        if 'endpoint' not in data or 'keys' not in data or 'p256dh' not in data['keys'] or 'auth' not in data['keys']:
+        if 'endpoint' not in data:
             return JsonResponse({'error': 'Formato de inscrição inválido.'}, status=400)
 
-        # Monta o objeto de inscrição
-        subscription_data = {
-            'endpoint': data['endpoint'],
-            'p256dh': data['keys']['p256dh'],
-            'auth': data['keys']['auth']
-        }
+        # Esta biblioteca salva a subscrição inteira como um JSON
+        subscription_json = json.dumps(data)
         
-        # Cria ou atualiza o dispositivo de push
-        # A biblioteca django-webpush armazena isso no modelo WebPushDevice
-        device, created = WebPushDevice.objects.get_or_create(
+        # CORREÇÃO: Usar o modelo PushInformation
+        # A biblioteca espera que 'get_or_create' seja usado no 'subscription'
+        device, created = PushInformation.objects.get_or_create(
             user=request.user,
-            browser=data.get('browser', 'UNKNOWN'), # Tentamos obter o browser, se o JS enviar
-            registration_id=subscription_data['endpoint'],
-            defaults={'p256dh': subscription_data['p256dh'], 'auth': subscription_data['auth']}
+            subscription=subscription_json,
+            defaults={'browser': data.get('browser', 'UNKNOWN')}
         )
         
-        if not created:
-            # Se já existia, atualiza as chaves (caso tenham mudado)
-            device.p256dh = subscription_data['p256dh']
-            device.auth = subscription_data['auth']
-            device.save()
-            
-        return JsonResponse({'message': 'Inscrição salva com sucesso.'}, status=201)
+        if created:
+            return JsonResponse({'message': 'Inscrição salva com sucesso.'}, status=201)
+        else:
+            return JsonResponse({'message': 'Inscrição já existia.'}, status=200)
 
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Corpo da requisição inválido (JSON).'}, status=400)
@@ -83,10 +78,10 @@ def delete_webpush_subscription(request):
         if not endpoint:
             return JsonResponse({'error': 'Endpoint não fornecido.'}, status=400)
             
-        # Deleta a inscrição baseada no endpoint e no usuário logado
-        deleted_count, _ = WebPushDevice.objects.filter(
+        # CORREÇÃO: Temos que procurar pelo endpoint dentro do campo JSON 'subscription'
+        deleted_count, _ = PushInformation.objects.filter(
             user=request.user, 
-            registration_id=endpoint
+            subscription__contains=endpoint # Query correta
         ).delete()
         
         if deleted_count > 0:
