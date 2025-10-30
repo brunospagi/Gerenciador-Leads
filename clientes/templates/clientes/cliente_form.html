@@ -319,6 +319,64 @@ document.addEventListener('DOMContentLoaded', (event) => {
     }
     {% endif %}
 
+
+    // --- 4. NOVO: Lógica de Background Sync ---
+    const clienteForm = document.getElementById('clienteForm');
+    
+    // Apenas para formulários de CRIAÇÃO
+    {% if not form.instance.pk %}
+    if (clienteForm) {
+        clienteForm.addEventListener('submit', async (e) => {
+            // Se estiver online, deixa o formulário ser enviado normalmente
+            if (navigator.onLine) {
+                return;
+            }
+
+            // Se estiver OFFLINE:
+            e.preventDefault();
+            console.log('Offline: Capturando envio de formulário.');
+
+            // Verifica se o navegador suporta as APIs necessárias
+            if (!('serviceWorker' in navigator && 'SyncManager' in window && 'idbKeyval' in window)) {
+                alert('Você está offline e seu navegador não suporta a sincronização em segundo plano. Por favor, tente novamente quando tiver conexão.');
+                return;
+            }
+
+            const formData = new FormData(clienteForm);
+            const data = Object.fromEntries(formData.entries());
+            const csrfToken = data.csrfmiddlewaretoken;
+
+            try {
+                // Usamos um ID único para cada entrada do outbox
+                const entryId = `client_${new Date().getTime()}`;
+                const entry = {
+                    id: entryId,
+                    data: data,
+                    csrfToken: csrfToken
+                };
+
+                let outbox = (await idbKeyval.get('client-outbox')) || [];
+                outbox.push(entry);
+                await idbKeyval.set('client-outbox', outbox);
+
+                // Registra o sync
+                const swRegistration = await navigator.serviceWorker.ready;
+                await swRegistration.sync.register('sync-new-client');
+
+                console.log('Cliente salvo no outbox e sync registrado.');
+                
+                // Avisa o usuário e redireciona
+                alert('Você está offline. O novo cliente foi salvo e será cadastrado automaticamente assim que a conexão voltar.');
+                window.location.href = "{% url 'cliente_list' %}";
+
+            } catch (error) {
+                console.error('Erro ao salvar cliente no outbox:', error);
+                alert('Erro ao tentar salvar o cliente para envio posterior. Tente novamente.');
+            }
+        });
+    }
+    {% endif %}
+    // --- FIM DO NOVO BLOCO ---
 });
 </script>
 {% endblock %}

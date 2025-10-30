@@ -172,17 +172,18 @@
     <script src="https://unpkg.com/imask"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/js/lightbox.min.js"></script>
 
+    <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
+
     <script>
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("{% static 'images/js/serviceworker.js' %}")
                 .then(function (registration) {
                     console.log("Service Worker registrado com sucesso:", registration);
                     
-                    // --- NOVO: Registrar Periodic Sync ---
+                    // Registrar Periodic Sync
                     if ('periodicSync' in registration) {
                         requestPeriodicSyncPermission(registration);
                     }
-                    // --- FIM NOVO ---
                     
                 })
                 .catch(function (error) {
@@ -190,19 +191,16 @@
                 });
         }
 
-        // --- NOVO: Função para pedir permissão e registrar o sync ---
+        // Função para pedir permissão e registrar o Periodic Sync
         async function requestPeriodicSyncPermission(registration) {
             try {
-                // Pede permissão (pode não exibir pop-up, depende do PWA estar instalado)
+                // Pede permissão
                 const status = await navigator.permissions.query({name: 'periodic-background-sync'});
                 
                 if (status.state === 'granted') {
                     // Permissão já concedida, tenta registrar
                     await registerPeriodicSync(registration);
                 } else {
-                    // Permissão não concedida (prompt, denied, etc.)
-                    // Em muitos navegadores, a permissão só é concedida
-                    // se o PWA estiver instalado. Não vamos forçar um pop-up.
                     console.log('Permissão para Periodic Sync não está "granted". Estado: ' + status.state);
                 }
             } catch (error) {
