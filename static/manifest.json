@@ -1,21 +1,69 @@
 {
-    "name": "Gestão de Leads",
+    "name": "Gestão de Leads Spagi",
     "short_name": "Spagi Leads",
     "start_url": "/",
+    "id": "/",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#0d6efd",
     "orientation": "portrait-primary",
+    "description": "Sistema de Gerenciamento de Leads e Clientes (CRM) da Spagi.",
     "icons": [
         {
             "src": "/static/images/logo-spagi-192x192.png",
             "type": "image/png",
-            "sizes": "192x192"
+            "sizes": "192x192",
+            "purpose": "any maskable"
         },
         {
             "src": "/static/images/logo-spagi-512x512.png",
             "type": "image/png",
-            "sizes": "512x512"
+            "sizes": "512x512",
+            "purpose": "any maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Novo Cliente",
+            "short_name": "Novo",
+            "description": "Cadastrar um novo cliente lead",
+            "url": "/cliente/novo/",
+            "icons": [{ "src": "/static/images/logo-spagi-192x192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Calendário",
+            "short_name": "Agenda",
+            "description": "Ver agendamentos no calendário",
+            "url": "/calendario/",
+            "icons": [{ "src": "/static/images/logo-spagi-192x192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Nova Avaliação",
+            "short_name": "Avaliar",
+            "description": "Cadastrar uma nova avaliação de veículo",
+            "url": "/avaliacoes/nova/",
+            "icons": [{ "src": "/static/images/logo-spagi-192x192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "Abrir TV",
+            "short_name": "TV",
+            "description": "Abrir o player de vídeo da TV",
+            "url": "/tv-video/",
+            "icons": [{ "src": "/static/images/logo-spagi-192x192.png", "sizes": "192x192" }]
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "/static/images/screenshots/login.png",
+            "type": "image/png",
+            "sizes": "540x720",
+            "form_factor": "narrow"
+        },
+        {
+            "src": "/static/images/screenshots/dashboard.png",
+            "type": "image/png",
+            "sizes": "1280x800",
+            "form_factor": "wide"
         }
     ]
 }
