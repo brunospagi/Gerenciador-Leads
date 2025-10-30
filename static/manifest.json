@@ -32,7 +32,19 @@
             "url": "fonte_cliente"
         }
     },
+
+    "protocol_handlers": [
+        {
+            "protocol": "web+lead",
+            "action": "/cliente/novo/",
+            "title": "Novo Lead Spagi"
+        }
+    ],
     
+    "edge_side_panel": {
+        "preferred_width": 480
+    },
+
     "icons": [
         {
             "src": "/static/images/logo-spagi-192x192.png",
