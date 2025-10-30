@@ -21,6 +21,18 @@
         "productivity",
         "utilities"
     ],
+    
+    "share_target": {
+        "action": "/cliente/novo/",
+        "method": "GET",
+        "enctype": "application/x-www-form-urlencoded",
+        "params": {
+            "title": "nome_cliente",
+            "text": "observacao",
+            "url": "fonte_cliente"
+        }
+    },
+    
     "icons": [
         {
             "src": "/static/images/logo-spagi-192x192.png",

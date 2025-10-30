@@ -15,7 +15,7 @@ from xhtml2pdf import pisa
 import json
 from django.contrib.auth.models import User
 from collections import defaultdict
-from django.contrib import messages # Import para as mensagens
+from django.contrib import messages 
 
 
 class CalendarioView(LoginRequiredMixin, TemplateView):
@@ -53,8 +53,6 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
         context['fim_semana'] = end_of_week
         
         return context
-
-
 
 class ClienteListView(LoginRequiredMixin, ListView):
     model = Cliente
@@ -109,13 +107,42 @@ class ClienteDetailView(LoginRequiredMixin, DetailView):
         context['historicos'] = self.object.historico.all()
         return context
 
-
-# --- VIEW DE CRIAÇÃO COM VERIFICAÇÃO DE DUPLICIDADE (VERSÃO CORRIGIDA) ---
 class ClienteCreateView(LoginRequiredMixin, CreateView):
     model = Cliente
     form_class = ClienteForm
     template_name = 'clientes/cliente_form.html'
     success_url = reverse_lazy('cliente_list')
+
+    def get_initial(self):
+        """
+        Pré-preenche o formulário com dados vindos do Share Target (PWA)
+        ou de qualquer outro parâmetro GET.
+        """
+        initial = super().get_initial()
+        
+        # Mapeia os parâmetros do manifest (nome_cliente, observacao, fonte_cliente)
+        initial['nome_cliente'] = self.request.GET.get('nome_cliente', '')
+        initial['observacao'] = self.request.GET.get('observacao', '')
+        initial['fonte_cliente'] = self.request.GET.get('fonte_cliente', '')
+        
+        # Bônus: Se o texto compartilhado (observacao) parecer um telefone,
+        # movemos para o campo whatsapp.
+        if (self.request.GET.get('observacao') and 
+            not self.request.GET.get('nome_cliente') and
+            len(self.request.GET.get('observacao')) < 20):
+            
+            # Tenta limpar o texto para se parecer com um telefone
+            texto_obs = self.request.GET.get('observacao')
+            numeros = "".join(filter(str.isdigit, texto_obs))
+            if len(numeros) >= 10:
+                initial['whatsapp'] = numeros
+                # Atualiza a observação para registrar a origem
+                if self.request.GET.get('fonte_cliente'):
+                     initial['observacao'] = f"Lead recebido via 'Compartilhar' ({self.request.GET.get('fonte_cliente')}). Texto original: {texto_obs}"
+                else:
+                     initial['observacao'] = f"Lead recebido via 'Compartilhar'. Texto original: {texto_obs}"
+
+        return initial
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -144,7 +171,6 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
                 ).select_related('vendedor').first() 
 
                 if existing_client:
-                    # --- CORREÇÃO AQUI ---
                     # Cliente duplicado encontrado. 
                     # 1. Obtém o contexto completo que a view normalmente geraria.
                     context = self.get_context_data(form=form) 
@@ -160,7 +186,6 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
                     
                     # 3. Renderiza a resposta usando o contexto completo.
                     return self.render_to_response(context)
-                    # --- FIM DA CORREÇÃO ---
             
             # Se force_create=true ou se não houver existing_client, salva.
             return self.form_valid(form)
