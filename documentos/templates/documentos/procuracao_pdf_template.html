@@ -29,16 +29,18 @@
 
         /* --- ESTA É A CORREÇÃO --- */
         
-        /* O bloco com a borda. Agora é uma TABELA. */
+        /* O bloco com a borda (a tabela) */
         .data-bloco {
             width: 100%;
             border: 1px solid #000;
-            padding: 10px;
+            /* padding: 10px; <- Removido daqui */
             margin-bottom: 20px;
-            page-break-inside: avoid; /* Não quebra o bloco no meio da página */
+            page-break-inside: avoid;
         }
+        
+        /* A CÉLULA interna da tabela */
         .data-bloco td {
-             padding: 0; /* Remove padding da célula interna */
+             padding: 10px; /* <-- ADICIONADO AQUI: Este é o espaço que faltava */
         }
         
         /* --- FIM DA CORREÇÃO --- */
@@ -62,13 +64,13 @@
         }
         .outorgados-table td {
             border: 1px solid #000;
-            padding: 5px;
+            padding: 5px; /* Padding para a tabela interna (outorgados) */
             width: 50%;
         }
         .assinatura {
             margin-top: 25px;
             text-align: center;
-            page-break-inside: avoid; /* Assinatura NUNCA quebra */
+            page-break-inside: avoid;
         }
         .assinatura p {
             text-align: center;
