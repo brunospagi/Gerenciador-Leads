@@ -33,14 +33,13 @@
         .data-bloco {
             width: 100%;
             border: 1px solid #000;
-            /* padding: 10px; <- Removido daqui */
             margin-bottom: 20px;
             page-break-inside: avoid;
         }
         
         /* A CÉLULA interna da tabela */
         .data-bloco td {
-             padding: 10px; /* <-- ADICIONADO AQUI: Este é o espaço que faltava */
+             padding: 10px; /* <-- CORREÇÃO AQUI: Este é o espaço que faltava */
         }
         
         /* --- FIM DA CORREÇÃO --- */
@@ -57,6 +56,8 @@
             margin: 5px 0;
             font-weight: bold;
         }
+        
+        /* Tabela interna dos Outorgados */
         .outorgados-table {
             width: 100%;
             border-collapse: collapse;
@@ -64,9 +65,10 @@
         }
         .outorgados-table td {
             border: 1px solid #000;
-            padding: 5px; /* Padding para a tabela interna (outorgados) */
+            padding: 5px; /* Padding menor para a tabela interna */
             width: 50%;
         }
+        
         .assinatura {
             margin-top: 25px;
             text-align: center;
