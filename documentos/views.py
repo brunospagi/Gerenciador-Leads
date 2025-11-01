@@ -166,7 +166,7 @@ def gerar_procuracao_pdf(request, pk):
         'outorgados': outorgados_list,
         'cidade': 'São José dos Pinhais', 
         'data_hoje': timezone.now(),
-        'STATIC_URL': settings.STATIC_URL, # Passa o STATIC_URL para o template
+        'STATIC_URL': settings.STATIC_URL,
     }
     
     template = get_template(template_path)
@@ -174,14 +174,23 @@ def gerar_procuracao_pdf(request, pk):
 
     response = HttpResponse(content_type='application/pdf')
     filename = f"procuracao-{slugify(procuracao.veiculo_placa)}-{slugify(procuracao.outorgante_nome)}.pdf"
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
-    # Passa a função link_callback para o PISA
+    # --- AQUI ESTÁ A MUDANÇA ---
+    # Verificamos se o usuário quer 'imprimir' (inline) ou 'baixar' (attachment)
+    target = request.GET.get('target')
+    if target == 'inline':
+        # Abre o PDF no navegador
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
+    else:
+        # Força o download do PDF
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    # --- FIM DA MUDANÇA ---
+
     pisa_status = pisa.CreatePDF(
        html, 
        dest=response, 
        encoding='UTF-8',
-       link_callback=link_callback  # <--- Esta é a correção
+       link_callback=link_callback
     )
 
     if pisa_status.err:

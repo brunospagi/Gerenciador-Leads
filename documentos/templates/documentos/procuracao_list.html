@@ -33,9 +33,14 @@
                             <td>{{ doc.vendedor.username|default:"-" }}</td>
                         {% endif %}
                         <td class="text-center actions-btn">
-                            <a href="{% url 'procuracao_pdf' doc.pk %}" class="btn btn-sm btn-success rounded-pill px-3" title="Gerar PDF">
-                                <i class="bi bi-file-earmark-pdf-fill me-1"></i>Gerar PDF
+                            
+                            <a href="{% url 'procuracao_pdf' doc.pk %}" class="btn btn-sm btn-success" title="Baixar PDF">
+                                <i class="bi bi-file-earmark-arrow-down-fill me-1"></i>Baixar
                             </a>
+
+                            <a href="{% url 'procuracao_pdf' doc.pk %}?target=inline" target="_blank" class="btn btn-sm btn-secondary" title="Abrir para Imprimir">
+                                <i class="bi bi-printer-fill me-1"></i>Imprimir
+                            </a> 
                             <a href="{% url 'procuracao_update' doc.pk %}" class="btn btn-sm btn-outline-primary rounded-circle" style="width: 32px; height: 32px; line-height: 1.5;" title="Editar Dados"><i class="bi bi-pencil"></i></a>
                             <a href="{% url 'procuracao_delete' doc.pk %}" class="btn btn-sm btn-outline-danger rounded-circle" style="width: 32px; height: 32px; line-height: 1.5;" title="Excluir"><i class="bi bi-trash"></i></a>
                         </td>
@@ -55,6 +60,6 @@
     </div>
 </div>
 
-{% include 'includes/paginacao.html' %} {# Assume que você tem um template de paginação Padrão #}
+{% include 'includes/paginacao.html' %} {# Inclui a paginação #}
 
 {% endblock %}
