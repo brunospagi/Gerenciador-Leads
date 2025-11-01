@@ -115,25 +115,6 @@ document.addEventListener('DOMContentLoaded', (event) => {
     // Roda a função uma vez no carregamento da página para aplicar a máscara inicial
     updateMask();
     // --- Fim da máscara dinâmica ---
-
-    
-    // --- MÁSCARA DE PLACA (CORRIGIDA E VERIFICADA) ---
-    const placaInput = document.getElementById('id_veiculo_placa');
-    if (placaInput) {
-        placaInput.style.textTransform = 'uppercase';
-        
-        IMask(placaInput, {
-            mask: [
-                { mask: 'AAA-0000' },  // Placa antiga
-                { mask: 'AAA0A00' }   // Placa Mercosul
-            ],
-            prepare: function (str) {
-                // Sempre converte para maiúsculas
-                return str.toUpperCase();
-            }
-        });
-    }
-    // --- FIM DA MÁSCARA DE PLACA ---
 });
 </script>
 {% endblock %}

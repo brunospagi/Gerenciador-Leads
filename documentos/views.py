@@ -1,8 +1,8 @@
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
-from .models import Procuracao, Outorgado # Importar Outorgado
-from .forms import ProcuracaoForm, OutorgadoForm # Importar OutorgadoForm
+from .models import Procuracao, Outorgado 
+from .forms import ProcuracaoForm, OutorgadoForm
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
@@ -10,21 +10,22 @@ from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from django.utils.text import slugify
-from django.contrib.staticfiles.storage import staticfiles_storage
+import os
 from django.conf import settings
+from urllib.parse import urlparse
+from django.contrib.staticfiles import finders
+
 
 # --- Mixin para restringir acesso apenas a Admins ---
 class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
-        # Verifica se é superuser OU se tem perfil de ADMIN
         return self.request.user.is_superuser or \
                (hasattr(self.request.user, 'profile') and self.request.user.profile.nivel_acesso == 'ADMIN')
 
     def handle_no_permission(self):
-        # Se não tiver permissão, levanta erro 403
         raise PermissionDenied("Acesso restrito a Administradores.")
 
-# --- Novas Views para Gerenciar Outorgados (Apenas Admins) ---
+# --- Views para Gerenciar Outorgados (Apenas Admins) ---
 
 class OutorgadoListView(AdminRequiredMixin, ListView):
     model = Outorgado
@@ -108,49 +109,80 @@ class ProcuracaoDeleteView(LoginRequiredMixin, DeleteView):
             raise PermissionDenied("Você não tem permissão para excluir este documento.")
         return obj
 
-# --- View de Geração de PDF (MODIFICADA) ---
+# --- FUNÇÃO link_callback (ATUALIZADA) ---
+def link_callback(uri, rel):
+    """
+    Converte um URI de HTML (como /static/images/logo.png ou http://.../static/...)
+    para um caminho absoluto no sistema de arquivos.
+    """
+    try:
+        # 1. Analisa a URL
+        parsed_uri = urlparse(uri)
+        
+        # 2. Obtém o caminho (ex: /static/images/detran_logo.png)
+        # Se for uma URL absoluta, isso remove o 'http://dominio.com'
+        path = parsed_uri.path
+        
+        # 3. Remove o STATIC_URL do início do caminho
+        # (ex: remove /static/ deixando 'images/detran_logo.png')
+        if path.startswith(settings.STATIC_URL):
+            path = path[len(settings.STATIC_URL):]
+        
+        # 4. Usa o 'finders' do Django para encontrar o caminho absoluto no sistema
+        # Isso procura em STATIC_ROOT e em todas as pastas 'static' dos apps
+        result = finders.find(path)
+        
+        # 5. Se não encontrar, tenta o caminho original (fallback)
+        if not result:
+            result = os.path.join(settings.STATIC_ROOT, path)
+
+        # 6. Verifica se o arquivo realmente existe
+        if not os.path.isfile(result):
+            print(f"Erro no link_callback: Não foi possível encontrar o arquivo para o URI: {uri}")
+            print(f"Caminho procurado: {result}")
+            return None
+            
+        return result
+    except Exception as e:
+        print(f"Exceção no link_callback: {e} - URI: {uri}")
+        return None
+
+
+# --- View de Geração de PDF (ATUALIZADA) ---
 
 def gerar_procuracao_pdf(request, pk):
-    """
-    Gera o PDF da procuração com base no template e nos dados do objeto.
-    """
     procuracao = get_object_or_404(Procuracao, pk=pk)
     
-    # Verifica permissão
     user = request.user
     if not user.is_superuser and procuracao.vendedor != user:
         raise PermissionDenied("Você não tem permissão para gerar este PDF.")
 
     template_path = 'documentos/procuracao_pdf_template.html'
     
-    # --- ALTERAÇÃO AQUI (3 NOVAS LINHAS) ---
-    # 1. Cria a URL absoluta para a imagem da logo
-    # (Assumindo que a logo está em 'static/images/detran_logo.png')
-    logo_path = staticfiles_storage.url('images/detran_logo.png')
-    logo_url = request.build_absolute_uri(logo_path)
-    
-    # Busca a lista de outorgados do banco de dados
     outorgados_list = Outorgado.objects.all().order_by('nome')
     
-    # Define a cidade fixa e a data de geração
     context = {
         'procuracao': procuracao,
         'outorgados': outorgados_list,
         'cidade': 'São José dos Pinhais', 
         'data_hoje': timezone.now(),
-        'logo_url': logo_url,  # 2. Adiciona a URL da logo ao contexto
+        'STATIC_URL': settings.STATIC_URL, # Passa o STATIC_URL para o template
     }
     
     template = get_template(template_path)
-    html = template.render(context) # 3. Renderiza o template com o contexto
+    html = template.render(context)
 
     response = HttpResponse(content_type='application/pdf')
     filename = f"procuracao-{slugify(procuracao.veiculo_placa)}-{slugify(procuracao.outorgante_nome)}.pdf"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
-    # Converte HTML para PDF
+    # Passa a função link_callback para o PISA
     pisa_status = pisa.CreatePDF(
-       html, dest=response, encoding='UTF-8')
+       html, 
+       dest=response, 
+       encoding='UTF-8',
+       link_callback=link_callback  # <--- Esta é a correção
+    )
 
     if pisa_status.err:
        return HttpResponse('Ocorreram erros ao gerar o PDF <pre>' + html + '</pre>')
