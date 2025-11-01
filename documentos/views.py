@@ -10,6 +10,8 @@ from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from django.utils.text import slugify
+from django.contrib.staticfiles.storage import staticfiles_storage
+from django.conf import settings
 
 # --- Mixin para restringir acesso apenas a Admins ---
 class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -121,20 +123,26 @@ def gerar_procuracao_pdf(request, pk):
 
     template_path = 'documentos/procuracao_pdf_template.html'
     
-    # --- ALTERAÇÃO AQUI ---
+    # --- ALTERAÇÃO AQUI (3 NOVAS LINHAS) ---
+    # 1. Cria a URL absoluta para a imagem da logo
+    # (Assumindo que a logo está em 'static/images/detran_logo.png')
+    logo_path = staticfiles_storage.url('images/detran_logo.png')
+    logo_url = request.build_absolute_uri(logo_path)
+    
     # Busca a lista de outorgados do banco de dados
     outorgados_list = Outorgado.objects.all().order_by('nome')
     
     # Define a cidade fixa e a data de geração
     context = {
         'procuracao': procuracao,
-        'outorgados': outorgados_list, # Passa a lista para o template
-        'cidade': 'São José dos Pinhais', # Fixo, conforme solicitado
-        'data_hoje': timezone.now()
+        'outorgados': outorgados_list,
+        'cidade': 'São José dos Pinhais', 
+        'data_hoje': timezone.now(),
+        'logo_url': logo_url,  # 2. Adiciona a URL da logo ao contexto
     }
     
     template = get_template(template_path)
-    html = template.render(context)
+    html = template.render(context) # 3. Renderiza o template com o contexto
 
     response = HttpResponse(content_type='application/pdf')
     filename = f"procuracao-{slugify(procuracao.veiculo_placa)}-{slugify(procuracao.outorgante_nome)}.pdf"
