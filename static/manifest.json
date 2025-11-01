@@ -80,13 +80,6 @@
             "description": "Cadastrar uma nova avaliação de veículo",
             "url": "/avaliacoes/nova/",
             "icons": [{ "src": "/static/images/logo-spagi-192x192.png", "sizes": "192x192" }]
-        },
-        {
-            "name": "Abrir TV",
-            "short_name": "TV",
-            "description": "Abrir o player de vídeo da TV",
-            "url": "/tv-video/",
-            "icons": [{ "src": "/static/images/logo-spagi-192x192.png", "sizes": "192x192" }]
         }
     ],
     "screenshots": [

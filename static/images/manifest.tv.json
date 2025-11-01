@@ -1,0 +1,34 @@
+{
+    "name": "Spagi TV Player",
+    "short_name": "Spagi TV",
+    "description": "Player de Vídeo e Notícias da Spagi Motors.",
+    "start_url": "/tv-video/",
+    "id": "/tv-video/",
+    "scope": "/tv-video/",
+    "display": "fullscreen", 
+    "background_color": "#000000",
+    "theme_color": "#000000",
+    "orientation": "landscape-primary",
+    "lang": "pt-BR",
+    "icons": [
+        {
+            "src": "/static/images/logo-spagi-192x192.png",
+            "type": "image/png",
+            "sizes": "192x192"
+        },
+        {
+            "src": "/static/images/logo-spagi-512x512.png",
+            "type": "image/png",
+            "sizes": "512x512"
+        }
+    ],
+    "shortcuts": [
+         {
+            "name": "Abrir TV",
+            "short_name": "TV",
+            "description": "Abrir o player de vídeo da TV",
+            "url": "/tv-video/",
+            "icons": [{ "src": "/static/images/logo-spagi-192x192.png", "sizes": "192x192" }]
+        }
+    ]
+}
