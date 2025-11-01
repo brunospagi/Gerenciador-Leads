@@ -8,6 +8,7 @@ var filesToCache = [
     '/offline',
     
     // Manifest e Ícones
+    '/static/manifest.json',
     '/static/images/logo-spagi.png',
     
     // CSS (CDNs)
