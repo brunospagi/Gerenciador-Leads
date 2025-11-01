@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h4 class="mb-0">
+                    {% if form.instance.pk %}
+                        <i class="bi bi-pencil-square me-2"></i>Editar Dados da Procuração
+                    {% else %}
+                        <i class="bi bi-file-earmark-plus-fill me-2"></i>Gerar Nova Procuração
+                    {% endif %}
+                </h4>
+            </div>
+            <div class="card-body p-4">
+                <form method="post" id="procuracaoForm">
+                    {% csrf_token %}
+                    
+                    <h5 class="mb-3 border-bottom pb-2"><i class="bi bi-person-badge me-2"></i>1. Dados do Outorgante (Quem vendeu o veículo)</h5>
+                    <div class="row align-items-center">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.outorgante_nome.id_for_label }}" class="form-label">{{ form.outorgante_nome.label }}</label>
+                            {{ form.outorgante_nome }}
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">{{ form.tipo_documento.label }}</label>
+                            <div class="d-flex pt-2">
+                                {% for radio in form.tipo_documento %}
+                                <div class="form-check form-check-inline">
+                                    {{ radio.tag }}
+                                    <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="{{ form.outorgante_documento.id_for_label }}" class="form-label">{{ form.outorgante_documento.label }}</label>
+                            {{ form.outorgante_documento }}
+                        </div>
+                    </div>
+                    
+                    <h5 class="mt-4 mb-3 border-bottom pb-2"><i class="bi bi-car-front-fill me-2"></i>2. Dados do Veículo</h5>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.veiculo_marca_modelo.id_for_label }}" class="form-label">{{ form.veiculo_marca_modelo.label }}</label>
+                            {{ form.veiculo_marca_modelo }}
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="{{ form.veiculo_ano_fab.id_for_label }}" class="form-label">{{ form.veiculo_ano_fab.label }}</label>
+                            {{ form.veiculo_ano_fab }}
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="{{ form.veiculo_ano_mod.id_for_label }}" class="form-label">{{ form.veiculo_ano_mod.label }}</label>
+                            {{ form.veiculo_ano_mod }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.veiculo_placa.id_for_label }}" class="form-label">{{ form.veiculo_placa.label }}</label>
+                            {{ form.veiculo_placa }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.veiculo_cor.id_for_label }}" class="form-label">{{ form.veiculo_cor.label }}</label>
+                            {{ form.veiculo_cor }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="{{ form.veiculo_renavam.id_for_label }}" class="form-label">{{ form.veiculo_renavam.label }}</label>
+                            {{ form.veiculo_renavam }}
+                        </div>
+                    </div>
+
+                    <div class="card-footer bg-light text-end mt-4">
+                        <a href="{% url 'procuracao_list' %}" class="btn btn-secondary"><i class="bi bi-x-circle me-1"></i>Cancelar</a>
+                        <button type="submit" class="btn btn-success"><i class="bi bi-check-circle-fill me-1"></i>Salvar Dados</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/imask"></script>
+<script>
+document.addEventListener('DOMContentLoaded', (event) => {
+    
+    // --- Máscara dinâmica CPF/CNPJ ---
+    const docInput = document.getElementById('id_outorgante_documento');
+    const tipoDocRadios = document.querySelectorAll('input[name="tipo_documento"]');
+    let docMask;
+
+    const cpfMask = { mask: '000.000.000-00' };
+    const cnpjMask = { mask: '00.000.000/0000-00' };
+
+    function updateMask() {
+        if (docMask) {
+            docMask.destroy(); // Remove a máscara antiga
+        }
+        
+        // Pega o valor checado
+        const selectedType = document.querySelector('input[name="tipo_documento"]:checked').value;
+        
+        if (selectedType === 'CNPJ') {
+            docMask = IMask(docInput, cnpjMask);
+            docInput.placeholder = '00.000.000/0000-00';
+        } else {
+            docMask = IMask(docInput, cpfMask);
+            docInput.placeholder = '000.000.000-00';
+        }
+    }
+
+    // Adiciona o listener para qualquer mudança nos botões de rádio
+    tipoDocRadios.forEach(radio => radio.addEventListener('change', updateMask));
+    
+    // Roda a função uma vez no carregamento da página para aplicar a máscara inicial
+    updateMask();
+    // --- Fim da máscara dinâmica ---
+
+    const placaInput = document.getElementById('id_veiculo_placa');
+    if (placaInput) {
+        placaInput.style.textTransform = 'uppercase';
+        IMask(placaInput, {
+            mask: 'AAA[A]0A00',
+            prepare: function (str) {
+                return str.toUpperCase();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

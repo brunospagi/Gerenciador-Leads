@@ -85,6 +85,19 @@
                             </ul>
                         </li>
                         
+                        {# --- MENU DOCUMENTOS ATUALIZADO PARA DROPDOWN --- #}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDocumentos" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-file-earmark-text-fill"></i> Documentos
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navbarDocumentos">
+                                <li><a class="dropdown-item" href="{% url 'procuracao_list' %}"><i class="bi bi-file-earmark-text"></i> Procurações</a></li>
+                                {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+                                <li><a class="dropdown-item" href="{% url 'outorgado_list' %}"><i class="bi bi-person-badge-fill"></i> Gerenciar Outorgados</a></li>
+                                {% endif %}
+                            </ul>
+                        </li>
+                        
                         {# --- MENU ADMIN ATUALIZADO --- #}
                         {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
                         <li class="nav-item dropdown">

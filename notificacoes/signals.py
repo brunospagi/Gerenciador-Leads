@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from clientes.models import Cliente
 from .models import Notificacao
 from usuarios.models import Profile
-from webpush import send_user_notification # --- NOVO IMPORT ---
+import webpush  # --- NOVO IMPORT CORRETO ---
 import json
 
 @receiver(post_save, sender=Cliente)
@@ -20,7 +20,7 @@ def criar_notificacao_novo_lead(sender, instance, created, **kwargs):
             # 1. Cria a notificação no banco de dados
             Notificacao.objects.create(usuario=admin, mensagem=mensagem)
             
-            # --- NOVO: 2. Tenta enviar uma Notificação Push ---
+            # --- CORREÇÃO: 2. Tenta enviar uma Notificação Push ---
             try:
                 # Prepara os dados do PUSH
                 push_payload = {
@@ -31,7 +31,8 @@ def criar_notificacao_novo_lead(sender, instance, created, **kwargs):
                 }
                 
                 # Envia a notificação para todos os dispositivos logados desse admin
-                send_user_notification(
+                # CORRIGIDO: Chamar a função a partir do módulo 'webpush'
+                webpush.send_user_notification(
                     user=admin,
                     payload=push_payload,
                     ttl=1000
@@ -42,4 +43,4 @@ def criar_notificacao_novo_lead(sender, instance, created, **kwargs):
                 # Apenas logamos e continuamos, pois a notificação
                 # interna (no banco) já foi salva.
                 print(f"Erro ao enviar Push Notification para {admin.username}: {e}")
-            # --- FIM NOVO ---
+            # --- FIM CORREÇÃO ---

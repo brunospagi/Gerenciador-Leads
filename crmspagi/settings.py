@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'usuarios',
     'notificacoes',
     'webpush',
+    'documentos',
 ]
 
 MIDDLEWARE = [

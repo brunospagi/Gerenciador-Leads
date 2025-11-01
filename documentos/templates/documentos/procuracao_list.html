@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0 h2"><i class="bi bi-file-earmark-text-fill me-2"></i>Documentos - Procurações</h1>
+    <a href="{% url 'procuracao_create' %}" class="btn btn-primary rounded-pill px-3"><i class="bi bi-plus-lg me-1"></i>Gerar Nova Procuração</a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Outorgante</th>
+                        <th>Veículo</th>
+                        <th>Placa</th>
+                        <th>Gerado em</th>
+                        {% if user.is_superuser %}
+                            <th>Vendedor</th>
+                        {% endif %}
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in procuracoes %}
+                    <tr>
+                        <td><strong>{{ doc.outorgante_nome }}</strong></td>
+                        <td>{{ doc.veiculo_marca_modelo }}</td>
+                        <td>{{ doc.veiculo_placa }}</td>
+                        <td>{{ doc.data_criacao|date:"d/m/Y H:i" }}</td>
+                        {% if user.is_superuser %}
+                            <td>{{ doc.vendedor.username|default:"-" }}</td>
+                        {% endif %}
+                        <td class="text-center actions-btn">
+                            <a href="{% url 'procuracao_pdf' doc.pk %}" class="btn btn-sm btn-success rounded-pill px-3" title="Gerar PDF">
+                                <i class="bi bi-file-earmark-pdf-fill me-1"></i>Gerar PDF
+                            </a>
+                            <a href="{% url 'procuracao_update' doc.pk %}" class="btn btn-sm btn-outline-primary rounded-circle" style="width: 32px; height: 32px; line-height: 1.5;" title="Editar Dados"><i class="bi bi-pencil"></i></a>
+                            <a href="{% url 'procuracao_delete' doc.pk %}" class="btn btn-sm btn-outline-danger rounded-circle" style="width: 32px; height: 32px; line-height: 1.5;" title="Excluir"><i class="bi bi-trash"></i></a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center p-5">
+                            <i class="bi bi-file-earmark-x fs-1 text-muted"></i>
+                            <h5 class="mt-3">Nenhuma procuração gerada</h5>
+                            <p class="text-muted">Clique em "Gerar Nova Procuração" para começar.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% include 'includes/paginacao.html' %} {# Assume que você tem um template de paginação Padrão #}
+
+{% endblock %}
