@@ -119,12 +119,20 @@ document.addEventListener('DOMContentLoaded', (event) => {
     const placaInput = document.getElementById('id_veiculo_placa');
     if (placaInput) {
         placaInput.style.textTransform = 'uppercase';
+        
+        // --- CORREÇÃO AQUI ---
+        // Aplicamos uma lista de máscaras. O IMask usará a que corresponder.
         IMask(placaInput, {
-            mask: 'AAA[A]0A00',
+            mask: [
+                { mask: 'AAA-0000' },  // Placa antiga (ex: ABC-1234)
+                { mask: 'AAA0A00' }   // Placa Mercosul (ex: ABC4E67)
+            ],
             prepare: function (str) {
+                // Sempre converte para maiúsculas
                 return str.toUpperCase();
             }
         });
+        // --- FIM DA CORREÇÃO ---
     }
 });
 </script>
