@@ -19,6 +19,7 @@
             font-size: 16px;
             font-weight: bold;
             text-decoration: underline;
+            margin-top: 50px; /* Espaço para a logo */
             margin-bottom: 30px;
         }
         p {
@@ -65,19 +66,21 @@
         }
 
         .header-logo {
-            position: absolute; /* Posição absoluta para flutuar no topo */
-            top: 2cm; /* Igual à margem superior do @page */
-            left: 2cm; /* Igual à margem esquerda do @page */
-            width: 120px; /* Ajuste o tamanho da largura conforme sua logo */
+            position: absolute;
+            top: 1cm;
+            left: 2cm;
+            width: 120px;
             height: auto;
-            z-index: 1000; /* Garante que a logo fique acima de outros elementos */
+            z-index: 1000;
         }
 
     </style>
 </head>
 <body>
     <img src="{{ STATIC_URL }}images/detran_logo.png" class="header-logo" alt="Logo Detran">
+    
     <h1>PROCURAÇÃO</h1>
+    
     <p>
         Pelo presente instrumento de procuração <strong>IRREVOGÁVEL</strong>, o outorgante infraqualificado,
         confere ao mandato também qualificado, os poderes abaixo transcritos:
@@ -90,8 +93,8 @@
     </div>
     
     <div class="data-bloco">
+        <h2>OUTORGADOS:</h2>
         <table class="outorgados-table">
-            <h2>OUTORGADOS:</h2>
             {% for outorgado in outorgados %}
             <tr>
                 <td>NOME: <strong>{{ outorgado.nome|upper }}</strong></td>
@@ -104,9 +107,10 @@
             {% endfor %}
         </table>
     </div>
+
     <div class="data-bloco">
+        <h2>PODERES:</h2>
         <p style="font-weight: normal; margin: 0;">
-        <h2>PODERES:</h2><br>
             Qualquer um dos outorgados poderá assinar <strong>INDIVIDUALMENTE</strong> para a
             finalidade especial de representar junto aos Departamentos de Trânsito (DETRANS)
             veículo abaixo, podendo: assinar o recibo, autorização para transferência no verso do
@@ -119,16 +123,22 @@
             Fazer emplacamento.
         </p>
     </div>
+
     <div class="data-bloco">
-        <p><h2>VEÍCULO:</h2><br>MARCA/MODELO: {{ procuracao.veiculo_marca_modelo|upper }}  
-            ANO FAB: {{ procuracao.veiculo_ano_fab }} MOD: {{ procuracao.veiculo_ano_mod }} <br>
-        PLACA: {{ procuracao.veiculo_placa|upper }} COR: {{ procuracao.veiculo_cor|upper }} RENAVAM: {{ procuracao.veiculo_renavam }} </p>
+        <h2>VEÍCULO:</h2>
+        <p>MARCA/MODELO: {{ procuracao.veiculo_marca_modelo|upper }}</p>
+        <p>ANO FAB: {{ procuracao.veiculo_ano_fab }} MOD: {{ procuracao.veiculo_ano_mod }}</p>
+        <p>PLACA: {{ procuracao.veiculo_placa|upper }}</p>
+        <p>COR: {{ procuracao.veiculo_cor|upper }}</p>
+        <p>RENAVAM: {{ procuracao.veiculo_renavam }}</p>
     </div>
+    
     <p style="text-align: right;">
         {{ cidade }}, {{ data_hoje|date:"d" }} de {{ data_hoje|date:"F"|upper }} de {{ data_hoje|date:"Y" }}.
     </p>
+    
     <div class="assinatura">
-        <div>_______________________________________________________________</div>
+        <div class="linha-assinatura"></div>
         <p>{{ procuracao.outorgante_nome|upper }}</p>
         <p>(Assinatura do Outorgante)</p>
         <p><strong>Reconhecer Firma Por Verdadeiro</strong></p>
