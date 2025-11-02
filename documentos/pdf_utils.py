@@ -1,10 +1,11 @@
 import google.genai as genai
+import google.generativeai.types as genai_types # <-- IMPORT NECESSÁRIO
 from django.conf import settings
 import json
 import re
 from io import BytesIO
 
-# 1. Inicializa o cliente (igual ao avaliacoes/views.py)
+# 1. Inicializa o cliente
 try:
     GEMINI_CLIENT = genai.Client(api_key=settings.GEMINI_API_KEY) if settings.GEMINI_API_KEY else None
 except ImportError:
@@ -45,15 +46,21 @@ def extract_crlv_data_with_gemini(pdf_file):
         # 3. Prepara o arquivo PDF
         pdf_file.seek(0)
         pdf_data = pdf_file.read()
+
+        # --- CORREÇÃO AQUI ---
+        # Em vez de um dicionário, usamos o tipo 'Blob' da biblioteca.
+        pdf_blob = genai_types.Blob(
+            mime_type="application/pdf",
+            data=pdf_data
+        )
+        # --- FIM DA CORREÇÃO ---
         
-        # 4. Chama a API Gemini (CORRIGIDO)
-        # Adicionamos um prompt de texto ("Extraia os dados...")
-        # antes do objeto do arquivo.
+        # 4. Chama a API Gemini com o objeto Blob
         response = GEMINI_CLIENT.models.generate_content(
             model='gemini-1.5-flash-latest', 
             contents=[
-                "Extraia os dados deste documento PDF.", # <-- ESTA LINHA É A CORREÇÃO
-                {"mime_type": "application/pdf", "data": pdf_data}
+                "Extraia os dados deste documento PDF.", 
+                pdf_blob  # <-- Agora estamos passando o objeto Blob
             ],
             config={
                 "system_instruction": system_instruction,
@@ -62,7 +69,6 @@ def extract_crlv_data_with_gemini(pdf_file):
         )
         
         # 5. Processa a resposta
-        # Remove cercas de markdown (```json ... ```) se a IA as adicionar
         cleaned_json = re.sub(r'```json\s*|\s*```', '', response.text, flags=re.DOTALL).strip()
         
         data = json.loads(cleaned_json)
@@ -79,7 +85,6 @@ def extract_crlv_data_with_gemini(pdf_file):
 
     except Exception as e:
         print(f"Erro ao processar PDF com Gemini: {e}")
-        # Tenta imprimir a resposta da IA para depuração, se ela existir
         if 'response' in locals():
             print(f"Resposta recebida (se houver): {getattr(response, 'text', 'N/A')}")
         return None
