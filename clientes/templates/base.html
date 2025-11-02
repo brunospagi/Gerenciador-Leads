@@ -60,9 +60,8 @@
             }
         }
 
-        /* Estilos do Menu Lateral (Drawer) */
-        .sidebar-nav .nav-link,
-        .sidebar-nav .dropdown-item {
+        /* --- ESTILOS DO MENU LATERAL (CORRIGIDOS) --- */
+        .sidebar-nav .nav-link {
             display: flex;
             align-items: center;
             color: #3c4043;
@@ -73,16 +72,31 @@
             border-radius: 0 24px 24px 0; /* Estilo "pill" do Quasar */
             margin-right: 12px;
         }
-        .sidebar-nav .nav-link:hover,
-        .sidebar-nav .dropdown-item:hover {
+        .sidebar-nav .nav-link:hover {
             background-color: rgba(60, 64, 67, 0.08); /* Cor de hover sutil */
             color: #3c4043;
         }
-        .sidebar-nav .nav-link i,
-        .sidebar-nav .dropdown-item i {
+        .sidebar-nav .nav-link i {
             color: #5f6368;
             margin-right: 16px;
             width: 1.2em;
+        }
+        
+        /* Estilo para a seta do "collapse" */
+        .sidebar-nav .nav-link .bi-chevron-down {
+            transition: transform 0.2s ease-in-out;
+            color: #5f6368;
+            margin-right: 0; /* Remove margem extra */
+        }
+        .sidebar-nav .nav-link[aria-expanded="true"] .bi-chevron-down {
+            transform: rotate(180deg);
+        }
+
+        /* Estilo para os sub-itens do menu (dentro do collapse) */
+        .sidebar-nav .collapse .nav-link {
+            font-size: .825rem; /* Fonte um pouco menor */
+            padding-left: 3.3rem; /* Indentação */
+            border-radius: 0;
         }
         
         .sidebar-footer {
@@ -111,32 +125,6 @@
                 </a>
 
                 <div class="d-none d-lg-block" style="width: 20px;"></div>
-
-                <form class="w-100 mx-3" action="{% url 'cliente_list' %}" method="get">
-                    <div class="input-group">
-                        <span class="input-group-text bg-light border-0"><i class="bi bi-search"></i></span>
-                        <input type="text" name="q" class="form-control bg-light border-0" 
-                               placeholder="Buscar por cliente, veículo..." 
-                               value="{{ search_query }}">
-                        
-                        <button class="btn btn-light border-0 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-sliders"></i>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end p-3" style="width: 400px;">
-                            <h6 class="dropdown-header">Filtros Avançados</h6>
-                            <div class="mb-2">
-                                <label for="filter_dias" class="form-label small">Último contato</label>
-                                <select name="dias" id="filter_dias" class="form-select form-select-sm">
-                                    <option value="" {% if not periodo_selecionado %}selected{% endif %}>Todos</option>
-                                    <option value="15" {% if periodo_selecionado == '15' %}selected{% endif %}>Últimos 15 dias</option>
-                                    <option value="30" {% if periodo_selecionado == '30' %}selected{% endif %}>Últimos 30 dias</option>
-                                    <option value="45" {% if periodo_selecionado == '45' %}selected{% endif %}>Últimos 45 dias</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-primary btn-sm w-100 mt-2">Aplicar Filtros</button>
-                        </ul>
-                    </div>
-                </form>
 
                 <div class="collapse navbar-collapse flex-grow-0" id="main-nav-right">
                     <div class="d-flex align-items-center ms-auto">
@@ -196,56 +184,77 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'calendario' %}"><i class="bi bi-calendar-week-fill"></i> Calendário</a>
                     </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarClientes" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-person-lines-fill"></i> Clientes
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="#navbarClientesCollapse" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="navbarClientesCollapse">
+                            <i class="bi bi-person-lines-fill"></i>
+                            Clientes
+                            <i class="bi bi-chevron-down small ms-auto"></i>
                         </a>
-                        <ul class="dropdown-menu border-0 bg-transparent shadow-none" aria-labelledby="navbarClientes">
-                            <li><a class="dropdown-item" href="{% url 'cliente_atrasados_list' %}"><i class="bi bi-clock-history"></i> Contatos Atrasados
-                                {% if clientes_atrasados_count > 0 %}
-                                    <span class="badge bg-danger rounded-pill ms-2">{{ clientes_atrasados_count }}</span>
-                                {% endif %}
-                            </a></li>
-                            <li><a class="dropdown-item" href="{% url 'cliente_finalizados_list' %}"><i class="bi bi-check-circle"></i> Finalizados</a></li>
-                        </ul>
+                        <div class="collapse" id="navbarClientesCollapse">
+                            <ul class="nav flex-column">
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{% url 'cliente_atrasados_list' %}">
+                                        <i class="bi bi-clock-history"></i> Contatos Atrasados
+                                        {% if clientes_atrasados_count > 0 %}
+                                            <span class="badge bg-danger rounded-pill ms-auto">{{ clientes_atrasados_count }}</span>
+                                        {% endif %}
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{% url 'cliente_finalizados_list' %}"><i class="bi bi-check-circle"></i> Finalizados</a>
+                                </li>
+                            </ul>
+                        </div>
                     </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarAvaliacoes" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-car-front-fill"></i> Avaliações
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="#navbarAvaliacoesCollapse" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="navbarAvaliacoesCollapse">
+                            <i class="bi bi-car-front-fill"></i>
+                            Avaliações
+                            <i class="bi bi-chevron-down small ms-auto"></i>
                         </a>
-                        <ul class="dropdown-menu border-0 bg-transparent shadow-none" aria-labelledby="navbarAvaliacoes">
-                            <li><a class="dropdown-item" href="{% url 'avaliacao_list' %}"><i class="bi bi-list-columns"></i> Lista de Avaliações</a></li>
-                            <li><a class="dropdown-item" href="{% url 'avaliacao_create' %}"><i class="bi bi-plus-circle"></i> Nova Avaliação</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'gerador_anuncio' %}"><i class="bi bi-megaphone-fill"></i> Gerador Simples (IA)</a></li>
-                            <li><a class="dropdown-item" href="{% url 'bulk_gerador_anuncio' %}"><i class="bi bi-tools"></i> Gerador em Massa (IA)</a></li>
-                        </ul>
+                        <div class="collapse" id="navbarAvaliacoesCollapse">
+                            <ul class="nav flex-column">
+                                <li class="nav-item"><a class="nav-link" href="{% url 'avaliacao_list' %}"><i class="bi bi-list-columns"></i> Lista de Avaliações</a></li>
+                                <li class="nav-item"><a class="nav-link" href="{% url 'avaliacao_create' %}"><i class="bi bi-plus-circle"></i> Nova Avaliação</a></li>
+                                <li class="nav-item"><a class="nav-link" href="{% url 'gerador_anuncio' %}"><i class="bi bi-megaphone-fill"></i> Gerador Simples (IA)</a></li>
+                                <li class="nav-item"><a class="nav-link" href="{% url 'bulk_gerador_anuncio' %}"><i class="bi bi-tools"></i> Gerador em Massa (IA)</a></li>
+                            </ul>
+                        </div>
                     </li>
                     
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDocumentos" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-file-earmark-text-fill"></i> Documentos
+                    <li class="nav-item">
+                        <a class="nav-link" href="#navbarDocumentosCollapse" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="navbarDocumentosCollapse">
+                            <i class="bi bi-file-earmark-text-fill"></i>
+                            Documentos
+                            <i class="bi bi-chevron-down small ms-auto"></i>
                         </a>
-                        <ul class="dropdown-menu border-0 bg-transparent shadow-none" aria-labelledby="navbarDocumentos">
-                            <li><a class="dropdown-item" href="{% url 'procuracao_list' %}"><i class="bi bi-file-earmark-text"></i> Procurações</a></li>
-                            {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                            <li><a class="dropdown-item" href="{% url 'outorgado_list' %}"><i class="bi bi-person-badge-fill"></i> Gerenciar Outorgados</a></li>
-                            {% endif %}
-                        </ul>
+                        <div class="collapse" id="navbarDocumentosCollapse">
+                            <ul class="nav flex-column">
+                                <li class="nav-item"><a class="nav-link" href="{% url 'procuracao_list' %}"><i class="bi bi-file-earmark-text"></i> Procurações</a></li>
+                                {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+                                <li class="nav-item"><a class="nav-link" href="{% url 'outorgado_list' %}"><i class="bi bi-person-badge-fill"></i> Gerenciar Outorgados</a></li>
+                                {% endif %}
+                            </ul>
+                        </div>
                     </li>
                     
                     {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarAdmin" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-shield-lock-fill"></i> Admin
+                    <li class="nav-item">
+                        <a class="nav-link" href="#navbarAdminCollapse" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="navbarAdminCollapse">
+                            <i class="bi bi-shield-lock-fill"></i>
+                            Admin
+                            <i class="bi bi-chevron-down small ms-auto"></i>
                         </a>
-                        <ul class="dropdown-menu border-0 bg-transparent shadow-none" aria-labelledby="navbarAdmin">
-                            <li><a class="dropdown-item" href="{% url 'admin_dashboard' %}"><i class="bi bi-speedometer2"></i> Painel Admin</a></li>
-                            <li><a class="dropdown-item" href="{% url 'relatorios' %}"><i class="bi bi-bar-chart-line-fill"></i> Relatórios Gerais</a></li>
-                            
-                            <li><a class="dropdown-item" href="{% url 'relatorio_atrasados' %}"><i class="bi bi-person-exclamation-fill"></i> Relatório de Atrasados</a></li>
-                            <li><a class="dropdown-item" href="{% url 'user_list' %}"><i class="bi bi-person-plus-fill"></i> Gerenciar Usuários</a></li>
-                        </ul>
+                        <div class="collapse" id="navbarAdminCollapse">
+                             <ul class="nav flex-column">
+                                <li class="nav-item"><a class="nav-link" href="{% url 'admin_dashboard' %}"><i class="bi bi-speedometer2"></i> Painel Admin</a></li>
+                                <li class="nav-item"><a class="nav-link" href="{% url 'relatorios' %}"><i class="bi bi-bar-chart-line-fill"></i> Relatórios Gerais</a></li>
+                                <li class="nav-item"><a class="nav-link" href="{% url 'relatorio_atrasados' %}"><i class="bi bi-person-exclamation-fill"></i> Relatório de Atrasados</a></li>
+                                <li class="nav-item"><a class="nav-link" href="{% url 'user_list' %}"><i class="bi bi-person-plus-fill"></i> Gerenciar Usuários</a></li>
+                            </ul>
+                        </div>
                     </li>
                     {% endif %}
                 </ul>
