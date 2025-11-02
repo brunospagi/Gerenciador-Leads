@@ -16,176 +16,276 @@
 
     <style>
         body {
-            display: flex;
-            flex-direction: column;
-            background-color: #f8f9fa;
+            background-color: #f8f9fa; /* bg-grey-1 do Quasar */
         }
-        main {
-            flex-shrink: 0;
+
+        /* Define a altura do cabeçalho (igual ao Quasar) */
+        .navbar-top-fixed {
+            height: 64px;
+            position: fixed;
+            top: 0;
+            right: 0;
+            left: 0;
+            z-index: 1030;
         }
-        .navbar {
-            box-shadow: 0 2px 4px rgba(0,0,0,.1);
+
+        /* Define o menu lateral (Drawer) */
+        .sidebar {
+            width: 280px; /* Largura do Quasar */
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 1000;
+            padding-top: 64px; /* Espaço para o header */
+            transition: all 0.3s ease;
         }
-        .nav-link {
+
+        /* Ajusta o menu lateral no Bootstrap 5 (Offcanvas) */
+        .offcanvas-lg.offcanvas-start {
+            width: 280px;
+        }
+
+        /* Wrapper do Conteúdo Principal */
+        .main-content {
+            padding-top: 64px; /* Altura do header */
+            padding-left: 280px; /* Largura da sidebar */
+            transition: padding-left 0.3s ease;
+        }
+        
+        /* Remove o padding-left em telas menores (quando o menu vira offcanvas) */
+        @media (max-width: 991.98px) {
+            .main-content {
+                padding-left: 0;
+            }
+        }
+
+        /* Estilos do Menu Lateral (Drawer) */
+        .sidebar-nav .nav-link,
+        .sidebar-nav .dropdown-item {
             display: flex;
             align-items: center;
+            color: #3c4043;
+            font-weight: 500;
+            font-size: .875rem;
+            line-height: 1.25rem;
+            padding: 12px 16px;
+            border-radius: 0 24px 24px 0; /* Estilo "pill" do Quasar */
+            margin-right: 12px;
         }
-        .nav-link i, .dropdown-item i {
-            margin-right: 8px;
-            width: 1.2em; /* Alinha os ícones */
+        .sidebar-nav .nav-link:hover,
+        .sidebar-nav .dropdown-item:hover {
+            background-color: rgba(60, 64, 67, 0.08); /* Cor de hover sutil */
+            color: #3c4043;
         }
-        /* Garante que o dropdown do usuário não quebre a linha no mobile */
-        .navbar-collapse .dropdown .nav-link {
-            white-space: nowrap;
+        .sidebar-nav .nav-link i,
+        .sidebar-nav .dropdown-item i {
+            color: #5f6368;
+            margin-right: 16px;
+            width: 1.2em;
+        }
+        
+        .sidebar-footer {
+            font-size: .75rem;
+            font-weight: 500;
         }
     </style>
 </head>
 <body class="d-flex flex-column h-100">
+    
     <header>
-        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-            <div class="container">
-                <a class="navbar-brand" href="{% url 'cliente_list' %}">
-                    <i class="bi bi-people-fill"></i> Gestão de Leads
-                </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-nav" aria-controls="main-nav" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
+        <nav class="navbar navbar-expand navbar-top-fixed bg-white text-dark border-bottom p-0" style="height: 64px;">
+            <div class="container-fluid">
+                
+                <button class="btn btn-outline-secondary border-0 d-lg-none" 
+                        type="button" 
+                        data-bs-toggle="offcanvas" 
+                        data-bs-target="#main-sidebar" 
+                        aria-controls="main-sidebar">
+                    <i class="bi bi-list fs-4"></i>
                 </button>
 
-                <div class="collapse navbar-collapse" id="main-nav">
-                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'cliente_list' %}"><i class="bi bi-speedometer2"></i> Dashboard</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'calendario' %}"><i class="bi bi-calendar-week-fill"></i> Calendário</a>
-                        </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarClientes" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-person-lines-fill"></i> Clientes
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navbarClientes">
-                                <li><a class="dropdown-item" href="{% url 'cliente_atrasados_list' %}"><i class="bi bi-clock-history"></i> Contatos Atrasados
-                                    {% if clientes_atrasados_count > 0 %}
-                                        <span class="badge bg-danger rounded-pill ms-2">{{ clientes_atrasados_count }}</span>
-                                    {% endif %}
-                                </a></li>
-                                <li><a class="dropdown-item" href="{% url 'cliente_finalizados_list' %}"><i class="bi bi-check-circle"></i> Finalizados</a></li>
-                            </ul>
-                        </li>
-                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarAvaliacoes" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-car-front-fill"></i> Avaliações
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navbarAvaliacoes">
-                                <li><a class="dropdown-item" href="{% url 'avaliacao_list' %}"><i class="bi bi-list-columns"></i> Lista de Avaliações</a></li>
-                                <li><a class="dropdown-item" href="{% url 'avaliacao_create' %}"><i class="bi bi-plus-circle"></i> Nova Avaliação</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{% url 'gerador_anuncio' %}"><i class="bi bi-megaphone-fill"></i> Gerador Simples (IA)</a></li>
-                                <li><a class="dropdown-item" href="{% url 'bulk_gerador_anuncio' %}"><i class="bi bi-tools"></i> Gerador em Massa (IA)</a></li>
-                            </ul>
-                        </li>
-                        
-                        {# --- MENU DOCUMENTOS ATUALIZADO PARA DROPDOWN --- #}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarDocumentos" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-file-earmark-text-fill"></i> Documentos
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navbarDocumentos">
-                                <li><a class="dropdown-item" href="{% url 'procuracao_list' %}"><i class="bi bi-file-earmark-text"></i> Procurações</a></li>
-                                {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                                <li><a class="dropdown-item" href="{% url 'outorgado_list' %}"><i class="bi bi-person-badge-fill"></i> Gerenciar Outorgados</a></li>
-                                {% endif %}
-                            </ul>
-                        </li>
-                        
-                        {# --- MENU ADMIN ATUALIZADO --- #}
-                        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarAdmin" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-shield-lock-fill"></i> Admin
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navbarAdmin">
-                                <li><a class="dropdown-item" href="{% url 'admin_dashboard' %}"><i class="bi bi-speedometer2"></i> Painel Admin</a></li>
-                                <li><a class="dropdown-item" href="{% url 'relatorios' %}"><i class="bi bi-bar-chart-line-fill"></i> Relatórios Gerais</a></li>
-                                
-                                <li><a class="dropdown-item" href="{% url 'relatorio_atrasados' %}"><i class="bi bi-person-exclamation-fill"></i> Relatório de Atrasados</a></li>
-                                <li><a class="dropdown-item" href="{% url 'user_list' %}"><i class="bi bi-person-plus-fill"></i> Gerenciar Usuários</a></li>
-                            </ul>
-                        </li>
-                        {% endif %}
-                    </ul>
+                <a class="navbar-brand d-none d-lg-flex align-items-center ms-3" href="{% url 'cliente_list' %}">
+                    <img src="{% static 'images/logo-spagi.png' %}" alt="Logo" style="height: 32px;" class="me-2">
+                    <span class="fs-5 fw-bold text-dark">Gestão de Leads</span>
+                </a>
 
-                    {% if user.is_authenticated %}
-                    <div class="d-flex align-items-center mt-2 mt-lg-0">
-                        <a href="{% url 'lista_notificacoes' %}" class="nav-link text-white me-3 position-relative">
-                            <i class="bi bi-bell-fill fs-5"></i>
-                            {% if unread_notifications_count > 0 %}
-                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.7em;">
-                                    {{ unread_notifications_count }}
-                                </span>
-                            {% endif %}
-                        </a>
+                <div class="d-none d-lg-block" style="width: 20px;"></div>
 
-                        <div class="dropdown">
-                            <a class="nav-link dropdown-toggle text-white" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-person-circle"></i> Olá, {{ user.username }}
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end">
-                                <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person-vcard"></i> Meu Perfil</a></li>
-                                <li><a class="dropdown-item" href="#" id="enable-push-notifications"><i class="bi bi-bell-plus-fill"></i> Ativar Notificações</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <form action="{% url 'logout' %}" method="post" class="px-3 py-2">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-danger w-100"><i class="bi bi-box-arrow-right"></i> Sair</button>
-                                    </form>
-                                </li>
-                            </ul>
-                        </div>
+                <form class="w-100 mx-3" action="{% url 'cliente_list' %}" method="get">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-0"><i class="bi bi-search"></i></span>
+                        <input type="text" name="q" class="form-control bg-light border-0" 
+                               placeholder="Buscar por cliente, veículo..." 
+                               value="{{ search_query }}">
+                        
+                        <button class="btn btn-light border-0 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-sliders"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end p-3" style="width: 400px;">
+                            <h6 class="dropdown-header">Filtros Avançados</h6>
+                            <div class="mb-2">
+                                <label for="filter_dias" class="form-label small">Último contato</label>
+                                <select name="dias" id="filter_dias" class="form-select form-select-sm">
+                                    <option value="" {% if not periodo_selecionado %}selected{% endif %}>Todos</option>
+                                    <option value="15" {% if periodo_selecionado == '15' %}selected{% endif %}>Últimos 15 dias</option>
+                                    <option value="30" {% if periodo_selecionado == '30' %}selected{% endif %}>Últimos 30 dias</option>
+                                    <option value="45" {% if periodo_selecionado == '45' %}selected{% endif %}>Últimos 45 dias</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm w-100 mt-2">Aplicar Filtros</button>
+                        </ul>
                     </div>
-                    {% else %}
-                        <div class="d-flex mt-2 mt-lg-0">
-                            <a href="{% url 'login' %}" class="btn btn-outline-light"><i class="bi bi-box-arrow-in-right"></i> Entrar</a>
-                        </div>
-                    {% endif %}
+                </form>
+
+                <div class="collapse navbar-collapse flex-grow-0" id="main-nav-right">
+                    <div class="d-flex align-items-center ms-auto">
+                        {% if user.is_authenticated %}
+                            <a href="{% url 'lista_notificacoes' %}" class="nav-link text-secondary position-relative me-2">
+                                <i class="bi bi-bell-fill fs-5"></i>
+                                {% if unread_notifications_count > 0 %}
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.7em;">
+                                        {{ unread_notifications_count }}
+                                    </span>
+                                {% endif %}
+                            </a>
+
+                            <div class="dropdown">
+                                <a class="nav-link text-dark" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <img src="https://cdn.quasar.dev/img/boy-avatar.png" alt="Avatar" width="32" height="32" class="rounded-circle">
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                    <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person-vcard"></i> Meu Perfil</a></li>
+                                    <li><a class="dropdown-item" href="#" id="enable-push-notifications"><i class="bi bi-bell-plus-fill"></i> Ativar Notificações</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <form action="{% url 'logout' %}" method="post" class="px-2">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-danger w-100"><i class="bi bi-box-arrow-right"></i> Sair</button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </div>
+                        {% else %}
+                            <div class="d-flex mt-2 mt-lg-0">
+                                <a href="{% url 'login' %}" class="btn btn-outline-primary"><i class="bi bi-box-arrow-in-right"></i> Entrar</a>
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
+                
+                <button class="navbar-toggler d-lg-none" type="button" data-bs-toggle="collapse" data-bs-target="#main-nav-right" aria-controls="main-nav-right" aria-expanded="false" aria-label="Toggle navigation">
+                    <i class="bi bi-three-dots-vertical"></i>
+                </button>
             </div>
         </nav>
     </header>
 
-    <main class="container my-4">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
+    <nav class="sidebar offcanvas-lg offcanvas-start bg-white border-end" tabindex="-1" id="main-sidebar" aria-labelledby="main-sidebarLabel">
+        <div class="offcanvas-header d-lg-none">
+            <h5 class="offcanvas-title" id="main-sidebarLabel">Menu Principal</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#main-sidebar" aria-label="Close"></button>
+        </div>
 
-        {% block content %}{% endblock %}
-    </main>
-
-    <footer class="footer mt-auto py-3 bg-white border-top">
-      <div class="container">
-        <div class="d-flex flex-wrap justify-content-between align-items-center">
-            <div class="col-md-6 text-center text-md-start mb-2 mb-md-0">
-                <span class="text-muted">&copy; {% now "Y" %} Gestão de Leads. Todos os direitos reservados.</span>
+        <div class="offcanvas-body d-flex flex-column p-0">
+            <div class="flex-grow-1 overflow-auto">
+                <ul class="nav flex-column w-100 sidebar-nav pt-2">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'cliente_list' %}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'calendario' %}"><i class="bi bi-calendar-week-fill"></i> Calendário</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarClientes" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-lines-fill"></i> Clientes
+                        </a>
+                        <ul class="dropdown-menu border-0 bg-transparent shadow-none" aria-labelledby="navbarClientes">
+                            <li><a class="dropdown-item" href="{% url 'cliente_atrasados_list' %}"><i class="bi bi-clock-history"></i> Contatos Atrasados
+                                {% if clientes_atrasados_count > 0 %}
+                                    <span class="badge bg-danger rounded-pill ms-2">{{ clientes_atrasados_count }}</span>
+                                {% endif %}
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'cliente_finalizados_list' %}"><i class="bi bi-check-circle"></i> Finalizados</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarAvaliacoes" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-car-front-fill"></i> Avaliações
+                        </a>
+                        <ul class="dropdown-menu border-0 bg-transparent shadow-none" aria-labelledby="navbarAvaliacoes">
+                            <li><a class="dropdown-item" href="{% url 'avaliacao_list' %}"><i class="bi bi-list-columns"></i> Lista de Avaliações</a></li>
+                            <li><a class="dropdown-item" href="{% url 'avaliacao_create' %}"><i class="bi bi-plus-circle"></i> Nova Avaliação</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'gerador_anuncio' %}"><i class="bi bi-megaphone-fill"></i> Gerador Simples (IA)</a></li>
+                            <li><a class="dropdown-item" href="{% url 'bulk_gerador_anuncio' %}"><i class="bi bi-tools"></i> Gerador em Massa (IA)</a></li>
+                        </ul>
+                    </li>
+                    
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDocumentos" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-file-earmark-text-fill"></i> Documentos
+                        </a>
+                        <ul class="dropdown-menu border-0 bg-transparent shadow-none" aria-labelledby="navbarDocumentos">
+                            <li><a class="dropdown-item" href="{% url 'procuracao_list' %}"><i class="bi bi-file-earmark-text"></i> Procurações</a></li>
+                            {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+                            <li><a class="dropdown-item" href="{% url 'outorgado_list' %}"><i class="bi bi-person-badge-fill"></i> Gerenciar Outorgados</a></li>
+                            {% endif %}
+                        </ul>
+                    </li>
+                    
+                    {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarAdmin" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-shield-lock-fill"></i> Admin
+                        </a>
+                        <ul class="dropdown-menu border-0 bg-transparent shadow-none" aria-labelledby="navbarAdmin">
+                            <li><a class="dropdown-item" href="{% url 'admin_dashboard' %}"><i class="bi bi-speedometer2"></i> Painel Admin</a></li>
+                            <li><a class="dropdown-item" href="{% url 'relatorios' %}"><i class="bi bi-bar-chart-line-fill"></i> Relatórios Gerais</a></li>
+                            
+                            <li><a class="dropdown-item" href="{% url 'relatorio_atrasados' %}"><i class="bi bi-person-exclamation-fill"></i> Relatório de Atrasados</a></li>
+                            <li><a class="dropdown-item" href="{% url 'user_list' %}"><i class="bi bi-person-plus-fill"></i> Gerenciar Usuários</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                </ul>
             </div>
-            <div class="col-md-6 d-flex align-items-center justify-content-center justify-content-md-end">
-                <span class="text-muted me-2">Desenvolvido por</span>
+            
+            <div class="sidebar-footer p-3 text-center text-muted border-top">
                 <a href="https://spagi.com.br/" target="_blank" rel="noopener noreferrer">
-                    <img src="{% static 'images/logo-spagi.png' %}" alt="Logo Spagi Sistemas" style="height: 36px; vertical-align: middle;">
+                    <img src="{% static 'images/logo-spagi.png' %}" alt="Logo Spagi Sistemas" style="height: 36px;">
                 </a>
+                <div class="mt-2">
+                    &copy; {% now "Y" %} Spagi Sistemas
+                </div>
             </div>
         </div>
-      </div>
-    </footer>
+    </nav>
+
+    <div class="main-content d-flex flex-column min-vh-100">
+        <main class="container-fluid my-4 flex-grow-1">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="footer mt-auto py-3 bg-white border-top">
+          <div class="container-fluid">
+            <span class="text-muted">&copy; {% now "Y" %} Gestão de Leads. Todos os direitos reservados.</span>
+          </div>
+        </footer>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/imask"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/js/lightbox.min.js"></script>
-
     <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
 
     <script>
@@ -210,30 +310,22 @@
                 .then(function (registration) {
                     console.log("Service Worker registrado com sucesso:", registration);
                     
-                    // Registrar Periodic Sync
                     if ('periodicSync' in registration) {
                         requestPeriodicSyncPermission(registration);
                     }
                     
-                    // --- NOVO: Lógica de Push ---
-                    // Expõe a 'registration' globalmente para o script de push usar
                     window.swRegistration = registration;
-                    // --- FIM NOVO ---
-                    
                 })
                 .catch(function (error) {
                     console.log("Falha ao registrar Service Worker:", error);
                 });
         }
 
-        // Função para pedir permissão e registrar o Periodic Sync
         async function requestPeriodicSyncPermission(registration) {
             try {
-                // Pede permissão
                 const status = await navigator.permissions.query({name: 'periodic-background-sync'});
                 
                 if (status.state === 'granted') {
-                    // Permissão já concedida, tenta registrar
                     await registerPeriodicSync(registration);
                 } else {
                     console.log('Permissão para Periodic Sync não está "granted". Estado: ' + status.state);
@@ -245,10 +337,8 @@
 
         async function registerPeriodicSync(registration) {
             try {
-                // Tenta desregistrar syncs antigos para evitar duplicatas
                 await registration.periodicSync.unregister('update-cache-daily');
                 
-                // Registra o novo sync
                 await registration.periodicSync.register('update-cache-daily', {
                     minInterval: 24 * 60 * 60 * 1000, // 1 dia
                 });
@@ -258,7 +348,6 @@
             }
         }
 
-        // --- NOVO: Lógica de Inscrição no Push ---
         document.addEventListener('DOMContentLoaded', () => {
             const pushButton = document.getElementById('enable-push-notifications');
             if (pushButton) {
@@ -284,7 +373,6 @@
 
         async function subscribeUserToPush() {
             try {
-                // 1. Obter a Chave VAPID pública do servidor
                 const response = await fetch("{% url 'get_vapid_public_key' %}");
                 if (!response.ok) {
                     throw new Error('Falha ao buscar a chave VAPID do servidor.');
@@ -293,7 +381,6 @@
                 const vapidPublicKey = data.vapid_public_key;
                 const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
 
-                // 2. Inscrever o usuário
                 const subscription = await window.swRegistration.pushManager.subscribe({
                     userVisibleOnly: true,
                     applicationServerKey: applicationServerKey
@@ -301,7 +388,6 @@
                 
                 console.log('Inscrição PUSH obtida:', JSON.stringify(subscription));
 
-                // 3. Enviar a inscrição para o servidor
                 const saveResponse = await fetch("{% url 'save_webpush_subscription' %}", {
                     method: 'POST',
                     headers: {
