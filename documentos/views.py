@@ -2,8 +2,8 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from .models import Procuracao, Outorgado 
-from .forms import ProcuracaoForm, OutorgadoForm, CRLVUploadForm 
-from .pdf_utils import extract_crlv_data
+from .forms import ProcuracaoForm, OutorgadoForm, CRLVUploadForm
+from .pdf_utils import extract_crlv_data_with_gemini as extract_crlv_data
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
@@ -115,7 +115,7 @@ class ProcuracaoCreateView(LoginRequiredMixin, CreateView):
             if upload_form.is_valid():
                 pdf_file: InMemoryUploadedFile = upload_form.cleaned_data['crlv_pdf']
                 
-                # Chama a função de extração
+                # Chama a função de extração (agora com Gemini)
                 self.extracted_data = extract_crlv_data(pdf_file)
                 
                 if self.extracted_data:
@@ -140,8 +140,10 @@ class ProcuracaoCreateView(LoginRequiredMixin, CreateView):
                     self.get_context_data(form=self.get_form(), upload_form=upload_form)
                 )
 
-        # Se não foi o botão de upload, é o submit principal do formulário
+        # Se não foi o botão de upload, é o submit principal do formulário (salvar)
         self.object = None
+        # Chama o 'post' da classe pai (CreateView) que lida com a validação
+        # e chama 'form_valid' ou 'form_invalid'
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
