@@ -3,9 +3,9 @@ from django.conf import settings
 import json
 import re
 from io import BytesIO
-import base64  # <-- 1. IMPORTAR BASE64
+import base64 
 
-# 2. Inicializa o cliente (igual ao avaliacoes/views.py)
+# 1. Inicializa o cliente
 try:
     GEMINI_CLIENT = genai.Client(api_key=settings.GEMINI_API_KEY) if settings.GEMINI_API_KEY else None
 except ImportError:
@@ -23,7 +23,7 @@ def extract_crlv_data_with_gemini(pdf_file):
         return None
 
     try:
-        # 3. Prepara o prompt (System Instruction)
+        # 2. Prepara o prompt (System Instruction)
         system_instruction = (
             "Você é um assistente de OCR (Reconhecimento Óptico de Caracteres) "
             "especializado em ler documentos de veículos brasileiros (CRLV-e)."
@@ -43,23 +43,21 @@ def extract_crlv_data_with_gemini(pdf_file):
             "{\"veiculo_renavam\": \"01234567890\", \"veiculo_placa\": \"AYR2H85\", ...}"
         )
         
-        # 4. Prepara o arquivo PDF
+        # 3. Prepara o arquivo PDF
         pdf_file.seek(0)
         pdf_data_bytes = pdf_file.read()
-        
-        # --- 5. CORREÇÃO: Codificar os bytes para Base64 ---
         pdf_data_base64 = base64.b64encode(pdf_data_bytes).decode('utf-8')
         
-        # 6. Chama a API Gemini (CORRIGIDO)
-        # A API v1 espera um dicionário com 'inline_data' contendo os dados em base64.
+        # 4. Chama a API Gemini (CORRIGIDO)
+        # Usando o nome do modelo que já funciona em avaliacoes/views.py
         response = GEMINI_CLIENT.models.generate_content(
-            model='gemini-1.5-flash-latest', 
+            model='gemini-2.5-flash',  # <-- ESTA É A CORREÇÃO
             contents=[
                 {"text": "Extraia os dados deste documento PDF."}, 
                 {
                     "inline_data": {
                         "mime_type": "application/pdf",
-                        "data": pdf_data_base64  # <-- Usando os dados codificados
+                        "data": pdf_data_base64
                     }
                 }
             ],
@@ -69,12 +67,12 @@ def extract_crlv_data_with_gemini(pdf_file):
             },
         )
         
-        # 7. Processa a resposta
+        # 5. Processa a resposta
         cleaned_json = re.sub(r'```json\s*|\s*```', '', response.text, flags=re.DOTALL).strip()
         
         data = json.loads(cleaned_json)
 
-        # 8. Lógica de pós-processamento
+        # 6. Lógica de pós-processamento
         if data.get('outorgante_documento'):
             doc_limpo = re.sub(r'\D', '', data['outorgante_documento'])
             if len(doc_limpo) > 11:
