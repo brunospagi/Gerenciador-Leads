@@ -45,3 +45,13 @@ class ProcuracaoForm(forms.ModelForm):
         for field_name, field in self.fields.items():
             if field_name != 'tipo_documento':
                 field.widget.attrs.update({'class': 'form-control'})
+
+class CRLVUploadForm(forms.Form):
+    """
+    Formulário para o upload do PDF do CRLV-e.
+    """
+    crlv_pdf = forms.FileField(
+        label="Carregar CRLV-e (PDF)",
+        required=True,
+        widget=forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': '.pdf'})
+    )

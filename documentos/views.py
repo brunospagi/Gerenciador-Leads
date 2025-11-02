@@ -2,7 +2,8 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from .models import Procuracao, Outorgado 
-from .forms import ProcuracaoForm, OutorgadoForm
+from .forms import ProcuracaoForm, OutorgadoForm, CRLVUploadForm 
+from .pdf_utils import extract_crlv_data
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
@@ -14,6 +15,8 @@ import os
 from django.conf import settings
 from urllib.parse import urlparse
 from django.contrib.staticfiles import finders
+from django.contrib import messages
+from django.core.files.uploadedfile import InMemoryUploadedFile
 
 
 # --- Mixin para restringir acesso apenas a Admins ---
@@ -80,8 +83,70 @@ class ProcuracaoCreateView(LoginRequiredMixin, CreateView):
     template_name = 'documentos/procuracao_form.html'
     success_url = reverse_lazy('procuracao_list')
 
+    def get_context_data(self, **kwargs):
+        """Adiciona o formulário de upload ao contexto."""
+        context = super().get_context_data(**kwargs)
+        if 'upload_form' not in kwargs:
+            context['upload_form'] = CRLVUploadForm()
+        
+        # Título
+        context['title'] = "Gerar Nova Procuração"
+        if hasattr(self, 'extracted_data'):
+            context['title'] = "Verifique os Dados Extraídos"
+            
+        return context
+
+    def get_form_kwargs(self):
+        """Passa dados iniciais (extraídos) para o ProcuracaoForm."""
+        kwargs = super().get_form_kwargs()
+        if hasattr(self, 'extracted_data'):
+            kwargs['initial'] = self.extracted_data
+        return kwargs
+
+    def post(self, request, *args, **kwargs):
+        """
+        Sobrescreve o POST para verificar se é um upload de PDF
+        ou o envio do formulário principal.
+        """
+        # Verifica se o botão "upload_crlv" foi pressionado
+        if 'upload_crlv' in request.POST:
+            upload_form = CRLVUploadForm(request.POST, request.FILES)
+            
+            if upload_form.is_valid():
+                pdf_file: InMemoryUploadedFile = upload_form.cleaned_data['crlv_pdf']
+                
+                # Chama a função de extração
+                self.extracted_data = extract_crlv_data(pdf_file)
+                
+                if self.extracted_data:
+                    messages.success(request, "Dados extraídos do PDF com sucesso! Verifique e salve.")
+                else:
+                    messages.error(request, "Não foi possível extrair dados do PDF. Verifique o arquivo ou preencha manualmente.")
+                    self.extracted_data = {}
+
+                # Renderiza a página novamente com os dados pré-preenchidos
+                self.object = None # crucial para CreateView
+                form_class = self.get_form_class()
+                form = self.get_form(form_class) # get_form() usará get_form_kwargs() e pegará 'initial'
+                
+                return self.render_to_response(
+                    self.get_context_data(form=form, upload_form=upload_form)
+                )
+            else:
+                # Se o formulário de upload for inválido, apenas renderiza a página
+                self.object = None
+                messages.error(request, "Nenhum arquivo PDF foi selecionado.")
+                return self.render_to_response(
+                    self.get_context_data(form=self.get_form(), upload_form=upload_form)
+                )
+
+        # Se não foi o botão de upload, é o submit principal do formulário
+        self.object = None
+        return super().post(request, *args, **kwargs)
+
     def form_valid(self, form):
         form.instance.vendedor = self.request.user
+        messages.success(self.request, "Procuração salva com sucesso!")
         return super().form_valid(form)
 
 class ProcuracaoUpdateView(LoginRequiredMixin, UpdateView):

@@ -9,11 +9,32 @@
                     {% if form.instance.pk %}
                         <i class="bi bi-pencil-square me-2"></i>Editar Dados da Procuração
                     {% else %}
-                        <i class="bi bi-file-earmark-plus-fill me-2"></i>Gerar Nova Procuração
+                        <i class="bi bi-file-earmark-plus-fill me-2"></i>{{ title|default:"Gerar Nova Procuração" }}
                     {% endif %}
                 </h4>
             </div>
             <div class="card-body p-4">
+                {% if not form.instance.pk %}
+                <div class="card bg-light mb-4 border-info">
+                    <div class="card-body">
+                        <h5 class="card-title text-info"><i class="bi bi-file-earmark-arrow-up-fill me-2"></i>Pré-preencher com CRLV-e</h5>
+                        <p class="card-text small mb-2">Envie o PDF do CRLV-e para extrair os dados do outorgante e do veículo automaticamente.</p>
+                        
+                        <form method="post" enctype="multipart/form-data" class="d-flex align-items-center">
+                            {% csrf_token %}
+                            <div class="flex-grow-1 me-2">
+                                {{ upload_form.crlv_pdf }}
+                            </div>
+                            <button type="submit" name="upload_crlv" class="btn btn-info">
+                                <i class="bi bi-magic me-1"></i>Extrair Dados
+                            </button>
+                        </form>
+                        {% if upload_form.crlv_pdf.errors %}
+                            <div class="text-danger small mt-2">{{ upload_form.crlv_pdf.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
                 <form method="post" id="procuracaoForm">
                     {% csrf_token %}
                     
@@ -70,7 +91,7 @@
 
                     <div class="card-footer bg-light text-end mt-4">
                         <a href="{% url 'procuracao_list' %}" class="btn btn-secondary"><i class="bi bi-x-circle me-1"></i>Cancelar</a>
-                        <button type="submit" class="btn btn-success"><i class="bi bi-check-circle-fill me-1"></i>Salvar Dados</button>
+                        <button type="submit" name="save_procuracao" class="btn btn-success"><i class="bi bi-check-circle-fill me-1"></i>Salvar Dados</button>
                     </div>
                 </form>
             </div>
@@ -98,7 +119,10 @@ document.addEventListener('DOMContentLoaded', (event) => {
         }
         
         // Pega o valor checado
-        const selectedType = document.querySelector('input[name="tipo_documento"]:checked').value;
+        const selectedRadio = document.querySelector('input[name="tipo_documento"]:checked');
+        if (!selectedRadio) return; // Sai se nenhum estiver checado
+        
+        const selectedType = selectedRadio.value;
         
         if (selectedType === 'CNPJ') {
             docMask = IMask(docInput, cnpjMask);
@@ -114,7 +138,6 @@ document.addEventListener('DOMContentLoaded', (event) => {
     
     // Roda a função uma vez no carregamento da página para aplicar a máscara inicial
     updateMask();
-    // --- Fim da máscara dinâmica ---
 });
 </script>
 {% endblock %}
