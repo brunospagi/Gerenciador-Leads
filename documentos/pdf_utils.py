@@ -46,10 +46,11 @@ def extract_crlv_data_with_gemini(pdf_file):
         pdf_file.seek(0)
         pdf_data = pdf_file.read()
         
-        # 4. Chama a API Gemini
-        # (Usando 'gemini-1.5-flash' que é excelente para multimodalidade rápida)
-        model = GEMINI_CLIENT.models.get_model('gemini-1.5-flash-latest')
-        response = model.generate_content(
+        # 4. Chama a API Gemini (CORRIGIDO)
+        # O erro estava aqui. 'get_model' não existe.
+        # A forma correta é passar o nome do modelo direto no 'generate_content'.
+        response = GEMINI_CLIENT.models.generate_content(
+            model='gemini-1.5-flash-latest', # <-- O nome do modelo vai aqui
             contents=[
                 system_prompt,
                 {"mime_type": "application/pdf", "data": pdf_data}
@@ -64,7 +65,7 @@ def extract_crlv_data_with_gemini(pdf_file):
         
         data = json.loads(cleaned_json)
 
-        # 6. Lógica de pós-processamento (a mesma de antes)
+        # 6. Lógica de pós-processamento
         if data.get('outorgante_documento'):
             doc_limpo = re.sub(r'\D', '', data['outorgante_documento'])
             if len(doc_limpo) > 11:
