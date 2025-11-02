@@ -14,11 +14,12 @@
                 </h4>
             </div>
             <div class="card-body p-4">
+
                 {% if not form.instance.pk %}
                 <div class="card bg-light mb-4 border-info">
                     <div class="card-body">
-                        <h5 class="card-title text-info"><i class="bi bi-file-earmark-arrow-up-fill me-2"></i>Pré-preencher com CRLV-e</h5>
-                        <p class="card-text small mb-2">Envie o PDF do CRLV-e para extrair os dados do outorgante e do veículo automaticamente.</p>
+                        <h5 class="card-title text-info"><i class="bi bi-file-earmark-arrow-up-fill me-2"></i>Pré-preencher com CRLV-e (IA)</h5>
+                        <p class="card-text small mb-2">Envie o PDF (mesmo que seja foto/scan) do CRLV-e para a IA ler os dados automaticamente.</p>
                         
                         <form method="post" enctype="multipart/form-data" class="d-flex align-items-center">
                             {% csrf_token %}
@@ -119,10 +120,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
         }
         
         // Pega o valor checado
-        const selectedRadio = document.querySelector('input[name="tipo_documento"]:checked');
-        if (!selectedRadio) return; // Sai se nenhum estiver checado
-        
-        const selectedType = selectedRadio.value;
+        const selectedType = document.querySelector('input[name="tipo_documento"]:checked').value;
         
         if (selectedType === 'CNPJ') {
             docMask = IMask(docInput, cnpjMask);
@@ -137,7 +135,11 @@ document.addEventListener('DOMContentLoaded', (event) => {
     tipoDocRadios.forEach(radio => radio.addEventListener('change', updateMask));
     
     // Roda a função uma vez no carregamento da página para aplicar a máscara inicial
-    updateMask();
+    // (Verifica se há um radio checado para evitar erro)
+    if (document.querySelector('input[name="tipo_documento"]:checked')) {
+        updateMask();
+    }
+    // --- Fim da máscara dinâmica ---
 });
 </script>
 {% endblock %}
