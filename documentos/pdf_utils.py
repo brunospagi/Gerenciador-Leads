@@ -22,8 +22,8 @@ def extract_crlv_data_with_gemini(pdf_file):
         return None
 
     try:
-        # 2. Prepara o prompt para a IA
-        system_prompt = (
+        # 2. Prepara o prompt (System Instruction)
+        system_instruction = (
             "Você é um assistente de OCR (Reconhecimento Óptico de Caracteres) "
             "especializado em ler documentos de veículos brasileiros (CRLV-e)."
             "Sua tarefa é extrair os campos-chave do documento PDF fornecido e "
@@ -42,21 +42,23 @@ def extract_crlv_data_with_gemini(pdf_file):
             "{\"veiculo_renavam\": \"01234567890\", \"veiculo_placa\": \"AYR2H85\", ...}"
         )
         
-        # 3. Prepara o arquivo PDF para a API
+        # 3. Prepara o arquivo PDF
         pdf_file.seek(0)
         pdf_data = pdf_file.read()
         
         # 4. Chama a API Gemini (CORRIGIDO)
-        # O erro estava aqui. 'get_model' não existe.
-        # A forma correta é passar o nome do modelo direto no 'generate_content'.
+        # O parâmetro correto é 'config', que aceita tanto a
+        # instrução do sistema quanto o tipo de resposta.
         response = GEMINI_CLIENT.models.generate_content(
-            model='gemini-1.5-flash-latest', # <-- O nome do modelo vai aqui
+            model='gemini-1.5-flash-latest', 
             contents=[
-                system_prompt,
+                # O prompt do sistema não vai aqui, vai no 'config'
                 {"mime_type": "application/pdf", "data": pdf_data}
             ],
-            # Solicita que a resposta seja em JSON
-            generation_config={"response_mime_type": "application/json"},
+            config={
+                "system_instruction": system_instruction,
+                "response_mime_type": "application/json"
+            },
         )
         
         # 5. Processa a resposta
