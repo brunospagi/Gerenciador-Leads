@@ -47,12 +47,12 @@ def extract_crlv_data_with_gemini(pdf_file):
         pdf_data = pdf_file.read()
         
         # 4. Chama a API Gemini (CORRIGIDO)
-        # O parâmetro correto é 'config', que aceita tanto a
-        # instrução do sistema quanto o tipo de resposta.
+        # Adicionamos um prompt de texto ("Extraia os dados...")
+        # antes do objeto do arquivo.
         response = GEMINI_CLIENT.models.generate_content(
             model='gemini-1.5-flash-latest', 
             contents=[
-                # O prompt do sistema não vai aqui, vai no 'config'
+                "Extraia os dados deste documento PDF.", # <-- ESTA LINHA É A CORREÇÃO
                 {"mime_type": "application/pdf", "data": pdf_data}
             ],
             config={
