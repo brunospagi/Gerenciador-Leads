@@ -2,7 +2,7 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from .models import Procuracao, Outorgado 
-from .forms import ProcuracaoForm, OutorgadoForm, CRLVUploadForm
+from .forms import ProcuracaoForm, OutorgadoForm, CRLVUploadForm 
 from .pdf_utils import extract_crlv_data_with_gemini as extract_crlv_data
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import PermissionDenied
@@ -15,7 +15,7 @@ import os
 from django.conf import settings
 from urllib.parse import urlparse
 from django.contrib.staticfiles import finders
-from django.contrib import messages
+from django.contrib import messages 
 from django.core.files.uploadedfile import InMemoryUploadedFile
 
 
@@ -124,10 +124,17 @@ class ProcuracaoCreateView(LoginRequiredMixin, CreateView):
                     messages.error(request, "Não foi possível extrair dados do PDF. Verifique o arquivo ou preencha manualmente.")
                     self.extracted_data = {}
 
-                # Renderiza a página novamente com os dados pré-preenchidos
-                self.object = None # crucial para CreateView
-                form_class = self.get_form_class()
-                form = self.get_form(form_class) # get_form() usará get_form_kwargs() e pegará 'initial'
+                # --- CORREÇÃO AQUI ---
+                # Quando o upload é feito, o form é instanciado com `data=request.POST`.
+                # Esse `request.POST` está vazio (só tem o botão), e ele "ganha"
+                # do `initial` (com os dados da IA) que tentamos injetar.
+                # A solução é instanciar o formulário manualmente APENAS com
+                # os dados iniciais, ignorando o `request.POST` do upload.
+                
+                self.object = None 
+                # Instanciamos o formulário passando 'initial' diretamente.
+                form = self.get_form_class()(initial=self.extracted_data) 
+                # --- FIM DA CORREÇÃO ---
                 
                 return self.render_to_response(
                     self.get_context_data(form=form, upload_form=upload_form)
@@ -140,10 +147,8 @@ class ProcuracaoCreateView(LoginRequiredMixin, CreateView):
                     self.get_context_data(form=self.get_form(), upload_form=upload_form)
                 )
 
-        # Se não foi o botão de upload, é o submit principal do formulário (salvar)
+        # Se não foi o botão de upload, é o submit principal (salvar)
         self.object = None
-        # Chama o 'post' da classe pai (CreateView) que lida com a validação
-        # e chama 'form_valid' ou 'form_invalid'
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
