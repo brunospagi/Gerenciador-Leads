@@ -140,7 +140,7 @@
 
                             <div class="dropdown">
                                 <a class="nav-link text-dark" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <img src="https://cdn.quasar.dev/img/boy-avatar.png" alt="Avatar" width="32" height="32" class="rounded-circle">
+                                    <img src="{{ user.profile.get_avatar_url }}" alt="Avatar" width="32" height="32" class="rounded-circle" style="object-fit: cover;">
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                                     <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person-vcard"></i> Meu Perfil</a></li>

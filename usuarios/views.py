@@ -5,7 +5,11 @@ from django.contrib.auth.views import PasswordChangeView
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, FormView
 from django.urls import reverse_lazy
 from django.contrib import messages
-from .forms import CustomPasswordChangeForm, UserCreationFormByAdmin, UserUpdateFormByAdmin, AdminSetPasswordForm
+# --- ProfileAvatarForm ADICIONADO ---
+from .forms import (
+    CustomPasswordChangeForm, UserCreationFormByAdmin, 
+    UserUpdateFormByAdmin, AdminSetPasswordForm, ProfileAvatarForm
+)
 from django.contrib.auth.models import User
 from .models import Profile, UserLoginActivity
 from django.core.exceptions import PermissionDenied
@@ -14,17 +18,35 @@ from django.db.models.functions import TruncDate
 from django.utils import timezone
 from datetime import timedelta
 import json
-from leadge.forms import TVVideoForm # --- IMPORT ADICIONADO ---
-from leadge.models import TVVideo # --- IMPORT ADICIONADO ---
+from leadge.forms import TVVideoForm 
+from leadge.models import TVVideo 
 
 
 class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
         return self.request.user.is_superuser or (hasattr(self.request.user, 'profile') and self.request.user.profile.nivel_acesso == Profile.NivelAcesso.ADMIN)
 
+# --- ATUALIZADA A VIEW DE PERFIL ---
 @login_required
 def profile_view(request):
-    return render(request, 'usuarios/profile.html')
+    # Instancia o formulário com os dados do perfil do usuário
+    form = ProfileAvatarForm(instance=request.user.profile)
+    
+    if request.method == 'POST':
+        # Se for um POST, processa o formulário com os dados e arquivos enviados
+        form = ProfileAvatarForm(request.POST, request.FILES, instance=request.user.profile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Avatar atualizado com sucesso!')
+            return redirect('profile')
+        else:
+            messages.error(request, 'Houve um erro ao atualizar o avatar.')
+
+    # No método GET (ou se o form for inválido), renderiza a página com o formulário
+    context = {
+        'form': form
+    }
+    return render(request, 'usuarios/profile.html', context)
 
 class CustomPasswordChangeView(PasswordChangeView):
     form_class = CustomPasswordChangeForm
