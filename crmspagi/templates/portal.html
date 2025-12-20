@@ -1,0 +1,261 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Sistemas - SPAGI</title>
+    <link rel="icon" href="{% static 'images/logo-spagi.png' %}">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Estilos baseados no exemplo enviado (Layout e Cores) */
+        :root {
+            --primary-color: #004b8d; /* Azul parecido com o exemplo */
+            --surface-ground: #eff3f8;
+            --text-color: #495057;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--surface-ground);
+            color: var(--text-color);
+        }
+
+        /* Topbar */
+        .layout-topbar {
+            height: 5rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: white;
+            box-shadow: 0 3px 5px rgba(0,0,0,.02), 0 0 2px rgba(0,0,0,.05), 0 1px 4px rgba(0,0,0,.08);
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+            z-index: 999;
+        }
+
+        .layout-topbar-logo img {
+            height: 3rem; /* Ajuste para seu logo */
+        }
+
+        .layout-topbar-menu {
+            margin-left: auto;
+            list-style: none;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .layout-topbar-button {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: var(--text-color);
+            font-size: 1.2rem;
+            padding: 0.5rem;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+
+        .layout-topbar-button:hover {
+            background-color: #f6f9fc;
+        }
+
+        /* Main Content */
+        .layout-main-container {
+            padding-top: 6rem; /* Espaço para a topbar */
+            padding-left: 2rem;
+            padding-right: 2rem;
+            padding-bottom: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Cards e Grid */
+        .card {
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+            border-bottom: 2px solid #eee;
+            padding-bottom: 0.5rem;
+        }
+
+        .system-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .system-item {
+            background-color: #f8f9fa; /* Ou a cor azul do exemplo */
+            border-radius: 6px;
+            padding: 1rem;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 120px;
+            position: relative;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border-left: 4px solid var(--primary-color);
+            overflow: hidden;
+        }
+
+        .system-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        /* Estilo colorido estilo o exemplo */
+        .system-item.blue { background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%); color: white; border: none; }
+        .system-item.orange { background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); color: white; border: none; }
+        .system-item.green { background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%); color: white; border: none; }
+
+        .system-name {
+            font-size: 1.1rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .system-desc {
+            font-size: 0.85rem;
+            opacity: 0.9;
+            margin-top: 0.5rem;
+        }
+
+        .system-icon {
+            position: absolute;
+            bottom: 10px;
+            right: 15px;
+            font-size: 2.5rem;
+            opacity: 0.2;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="layout-wrapper">
+        <div class="layout-topbar">
+            <a href="{% url 'portal' %}" class="layout-topbar-logo">
+                <img src="{% static 'images/logo-spagi.png' %}" alt="Logo SPAGI">
+            </a>
+
+            <div class="layout-topbar-menu">
+                <button class="layout-topbar-button" title="Calendário">
+                    <i class="fa fa-calendar"></i>
+                </button>
+                <button class="layout-topbar-button" title="Configurações">
+                    <i class="fa fa-cog"></i>
+                </button>
+                <button class="layout-topbar-button" title="Perfil">
+                    <i class="fa fa-user"></i>
+                </button>
+                {% if user.is_authenticated %}
+                    <span style="display:flex; align-items:center; margin-left:10px;">Olá, {{ user.username }}</span>
+                    <a href="{% url 'logout' %}" class="layout-topbar-button" title="Sair">
+                        <i class="fa fa-sign-out-alt"></i>
+                    </a>
+                {% else %}
+                    <a href="{% url 'login' %}" class="layout-topbar-button">Login</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="layout-main-container">
+            
+            <div class="card">
+                <div class="section-title">Bem-vindo ao Gerenciador de Leads</div>
+                <p>Selecione um dos sistemas abaixo para começar.</p>
+            </div>
+
+            <div class="card">
+                <div class="section-title"><i class="fa fa-users"></i> Gestão de Clientes</div>
+                <div class="system-grid">
+                    
+                    <a href="{% url 'cliente_list' %}" class="system-item blue">
+                        <div>
+                            <span class="system-name">Clientes</span>
+                            <div class="system-desc">Listagem e gestão de leads</div>
+                        </div>
+                        <i class="fa fa-address-book system-icon"></i>
+                    </a>
+
+                    <a href="{% url 'cliente_create' %}" class="system-item green">
+                        <div>
+                            <span class="system-name">Novo Cliente</span>
+                            <div class="system-desc">Cadastrar novo lead</div>
+                        </div>
+                        <i class="fa fa-user-plus system-icon"></i>
+                    </a>
+
+                    <a href="{% url 'cliente_atrasados_list' %}" class="system-item orange">
+                        <div>
+                            <span class="system-name">Atrasados</span>
+                            <div class="system-desc">Leads com pendências</div>
+                        </div>
+                        <i class="fa fa-clock system-icon"></i>
+                    </a>
+
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-title"><i class="fa fa-chart-line"></i> Relatórios & Ferramentas</div>
+                <div class="system-grid">
+                    
+                    <a href="{% url 'relatorios' %}" class="system-item">
+                        <div>
+                            <span class="system-name" style="color:var(--primary-color)">Dashboard</span>
+                            <div class="system-desc" style="color:#666">Visão geral de desempenho</div>
+                        </div>
+                        <i class="fa fa-chart-pie system-icon" style="color:var(--primary-color)"></i>
+                    </a>
+
+                    <a href="{% url 'calendario' %}" class="system-item">
+                        <div>
+                            <span class="system-name" style="color:var(--primary-color)">Calendário</span>
+                            <div class="system-desc" style="color:#666">Agenda de contatos</div>
+                        </div>
+                        <i class="fa fa-calendar-alt system-icon" style="color:var(--primary-color)"></i>
+                    </a>
+
+                    <a href="{% url 'tv_video_display' %}" class="system-item">
+                        <div>
+                            <span class="system-name" style="color:var(--primary-color)">Painel TV</span>
+                            <div class="system-desc" style="color:#666">Exibição para monitor</div>
+                        </div>
+                        <i class="fa fa-tv system-icon" style="color:var(--primary-color)"></i>
+                    </a>
+
+                </div>
+            </div>
+
+            <div class="footer">
+                SPAGI Gerenciador de Leads - Versão 1.0
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
