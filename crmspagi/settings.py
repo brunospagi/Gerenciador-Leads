@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'notificacoes',
     'webpush',
     'documentos',
+    'autorizacoes',
 ]
 
 MIDDLEWARE = [
@@ -94,7 +95,10 @@ ROOT_URLCONF = 'crmspagi.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'crmspagi' / 'templates'],
+        'DIRS': [
+            BASE_DIR / 'templates', 
+            BASE_DIR / 'crmspagi' / 'templates'
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -109,7 +113,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'crmspagi.wsgi.application'
 
-LOGIN_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = 'portal'
 LOGOUT_REDIRECT_URL = '/contas/login/'
 LOGIN_URL = '/contas/login/'
 

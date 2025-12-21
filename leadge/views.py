@@ -1,10 +1,15 @@
 from django.shortcuts import render, redirect
 from django.views import View
-from .models import TVVideo
+from .models import Banner, TVVideo
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings 
-
+from django.views.generic import TemplateView
+from django.urls import reverse_lazy
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from .models import Banner, TVVideo
+from .forms import BannerForm
 
 # Usamos csrf_exempt para evitar problemas de CSRF em telas de exibição pública,
 # mas mantenha o CSRF ativo nas demais partes do sistema.
@@ -26,3 +31,40 @@ class TVVideoView(View):
             'MANUAL_NEWS': video_config.manual_news_ticker,
         }
         return render(request, 'leadge/tv_video.html', context)
+
+class PortalView(TemplateView):
+    template_name = 'portal.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['banners'] = Banner.objects.filter(ativo=True).order_by('ordem', '-data_criacao')
+        return context
+    
+# Mixin para garantir que só ADMIN acesse
+class AdminRequiredMixin(UserPassesTestMixin):
+    def test_func(self):
+        return self.request.user.is_superuser or getattr(self.request.user.profile, 'nivel_acesso', '') == 'ADMIN'
+
+# --- VIEWS DE BANNER ---
+
+class BannerListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
+    model = Banner
+    template_name = 'leadge/banner_list.html'
+    context_object_name = 'banners'
+
+class BannerCreateView(LoginRequiredMixin, AdminRequiredMixin, CreateView):
+    model = Banner
+    form_class = BannerForm
+    template_name = 'leadge/banner_form.html'
+    success_url = reverse_lazy('banner_list')
+
+class BannerUpdateView(LoginRequiredMixin, AdminRequiredMixin, UpdateView):
+    model = Banner
+    form_class = BannerForm
+    template_name = 'leadge/banner_form.html'
+    success_url = reverse_lazy('banner_list')
+
+class BannerDeleteView(LoginRequiredMixin, AdminRequiredMixin, DeleteView):
+    model = Banner
+    template_name = 'leadge/banner_confirm_delete.html'
+    success_url = reverse_lazy('banner_list')

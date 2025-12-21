@@ -4,291 +4,224 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Gestão de Leads</title>
+    <title>{% block title %}Gestão de Leads{% endblock %}</title>
 
     <meta name="theme-color" content="#0d6efd">
     <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="apple-touch-icon" href="{% static 'images/logo-spagi.png' %}">
+    <link rel="icon" href="{% static 'images/logo-spagi.png' %}">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/css/lightbox.min.css" />
 
+    <link rel="stylesheet" href="{% static 'css/portal-theme.css' %}">
+
     <style>
+        /* Ajustes para o Layout Interno (Com Sidebar) */
         body {
-            background-color: #f8f9fa; /* bg-grey-1 do Quasar */
+            background-color: #f8f9fa;
+            overflow-x: hidden; /* Evita rolagem horizontal acidental */
         }
 
-        /* Define a altura do cabeçalho (igual ao Quasar) */
-        .navbar-top-fixed {
-            height: 64px;
-            position: fixed;
-            top: 0;
-            right: 0;
-            left: 0;
-            z-index: 1030;
-        }
-
-        /* Define o menu lateral (Drawer) */
+        /* Sidebar Fixa (Abaixo do Topbar do Portal) */
         .sidebar {
-            width: 280px; /* Largura do Quasar */
+            width: 280px;
             position: fixed;
-            top: 0;
+            top: var(--topbar-height, 5rem); /* Pega a altura do CSS do portal */
             bottom: 0;
             left: 0;
             z-index: 1000;
-            padding-top: 64px; /* Espaço para o header */
-            transition: all 0.3s ease;
+            padding-top: 1rem;
+            background: white;
+            border-right: 1px solid #dee2e6;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
         }
 
-        /* Ajusta o menu lateral no Bootstrap 5 (Offcanvas) */
-        .offcanvas-lg.offcanvas-start {
-            width: 280px;
-        }
-
-        /* Wrapper do Conteúdo Principal */
+        /* Conteúdo Principal (Empurrado pela Sidebar e Topbar) */
         .main-content {
-            padding-top: 64px; /* Altura do header */
-            padding-left: 280px; /* Largura da sidebar */
-            transition: padding-left 0.3s ease;
+            margin-top: var(--topbar-height, 5rem);
+            margin-left: 280px;
+            padding: 2rem;
+            min-height: calc(100vh - 5rem);
+            display: flex;
+            flex-direction: column;
+            transition: margin-left 0.3s ease;
         }
         
-        /* Remove o padding-left em telas menores (quando o menu vira offcanvas) */
+        /* Responsividade Mobile */
         @media (max-width: 991.98px) {
-            .main-content {
-                padding-left: 0;
-            }
+            .sidebar { transform: translateX(-100%); } /* Esconde sidebar */
+            .sidebar.show { transform: translateX(0); } /* Mostra quando ativo */
+            .main-content { margin-left: 0; }
         }
 
-        /* --- ESTILOS DO MENU LATERAL (CORRIGIDOS) --- */
+        /* Estilo dos Links da Sidebar */
         .sidebar-nav .nav-link {
+            color: #495057;
+            border-radius: 0 25px 25px 0;
+            margin-right: 10px;
+            padding: 0.8rem 1rem;
+            font-weight: 500;
             display: flex;
             align-items: center;
-            color: #3c4043;
-            font-weight: 500;
-            font-size: .875rem;
-            line-height: 1.25rem;
-            padding: 12px 16px;
-            border-radius: 0 24px 24px 0; /* Estilo "pill" do Quasar */
-            margin-right: 12px;
         }
-        .sidebar-nav .nav-link:hover {
-            background-color: rgba(60, 64, 67, 0.08); /* Cor de hover sutil */
-            color: #3c4043;
+        .sidebar-nav .nav-link:hover, .sidebar-nav .nav-link.active {
+            background-color: #eef2f6;
+            color: var(--primary-color);
         }
         .sidebar-nav .nav-link i {
-            color: #5f6368;
-            margin-right: 16px;
-            width: 1.2em;
+            margin-right: 12px;
+            color: #6c757d;
+            width: 20px;
+            text-align: center;
         }
+        .sidebar-nav .nav-link:hover i { color: var(--primary-color); }
         
-        /* Estilo para a seta do "collapse" */
-        .sidebar-nav .nav-link .bi-chevron-down {
-            transition: transform 0.2s ease-in-out;
-            color: #5f6368;
-            margin-right: 0; /* Remove margem extra */
-        }
-        .sidebar-nav .nav-link[aria-expanded="true"] .bi-chevron-down {
-            transform: rotate(180deg);
-        }
-
-        /* Estilo para os sub-itens do menu (dentro do collapse) */
+        /* Submenus */
         .sidebar-nav .collapse .nav-link {
-            font-size: .825rem; /* Fonte um pouco menor */
-            padding-left: 3.3rem; /* Indentação */
-            border-radius: 0;
-        }
-        
-        .sidebar-footer {
-            font-size: .75rem;
-            font-weight: 500;
+            font-size: 0.9em;
+            padding-left: 3rem;
         }
     </style>
+    {% block extra_css %}{% endblock %}
 </head>
-<body class="d-flex flex-column h-100">
+<body>
     
-    <header>
-        <nav class="navbar navbar-expand navbar-top-fixed bg-white text-dark border-bottom p-0" style="height: 64px;">
-            <div class="container-fluid">
-                
-                <button class="btn btn-outline-secondary border-0 d-lg-none" 
-                        type="button" 
-                        data-bs-toggle="offcanvas" 
-                        data-bs-target="#main-sidebar" 
-                        aria-controls="main-sidebar">
-                    <i class="bi bi-list fs-4"></i>
-                </button>
+    <div class="layout-topbar">
+        <button class="btn btn-link text-secondary d-lg-none me-2 border-0" type="button" 
+                onclick="document.querySelector('.sidebar').classList.toggle('show')">
+            <i class="fa fa-bars fs-4"></i>
+        </button>
 
-                <a class="navbar-brand d-none d-lg-flex align-items-center ms-3" href="{% url 'cliente_list' %}">
-                    <img src="{% static 'images/logo-spagi.png' %}" alt="Logo" style="height: 32px;" class="me-2">
-                    <span class="fs-5 fw-bold text-dark">Gestão de Leads</span>
-                </a>
+        <a href="{% url 'portal' %}" class="layout-topbar-logo">
+            <img src="{% static 'images/logo-spagi.png' %}" alt="Logo">
+            <span class="d-none d-md-flex align-items-center fs-6 text-muted ms-2">
+                Portal <i class="fa fa-chevron-right mx-2 fs-6"></i> <strong class="text-primary">CRM</strong>
+            </span>
+        </a>
 
-                <div class="d-none d-lg-block" style="width: 20px;"></div>
+        <div class="layout-topbar-menu">
+            <a href="{% url 'portal' %}" class="layout-topbar-button" title="Voltar ao Portal de Sistemas">
+                <i class="fa fa-th"></i>
+            </a>
 
-                <div class="collapse navbar-collapse flex-grow-0" id="main-nav-right">
-                    <div class="d-flex align-items-center ms-auto">
-                        {% if user.is_authenticated %}
-                            <a href="{% url 'lista_notificacoes' %}" class="nav-link text-secondary position-relative me-2">
-                                <i class="bi bi-bell-fill fs-5"></i>
-                                {% if unread_notifications_count > 0 %}
-                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.7em;">
-                                        {{ unread_notifications_count }}
-                                    </span>
-                                {% endif %}
-                            </a>
-
-                            <div class="dropdown">
-                                <a class="nav-link text-dark" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <img src="{{ user.profile.get_avatar_url }}" alt="Avatar" width="32" height="32" class="rounded-circle" style="object-fit: cover;">
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                                    <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person-vcard"></i> Meu Perfil</a></li>
-                                    <li><a class="dropdown-item" href="#" id="enable-push-notifications"><i class="bi bi-bell-plus-fill"></i> Ativar Notificações</a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li>
-                                        <form action="{% url 'logout' %}" method="post" class="px-2">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-danger w-100"><i class="bi bi-box-arrow-right"></i> Sair</button>
-                                        </form>
-                                    </li>
-                                </ul>
-                            </div>
-                        {% else %}
-                            <div class="d-flex mt-2 mt-lg-0">
-                                <a href="{% url 'login' %}" class="btn btn-outline-primary"><i class="bi bi-box-arrow-in-right"></i> Entrar</a>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-                
-                <button class="navbar-toggler d-lg-none" type="button" data-bs-toggle="collapse" data-bs-target="#main-nav-right" aria-controls="main-nav-right" aria-expanded="false" aria-label="Toggle navigation">
-                    <i class="bi bi-three-dots-vertical"></i>
-                </button>
-            </div>
-        </nav>
-    </header>
-
-    <nav class="sidebar offcanvas-lg offcanvas-start bg-white border-end" tabindex="-1" id="main-sidebar" aria-labelledby="main-sidebarLabel">
-        <div class="offcanvas-header d-lg-none">
-            <h5 class="offcanvas-title" id="main-sidebarLabel">Menu Principal</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#main-sidebar" aria-label="Close"></button>
-        </div>
-
-        <div class="offcanvas-body d-flex flex-column p-0">
-            <div class="flex-grow-1 overflow-auto">
-                <ul class="nav flex-column w-100 sidebar-nav pt-2">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'cliente_list' %}"><i class="bi bi-speedometer2"></i> Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'calendario' %}"><i class="bi bi-calendar-week-fill"></i> Calendário</a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link" href="#navbarClientesCollapse" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="navbarClientesCollapse">
-                            <i class="bi bi-person-lines-fill"></i>
-                            Clientes
-                            <i class="bi bi-chevron-down small ms-auto"></i>
-                        </a>
-                        <div class="collapse" id="navbarClientesCollapse">
-                            <ul class="nav flex-column">
-                                <li class="nav-item">
-                                    <a class="nav-link" href="{% url 'cliente_atrasados_list' %}">
-                                        <i class="bi bi-clock-history"></i> Contatos Atrasados
-                                        {% if clientes_atrasados_count > 0 %}
-                                            <span class="badge bg-danger rounded-pill ms-auto">{{ clientes_atrasados_count }}</span>
-                                        {% endif %}
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" href="{% url 'cliente_finalizados_list' %}"><i class="bi bi-check-circle"></i> Finalizados</a>
-                                </li>
-                            </ul>
-                        </div>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link" href="#navbarAvaliacoesCollapse" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="navbarAvaliacoesCollapse">
-                            <i class="bi bi-car-front-fill"></i>
-                            Avaliações
-                            <i class="bi bi-chevron-down small ms-auto"></i>
-                        </a>
-                        <div class="collapse" id="navbarAvaliacoesCollapse">
-                            <ul class="nav flex-column">
-                                <li class="nav-item"><a class="nav-link" href="{% url 'avaliacao_list' %}"><i class="bi bi-list-columns"></i> Lista de Avaliações</a></li>
-                                <li class="nav-item"><a class="nav-link" href="{% url 'avaliacao_create' %}"><i class="bi bi-plus-circle"></i> Nova Avaliação</a></li>
-                                <li class="nav-item"><a class="nav-link" href="{% url 'gerador_anuncio' %}"><i class="bi bi-megaphone-fill"></i> Gerador Simples (IA)</a></li>
-                                <li class="nav-item"><a class="nav-link" href="{% url 'bulk_gerador_anuncio' %}"><i class="bi bi-tools"></i> Gerador em Massa (IA)</a></li>
-                            </ul>
-                        </div>
-                    </li>
-                    
-                    <li class="nav-item">
-                        <a class="nav-link" href="#navbarDocumentosCollapse" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="navbarDocumentosCollapse">
-                            <i class="bi bi-file-earmark-text-fill"></i>
-                            Documentos
-                            <i class="bi bi-chevron-down small ms-auto"></i>
-                        </a>
-                        <div class="collapse" id="navbarDocumentosCollapse">
-                            <ul class="nav flex-column">
-                                <li class="nav-item"><a class="nav-link" href="{% url 'procuracao_list' %}"><i class="bi bi-file-earmark-text"></i> Procurações</a></li>
-                                {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                                <li class="nav-item"><a class="nav-link" href="{% url 'outorgado_list' %}"><i class="bi bi-person-badge-fill"></i> Gerenciar Outorgados</a></li>
-                                {% endif %}
-                            </ul>
-                        </div>
-                    </li>
-                    
-                    {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="#navbarAdminCollapse" role="button" data-bs-toggle="collapse" aria-expanded="false" aria-controls="navbarAdminCollapse">
-                            <i class="bi bi-shield-lock-fill"></i>
-                            Admin
-                            <i class="bi bi-chevron-down small ms-auto"></i>
-                        </a>
-                        <div class="collapse" id="navbarAdminCollapse">
-                             <ul class="nav flex-column">
-                                <li class="nav-item"><a class="nav-link" href="{% url 'admin_dashboard' %}"><i class="bi bi-speedometer2"></i> Painel Admin</a></li>
-                                <li class="nav-item"><a class="nav-link" href="{% url 'relatorios' %}"><i class="bi bi-bar-chart-line-fill"></i> Relatórios Gerais</a></li>
-                                <li class="nav-item"><a class="nav-link" href="{% url 'relatorio_atrasados' %}"><i class="bi bi-person-exclamation-fill"></i> Relatório de Atrasados</a></li>
-                                <li class="nav-item"><a class="nav-link" href="{% url 'user_list' %}"><i class="bi bi-person-plus-fill"></i> Gerenciar Usuários</a></li>
-                            </ul>
-                        </div>
-                    </li>
+            {% if user.is_authenticated %}
+                <a href="{% url 'lista_notificacoes' %}" class="layout-topbar-button position-relative" title="Notificações">
+                    <i class="fa fa-bell"></i>
+                    {% if unread_notifications_count > 0 %}
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.5em; padding: 0.3em 0.5em;">
+                            {{ unread_notifications_count }}
+                        </span>
                     {% endif %}
-                </ul>
-            </div>
-            
-            <div class="sidebar-footer p-3 text-center text-muted border-top">
-                <a href="https://spagi.com.br/" target="_blank" rel="noopener noreferrer">
-                    <img src="{% static 'images/logo-spagi.png' %}" alt="Logo Spagi Sistemas" style="height: 36px;">
                 </a>
-                <div class="mt-2">
-                    &copy; {% now "Y" %} Spagi Sistemas
+            {% endif %}
+
+            {% if user.is_authenticated %}
+                <div class="dropdown">
+                    <a href="#" class="layout-topbar-button d-flex align-items-center gap-2 text-decoration-none" data-bs-toggle="dropdown">
+                        {% if user.profile.avatar %}
+                            <img src="{{ user.profile.avatar.url }}" alt="User" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
+                        {% else %}
+                            <i class="fa fa-user-circle fs-4"></i>
+                        {% endif %}
+                        
+                        <span class="d-none d-md-block fs-6 fw-bold text-dark">
+                            {{ user.get_full_name|default:user.username }}
+                        </span>
+                    </a>
+                    
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2">
+                        <li><h6 class="dropdown-header">Logado como {{ user.username }}</h6></li>
+                        <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="fa fa-id-card me-2"></i> Meu Perfil</a></li>
+                        <li><a class="dropdown-item" href="#" id="enable-push-notifications"><i class="fa fa-bell me-2"></i> Ativar Push</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form action="{% url 'logout' %}" method="post" class="px-2">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger w-100"><i class="fa fa-sign-out-alt me-1"></i> Sair</button>
+                            </form>
+                        </li>
+                    </ul>
                 </div>
-            </div>
+            {% else %}
+                <a href="{% url 'login' %}" class="layout-topbar-button"><i class="fa fa-sign-in-alt"></i> Login</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <nav class="sidebar shadow-sm">
+        <div class="px-3 mb-2 text-uppercase small text-muted fw-bold">Gestão</div>
+        <ul class="nav flex-column sidebar-nav">
+            <li class="nav-item"><a class="nav-link" href="{% url 'cliente_list' %}"><i class="fa fa-users"></i> Clientes / Leads</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'cliente_create' %}"><i class="fa fa-user-plus"></i> Novo Cadastro</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'calendario' %}"><i class="fa fa-calendar-alt"></i> Calendário</a></li>
+            
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'autorizacao_list' %}">
+                    <i class="fa fa-file-signature text-primary"></i> Autorizações
+                </a>
+            </li>
+        </ul>
+
+        <div class="px-3 mt-4 mb-2 text-uppercase small text-muted fw-bold">Monitoramento</div>
+        <ul class="nav flex-column sidebar-nav">
+            <li class="nav-item">
+                <a class="nav-link" href="{% url 'cliente_atrasados_list' %}">
+                    <i class="fa fa-clock text-warning"></i> Atrasados
+                    {% if clientes_atrasados_count > 0 %}
+                        <span class="badge bg-danger rounded-pill ms-auto">{{ clientes_atrasados_count }}</span>
+                    {% endif %}
+                </a>
+            </li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'cliente_finalizados_list' %}"><i class="fa fa-check-circle"></i> Finalizados</a></li>
+        </ul>
+        
+        <div class="px-3 mt-4 mb-2 text-uppercase small text-muted fw-bold">Ferramentas</div>
+        <ul class="nav flex-column sidebar-nav">
+            <li class="nav-item">
+                <a class="nav-link" href="#menuDocs" data-bs-toggle="collapse" role="button" aria-expanded="false">
+                   <i class="fa fa-folder-open"></i> Documentos <i class="fa fa-chevron-down ms-auto" style="font-size:0.7em"></i>
+                </a>
+                <div class="collapse" id="menuDocs">
+                    <ul class="nav flex-column">
+                         <li class="nav-item"><a class="nav-link ps-5" href="{% url 'procuracao_list' %}">Procurações</a></li>
+                         {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+                         <li class="nav-item"><a class="nav-link ps-5" href="{% url 'outorgado_list' %}">Outorgados</a></li>
+                         {% endif %}
+                    </ul>
+                </div>
+            </li>
+
+            <li class="nav-item"><a class="nav-link" href="{% url 'gerador_anuncio' %}"><i class="fa fa-robot"></i> Gerador IA</a></li>
+            <li class="nav-item"><a class="nav-link" href="{% url 'avaliacao_list' %}"><i class="fa fa-car"></i> Avaliações</a></li>
+            
+            {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'relatorios' %}"><i class="fa fa-chart-line text-danger"></i> Relatórios</a></li>
+            {% endif %}
+        </ul>
+        
+        <div class="mt-auto p-3 text-center border-top bg-light">
+            <small class="text-muted d-block">SPAGI Sistemas v1.4</small>
+            <small class="text-muted">&copy; {% now "Y" %}</small>
         </div>
     </nav>
 
-    <div class="main-content d-flex flex-column min-vh-100">
-        <main class="container-fluid my-4 flex-grow-1">
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
+    <div class="main-content">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
 
-            {% block content %}{% endblock %}
-        </main>
-
-        <footer class="footer mt-auto py-3 bg-white border-top">
-          <div class="container-fluid">
-            <span class="text-muted">&copy; {% now "Y" %} Gestão de Leads. Todos os direitos reservados.</span>
-          </div>
+        {% block content %}{% endblock %}
+        
+        <footer class="mt-auto py-3 text-center text-muted border-top pt-4">
+            <small>Sistema de Gestão de Leads - SPAGI</small>
         </footer>
     </div>
 
@@ -298,16 +231,11 @@
     <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
 
     <script>
-        // Função utilitária para converter a chave VAPID
         function urlBase64ToUint8Array(base64String) {
             const padding = '='.repeat((4 - base64String.length % 4) % 4);
-            const base64 = (base64String + padding)
-                .replace(/-/g, '+')
-                .replace(/_/g, '/');
-
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
             const rawData = window.atob(base64);
             const outputArray = new Uint8Array(rawData.length);
-
             for (let i = 0; i < rawData.length; ++i) {
                 outputArray[i] = rawData.charCodeAt(i);
             }
@@ -317,104 +245,52 @@
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("{% static 'images/js/serviceworker.js' %}")
                 .then(function (registration) {
-                    console.log("Service Worker registrado com sucesso:", registration);
-                    
-                    if ('periodicSync' in registration) {
-                        requestPeriodicSyncPermission(registration);
-                    }
-                    
+                    console.log("Service Worker registrado.");
+                    if ('periodicSync' in registration) { requestPeriodicSyncPermission(registration); }
                     window.swRegistration = registration;
-                })
-                .catch(function (error) {
-                    console.log("Falha ao registrar Service Worker:", error);
+                }).catch(function (error) {
+                    console.log("Falha no SW:", error);
                 });
         }
 
         async function requestPeriodicSyncPermission(registration) {
             try {
                 const status = await navigator.permissions.query({name: 'periodic-background-sync'});
-                
                 if (status.state === 'granted') {
-                    await registerPeriodicSync(registration);
-                } else {
-                    console.log('Permissão para Periodic Sync não está "granted". Estado: ' + status.state);
+                    await registration.periodicSync.register('update-cache-daily', { minInterval: 24 * 60 * 60 * 1000 });
                 }
-            } catch (error) {
-                console.error('Falha ao verificar permissão de Periodic Sync:', error);
-            }
-        }
-
-        async function registerPeriodicSync(registration) {
-            try {
-                await registration.periodicSync.unregister('update-cache-daily');
-                
-                await registration.periodicSync.register('update-cache-daily', {
-                    minInterval: 24 * 60 * 60 * 1000, // 1 dia
-                });
-                console.log('Periodic Sync (update-cache-daily) registrado com sucesso.');
-            } catch (error) {
-                console.error('Falha ao registrar Periodic Sync:', error);
-            }
+            } catch (e) { console.error(e); }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             const pushButton = document.getElementById('enable-push-notifications');
-            if (pushButton) {
-                pushButton.addEventListener('click', askForPushPermission);
-            }
+            if (pushButton) { pushButton.addEventListener('click', askForPushPermission); }
         });
 
         async function askForPushPermission() {
-            if (!('Notification' in window) || !('PushManager' in window) || !window.swRegistration) {
-                alert('Seu navegador não suporta Notificações Push.');
-                return;
-            }
-
+            if (!('Notification' in window) || !window.swRegistration) return alert('Navegador não suporta Push.');
             const permission = await Notification.requestPermission();
-            
-            if (permission === 'granted') {
-                console.log('Permissão de notificação concedida.');
-                await subscribeUserToPush();
-            } else {
-                console.warn('Permissão de notificação negada.');
-            }
+            if (permission === 'granted') await subscribeUserToPush();
         }
 
         async function subscribeUserToPush() {
             try {
                 const response = await fetch("{% url 'get_vapid_public_key' %}");
-                if (!response.ok) {
-                    throw new Error('Falha ao buscar a chave VAPID do servidor.');
-                }
                 const data = await response.json();
-                const vapidPublicKey = data.vapid_public_key;
-                const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
-
+                const applicationServerKey = urlBase64ToUint8Array(data.vapid_public_key);
                 const subscription = await window.swRegistration.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: applicationServerKey
+                    userVisibleOnly: true, applicationServerKey: applicationServerKey
                 });
                 
-                console.log('Inscrição PUSH obtida:', JSON.stringify(subscription));
-
-                const saveResponse = await fetch("{% url 'save_webpush_subscription' %}", {
+                await fetch("{% url 'save_webpush_subscription' %}", {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(subscription.toJSON())
                 });
-
-                if (saveResponse.ok) {
-                    alert('Notificações ativadas com sucesso!');
-                } else {
-                    const errorData = await saveResponse.json();
-                    throw new Error(errorData.error || 'Falha ao salvar inscrição no servidor.');
-                }
-                
+                alert('Notificações ativadas!');
             } catch (error) {
-                console.error('Falha ao se inscrever no Push:', error);
-                alert('Erro ao ativar notificações: ' + error.message);
+                console.error('Erro Push:', error);
+                alert('Erro ao ativar notificações.');
             }
         }
     </script>

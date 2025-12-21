@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import TVVideo
+from .models import TVVideo , Banner
 
 class TVVideoAdmin(admin.ModelAdmin):
     # Enforce the singleton pattern in the admin interface (disable 'Add' button if exists)
@@ -14,3 +14,10 @@ class TVVideoAdmin(admin.ModelAdmin):
     fields = ('titulo', 'video_url')
 
 admin.site.register(TVVideo, TVVideoAdmin)
+
+@admin.register(Banner)
+class BannerAdmin(admin.ModelAdmin):
+    list_display = ('titulo', 'ativo', 'ordem', 'data_criacao')
+    list_editable = ('ativo', 'ordem')
+    search_fields = ('titulo', 'descricao')
+    list_filter = ('ativo',)

@@ -1,0 +1,56 @@
+{% extends 'base.html' %} {% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h4>Autorizações e Concessões</h4>
+        <a href="{% url 'autorizacao_create' %}" class="btn btn-primary"><i class="fa fa-plus"></i> Nova Solicitação</a>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Veículo</th>
+                        <th>Tipo</th>
+                        <th>Valor Est.</th>
+                        <th>Solicitante</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in autorizacoes %}
+                    <tr>
+                        <td>
+                            {% if item.status == 'APROVADO' %}<span class="badge bg-success">Aprovado</span>
+                            {% elif item.status == 'REJEITADO' %}<span class="badge bg-danger">Rejeitado</span>
+                            {% else %}<span class="badge bg-warning text-dark">Pendente</span>{% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ item.placa }}</strong><br>
+                            <small>{{ item.modelo }}</small>
+                        </td>
+                        <td>{{ item.get_tipo_display }}</td>
+                        <td>R$ {{ item.valor_estimado }}</td>
+                        <td>{{ item.vendedor.username }}</td>
+                        <td>
+                            <a href="{% url 'autorizacao_print' item.pk %}" target="_blank" class="btn btn-sm btn-secondary" title="Imprimir Documento">
+                                <i class="fa fa-print"></i>
+                            </a>
+
+                            {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+                                {% if item.status == 'PENDENTE' %}
+                                <a href="{% url 'autorizacao_approve' item.pk %}" class="btn btn-sm btn-success" title="Aprovar"><i class="fa fa-check"></i></a>
+                                <a href="{% url 'autorizacao_reject' item.pk %}" class="btn btn-sm btn-danger" title="Rejeitar"><i class="fa fa-times"></i></a>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="text-center">Nenhuma autorização registrada.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

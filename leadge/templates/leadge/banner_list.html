@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Banners do Portal{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3><i class="fa fa-images text-primary"></i> Banners do Portal</h3>
+        <a href="{% url 'banner_create' %}" class="btn btn-success">
+            <i class="fa fa-plus"></i> Novo Banner
+        </a>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-3" style="width: 100px;">Imagem</th>
+                            <th>Título</th>
+                            <th>Status</th>
+                            <th>Ordem</th>
+                            <th class="text-end pe-3">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for banner in banners %}
+                        <tr>
+                            <td class="ps-3">
+                                {% if banner.imagem %}
+                                    <img src="{{ banner.imagem.url }}" class="rounded" style="width: 80px; height: 40px; object-fit: cover;">
+                                {% else %}
+                                    <span class="text-muted"><i class="fa fa-image"></i></span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong>{{ banner.titulo }}</strong><br>
+                                <small class="text-muted">{{ banner.descricao|truncatechars:50 }}</small>
+                            </td>
+                            <td>
+                                {% if banner.ativo %}
+                                    <span class="badge bg-success">Ativo</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inativo</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ banner.ordem }}</td>
+                            <td class="text-end pe-3">
+                                <a href="{% url 'banner_update' banner.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                    <i class="fa fa-edit"></i>
+                                </a>
+                                <a href="{% url 'banner_delete' banner.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir">
+                                    <i class="fa fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                Nenhum banner cadastrado. Clique em "Novo Banner" para começar.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

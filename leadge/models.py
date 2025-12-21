@@ -64,3 +64,21 @@ class TVVideo(models.Model):
 
     def __str__(self):
         return self.titulo
+
+class Banner(models.Model):
+    titulo = models.CharField(max_length=100, verbose_name="Título da Novidade")
+    imagem = models.ImageField(upload_to='banners/', verbose_name="Imagem do Banner (1200x400 recom.)")
+    descricao = models.TextField(blank=True, null=True, verbose_name="Descrição Curta")
+    link = models.URLField(blank=True, null=True, verbose_name="Link de Destino (Opcional)")
+    
+    ativo = models.BooleanField(default=True, verbose_name="Exibir no Portal?")
+    ordem = models.IntegerField(default=0, help_text="Menor número aparece primeiro")
+    data_criacao = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Banner de Novidade"
+        verbose_name_plural = "Banners do Portal"
+        ordering = ['ordem', '-data_criacao']
+
+    def __str__(self):
+        return self.titulo

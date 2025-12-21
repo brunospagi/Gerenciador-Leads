@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">Confirmar Exclusão</div>
+                <div class="card-body text-center">
+                    <h5 class="card-title">Tem certeza que deseja excluir o banner "{{ object.titulo }}"?</h5>
+                    <p class="card-text">Esta ação não pode ser desfeita e o banner será removido do portal.</p>
+                    <form method="post" class="mt-4">
+                        {% csrf_token %}
+                        <a href="{% url 'banner_list' %}" class="btn btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-danger">Sim, Excluir</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

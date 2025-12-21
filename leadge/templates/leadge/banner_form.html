@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gerenciar Banner{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="mb-0 text-primary">
+                        <i class="fa fa-image me-2"></i>
+                        {% if form.instance.pk %}Editar Banner{% else %}Novo Banner{% endif %}
+                    </h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        {% if form.errors %}
+                            <div class="alert alert-danger">Verifique os erros abaixo.</div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Título do Banner</label>
+                            {{ form.titulo }}
+                            <div class="form-text">Texto principal que aparece sobre a imagem.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Imagem de Fundo</label>
+                            {{ form.imagem }}
+                            {% if form.instance.imagem %}
+                                <div class="mt-2">
+                                    <small>Atual:</small><br>
+                                    <img src="{{ form.instance.imagem.url }}" height="80" class="rounded">
+                                </div>
+                            {% endif %}
+                            <div class="form-text text-muted">Recomendado: 1200x400px (JPG ou PNG).</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Link de Destino (Opcional)</label>
+                                {{ form.link }}
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Ordem</label>
+                                {{ form.ordem }}
+                            </div>
+                            <div class="col-md-3 mb-3 d-flex align-items-center">
+                                <div class="form-check form-switch mt-3">
+                                    {{ form.ativo }}
+                                    <label class="form-check-label" for="{{ form.ativo.id_for_label }}">Ativo?</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">Descrição Curta</label>
+                            {{ form.descricao }}
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                            <a href="{% url 'banner_list' %}" class="btn btn-light border">Cancelar</a>
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="fa fa-save"></i> Salvar Banner
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Script simples para aplicar classes Bootstrap aos campos
+    document.addEventListener("DOMContentLoaded", function() {
+        const inputs = document.querySelectorAll('input, textarea, select');
+        inputs.forEach(input => {
+            if (input.type === 'checkbox') {
+                input.classList.add('form-check-input');
+            } else if (input.type !== 'file') {
+                input.classList.add('form-control');
+            } else {
+                input.classList.add('form-control'); // File input tbm usa form-control no BS5
+            }
+        });
+    });
+</script>
+{% endblock %}

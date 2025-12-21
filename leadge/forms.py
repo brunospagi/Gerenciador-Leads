@@ -1,5 +1,5 @@
 from django import forms
-from .models import TVVideo
+from .models import Banner, TVVideo
 
 class TVVideoForm(forms.ModelForm):
     class Meta:
@@ -11,4 +11,13 @@ class TVVideoForm(forms.ModelForm):
             'video_mp4': forms.ClearableFileInput(attrs={'class': 'form-control'}),
             'newsdata_api_key': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Chave da API NewsData.io'}),
             'manual_news_ticker': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Notícia 1 | Notícia 2 | Notícia 3'}),
+        }
+
+class BannerForm(forms.ModelForm):
+    class Meta:
+        model = Banner
+        fields = ['titulo', 'imagem', 'descricao', 'link', 'ativo', 'ordem']
+        widgets = {
+            'descricao': forms.Textarea(attrs={'rows': 3}),
+            'link': forms.URLInput(attrs={'placeholder': 'https://...'}),
         }

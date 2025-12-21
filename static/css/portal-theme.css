@@ -1,0 +1,141 @@
+/* brunospagi/gerenciador-leads/Gerenciador-Leads-.../static/css/portal-theme.css */
+
+:root {
+    --primary-color: #004b8d;
+    --surface-ground: #eff3f8;
+    --text-color: #495057;
+    --topbar-height: 5rem;
+}
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--surface-ground);
+    color: var(--text-color);
+}
+
+/* --- Topbar (Menu Superior Unificado) --- */
+.layout-topbar {
+    height: var(--topbar-height);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: white;
+    box-shadow: 0 3px 5px rgba(0,0,0,.02), 0 0 2px rgba(0,0,0,.05), 0 1px 4px rgba(0,0,0,.08);
+    display: flex;
+    align-items: center;
+    padding: 0 2rem;
+    z-index: 1040; /* Acima do Bootstrap modal/sidebar */
+}
+
+.layout-topbar-logo {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: inherit;
+}
+
+.layout-topbar-logo img {
+    height: 3rem;
+    margin-right: 1rem;
+}
+
+.layout-topbar-logo span {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.layout-topbar-menu {
+    margin-left: auto;
+    list-style: none;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.layout-topbar-button {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-color);
+    font-size: 1.2rem;
+    padding: 0.7rem;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+    text-decoration: none; /* Importante para links */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.layout-topbar-button:hover {
+    background-color: #f6f9fc;
+    color: var(--primary-color);
+}
+
+/* --- Layout Container (Para a Dashboard) --- */
+.layout-main-container {
+    padding-top: calc(var(--topbar-height) + 2rem);
+    padding-left: 2rem;
+    padding-right: 2rem;
+    padding-bottom: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* --- Estilos do Grid de Sistemas (Dashboard) --- */
+.card {
+    background: #ffffff;
+    padding: 1.5rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 1px -1px rgba(0,0,0,.2), 0 1px 1px 0 rgba(0,0,0,.14), 0 1px 3px 0 rgba(0,0,0,.12);
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+    border-bottom: 2px solid #eee;
+    padding-bottom: 0.5rem;
+}
+
+.system-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.system-item {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 1rem;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 120px;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border-left: 4px solid var(--primary-color);
+    overflow: hidden;
+}
+
+.system-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+/* Cores dos cards */
+.system-item.blue { background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%); color: white; border: none; }
+.system-item.orange { background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); color: white; border: none; }
+.system-item.green { background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%); color: white; border: none; }
+
+.system-name { font-size: 1.1rem; font-weight: bold; display: block; }
+.system-desc { font-size: 0.85rem; opacity: 0.9; margin-top: 0.5rem; }
+.system-icon { position: absolute; bottom: 10px; right: 15px; font-size: 2.5rem; opacity: 0.2; }
+.footer { text-align: center; padding: 2rem; color: #6c757d; font-size: 0.9rem; }
