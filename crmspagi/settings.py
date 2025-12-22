@@ -117,7 +117,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'crmspagi.wsgi.application'
 
-LOGIN_REDIRECT_URL = 'portal'
+LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/contas/login/'
 LOGIN_URL = '/contas/login/'
 

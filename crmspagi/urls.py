@@ -5,9 +5,9 @@ from django.views.generic import TemplateView # Certifique-se que isto está imp
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('contas/', include('django.contrib.auth.urls')),
-    path('portal/', TemplateView.as_view(template_name='portal.html'), name='portal'),
+    path('', TemplateView.as_view(template_name='portal.html'), name='portal'),
     path('', include('leadge.urls')),
-    path('', include('clientes.urls')), 
+    path('clientes/', include('clientes.urls')), 
     path('', include('usuarios.urls')),
     path('', include('notificacoes.urls')),
     path('', include('avaliacoes.urls')),

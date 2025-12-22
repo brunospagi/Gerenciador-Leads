@@ -8,68 +8,93 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 
     <style>
-        body { overflow-x: hidden; background-color: #f3f4f6; }
+        body { 
+            overflow-x: hidden; 
+            background-color: #f8f9fa; 
+            font-family: 'Inter', sans-serif;
+        }
         
         #wrapper { display: flex; width: 100%; align-items: stretch; transition: all 0.3s; }
 
-        /* SIDEBAR (Barra Lateral) */
+        /* --- SIDEBAR (Barra Lateral Clara) --- */
         #sidebar-wrapper {
-            min-width: 250px;
-            max-width: 250px;
-            background-color: #212529; /* Fundo escuro */
-            color: #fff;
+            min-width: 260px;
+            max-width: 260px;
+            background-color: #ffffff;
+            color: #333;
             min-height: 100vh;
+            border-right: 1px solid #e0e0e0;
             transition: all 0.3s;
+            z-index: 1000;
         }
         
-        #sidebar-wrapper .sidebar-heading {
-            padding: 1.5rem;
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #ffc107; /* Amarelo destaque */
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+        /* Logo / Banner */
+        .sidebar-brand {
+            padding: 1.2rem 1rem;
             text-align: center;
+            border-bottom: 1px solid #f0f0f0;
+            background-color: #fff;
         }
 
-        #sidebar-wrapper .list-group-item {
-            padding: 1rem 1.2rem;
-            background-color: transparent;
-            color: rgba(255,255,255,0.7);
-            border: none;
+        /* Links do Menu */
+        #sidebar-wrapper .nav-link {
+            color: #555;
+            padding: 0.9rem 1.5rem;
             font-size: 0.95rem;
-            cursor: pointer;
+            font-weight: 500;
+            border-left: 4px solid transparent;
+            transition: all 0.2s;
         }
         
-        #sidebar-wrapper .list-group-item:hover {
-            background-color: rgba(255,255,255,0.1);
-            color: #fff;
+        #sidebar-wrapper .nav-link:hover {
+            color: #0d6efd;
+            background-color: #f0f7ff;
+            border-left-color: #0d6efd;
+        }
+        
+        #sidebar-wrapper .nav-link i {
+            width: 20px;
+            text-align: center;
+            margin-right: 8px;
         }
 
-        /* Estilo para links ativos (sub-menu) */
-        .sidebar-subitem {
+        /* Sub-menus */
+        .sub-menu {
+            background-color: #f8f9fa;
+        }
+        .sub-menu .nav-link {
+            padding-left: 3.5rem !important;
             font-size: 0.9rem;
-            padding-left: 3.5rem !important; /* Indentação */
-            background-color: #1a1d20 !important; /* Um pouco mais escuro */
-            border-left: 3px solid transparent;
-        }
-        .sidebar-subitem:hover {
-            border-left: 3px solid #ffc107;
+            border-left: none !important;
         }
 
-        /* Toggler do Menu */
-        #wrapper.toggled #sidebar-wrapper { margin-left: -250px; }
+        /* --- TOGGLE --- */
+        #wrapper.toggled #sidebar-wrapper { margin-left: -260px; }
 
         @media (max-width: 768px) {
-            #sidebar-wrapper { margin-left: -250px; }
+            #sidebar-wrapper { margin-left: -260px; }
             #wrapper.toggled #sidebar-wrapper { margin-left: 0; }
         }
         
-        /* Ajustes gerais */
         #page-content-wrapper { width: 100%; }
-        .nav-link { color: inherit; }
-        a { text-decoration: none; }
+
+        /* Avatar do Usuário */
+        .user-avatar {
+            width: 38px; 
+            height: 38px; 
+            border-radius: 50%; 
+            object-fit: cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(45deg, #0d6efd, #6610f2); /* Azul para Roxo */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        }
     </style>
 </head>
 <body>
@@ -77,104 +102,190 @@
 <div class="d-flex" id="wrapper">
 
     <div id="sidebar-wrapper">
-        <div class="sidebar-heading">
-            <i class="fa fa-cubes me-2"></i> SPAGI CRM
+        
+        <div class="sidebar-brand">
+            {% if banner_sistema and banner_sistema.usar_imagem and banner_sistema.imagem %}
+                <img src="{{ banner_sistema.imagem.url }}" alt="Logo" class="img-fluid" style="max-height: 45px; object-fit: contain;">
+            {% else %}
+                <div class="fw-bold fs-4 text-primary">
+                    <i class="fa fa-cubes"></i> SPAGI
+                </div>
+                <small class="text-muted" style="letter-spacing: 1px;">GESTÃO INTELIGENTE</small>
+            {% endif %}
         </div>
         
-        <div class="list-group list-group-flush mt-3">
+        <ul class="nav flex-column mt-2">
             
-            <a href="/" class="list-group-item list-group-item-action">
-                <i class="fa fa-tachometer-alt me-3" style="width:20px; text-align:center"></i> Portal / Início
-            </a>
-
-            <a href="#menuFinanciamento" class="list-group-item list-group-item-action" data-bs-toggle="collapse">
-                <i class="fa fa-university me-3" style="width:20px; text-align:center"></i> Financiamentos
-                <i class="fa fa-chevron-down float-end mt-1" style="font-size:0.7em"></i>
-            </a>
-            <div class="collapse" id="menuFinanciamento">
-                <a href="{% url 'financiamentos_kanban' %}" class="list-group-item list-group-item-action sidebar-subitem">Mesa (Kanban)</a>
-                <a href="{% url 'financiamentos_create' %}" class="list-group-item list-group-item-action sidebar-subitem">Nova Ficha</a>
-            </div>
-
-            <a href="#menuVendas" class="list-group-item list-group-item-action" data-bs-toggle="collapse">
-                <i class="fa fa-tags me-3" style="width:20px; text-align:center"></i> Produtos/Serviços
-                <i class="fa fa-chevron-down float-end mt-1" style="font-size:0.7em"></i>
-            </a>
-            <div class="collapse" id="menuVendas">
-                <a href="{% url 'venda_produto_create' %}" class="list-group-item list-group-item-action sidebar-subitem">Registrar Venda</a>
-                <a href="{% url 'venda_produto_list' %}" class="list-group-item list-group-item-action sidebar-subitem">Histórico / Conferência</a>
-                
-                {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                <a href="{% url 'venda_produto_relatorio' %}" class="list-group-item list-group-item-action sidebar-subitem text-warning">
-                    <i class="fa fa-chart-pie me-2"></i> Relatório Financeiro
+            <li class="nav-item">
+                <a href="{% url 'home' %}" class="nav-link">
+                    <i class="fa fa-home text-primary"></i> Portal / Início
                 </a>
-                {% endif %}
+            </li>
+
+            <div class="px-3 mt-4 mb-2 text-uppercase small fw-bold text-muted" style="font-size: 0.75em;">
+                Operacional
             </div>
 
-            <a href="#menuDocs" class="list-group-item list-group-item-action" data-bs-toggle="collapse">
-                <i class="fa fa-folder-open me-3" style="width:20px; text-align:center"></i> Documentos
-                <i class="fa fa-chevron-down float-end mt-1" style="font-size:0.7em"></i>
-            </a>
-            <div class="collapse" id="menuDocs">
-                <a href="{% url 'procuracao_list' %}" class="list-group-item list-group-item-action sidebar-subitem">Procurações</a>
-                {% if user.is_superuser %}
-                <a href="{% url 'outorgado_list' %}" class="list-group-item list-group-item-action sidebar-subitem">Outorgados</a>
-                {% endif %}
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#menuClientes" data-bs-toggle="collapse">
+                    <i class="fa fa-users text-primary"></i> Gestão de Clientes
+                    <i class="fa fa-chevron-down float-end mt-1 small"></i>
+                </a>
+                <div class="collapse sub-menu" id="menuClientes">
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="{% url 'cliente_list' %}">Painel de Clientes</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'cliente_create' %}">Novo Cadastro</a></li>
+                        <li class="nav-item"><a class="nav-link text-warning" href="{% url 'cliente_atrasados_list' %}">Pendências / Atrasados</a></li>
+                    </ul>
+                </div>
+            </li>
+
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#menuFinanciamento" data-bs-toggle="collapse">
+                    <i class="fa fa-university text-secondary"></i> Financiamentos 
+                    <i class="fa fa-chevron-down float-end mt-1 small"></i>
+                </a>
+                <div class="collapse sub-menu" id="menuFinanciamento">
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="{% url 'financiamentos_kanban' %}">Mesa (Kanban)</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'financiamentos_create' %}">Nova Ficha</a></li>
+                    </ul>
+                </div>
+            </li>
+
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#menuVendas" data-bs-toggle="collapse">
+                    <i class="fa fa-tags text-success"></i> Produtos/Serviços
+                    <i class="fa fa-chevron-down float-end mt-1 small"></i>
+                </a>
+                <div class="collapse sub-menu" id="menuVendas">
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="{% url 'venda_produto_create' %}">Registrar Venda</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'venda_produto_list' %}">Histórico</a></li>
+                        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+                        <li class="nav-item"><a class="nav-link fw-bold text-danger" href="{% url 'venda_produto_relatorio' %}">Relatório Financeiro</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </li>
+
+            <li class="nav-item">
+                <a href="{% url 'avaliacao_list' %}" class="nav-link"> 
+                    <i class="fa fa-star text-warning"></i> Avaliações
+                </a>
+            </li>
+
+            <div class="px-3 mt-4 mb-2 text-uppercase small fw-bold text-muted" style="font-size: 0.75em;">
+                Ferramentas
             </div>
 
+            <li class="nav-item">
+                <a class="nav-link collapsed" href="#menuDocs" data-bs-toggle="collapse">
+                    <i class="fa fa-folder-open text-info"></i> Documentos
+                    <i class="fa fa-chevron-down float-end mt-1 small"></i>
+                </a>
+                <div class="collapse sub-menu" id="menuDocs">
+                    <ul class="nav flex-column">
+                        <li class="nav-item"><a class="nav-link" href="{% url 'procuracao_list' %}">Procurações</a></li>
+                        {% if user.is_superuser %}
+                        <li class="nav-item"><a class="nav-link" href="{% url 'outorgado_list' %}">Outorgados</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </li>
+
+            {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+            <div class="px-3 mt-4 mb-2 text-uppercase small fw-bold text-muted" style="font-size: 0.75em;">
+                Admin
+            </div>
+            <li class="nav-item">
+                <a href="{% url 'admin_dashboard' %}" class="nav-link">
+                    <i class="fa fa-shield-alt text-danger"></i> Painel Geral
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{% url 'banner_list' %}" class="nav-link">
+                    <i class="fa fa-images text-danger"></i> Banners Home
+                </a>
+            </li>
+            {% endif %}
+
+        </ul>
+        
+        <div class="mt-auto p-3 text-center border-top border-light">
+            <small class="text-muted" style="font-size: 0.7em;">SPAGI v2.1 &copy; {% now "Y" %}</small>
         </div>
     </div>
 
     <div id="page-content-wrapper">
 
-        <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm px-3">
+        <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm px-3 py-2">
             <div class="container-fluid">
                 
-                <button class="btn btn-outline-dark border-0" id="menu-toggle">
-                    <i class="fa fa-bars fa-lg"></i>
+                <button class="btn btn-light border-0" id="menu-toggle">
+                    <i class="fa fa-bars fa-lg text-secondary"></i>
                 </button>
 
                 <div class="ms-auto d-flex align-items-center">
                     
-                    <a href="#" class="text-secondary me-4 position-relative">
+                    <a href="#" class="text-secondary me-3 position-relative p-2">
                         <i class="fa fa-bell fa-lg"></i>
                         <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
                     </a>
 
+                    <div class="vr me-3 d-none d-lg-block"></div>
+
                     <div class="dropdown">
-                        <a href="#" class="d-flex align-items-center text-dark text-decoration-none dropdown-toggle" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false">
-                            <div class="bg-primary text-white rounded-circle me-2 d-flex justify-content-center align-items-center" style="width:35px; height:35px; font-weight:bold;">
-                                {{ user.username|slice:":1"|upper }}
+                        <a href="#" class="d-flex align-items-center text-decoration-none dropdown-toggle" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            
+                            {% if user.profile.foto %}
+                                <img src="{{ user.profile.foto.url }}" alt="Foto" class="user-avatar me-2 shadow-sm">
+                            {% else %}
+                                <div class="user-avatar me-2 shadow-sm">
+                                    {{ user.username|slice:":1"|upper }}
+                                </div>
+                            {% endif %}
+                            
+                            <div class="d-none d-lg-block text-dark lh-1 text-start">
+                                <span class="d-block fw-bold small">{{ user.get_full_name|default:user.username }}</span>
+                                <span class="d-block text-muted" style="font-size: 0.7em;">
+                                    {% if user.is_superuser %}Administrador{% else %}Colaborador{% endif %}
+                                </span>
                             </div>
-                            <span class="d-none d-md-block fw-bold">{{ user.get_full_name|default:user.username }}</span>
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2" aria-labelledby="dropdownUser">
-                            <li><a class="dropdown-item" href="#"><i class="fa fa-user me-2"></i> Meu Perfil</a></li>
+
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2" aria-labelledby="userDropdown">
+                            <li><h6 class="dropdown-header">Minha Conta</h6></li>
+                            <li><a class="dropdown-item" href="#"><i class="fa fa-user me-2 text-primary"></i> Meu Perfil</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fa fa-cog me-2 text-secondary"></i> Configurações</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <form action="{% url 'logout' %}" method="post">
                                     {% csrf_token %}
-                                    <button type="submit" class="dropdown-item text-danger"><i class="fa fa-sign-out-alt me-2"></i> Sair do Sistema</button>
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="fa fa-sign-out-alt me-2"></i> Sair
+                                    </button>
                                 </form>
                             </li>
                         </ul>
                     </div>
+
                 </div>
             </div>
         </nav>
 
-        <div class="container-fluid mt-3">
+        <main class="container-fluid py-4">
             {% if messages %}
                 {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm border-0 border-start border-4 border-{{ message.tags }}" role="alert">
+                        {% if message.tags == 'success' %}<i class="fa fa-check-circle me-2"></i>{% endif %}
+                        {% if message.tags == 'danger' or message.tags == 'error' %}<i class="fa fa-exclamation-circle me-2"></i>{% endif %}
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
                 {% endfor %}
             {% endif %}
-        </div>
 
-        <main class="container-fluid py-3">
             {% block content %}
             {% endblock %}
         </main>
