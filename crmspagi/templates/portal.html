@@ -19,12 +19,14 @@
                 <div class="carousel-item {% if forloop.first %}active{% endif %}" data-bs-interval="5000">
                     {% if banner.link %}<a href="{{ banner.link }}">{% endif %}
                         <img src="{{ banner.imagem.url }}" class="d-block w-100" alt="{{ banner.titulo }}" style="object-fit: cover; height: 100%; max-height: 400px;">
-                        {% if banner.descricao %}
+                        
+                        {% if banner.titulo or banner.descricao %}
                         <div class="carousel-caption d-none d-md-block bg-dark bg-opacity-50 rounded p-2">
-                            <h5>{{ banner.titulo }}</h5>
-                            <p>{{ banner.descricao }}</p>
+                            {% if banner.titulo %}<h5>{{ banner.titulo }}</h5>{% endif %}
+                            {% if banner.descricao %}<p>{{ banner.descricao }}</p>{% endif %}
                         </div>
                         {% endif %}
+                    
                     {% if banner.link %}</a>{% endif %}
                 </div>
                 {% endfor %}
@@ -41,63 +43,82 @@
         </div>
     </div>
     {% else %}
-    <div class="card border-0 border-start border-4 border-primary mb-4">
-        <div class="d-flex align-items-center p-3">
+    <div class="card border-0 border-start border-4 border-primary mb-4 shadow-sm">
+        <div class="d-flex align-items-center p-4">
             <div class="flex-grow-1">
-                <h4 class="mb-1 text-primary">Bem-vindo(a), {{ user.get_full_name|default:user.username }}!</h4>
-                <p class="mb-0 text-muted">Selecione um sistema abaixo para acessar.</p>
+                <h4 class="mb-1 text-primary fw-bold">Bem-vindo(a), {{ user.get_full_name|default:user.username }}!</h4>
+                <p class="mb-0 text-muted">Selecione um sistema abaixo para acessar suas ferramentas de trabalho.</p>
             </div>
-            <i class="fa fa-th-large text-black-50 fa-3x"></i>
+            <i class="fa fa-th-large text-black-50 fa-3x opacity-25"></i>
         </div>
     </div>
     {% endif %}
 
-    <div class="card">
-        <div class="section-title"><i class="fa fa-users"></i> Gestão de Clientes</div>
-        <div class="system-grid">
+
+    <div class="card mb-4 shadow-sm">
+        <div class="section-title border-bottom pb-2 mb-3 mx-3 mt-3 fw-bold text-secondary">
+            <i class="fa fa-users me-2"></i> Gestão de Clientes
+        </div>
+        <div class="system-grid p-3 pt-0">
             
-            <a href="{% url 'cliente_list' %}" class="system-item blue">
+            <a href="{% url 'cliente_list' %}" class="system-item" style="border-left: 4px solid #0d6efd;">
                 <div>
-                    <span class="system-name">Painel de Clientes</span>
-                    <div class="system-desc">Gestão completa de leads</div>
+                    <span class="system-name text-primary">Painel de Clientes</span>
+                    <div class="system-desc text-muted">Gestão completa de leads</div>
                 </div>
-                <i class="fa fa-address-book system-icon"></i>
+                <i class="fa fa-address-book system-icon text-primary opacity-50"></i>
             </a>
 
-            <a href="{% url 'cliente_atrasados_list' %}" class="system-item orange">
+            <a href="{% url 'cliente_atrasados_list' %}" class="system-item" style="border-left: 4px solid #fd7e14;">
                 <div>
-                    <span class="system-name">Pendências</span>
-                    <div class="system-desc">Clientes atrasados</div>
+                    <span class="system-name text-warning">Pendências</span>
+                    <div class="system-desc text-muted">Clientes atrasados</div>
                 </div>
-                <i class="fa fa-clock system-icon"></i>
+                <i class="fa fa-clock system-icon text-warning opacity-50"></i>
             </a>
 
-            <a href="{% url 'cliente_create' %}" class="system-item green">
+            <a href="{% url 'cliente_create' %}" class="system-item" style="border-left: 4px solid #198754;">
                 <div>
-                    <span class="system-name">Novo Cadastro</span>
-                    <div class="system-desc">Adicionar lead rápido</div>
+                    <span class="system-name text-success">Novo Cadastro</span>
+                    <div class="system-desc text-muted">Adicionar lead rápido</div>
                 </div>
-                <i class="fa fa-plus system-icon"></i>
+                <i class="fa fa-plus system-icon text-success opacity-50"></i>
             </a>
+
         </div>
     </div>
-    <div class="card">
-        <div class="section-title"><i class="fa fa-tools"></i> Ferramentas & Utilitários</div>
-        <div class="system-grid">
+
+
+    <div class="card mb-4 shadow-sm">
+        <div class="section-title border-bottom pb-2 mb-3 mx-3 mt-3 fw-bold text-secondary">
+            <i class="fa fa-tools me-2"></i> Ferramentas & Utilitários
+        </div>
+        <div class="system-grid p-3 pt-0">
+            
             <a href="{% url 'venda_produto_list' %}" class="system-item">
-    <div>
-        <span class="system-name" style="color:#198754">Vendas Extras</span>
-        <div class="system-desc" style="color:#666">Seguro, Garantia e Desp.</div>
-    </div>
-    <i class="fa fa-cash-register system-icon" style="color:#198754"></i>
-</a>       
-         <a href="{% url 'financiamentos_kanban' %}" class="system-item">
                 <div>
-                    <span class="system-name" style="color:var(--primary-color)">Gestão de Fichas</span>
-                    <div class="system-desc" style="color:#666">Financiamentos</div>
+                    <span class="system-name" style="color:#198754">Vendas Extras</span>
+                    <div class="system-desc" style="color:#666">Seguro, Garantia e Desp.</div>
                 </div>
-                <i class="fa fa-file-university system-icon" style="color:var(--primary-color)"></i>
+                <i class="fa fa-tags system-icon" style="color:#198754"></i>
+            </a>       
+            
+            <a href="{% url 'financiamentos_kanban' %}" class="system-item">
+                <div>
+                    <span class="system-name" style="color:#0d6efd">Mesa de Financiamento</span>
+                    <div class="system-desc" style="color:#666">Gestão de Fichas (Kanban)</div>
+                </div>
+                <i class="fa fa-university system-icon" style="color:#0d6efd"></i>
             </a>
+
+            <a href="{% url 'procuracao_list' %}" class="system-item">
+                <div>
+                    <span class="system-name" style="color:#6f42c1">Documentos</span>
+                    <div class="system-desc" style="color:#666">Gerador de Procurações</div>
+                </div>
+                <i class="fa fa-file-contract system-icon" style="color:#6f42c1"></i>
+            </a>
+
             <a href="{% url 'autorizacao_list' %}" class="system-item">
                 <div>
                     <span class="system-name" style="color:#6f42c1">Autorizações</span>
@@ -106,83 +127,80 @@
                 <i class="fa fa-file-signature system-icon" style="color:#6f42c1"></i>
             </a>
 
-            <a href="{% url 'procuracao_list' %}" class="system-item">
-                <div>
-                    <span class="system-name" style="color:var(--primary-color)">Documentos</span>
-                    <div class="system-desc" style="color:#666">Procurações</div>
-                </div>
-                <i class="fa fa-file-contract system-icon" style="color:var(--primary-color)"></i>
-            </a>
-
             <a href="{% url 'calendario' %}" class="system-item">
                 <div>
-                    <span class="system-name" style="color:var(--primary-color)">Calendário</span>
+                    <span class="system-name text-dark">Calendário</span>
                     <div class="system-desc" style="color:#666">Agenda de contatos</div>
                 </div>
-                <i class="fa fa-calendar-alt system-icon" style="color:var(--primary-color)"></i>
+                <i class="fa fa-calendar-alt system-icon text-dark"></i>
             </a>
 
             <a href="{% url 'gerador_anuncio' %}" class="system-item">
                 <div>
-                    <span class="system-name" style="color:var(--primary-color)">Gerador IA</span>
-                    <div class="system-desc" style="color:#666">Criar anúncios</div>
+                    <span class="system-name text-info">Gerador IA</span>
+                    <div class="system-desc" style="color:#666">Criar anúncios de venda</div>
                 </div>
-                <i class="fa fa-robot system-icon" style="color:var(--primary-color)"></i>
+                <i class="fa fa-robot system-icon text-info"></i>
             </a>
 
             {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-            <a href="{% url 'relatorios' %}" class="system-item">
+            <a href="{% url 'venda_produto_relatorio' %}" class="system-item">
                 <div>
-                    <span class="system-name" style="color:#d9534f">Relatórios Gerais</span>
-                    <div class="system-desc" style="color:#666">Métricas de Vendas</div>
+                    <span class="system-name" style="color:#dc3545">Relatórios Gerais</span>
+                    <div class="system-desc" style="color:#666">Métricas Financeiras</div>
                 </div>
-                <i class="fa fa-chart-pie system-icon" style="color:#d9534f"></i>
+                <i class="fa fa-chart-pie system-icon" style="color:#dc3545"></i>
             </a>
             {% endif %}
 
         </div>
     </div>
     
+
     {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-    <div class="card border-0 border-start border-4 border-danger">
-        <div class="section-title text-danger"><i class="fa fa-shield-alt"></i> Administração</div>
-        <div class="system-grid">
+    <div class="card mb-4 shadow-sm border-danger border-top border-3">
+        <div class="section-title border-bottom pb-2 mb-3 mx-3 mt-3 fw-bold text-danger">
+            <i class="fa fa-shield-alt me-2"></i> Administração
+        </div>
+        <div class="system-grid p-3 pt-0">
+            
             <a href="{% url 'banner_list' %}" class="system-item">
-    <div>
-        <span class="system-name" style="color:#d9534f">Gerenciar Banners</span>
-        <div class="system-desc" style="color:#666">Imagens da Home</div>
-    </div>
-    <i class="fa fa-images system-icon" style="color:#d9534f"></i>
-</a>
+                <div>
+                    <span class="system-name text-danger">Gerenciar Banners</span>
+                    <div class="system-desc text-muted">Imagens da Home</div>
+                </div>
+                <i class="fa fa-images system-icon text-danger opacity-50"></i>
+            </a>
+
             <a href="{% url 'admin_dashboard' %}" class="system-item">
                 <div>
-                    <span class="system-name" style="color:#d9534f">Painel Admin</span>
-                    <div class="system-desc" style="color:#666">Visão geral do sistema</div>
+                    <span class="system-name text-danger">Painel Admin</span>
+                    <div class="system-desc text-muted">Visão geral do sistema</div>
                 </div>
-                <i class="fa fa-tachometer-alt system-icon" style="color:#d9534f"></i>
+                <i class="fa fa-tachometer-alt system-icon text-danger opacity-50"></i>
             </a>
 
             <a href="{% url 'user_list' %}" class="system-item">
                 <div>
-                    <span class="system-name" style="color:#d9534f">Usuários</span>
-                    <div class="system-desc" style="color:#666">Gerenciar acessos</div>
+                    <span class="system-name text-danger">Usuários</span>
+                    <div class="system-desc text-muted">Gerenciar acessos</div>
                 </div>
-                <i class="fa fa-users-cog system-icon" style="color:#d9534f"></i>
+                <i class="fa fa-users-cog system-icon text-danger opacity-50"></i>
             </a>
 
              <a href="{% url 'relatorio_atrasados' %}" class="system-item">
                 <div>
-                    <span class="system-name" style="color:#d9534f">Relatório Atrasados</span>
-                    <div class="system-desc" style="color:#666">Auditoria de equipe</div>
+                    <span class="system-name text-danger">Relatório Atrasados</span>
+                    <div class="system-desc text-muted">Auditoria de equipe</div>
                 </div>
-                <i class="fa fa-exclamation-triangle system-icon" style="color:#d9534f"></i>
+                <i class="fa fa-exclamation-triangle system-icon text-danger opacity-50"></i>
             </a>
 
         </div>
     </div>
     {% endif %}
 
-    <div class="footer">
+    <div class="footer text-center text-muted mt-5 mb-3 small">
         SPAGI Sistemas &copy; {% now "Y" %}
     </div>
 </div>

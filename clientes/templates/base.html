@@ -1,331 +1,199 @@
 {% load static %}
-<!doctype html>
-<html lang="pt-br" class="h-100">
+<!DOCTYPE html>
+<html lang="pt-br">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Gestão de Leads{% endblock %}</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CRM SPAGI{% endblock %}</title>
 
-    <meta name="theme-color" content="#0d6efd">
-    <link rel="manifest" href="{% static 'manifest.json' %}">
-    <link rel="icon" href="{% static 'images/logo-spagi.png' %}">
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/css/lightbox.min.css" />
-
-    <link rel="stylesheet" href="{% static 'css/portal-theme.css' %}">
 
     <style>
-        /* Ajustes para o Layout Interno (Com Sidebar) */
-        body {
-            background-color: #f8f9fa;
-            overflow-x: hidden; /* Evita rolagem horizontal acidental */
-        }
+        body { overflow-x: hidden; background-color: #f3f4f6; }
+        
+        #wrapper { display: flex; width: 100%; align-items: stretch; transition: all 0.3s; }
 
-        /* Sidebar Fixa (Abaixo do Topbar do Portal) */
-        .sidebar {
-            width: 280px;
-            position: fixed;
-            top: var(--topbar-height, 5rem); /* Pega a altura do CSS do portal */
-            bottom: 0;
-            left: 0;
-            z-index: 1000;
-            padding-top: 1rem;
-            background: white;
-            border-right: 1px solid #dee2e6;
-            overflow-y: auto;
-            transition: transform 0.3s ease;
-        }
-
-        /* Conteúdo Principal (Empurrado pela Sidebar e Topbar) */
-        .main-content {
-            margin-top: var(--topbar-height, 5rem);
-            margin-left: 280px;
-            padding: 2rem;
-            min-height: calc(100vh - 5rem);
-            display: flex;
-            flex-direction: column;
-            transition: margin-left 0.3s ease;
+        /* SIDEBAR (Barra Lateral) */
+        #sidebar-wrapper {
+            min-width: 250px;
+            max-width: 250px;
+            background-color: #212529; /* Fundo escuro */
+            color: #fff;
+            min-height: 100vh;
+            transition: all 0.3s;
         }
         
-        /* Responsividade Mobile */
-        @media (max-width: 991.98px) {
-            .sidebar { transform: translateX(-100%); } /* Esconde sidebar */
-            .sidebar.show { transform: translateX(0); } /* Mostra quando ativo */
-            .main-content { margin-left: 0; }
-        }
-
-        /* Estilo dos Links da Sidebar */
-        .sidebar-nav .nav-link {
-            color: #495057;
-            border-radius: 0 25px 25px 0;
-            margin-right: 10px;
-            padding: 0.8rem 1rem;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-        }
-        .sidebar-nav .nav-link:hover, .sidebar-nav .nav-link.active {
-            background-color: #eef2f6;
-            color: var(--primary-color);
-        }
-        .sidebar-nav .nav-link i {
-            margin-right: 12px;
-            color: #6c757d;
-            width: 20px;
+        #sidebar-wrapper .sidebar-heading {
+            padding: 1.5rem;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #ffc107; /* Amarelo destaque */
+            border-bottom: 1px solid rgba(255,255,255,0.1);
             text-align: center;
         }
-        .sidebar-nav .nav-link:hover i { color: var(--primary-color); }
-        
-        /* Submenus */
-        .sidebar-nav .collapse .nav-link {
-            font-size: 0.9em;
-            padding-left: 3rem;
+
+        #sidebar-wrapper .list-group-item {
+            padding: 1rem 1.2rem;
+            background-color: transparent;
+            color: rgba(255,255,255,0.7);
+            border: none;
+            font-size: 0.95rem;
+            cursor: pointer;
         }
+        
+        #sidebar-wrapper .list-group-item:hover {
+            background-color: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        /* Estilo para links ativos (sub-menu) */
+        .sidebar-subitem {
+            font-size: 0.9rem;
+            padding-left: 3.5rem !important; /* Indentação */
+            background-color: #1a1d20 !important; /* Um pouco mais escuro */
+            border-left: 3px solid transparent;
+        }
+        .sidebar-subitem:hover {
+            border-left: 3px solid #ffc107;
+        }
+
+        /* Toggler do Menu */
+        #wrapper.toggled #sidebar-wrapper { margin-left: -250px; }
+
+        @media (max-width: 768px) {
+            #sidebar-wrapper { margin-left: -250px; }
+            #wrapper.toggled #sidebar-wrapper { margin-left: 0; }
+        }
+        
+        /* Ajustes gerais */
+        #page-content-wrapper { width: 100%; }
+        .nav-link { color: inherit; }
+        a { text-decoration: none; }
     </style>
-    {% block extra_css %}{% endblock %}
 </head>
 <body>
-    
-    <div class="layout-topbar">
-        <button class="btn btn-link text-secondary d-lg-none me-2 border-0" type="button" 
-                onclick="document.querySelector('.sidebar').classList.toggle('show')">
-            <i class="fa fa-bars fs-4"></i>
-        </button>
 
-        <a href="{% url 'portal' %}" class="layout-topbar-logo">
-            <img src="{% static 'images/logo-spagi.png' %}" alt="Logo">
-            <span class="d-none d-md-flex align-items-center fs-6 text-muted ms-2">
-                Portal <i class="fa fa-chevron-right mx-2 fs-6"></i> <strong class="text-primary">CRM</strong>
-            </span>
-        </a>
+<div class="d-flex" id="wrapper">
 
-        <div class="layout-topbar-menu">
-            <a href="{% url 'portal' %}" class="layout-topbar-button" title="Voltar ao Portal de Sistemas">
-                <i class="fa fa-th"></i>
+    <div id="sidebar-wrapper">
+        <div class="sidebar-heading">
+            <i class="fa fa-cubes me-2"></i> SPAGI CRM
+        </div>
+        
+        <div class="list-group list-group-flush mt-3">
+            
+            <a href="/" class="list-group-item list-group-item-action">
+                <i class="fa fa-tachometer-alt me-3" style="width:20px; text-align:center"></i> Portal / Início
             </a>
 
-            {% if user.is_authenticated %}
-                <a href="{% url 'lista_notificacoes' %}" class="layout-topbar-button position-relative" title="Notificações">
-                    <i class="fa fa-bell"></i>
-                    {% if unread_notifications_count > 0 %}
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.5em; padding: 0.3em 0.5em;">
-                            {{ unread_notifications_count }}
-                        </span>
-                    {% endif %}
-                </a>
-            {% endif %}
+            <a href="#menuFinanciamento" class="list-group-item list-group-item-action" data-bs-toggle="collapse">
+                <i class="fa fa-university me-3" style="width:20px; text-align:center"></i> Financiamentos
+                <i class="fa fa-chevron-down float-end mt-1" style="font-size:0.7em"></i>
+            </a>
+            <div class="collapse" id="menuFinanciamento">
+                <a href="{% url 'financiamentos_kanban' %}" class="list-group-item list-group-item-action sidebar-subitem">Mesa (Kanban)</a>
+                <a href="{% url 'financiamentos_create' %}" class="list-group-item list-group-item-action sidebar-subitem">Nova Ficha</a>
+            </div>
 
-            {% if user.is_authenticated %}
-                <div class="dropdown">
-                    <a href="#" class="layout-topbar-button d-flex align-items-center gap-2 text-decoration-none" data-bs-toggle="dropdown">
-                        {% if user.profile.avatar %}
-                            <img src="{{ user.profile.avatar.url }}" alt="User" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
-                        {% else %}
-                            <i class="fa fa-user-circle fs-4"></i>
-                        {% endif %}
-                        
-                        <span class="d-none d-md-block fs-6 fw-bold text-dark">
-                            {{ user.get_full_name|default:user.username }}
-                        </span>
-                    </a>
-                    
-                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2">
-                        <li><h6 class="dropdown-header">Logado como {{ user.username }}</h6></li>
-                        <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="fa fa-id-card me-2"></i> Meu Perfil</a></li>
-                        <li><a class="dropdown-item" href="#" id="enable-push-notifications"><i class="fa fa-bell me-2"></i> Ativar Push</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <form action="{% url 'logout' %}" method="post" class="px-2">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-sm btn-danger w-100"><i class="fa fa-sign-out-alt me-1"></i> Sair</button>
-                            </form>
-                        </li>
-                    </ul>
-                </div>
-            {% else %}
-                <a href="{% url 'login' %}" class="layout-topbar-button"><i class="fa fa-sign-in-alt"></i> Login</a>
-            {% endif %}
-        </div>
-    </div>
-
-    <nav class="sidebar shadow-sm">
-        <div class="px-3 mb-2 text-uppercase small text-muted fw-bold">Gestão</div>
-        <ul class="nav flex-column sidebar-nav">
-            <li class="nav-item"><a class="nav-link" href="{% url 'cliente_list' %}"><i class="fa fa-users"></i> Clientes / Leads</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'cliente_create' %}"><i class="fa fa-user-plus"></i> Novo Cadastro</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'calendario' %}"><i class="fa fa-calendar-alt"></i> Calendário</a></li>
-            
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'autorizacao_list' %}">
-                    <i class="fa fa-file-signature text-primary"></i> Autorizações
-                </a>
-            </li>
-        </ul>        
-        <div class="px-3 mt-4 mb-2 text-uppercase small text-muted fw-bold">Vendas</div>
-        <ul class="nav flex-column sidebar-nav">
-            <li class="nav-item">
-                <a class="nav-link" href="#menuDocs" data-bs-toggle="collapse" role="button" aria-expanded="false">
-                   <i class="fa fa-folder-open"></i> Vendas Produtos <i class="fa fa-chevron-down ms-auto" style="font-size:0.7em"></i>
-                </a>
-                <div class="collapse" id="menuDocs">
-                    <ul class="nav flex-column">
-                         <li class="nav-item"><a class="nav-link ps-5" href="{% url 'venda_produto_create' %}">Registrar Venda</a></li>
-                         <li class="nav-item"><a class="nav-link ps-5" href="{% url 'venda_produto_list' %}">Histórico / Conferência</a></li>
-                         {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                         <li class="nav-item"><a class="nav-link ps-5" href="{% url 'venda_produto_relatorio' %}">Relatório de Comissões</a></li>
-                         {% endif %}
-                    </ul>
-                </div>
-            </li>
-            <li class="nav-item">
-    <a class="nav-link" href="#menuFinanciamento" data-bs-toggle="collapse" role="button" aria-expanded="false">
-        <i class="fa fa-university"></i> Financiamentos <i class="fa fa-chevron-down ms-auto" style="font-size:0.7em"></i>
-    </a>
-    <div class="collapse" id="menuFinanciamento">
-        <ul class="nav flex-column">
-            <li class="nav-item">
-                <a class="nav-link ps-5" href="{% url 'financiamentos_kanban' %}">Mesa (Kanban)</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link ps-5" href="{% url 'financiamentos_create' %}">Nova Ficha</a>
-            </li>
-        </ul>
-    </div>
-</li>
-        </ul>
-        <div class="px-3 mt-4 mb-2 text-uppercase small text-muted fw-bold">Monitoramento</div>
-        <ul class="nav flex-column sidebar-nav">
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'cliente_atrasados_list' %}">
-                    <i class="fa fa-clock text-warning"></i> Atrasados
-                    {% if clientes_atrasados_count > 0 %}
-                        <span class="badge bg-danger rounded-pill ms-auto">{{ clientes_atrasados_count }}</span>
-                    {% endif %}
-                </a>
-            </li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'cliente_finalizados_list' %}"><i class="fa fa-check-circle"></i> Finalizados</a></li>
-        </ul>
-        
-        <div class="px-3 mt-4 mb-2 text-uppercase small text-muted fw-bold">Ferramentas</div>
-        <ul class="nav flex-column sidebar-nav">
-            <li class="nav-item">
-                <a class="nav-link" href="#menuDocs" data-bs-toggle="collapse" role="button" aria-expanded="false">
-                   <i class="fa fa-folder-open"></i> Documentos <i class="fa fa-chevron-down ms-auto" style="font-size:0.7em"></i>
-                </a>
-                <div class="collapse" id="menuDocs">
-                    <ul class="nav flex-column">
-                         <li class="nav-item"><a class="nav-link ps-5" href="{% url 'procuracao_list' %}">Procurações</a></li>
-                         {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                         <li class="nav-item"><a class="nav-link ps-5" href="{% url 'outorgado_list' %}">Outorgados</a></li>
-                         {% endif %}
-                    </ul>
-                </div>
-            </li>
-
-            <li class="nav-item"><a class="nav-link" href="{% url 'gerador_anuncio' %}"><i class="fa fa-robot"></i> Gerador IA</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'avaliacao_list' %}"><i class="fa fa-car"></i> Avaliações</a></li>
-            
-            {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-            <li class="nav-item"><a class="nav-link" href="{% url 'relatorios' %}"><i class="fa fa-chart-line text-danger"></i> Relatórios</a></li>
-            {% endif %}
-        </ul>
-        
-        <div class="mt-auto p-3 text-center border-top bg-light">
-            <small class="text-muted d-block">SPAGI Sistemas v1.4</small>
-            <small class="text-muted">&copy; {% now "Y" %}</small>
-        </div>
-    </nav>
-
-    <div class="main-content">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
-
-        {% block content %}{% endblock %}
-        
-        <footer class="mt-auto py-3 text-center text-muted border-top pt-4">
-            <small>Sistema de Gestão de Leads - SPAGI</small>
-        </footer>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://unpkg.com/imask"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/js/lightbox.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
-
-    <script>
-        function urlBase64ToUint8Array(base64String) {
-            const padding = '='.repeat((4 - base64String.length % 4) % 4);
-            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-            const rawData = window.atob(base64);
-            const outputArray = new Uint8Array(rawData.length);
-            for (let i = 0; i < rawData.length; ++i) {
-                outputArray[i] = rawData.charCodeAt(i);
-            }
-            return outputArray;
-        }
-    
-        if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.register("{% static 'images/js/serviceworker.js' %}")
-                .then(function (registration) {
-                    console.log("Service Worker registrado.");
-                    if ('periodicSync' in registration) { requestPeriodicSyncPermission(registration); }
-                    window.swRegistration = registration;
-                }).catch(function (error) {
-                    console.log("Falha no SW:", error);
-                });
-        }
-
-        async function requestPeriodicSyncPermission(registration) {
-            try {
-                const status = await navigator.permissions.query({name: 'periodic-background-sync'});
-                if (status.state === 'granted') {
-                    await registration.periodicSync.register('update-cache-daily', { minInterval: 24 * 60 * 60 * 1000 });
-                }
-            } catch (e) { console.error(e); }
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const pushButton = document.getElementById('enable-push-notifications');
-            if (pushButton) { pushButton.addEventListener('click', askForPushPermission); }
-        });
-
-        async function askForPushPermission() {
-            if (!('Notification' in window) || !window.swRegistration) return alert('Navegador não suporta Push.');
-            const permission = await Notification.requestPermission();
-            if (permission === 'granted') await subscribeUserToPush();
-        }
-
-        async function subscribeUserToPush() {
-            try {
-                const response = await fetch("{% url 'get_vapid_public_key' %}");
-                const data = await response.json();
-                const applicationServerKey = urlBase64ToUint8Array(data.vapid_public_key);
-                const subscription = await window.swRegistration.pushManager.subscribe({
-                    userVisibleOnly: true, applicationServerKey: applicationServerKey
-                });
+            <a href="#menuVendas" class="list-group-item list-group-item-action" data-bs-toggle="collapse">
+                <i class="fa fa-tags me-3" style="width:20px; text-align:center"></i> Produtos/Serviços
+                <i class="fa fa-chevron-down float-end mt-1" style="font-size:0.7em"></i>
+            </a>
+            <div class="collapse" id="menuVendas">
+                <a href="{% url 'venda_produto_create' %}" class="list-group-item list-group-item-action sidebar-subitem">Registrar Venda</a>
+                <a href="{% url 'venda_produto_list' %}" class="list-group-item list-group-item-action sidebar-subitem">Histórico / Conferência</a>
                 
-                await fetch("{% url 'save_webpush_subscription' %}", {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(subscription.toJSON())
-                });
-                alert('Notificações ativadas!');
-            } catch (error) {
-                console.error('Erro Push:', error);
-                alert('Erro ao ativar notificações.');
-            }
-        }
-    </script>
+                {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+                <a href="{% url 'venda_produto_relatorio' %}" class="list-group-item list-group-item-action sidebar-subitem text-warning">
+                    <i class="fa fa-chart-pie me-2"></i> Relatório Financeiro
+                </a>
+                {% endif %}
+            </div>
 
-    {% block extra_js %}{% endblock %}
+            <a href="#menuDocs" class="list-group-item list-group-item-action" data-bs-toggle="collapse">
+                <i class="fa fa-folder-open me-3" style="width:20px; text-align:center"></i> Documentos
+                <i class="fa fa-chevron-down float-end mt-1" style="font-size:0.7em"></i>
+            </a>
+            <div class="collapse" id="menuDocs">
+                <a href="{% url 'procuracao_list' %}" class="list-group-item list-group-item-action sidebar-subitem">Procurações</a>
+                {% if user.is_superuser %}
+                <a href="{% url 'outorgado_list' %}" class="list-group-item list-group-item-action sidebar-subitem">Outorgados</a>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+
+    <div id="page-content-wrapper">
+
+        <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm px-3">
+            <div class="container-fluid">
+                
+                <button class="btn btn-outline-dark border-0" id="menu-toggle">
+                    <i class="fa fa-bars fa-lg"></i>
+                </button>
+
+                <div class="ms-auto d-flex align-items-center">
+                    
+                    <a href="#" class="text-secondary me-4 position-relative">
+                        <i class="fa fa-bell fa-lg"></i>
+                        <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
+                    </a>
+
+                    <div class="dropdown">
+                        <a href="#" class="d-flex align-items-center text-dark text-decoration-none dropdown-toggle" id="dropdownUser" data-bs-toggle="dropdown" aria-expanded="false">
+                            <div class="bg-primary text-white rounded-circle me-2 d-flex justify-content-center align-items-center" style="width:35px; height:35px; font-weight:bold;">
+                                {{ user.username|slice:":1"|upper }}
+                            </div>
+                            <span class="d-none d-md-block fw-bold">{{ user.get_full_name|default:user.username }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2" aria-labelledby="dropdownUser">
+                            <li><a class="dropdown-item" href="#"><i class="fa fa-user me-2"></i> Meu Perfil</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form action="{% url 'logout' %}" method="post">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item text-danger"><i class="fa fa-sign-out-alt me-2"></i> Sair do Sistema</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container-fluid mt-3">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <main class="container-fluid py-3">
+            {% block content %}
+            {% endblock %}
+        </main>
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    var el = document.getElementById("wrapper");
+    var toggleButton = document.getElementById("menu-toggle");
+
+    toggleButton.onclick = function () {
+        el.classList.toggle("toggled");
+    };
+</script>
+
+{% block extra_js %}{% endblock %}
+
 </body>
 </html>
