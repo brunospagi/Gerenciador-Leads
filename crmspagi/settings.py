@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'autorizacoes',
     'vendas_produtos',
     'financiamentos',
+    'core',
 ]
 
 MIDDLEWARE = [
