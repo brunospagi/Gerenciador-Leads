@@ -81,34 +81,6 @@
             </a>
         </div>
     </div>
-    <div class="col-xl-3 col-md-6 mb-4">
-    <div class="card border-left-primary shadow h-100 py-2 border-0 border-start border-4 border-primary">
-        <div class="card-body">
-            <div class="row no-gutters align-items-center">
-                <div class="col mr-2">
-                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                        Gestão de Fichas
-                    </div>
-                    <div class="h5 mb-0 font-weight-bold text-gray-800">
-                        Financiamentos
-                    </div>
-                    <div class="mt-2">
-                        <a href="{% url 'financiamentos_kanban' %}" class="btn btn-sm btn-primary shadow-sm">
-                            <i class="fa fa-columns me-1"></i> Acessar Mesa
-                        </a>
-                        <a href="{% url 'financiamentos_create' %}" class="btn btn-sm btn-outline-secondary ms-1" title="Nova Ficha">
-                            <i class="fa fa-plus"></i>
-                        </a>
-                    </div>
-                </div>
-                <div class="col-auto">
-                    <i class="fa fa-university fa-2x text-gray-300 text-muted opacity-50"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
     <div class="card">
         <div class="section-title"><i class="fa fa-tools"></i> Ferramentas & Utilitários</div>
         <div class="system-grid">
@@ -118,8 +90,14 @@
         <div class="system-desc" style="color:#666">Seguro, Garantia e Desp.</div>
     </div>
     <i class="fa fa-cash-register system-icon" style="color:#198754"></i>
-</a>
-            
+</a>       
+         <a href="{% url 'financiamentos_kanban' %}" class="system-item">
+                <div>
+                    <span class="system-name" style="color:var(--primary-color)">Gestão de Fichas</span>
+                    <div class="system-desc" style="color:#666">Financiamentos</div>
+                </div>
+                <i class="fa fa-file-university system-icon" style="color:var(--primary-color)"></i>
+            </a>
             <a href="{% url 'autorizacao_list' %}" class="system-item">
                 <div>
                     <span class="system-name" style="color:#6f42c1">Autorizações</span>
