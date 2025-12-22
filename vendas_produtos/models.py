@@ -131,7 +131,7 @@ class VendaProduto(models.Model):
             referencia_comissao = Decimal('150.00')
             self.custo_base = Decimal('0.00')
             
-            if self.valor_venda >= 299:
+            if self.valor_venda >= 150:
                 # COM ADESÃO:
                 # Vendedor ganha R$ 150 fixo (externo).
                 self.comissao_vendedor = referencia_comissao
