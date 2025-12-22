@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}Cadastro de Financiamento{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-8">
+            <div class="card shadow border-0">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fa fa-file-contract me-2"></i>Dados da Ficha</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <h6 class="text-primary border-bottom pb-2 mb-3">Cliente e Veículo</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label">Nome do Cliente</label>
+                                {{ form.cliente_nome }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Veículo</label>
+                                {{ form.veiculo }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Ano</label>
+                                {{ form.ano }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Placa</label>
+                                {{ form.placa }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Valor do Veículo</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    {{ form.valor_veiculo }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <h6 class="text-primary border-bottom pb-2 mb-3">Detalhes do Financiamento</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label">Banco</label>
+                                {{ form.banco }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Valor Financiado</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    {{ form.valor_financiado }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Qtd Parcelas</label>
+                                {{ form.qtd_parcelas }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Valor da Parcela</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    {{ form.valor_parcela }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-success fw-bold">% Retorno</label>
+                                <div class="input-group">
+                                    {{ form.porcentagem_retorno }}
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Status Inicial</label>
+                                {{ form.status }}
+                            </div>
+                        </div>
+
+                        <div class="text-end">
+                            <a href="{% url 'financiamentos_kanban' %}" class="btn btn-light border me-2">Cancelar</a>
+                            <button type="submit" class="btn btn-success px-4">Salvar Ficha</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

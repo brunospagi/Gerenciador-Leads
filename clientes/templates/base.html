@@ -180,6 +180,21 @@
                     </ul>
                 </div>
             </li>
+            <li class="nav-item">
+    <a class="nav-link" href="#menuFinanciamento" data-bs-toggle="collapse" role="button" aria-expanded="false">
+        <i class="fa fa-university"></i> Financiamentos <i class="fa fa-chevron-down ms-auto" style="font-size:0.7em"></i>
+    </a>
+    <div class="collapse" id="menuFinanciamento">
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link ps-5" href="{% url 'financiamentos_kanban' %}">Mesa (Kanban)</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link ps-5" href="{% url 'financiamentos_create' %}">Nova Ficha</a>
+            </li>
+        </ul>
+    </div>
+</li>
         </ul>
         <div class="px-3 mt-4 mb-2 text-uppercase small text-muted fw-bold">Monitoramento</div>
         <ul class="nav flex-column sidebar-nav">

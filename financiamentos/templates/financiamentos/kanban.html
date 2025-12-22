@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}Mesa de Financiamentos{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3" style="background-color: #f0f2f5; min-height: 100vh;">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold mb-0 text-dark"><i class="fa fa-university me-2"></i>Mesa de Financiamentos</h4>
+            <small class="text-muted">Gerenciamento visual de propostas</small>
+        </div>
+        <a href="{% url 'financiamentos_create' %}" class="btn btn-primary shadow-sm">
+            <i class="fa fa-plus me-2"></i>Nova Ficha
+        </a>
+    </div>
+
+    <div class="d-flex overflow-auto pb-4" style="gap: 1rem; height: calc(100vh - 160px);">
+        
+        {% for col in kanban_data %}
+        <div class="kanban-col flex-shrink-0" style="width: 300px; display: flex; flex-direction: column;">
+            
+            <div class="card border-0 shadow-sm mb-2 border-top border-4 border-{{ col.color }}">
+                <div class="card-body p-2 d-flex justify-content-between align-items-center bg-white rounded">
+                    <span class="fw-bold text-uppercase small text-{{ col.color }}">{{ col.label }}</span>
+                    <span class="badge bg-light text-dark border">{{ col.count }}</span>
+                </div>
+                {% if col.total_retorno > 0 %}
+                <div class="px-2 pb-1 text-end">
+                    <small class="text-success fw-bold" style="font-size: 0.75rem;">Retorno: R$ {{ col.total_retorno|floatformat:2 }}</small>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="kanban-items flex-grow-1" data-status="{{ col.code }}" style="min-height: 100px;">
+                {% for ficha in col.items %}
+                <div class="card mb-2 border-0 shadow-sm kanban-card cursor-grab" data-id="{{ ficha.id }}">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="badge bg-secondary bg-opacity-10 text-dark">{{ ficha.banco }}</span>
+                            <a href="{% url 'financiamentos_update' ficha.id %}" class="text-muted hover-icon"><i class="fa fa-pencil-alt"></i></a>
+                        </div>
+                        
+                        <h6 class="fw-bold text-primary mb-1">{{ ficha.cliente_nome|truncatechars:20 }}</h6>
+                        <div class="small text-muted mb-2">
+                            <i class="fa fa-car me-1"></i> {{ ficha.veiculo }} <span class="fw-bold text-dark">{{ ficha.placa }}</span>
+                        </div>
+
+                        <div class="bg-light p-2 rounded border small mb-2">
+                            <div class="d-flex justify-content-between">
+                                <span>Valor:</span> <strong>R$ {{ ficha.valor_veiculo|floatformat:0 }}</strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Financ:</span> <strong>R$ {{ ficha.valor_financiado|floatformat:0 }}</strong>
+                            </div>
+                            <div class="d-flex justify-content-between border-top mt-1 pt-1">
+                                <span>Parcela:</span> <strong>{{ ficha.qtd_parcelas }}x {{ ficha.valor_parcela }}</strong>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center small mt-2 pt-2 border-top">
+                            <span class="text-muted">Retorno ({{ ficha.porcentagem_retorno }}%)</span>
+                            <span class="fw-bold text-success">R$ {{ ficha.valor_retorno|floatformat:2 }}</span>
+                        </div>
+                        
+                        <div class="text-end mt-1">
+                            <small class="text-muted" style="font-size: 0.7em;">Vend: {{ ficha.vendedor.username }}</small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const containers = document.querySelectorAll('.kanban-items');
+        
+        containers.forEach(container => {
+            new Sortable(container, {
+                group: 'kanban', // Permite mover entre listas
+                animation: 150,
+                ghostClass: 'bg-info-subtle', // Classe visual ao arrastar
+                delay: 100, // Evita clique acidental
+                delayOnTouchOnly: true,
+                onEnd: function (evt) {
+                    const itemEl = evt.item;
+                    const newStatus = evt.to.getAttribute('data-status');
+                    const fichaId = itemEl.getAttribute('data-id');
+                    
+                    // Se mudou de coluna
+                    if (evt.from !== evt.to) {
+                        updateStatus(fichaId, newStatus);
+                    }
+                }
+            });
+        });
+
+        function updateStatus(id, status) {
+            fetch("{% url 'financiamentos_api_update' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}"
+                },
+                body: JSON.stringify({ id: id, status: status })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.error) {
+                    alert("Erro: " + data.error);
+                    location.reload();
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                location.reload();
+            });
+        }
+    });
+</script>
+
+<style>
+    .kanban-col { min-height: 200px; }
+    .kanban-container::-webkit-scrollbar { height: 12px; }
+    .kanban-container::-webkit-scrollbar-track { background: #e0e0e0; border-radius: 6px; }
+    .kanban-container::-webkit-scrollbar-thumb { background: #adb5bd; border-radius: 6px; }
+    .cursor-grab { cursor: grab; }
+    .cursor-grab:active { cursor: grabbing; }
+    .hover-icon:hover { color: #0d6efd !important; }
+</style>
+{% endblock %}
