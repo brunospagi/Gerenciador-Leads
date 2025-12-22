@@ -14,7 +14,11 @@ from .forms import VendaProdutoForm
 
 User = get_user_model()
 
-# --- 1. LISTAGEM (DASHBOARD - MÊS CORRENTE) ---
+# =============================================================================
+# 1. LISTAGEM OPERACIONAL (DASHBOARD)
+# - Filtra mês corrente.
+# - Vendedor vê apenas as suas. Admin vê todas.
+# =============================================================================
 class VendaProdutoListView(LoginRequiredMixin, ListView):
     model = VendaProduto
     template_name = 'vendas_produtos/lista.html'
@@ -31,27 +35,33 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         user = self.request.user
         qs = VendaProduto.objects.all().select_related('vendedor', 'gerente')
+
+        # 1. Filtro de Data (Mês Corrente)
         data_inicio, data_fim = self.get_periodo_mes_atual()
         qs = qs.filter(data_venda__range=[data_inicio, data_fim])
 
+        # 2. Permissão
         if not (user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN'):
             qs = qs.filter(vendedor=user)
+            
         return qs.order_by('-data_venda', '-id')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
+        
         data_inicio, data_fim = self.get_periodo_mes_atual()
         context['periodo_inicio'] = data_inicio
         context['periodo_fim'] = data_fim
 
-        # Cálculos Cards
         vendas_do_mes = self.get_queryset()
+
+        # Minha Comissão (Pessoal)
         if user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN':
              minhas_vendas = VendaProduto.objects.filter(vendedor=user, data_venda__range=[data_inicio, data_fim])
              total_minha = minhas_vendas.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum']
              
-             # Total Equipe (sem filtro de vendedor)
+             # Totais Gerais (Para Admin)
              todas_vendas = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim])
              context['total_comissao_equipe'] = todas_vendas.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
              context['total_loja'] = todas_vendas.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
@@ -61,7 +71,10 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
         context['minha_comissao'] = total_minha or 0
         return context
 
-# --- 2. CREATE ---
+
+# =============================================================================
+# 2. CRIAÇÃO DE VENDA
+# =============================================================================
 class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
     model = VendaProduto
     form_class = VendaProdutoForm
@@ -72,10 +85,13 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
         form.instance.vendedor = self.request.user
         if not form.instance.data_venda:
             form.instance.data_venda = timezone.now().date()
-        messages.success(self.request, "Venda registrada com sucesso!")
+        messages.success(self.request, "Venda registrada com sucesso! Aguardando conferência.")
         return super().form_valid(form)
 
-# --- 3. UPDATE ---
+
+# =============================================================================
+# 3. EDIÇÃO DE VENDA (COM TRAVA DE SEGURANÇA)
+# =============================================================================
 class VendaProdutoUpdateView(LoginRequiredMixin, UpdateView):
     model = VendaProduto
     form_class = VendaProdutoForm
@@ -85,23 +101,32 @@ class VendaProdutoUpdateView(LoginRequiredMixin, UpdateView):
     def dispatch(self, request, *args, **kwargs):
         venda = self.get_object()
         is_admin = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'
+        
+        # --- TRAVA: Se aprovado, Vendedor não mexe ---
         if venda.status == 'APROVADO' and not is_admin:
-            messages.error(request, "Vendas aprovadas não podem ser alteradas.")
+            messages.error(request, "Vendas APROVADAS não podem ser alteradas. Solicite ao gerente.")
             return redirect('venda_produto_list')
+            
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
         is_admin = self.request.user.is_superuser or getattr(self.request.user.profile, 'nivel_acesso', '') == 'ADMIN'
+        
+        # Se Vendedor editar, reseta para PENDENTE
         if not is_admin:
             form.instance.status = 'PENDENTE'
             form.instance.gerente = None
             form.instance.data_aprovacao = None
-            messages.info(self.request, "Venda editada. Voltou para análise (Pendente).")
+            messages.info(self.request, "Alteração realizada. A venda voltou para análise (Pendente).")
         else:
             messages.success(self.request, "Venda alterada com sucesso.")
+            
         return super().form_valid(form)
 
-# --- 4. DELETE ---
+
+# =============================================================================
+# 4. EXCLUSÃO DE VENDA (COM TRAVA DE SEGURANÇA)
+# =============================================================================
 class VendaProdutoDeleteView(LoginRequiredMixin, DeleteView):
     model = VendaProduto
     template_name = 'vendas_produtos/delete_confirm.html'
@@ -111,10 +136,12 @@ class VendaProdutoDeleteView(LoginRequiredMixin, DeleteView):
         venda = self.get_object()
         is_admin = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'
         
+        # 1. Só dono ou admin exclui
         if venda.vendedor != request.user and not is_admin:
             messages.error(request, "Permissão negada.")
             return redirect('venda_produto_list')
 
+        # 2. --- TRAVA: Se aprovado, ninguém exclui (exceto admin forçado) ---
         if venda.status == 'APROVADO' and not is_admin:
             messages.error(request, "Vendas APROVADAS não podem ser excluídas.")
             return redirect('venda_produto_list')
@@ -125,19 +152,21 @@ class VendaProdutoDeleteView(LoginRequiredMixin, DeleteView):
         messages.success(self.request, "Venda excluída com sucesso.")
         return super().form_valid(form)
 
-# --- 5. COMPROVANTE INDIVIDUAL ---
+
+# =============================================================================
+# 5. IMPRESSÃO E RELATÓRIOS
+# =============================================================================
 class VendaProdutoPrintView(LoginRequiredMixin, DetailView):
     model = VendaProduto
     template_name = 'vendas_produtos/comprovante.html'
     context_object_name = 'venda'
 
-# --- 6. RELATÓRIO FINANCEIRO (FILTROS) ---
 class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
     template_name = 'vendas_produtos/relatorio.html'
 
     def dispatch(self, request, *args, **kwargs):
         if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
-            messages.error(request, "Acesso negado.")
+            messages.error(request, "Acesso negado ao relatório.")
             return redirect('venda_produto_list')
         return super().dispatch(request, *args, **kwargs)
 
@@ -171,7 +200,7 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         context['vendedor_selecionado'] = int(vendedor_id) if vendedor_id else None
         context['lista_vendedores'] = User.objects.filter(is_active=True).order_by('first_name')
 
-        # Buscar e Filtrar
+        # Buscar APENAS APROVADOS
         vendas_aprovadas = VendaProduto.objects.filter(
             status='APROVADO',
             data_venda__range=[data_inicio, data_fim]
@@ -180,12 +209,11 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         if vendedor_id:
             vendas_aprovadas = vendas_aprovadas.filter(vendedor_id=vendedor_id)
 
-        # Totais
+        # Totais e Agrupamento
         context['total_geral_comissao'] = vendas_aprovadas.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
         context['total_geral_loja'] = vendas_aprovadas.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
         context['qtd_vendas'] = vendas_aprovadas.count()
 
-        # Agrupamento
         vendedores_ids = vendas_aprovadas.values_list('vendedor', flat=True).distinct()
         lista_por_vendedor = []
         for user_id in vendedores_ids:
@@ -200,11 +228,15 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         context['relatorio_vendedores'] = lista_por_vendedor
         return context
 
-# --- 7. ACTIONS ---
+
+# =============================================================================
+# 6. AÇÕES DE GERÊNCIA
+# =============================================================================
 def aprovar_venda_produto(request, pk):
     if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
-        messages.error(request, "Apenas Gerentes.")
+        messages.error(request, "Permissão negada.")
         return redirect('venda_produto_list')
+
     venda = get_object_or_404(VendaProduto, pk=pk)
     venda.status = 'APROVADO'
     venda.motivo_recusa = None
@@ -216,8 +248,9 @@ def aprovar_venda_produto(request, pk):
 
 def rejeitar_venda_produto(request, pk):
     if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
-        messages.error(request, "Apenas Gerentes.")
+        messages.error(request, "Permissão negada.")
         return redirect('venda_produto_list')
+
     if request.method == 'POST':
         venda = get_object_or_404(VendaProduto, pk=pk)
         venda.status = 'REJEITADO'
