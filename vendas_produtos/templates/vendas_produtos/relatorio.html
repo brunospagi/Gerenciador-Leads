@@ -12,34 +12,28 @@
                 <div class="card-body p-3">
                     <form method="get" class="row g-3 align-items-end">
                         <div class="col-md-3">
-                            <label class="form-label small fw-bold text-muted text-uppercase">Data Início</label>
+                            <label class="form-label small fw-bold text-muted">Data Início</label>
                             <input type="date" name="data_inicio" class="form-control" value="{{ periodo_inicio_str }}">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label small fw-bold text-muted text-uppercase">Data Fim</label>
+                            <label class="form-label small fw-bold text-muted">Data Fim</label>
                             <input type="date" name="data_fim" class="form-control" value="{{ periodo_fim_str }}">
                         </div>
-                        
                         <div class="col-md-3">
-                            <label class="form-label small fw-bold text-muted text-uppercase">Vendedor</label>
+                            <label class="form-label small fw-bold text-muted">Vendedor</label>
                             <select name="vendedor" class="form-select">
                                 <option value="">Todos os Vendedores</option>
-                                {% for item in relatorio_vendedores %}
-                                    <option value="{{ item.vendedor.id }}" {% if vendedor_selecionado == item.vendedor.id %}selected{% endif %}>
-                                        {{ item.vendedor.get_full_name|default:item.vendedor.username }}
+                                {% for u in lista_vendedores %}
+                                    <option value="{{ u.id }}" {% if vendedor_selecionado == u.id %}selected{% endif %}>
+                                        {{ u.get_full_name|default:u.username }}
                                     </option>
                                 {% endfor %}
                             </select>
                         </div>
-
                         <div class="col-md-3 d-flex gap-2">
-                            <button type="submit" class="btn btn-primary w-100"><i class="fa fa-filter me-2"></i>Filtrar</button>
-                            
-                            <button type="button" id="btn-generate-pdf" class="btn btn-danger w-50" title="Salvar PDF">
-                                <i class="fa fa-file-pdf"></i>
-                            </button>
-                            
-                            <a href="{% url 'venda_produto_list' %}" class="btn btn-light border w-50" title="Voltar"><i class="fa fa-arrow-left"></i></a>
+                            <button type="submit" class="btn btn-primary w-100"><i class="fa fa-filter"></i></button>
+                            <button type="button" id="btn-generate-pdf" class="btn btn-danger w-50" title="PDF"><i class="fa fa-file-pdf"></i></button>
+                            <a href="{% url 'venda_produto_list' %}" class="btn btn-light border w-50"><i class="fa fa-arrow-left"></i></a>
                         </div>
                     </form>
                 </div>
@@ -48,45 +42,33 @@
     </div>
 
     <div id="pdf-content" class="print-sheet mx-auto bg-white shadow-lg p-5">
-        
         <div class="d-flex justify-content-between align-items-end border-bottom pb-3 mb-4 header-print">
             <div>
-                <div class="mb-2">
-                    <h2 class="fw-bold text-dark mb-0">SPAGI <span class="text-primary">Sistemas</span></h2>
-                    <small class="text-muted">Relatório Oficial de Comissões</small>
-                </div>
+                <h2 class="fw-bold text-dark mb-0">SPAGI <span class="text-primary">Sistemas</span></h2>
                 <h5 class="text-uppercase fw-bold mt-3">Fechamento de Comissões</h5>
             </div>
             <div class="text-end">
-                <div class="text-muted small">Período de Apuração</div>
                 <div class="fs-5 fw-bold">{{ periodo_inicio|date:"d/m/Y" }} a {{ periodo_fim|date:"d/m/Y" }}</div>
-                {% if vendedor_selecionado %}
-                    <div class="badge bg-primary text-white mt-2 px-3">Filtro: Individual</div>
-                {% else %}
-                    <div class="badge bg-dark text-white mt-2 px-3">Filtro: Geral</div>
-                {% endif %}
+                <div class="badge bg-dark text-white mt-2 px-3">STATUS: APROVADO</div>
             </div>
         </div>
 
         <div class="row mb-5">
-            <div class="col-12">
-                <h6 class="text-uppercase text-muted fw-bold small border-bottom pb-1 mb-2">Resumo Consolidado</h6>
-            </div>
             <div class="col-4">
                 <div class="p-3 bg-light rounded border text-center">
-                    <small class="text-muted text-uppercase fw-bold">Vendas Aprovadas</small>
-                    <div class="fs-4 fw-bold text-dark">{{ qtd_vendas }}</div>
+                    <small class="text-muted fw-bold">Vendas</small>
+                    <div class="fs-4 fw-bold">{{ qtd_vendas }}</div>
                 </div>
             </div>
             <div class="col-4">
                 <div class="p-3 bg-light rounded border text-center">
-                    <small class="text-muted text-uppercase fw-bold">Lucro Líquido (Loja)</small>
+                    <small class="text-muted fw-bold">Lucro Loja</small>
                     <div class="fs-4 fw-bold text-primary">R$ {{ total_geral_loja|floatformat:2 }}</div>
                 </div>
             </div>
             <div class="col-4">
                 <div class="p-3 bg-light rounded border text-center">
-                    <small class="text-muted text-uppercase fw-bold">Total Comissões</small>
+                    <small class="text-muted fw-bold">Total Comissões</small>
                     <div class="fs-4 fw-bold text-success">R$ {{ total_geral_comissao|floatformat:2 }}</div>
                 </div>
             </div>
@@ -96,111 +78,63 @@
             {% for item in relatorio_vendedores %}
             <div class="mb-5 break-inside-avoid">
                 <div class="d-flex justify-content-between align-items-center bg-dark text-white p-2 px-3 rounded-top">
-                    <div class="fw-bold"><i class="fa fa-user me-2"></i> {{ item.vendedor.get_full_name|default:item.vendedor.username|upper }}</div>
+                    <div class="fw-bold"><i class="fa fa-user me-2"></i> {{ item.vendedor.get_full_name|upper }}</div>
                     <div>A Receber: <span class="fw-bold text-warning">R$ {{ item.total_comissao|floatformat:2 }}</span></div>
                 </div>
-
                 <table class="table table-bordered table-striped table-sm mb-0 fs-small">
                     <thead class="table-light">
                         <tr>
-                            <th width="10%">Data</th>
-                            <th width="15%">Placa</th>
-                            <th width="25%">Cliente</th>
-                            <th width="20%">Produto</th>
-                            <th width="15%" class="text-end">Valor Venda</th>
-                            <th width="15%" class="text-end text-success">Comissão</th>
+                            <th>Data</th>
+                            <th>Placa</th>
+                            <th>Cliente</th>
+                            <th>Produto</th>
+                            <th class="text-end">Valor</th>
+                            <th class="text-end">Comissão</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for venda in item.vendas %}
                         <tr>
-                            <td>{{ venda.data_venda|date:"d/m/y" }}</td>
-                            <td class="text-uppercase font-monospace">{{ venda.placa }}</td>
-                            <td>{{ venda.cliente_nome|truncatechars:25 }}</td>
+                            <td>{{ venda.data_venda|date:"d/m" }}</td>
+                            <td>{{ venda.placa }}</td>
+                            <td>{{ venda.cliente_nome|truncatechars:20 }}</td>
                             <td>{{ venda.get_tipo_produto_display }}</td>
-                            <td class="text-end">R$ {{ venda.valor_venda }}</td>
-                            <td class="text-end fw-bold text-success">R$ {{ venda.comissao_vendedor }}</td>
+                            <td class="text-end">{{ venda.valor_venda }}</td>
+                            <td class="text-end fw-bold text-success">{{ venda.comissao_vendedor }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                     <tfoot class="bg-light">
-                        <tr>
-                            <td colspan="6" class="text-end small text-muted fst-italic pt-2">
-                                <i class="fa fa-check-circle me-1"></i> 
-                                Conferido por {{ item.vendas.0.gerente.username }} em {{ item.vendas.0.data_aprovacao|date:"d/m H:i" }}
-                            </td>
-                        </tr>
+                        <tr><td colspan="6" class="text-end small fst-italic">Conf: {{ item.vendas.0.gerente.username }}</td></tr>
                     </tfoot>
                 </table>
             </div>
             {% endfor %}
-
-            <div class="row mt-5 pt-5 signature-area">
-                <div class="col-6 text-center">
-                    <div class="border-top border-dark w-75 mx-auto pt-2">
-                        <strong>Financeiro</strong><br>
-                        <span class="small text-muted">Visto da Loja</span>
-                    </div>
-                </div>
-                <div class="col-6 text-center">
-                    <div class="border-top border-dark w-75 mx-auto pt-2">
-                        <strong>Gerência</strong><br>
-                        <span class="small text-muted">Aprovação</span>
-                    </div>
-                </div>
-            </div>
-
         {% else %}
-            <div class="alert alert-warning text-center p-5">
-                <h4>Nenhum registro encontrado.</h4>
-                <p>Verifique o filtro de datas e vendedor.</p>
-            </div>
+            <div class="alert alert-warning text-center">Nenhum registro encontrado.</div>
         {% endif %}
-        
-        <div class="mt-5 pt-3 border-top text-center text-muted small">
-            Relatório gerado pelo sistema SPAGI em {% now "d/m/Y \à\s H:i" %}
-        </div>
     </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-
 <script>
     document.getElementById('btn-generate-pdf').addEventListener('click', function () {
         const element = document.getElementById('pdf-content');
-        
         const opt = {
-            margin:       [10, 10, 10, 10], // Margens (top, left, bottom, right)
-            filename:     'Relatorio_Comissoes_{{ periodo_inicio|date:"Y-m" }}.pdf',
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2 }, // Melhora qualidade
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            margin: [10, 10, 10, 10],
+            filename: 'Relatorio_Comissoes.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
-
-        // Efeito visual de carregando
         const btn = this;
-        const originalContent = btn.innerHTML;
-        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Gerando...';
-        btn.disabled = true;
-
-        html2pdf().set(opt).from(element).save().then(function(){
-            btn.innerHTML = originalContent;
-            btn.disabled = false;
-        });
+        btn.innerHTML = '...';
+        html2pdf().set(opt).from(element).save().then(() => { btn.innerHTML = '<i class="fa fa-file-pdf"></i>'; });
     });
 </script>
-
 <style>
-    .print-sheet {
-        max-width: 210mm;
-        min-height: 297mm;
-        margin: 0 auto;
-    }
+    .print-sheet { max-width: 210mm; min-height: 297mm; margin: 0 auto; }
     .fs-small { font-size: 0.85rem; }
-    
-    /* Evita que tabelas sejam cortadas no PDF */
-    .break-inside-avoid {
-        page-break-inside: avoid;
-    }
+    .break-inside-avoid { page-break-inside: avoid; }
 </style>
 {% endblock %}

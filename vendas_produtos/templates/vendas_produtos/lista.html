@@ -3,19 +3,16 @@
 
 {% block content %}
 <div class="container-fluid mt-3">
-    
     <div class="alert alert-light border shadow-sm d-flex justify-content-between align-items-center mb-4">
         <div>
             <i class="fa fa-calendar-alt text-primary me-2"></i>
-            <strong>Período Visualizado:</strong> 
-            {{ periodo_inicio|date:"d/m/Y" }} até {{ periodo_fim|date:"d/m/Y" }}
+            <strong>Período:</strong> {{ periodo_inicio|date:"d/m" }} a {{ periodo_fim|date:"d/m/Y" }}
         </div>
         <div class="d-flex align-items-center gap-2">
-            <span class="text-muted small me-2">Exibindo apenas vendas deste mês.</span>
-            
+            <span class="text-muted small me-2">Vendas do Mês Atual.</span>
             {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
             <a href="{% url 'venda_produto_relatorio' %}" class="btn btn-dark btn-sm">
-                <i class="fa fa-file-invoice-dollar me-2"></i> Relatório de Fechamento
+                <i class="fa fa-file-invoice-dollar me-2"></i> Relatório
             </a>
             {% endif %}
         </div>
@@ -25,29 +22,25 @@
         <div class="col-md-4 mb-3">
             <div class="card bg-primary text-white h-100 shadow-sm">
                 <div class="card-body">
-                    <h6><i class="fa fa-wallet me-2"></i>Minha Comissão</h6>
+                    <h6>Minha Comissão</h6>
                     <h3 class="fw-bold">R$ {{ minha_comissao|floatformat:2 }}</h3>
-                    <small class="text-white-50">Acumulado pessoal no período</small>
                 </div>
             </div>
         </div>
-
         {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
         <div class="col-md-4 mb-3">
             <div class="card bg-info text-dark h-100 shadow-sm">
                 <div class="card-body">
-                    <h6><i class="fa fa-users me-2"></i>Total Equipe</h6>
+                    <h6>Total Equipe</h6>
                     <h3 class="fw-bold">R$ {{ total_comissao_equipe|floatformat:2 }}</h3>
-                    <small class="text-dark-50">Total de comissões a pagar</small>
                 </div>
             </div>
         </div>
         <div class="col-md-4 mb-3">
             <div class="card bg-success text-white h-100 shadow-sm">
                 <div class="card-body">
-                    <h6><i class="fa fa-chart-line me-2"></i>Lucro Loja</h6>
+                    <h6>Lucro Loja</h6>
                     <h3 class="fw-bold">R$ {{ total_loja|floatformat:2 }}</h3>
-                    <small class="text-white-50">Resultado líquido da operação</small>
                 </div>
             </div>
         </div>
@@ -55,8 +48,8 @@
     </div>
 
     <div class="card shadow-sm border-0">
-        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 text-dark"><i class="fa fa-list me-2"></i>Vendas Registradas</h5>
+        <div class="card-header bg-white py-3 d-flex justify-content-between">
+            <h5 class="mb-0">Vendas Registradas</h5>
             <a href="{% url 'venda_produto_create' %}" class="btn btn-success btn-sm"><i class="fa fa-plus"></i> Nova Venda</a>
         </div>
         <div class="card-body p-0">
@@ -65,86 +58,68 @@
                     <thead class="bg-light">
                         <tr>
                             <th>Data</th>
-                            
-                            {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                            <th>Vendedor</th>
-                            {% endif %}
-
+                            {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}<th>Vendedor</th>{% endif %}
                             <th>Produto</th>
-                            <th>Cliente / Placa</th>
+                            <th>Cliente</th>
                             <th>Valores</th>
                             <th>Status</th>
-                            <th class="text-end" style="min-width: 180px;">Ações</th>
+                            <th class="text-end">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in vendas %}
                         <tr class="{% if item.status == 'REJEITADO' %}table-danger{% endif %}">
-                            
-                            <td class="text-nowrap">{{ item.data_venda|date:"d/m/Y" }}</td>
+                            <td>{{ item.data_venda|date:"d/m/y" }}</td>
                             
                             {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
                             <td>
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar-circle bg-secondary text-white rounded-circle me-2 d-flex align-items-center justify-content-center" style="width:30px; height:30px; font-size:0.8em;">
+                                    <div class="bg-secondary text-white rounded-circle me-2 d-flex justify-content-center align-items-center" style="width:25px;height:25px;font-size:0.7em;">
                                         {{ item.vendedor.username|slice:":1"|upper }}
                                     </div>
-                                    <span class="fw-bold">{{ item.vendedor.get_full_name|default:item.vendedor.username }}</span>
+                                    {{ item.vendedor.get_full_name|default:item.vendedor.username }}
                                 </div>
                             </td>
                             {% endif %}
 
                             <td>
-                                {{ item.get_tipo_produto_display }}
-                                <br>
+                                {{ item.get_tipo_produto_display }}<br>
                                 <span class="badge bg-light text-dark border">{{ item.get_forma_pagamento_display }}</span>
                             </td>
-
                             <td>
                                 <strong>{{ item.cliente_nome }}</strong><br>
                                 <small class="text-muted">{{ item.placa }}</small>
                             </td>
-
                             <td>
-                                <div style="font-size: 0.9em;">
-                                    Venda: <strong>R$ {{ item.valor_venda }}</strong><br>
-                                    <span class="text-success">Comissão: R$ {{ item.comissao_vendedor }}</span>
-                                </div>
+                                <small>Venda: R$ {{ item.valor_venda }}</small><br>
+                                <strong class="text-success">Com: R$ {{ item.comissao_vendedor }}</strong>
                             </td>
-
                             <td>
                                 {% if item.status == 'APROVADO' %}
                                     <div class="text-success"><i class="fa fa-check-circle"></i> Aprovado</div>
                                 {% elif item.status == 'REJEITADO' %}
                                     <div class="text-danger"><i class="fa fa-times-circle"></i> Rejeitado</div>
-                                    {% if item.motivo_recusa %}
-                                        <small class="text-danger fw-bold d-block text-wrap" style="font-size:0.7em; max-width: 120px;">
-                                            {{ item.motivo_recusa|truncatechars:30 }}
-                                        </small>
-                                    {% endif %}
                                 {% else %}
                                     <div class="text-warning"><i class="fa fa-clock"></i> Pendente</div>
                                 {% endif %}
                             </td>
                             
                             <td class="text-end">
-                                
                                 {% if item.comprovante %}
-                                    <button type="button" class="btn btn-sm btn-info text-white" data-bs-toggle="modal" data-bs-target="#modalComprovante{{ item.pk }}" title="Ver Comprovante">
-                                        <i class="fa fa-eye"></i>
-                                    </button>
+                                    <button type="button" class="btn btn-sm btn-info text-white" data-bs-toggle="modal" data-bs-target="#modalComprovante{{ item.pk }}"><i class="fa fa-eye"></i></button>
                                 {% endif %}
 
-                                <a href="{% url 'venda_produto_print' item.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Imprimir Comprovante"><i class="fa fa-print"></i></a>
+                                <a href="{% url 'venda_produto_print' item.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="fa fa-print"></i></a>
                                 
                                 {% if item.status != 'APROVADO' or user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                                <a href="{% url 'venda_produto_update' item.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fa fa-pencil-alt"></i></a>
+                                    <a href="{% url 'venda_produto_update' item.pk %}" class="btn btn-sm btn-outline-primary"><i class="fa fa-pencil-alt"></i></a>
+                                    <a href="{% url 'venda_produto_delete' item.pk %}" class="btn btn-sm btn-outline-danger"><i class="fa fa-trash"></i></a>
                                 {% endif %}
 
                                 {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
                                     {% if item.status == 'PENDENTE' %}
-                                        <a href="{% url 'venda_produto_approve' item.pk %}" class="btn btn-sm btn-success" title="Aprovar"><i class="fa fa-check"></i></a>
-                                        <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#modalRecusa{{ item.pk }}" title="Recusar"><i class="fa fa-times"></i></button>
+                                        <a href="{% url 'venda_produto_approve' item.pk %}" class="btn btn-sm btn-success"><i class="fa fa-check"></i></a>
+                                        <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#modalRecusa{{ item.pk }}"><i class="fa fa-times"></i></button>
                                     {% endif %}
                                 {% endif %}
 
@@ -153,32 +128,26 @@
                                     <div class="modal-dialog modal-lg">
                                         <div class="modal-content">
                                             <div class="modal-header">
-                                                <h5 class="modal-title">Comprovante - {{ item.cliente_nome }}</h5>
+                                                <h5 class="modal-title">Comprovante</h5>
                                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                             </div>
                                             <div class="modal-body text-center bg-light">
                                                 {% with ext=item.comprovante.url|slice:"-4:"|lower %}
                                                     {% if ext == ".jpg" or ext == ".png" or item.comprovante.url|slice:"-5:"|lower == ".jpeg" %}
-                                                        <img src="{{ item.comprovante.url }}" class="img-fluid rounded shadow-sm" style="max-height: 500px;">
+                                                        <img src="{{ item.comprovante.url }}" class="img-fluid rounded" style="max-height: 500px;">
                                                     {% else %}
                                                         <div class="py-5">
                                                             <i class="fa fa-file-pdf fa-4x text-danger mb-3"></i><br>
-                                                            <p class="mb-3">Este arquivo é um documento (PDF ou outro formato).</p>
-                                                            <a href="{{ item.comprovante.url }}" target="_blank" class="btn btn-primary">
-                                                                <i class="fa fa-download me-2"></i> Baixar / Visualizar
-                                                            </a>
+                                                            <a href="{{ item.comprovante.url }}" target="_blank" class="btn btn-primary">Baixar Arquivo</a>
                                                         </div>
                                                     {% endif %}
                                                 {% endwith %}
-                                            </div>
-                                            <div class="modal-footer">
-                                                <a href="{{ item.comprovante.url }}" target="_blank" class="btn btn-outline-primary btn-sm">Abrir em nova aba</a>
-                                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 {% endif %}
+
                                 <div class="modal fade" id="modalRecusa{{ item.pk }}" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog">
                                         <form action="{% url 'venda_produto_reject' item.pk %}" method="post">
@@ -189,43 +158,24 @@
                                                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                                 </div>
                                                 <div class="modal-body text-start">
-                                                    <p>Vendedor: <strong>{{ item.vendedor.get_full_name }}</strong></p>
-                                                    <label class="form-label">Por qual motivo deseja recusar?</label>
-                                                    <textarea name="motivo_recusa" class="form-control" rows="3" required placeholder="Ex: Valor incorreto, falta comprovante..."></textarea>
+                                                    <textarea name="motivo_recusa" class="form-control" rows="3" placeholder="Motivo..." required></textarea>
                                                 </div>
                                                 <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                                    <button type="submit" class="btn btn-danger">Confirmar Recusa</button>
+                                                    <button type="submit" class="btn btn-danger">Confirmar</button>
                                                 </div>
                                             </div>
                                         </form>
                                     </div>
                                 </div>
-                                </td>
+                            </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="8" class="text-center py-5 text-muted">Nenhuma venda registrada neste mês ({{ periodo_inicio|date:"d/m" }} a {{ periodo_fim|date:"d/m" }}).</td></tr>
+                        <tr><td colspan="8" class="text-center py-5 text-muted">Nenhuma venda.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-            
-            {% if is_paginated %}
-            <div class="d-flex justify-content-center py-3">
-                <nav>
-                    <ul class="pagination">
-                        {% if page_obj.has_previous %}
-                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a></li>
-                        {% endif %}
-                        <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
-                        {% if page_obj.has_next %}
-                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Próxima</a></li>
-                        {% endif %}
-                    </ul>
-                </nav>
             </div>
-            {% endif %}
-        </div>
     </div>
 </div>
 {% endblock %}
