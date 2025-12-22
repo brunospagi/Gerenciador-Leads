@@ -17,10 +17,6 @@
                 <form method="post" id="clienteForm">
                     {% csrf_token %}
                     
-                    {{ form.marca_veiculo }}
-                    {{ form.modelo_veiculo }}
-                    {{ form.ano_veiculo }}
-
                     <h5 class="mb-3 border-bottom pb-2"><i class="bi bi-person-badge me-2"></i>1. Dados do Cliente</h5>
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -33,29 +29,23 @@
                         </div>
                     </div>
                     
-                    <h5 class="mt-4 mb-3 border-bottom pb-2"><i class="bi bi-car-front-fill me-2"></i>2. Dados do Veículo (Busca FIPE)</h5>
+                    <h5 class="mt-4 mb-3 border-bottom pb-2"><i class="bi bi-car-front-fill me-2"></i>2. Dados do Veículo (Manual)</h5>
                     <div class="row align-items-end">
                         <div class="col-md-4 mb-3">
                             <label for="{{ form.tipo_veiculo.id_for_label }}" class="form-label">{{ form.tipo_veiculo.label }}</label>
                             {{ form.tipo_veiculo }}
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label for="marca_select" class="form-label">Marca</label>
-                            <select id="marca_select" class="form-select" required>
-                                <option value="" selected disabled>Selecione o tipo</option>
-                            </select>
+                            <label for="{{ form.marca_veiculo.id_for_label }}" class="form-label">Marca</label>
+                            {{ form.marca_veiculo }}
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label for="modelo_select" class="form-label">Modelo</label>
-                            <select id="modelo_select" class="form-select" disabled required>
-                                <option value="" selected disabled>Selecione a marca</option>
-                            </select>
+                            <label for="{{ form.modelo_veiculo.id_for_label }}" class="form-label">Modelo</label>
+                            {{ form.modelo_veiculo }}
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label for="ano_select" class="form-label">Ano</label>
-                            <select id="ano_select" class="form-select" disabled required>
-                                <option value="" selected disabled>Selecione o modelo</option>
-                            </select>
+                            <label for="{{ form.ano_veiculo.id_for_label }}" class="form-label">Ano</label>
+                            {{ form.ano_veiculo }}
                         </div>
                          <div class="col-md-6 mb-3">
                             <label for="{{ form.valor_estimado_veiculo.id_for_label }}" class="form-label">{{ form.valor_estimado_veiculo.label }}</label>
@@ -190,107 +180,10 @@ document.addEventListener('DOMContentLoaded', (event) => {
         });
     }
 
+    // --- REMOVIDO: Toda a lógica JavaScript da API FIPE foi excluída daqui ---
 
-    // --- Lógica da API FIPE ---
-    const tipoVeiculoSelect = document.getElementById('id_tipo_veiculo');
-    const marcaSelect = document.getElementById('marca_select');
-    const modeloSelect = document.getElementById('modelo_select');
-    const anoSelect = document.getElementById('ano_select');
-
-    const marcaInput = document.getElementById('id_marca_veiculo');
-    const modeloInput = document.getElementById('id_modelo_veiculo');
-    const anoInput = document.getElementById('id_ano_veiculo');
-
-    const resetSelect = (select, message) => {
-        select.innerHTML = `<option value="" selected disabled>${message}</option>`;
-        select.disabled = true;
-    };
-
-    function carregarMarcas() {
-        const tipoVeiculo = tipoVeiculoSelect.value;
-        if (!tipoVeiculo) return;
-
-        resetSelect(marcaSelect, 'Carregando...');
-        resetSelect(modeloSelect, 'Selecione a marca');
-        resetSelect(anoSelect, 'Selecione o modelo');
-        
-        const marcasUrl = `/api/fipe/${tipoVeiculo}/marcas/`;
-
-        fetch(marcasUrl)
-            .then(response => response.json())
-            .then(data => {
-                marcaSelect.innerHTML = '<option value="" selected disabled>Selecione uma marca</option>';
-                data.forEach(marca => {
-                    const option = new Option(marca.nome, marca.codigo);
-                    if (marca.nome === marcaInput.value) { option.selected = true; }
-                    marcaSelect.add(option);
-                });
-                marcaSelect.disabled = false;
-            }).catch(error => console.error('Erro ao carregar marcas:', error));
-    }
-    
-    tipoVeiculoSelect.addEventListener('change', carregarMarcas);
-    carregarMarcas();
-
-    marcaSelect.addEventListener('change', () => {
-        const tipoVeiculo = tipoVeiculoSelect.value;
-        const marcaId = marcaSelect.value;
-        const marcaNome = marcaSelect.options[marcaSelect.selectedIndex].text;
-        
-        resetSelect(modeloSelect, 'Carregando...');
-        resetSelect(anoSelect, 'Selecione um modelo');
-        
-        if (!marcaId) return;
-        
-        marcaInput.value = marcaNome;
-        modeloInput.value = '';
-        anoInput.value = '';
-        
-        fetch(`/api/fipe/${tipoVeiculo}/marcas/${marcaId}/modelos/`)
-            .then(response => response.json())
-            .then(data => {
-                modeloSelect.innerHTML = '<option value="" selected disabled>Selecione um modelo</option>';
-                data.forEach(modelo => {
-                    const option = new Option(modelo.nome, modelo.codigo);
-                    modeloSelect.add(option);
-                });
-                modeloSelect.disabled = false;
-            }).catch(error => console.error('Erro ao carregar modelos:', error));
-    });
-
-    modeloSelect.addEventListener('change', () => {
-        const tipoVeiculo = tipoVeiculoSelect.value;
-        const marcaId = marcaSelect.value;
-        const modeloId = modeloSelect.value;
-        const modeloNome = modeloSelect.options[modeloSelect.selectedIndex].text;
-        
-        resetSelect(anoSelect, 'Carregando...');
-        
-        if (!modeloId) return;
-        
-        modeloInput.value = modeloNome;
-        anoInput.value = '';
-
-        fetch(`/api/fipe/${tipoVeiculo}/marcas/${marcaId}/modelos/${modeloId}/anos/`)
-            .then(response => response.json())
-            .then(data => {
-                anoSelect.innerHTML = '<option value="" selected disabled>Selecione o ano</option>';
-                data.forEach(ano => {
-                    const option = new Option(ano.nome, ano.codigo);
-                    anoSelect.add(option);
-                });
-                anoSelect.disabled = false;
-            }).catch(error => console.error('Erro ao carregar anos:', error));
-    });
-
-    anoSelect.addEventListener('change', () => {
-        const anoNome = anoSelect.options[anoSelect.selectedIndex].text;
-        anoInput.value = anoNome;
-    });
-
-    // --- 3. JAVASCRIPT DO MODAL DE DUPLICIDADE (NOVO) ---
+    // --- 3. JAVASCRIPT DO MODAL DE DUPLICIDADE ---
     {% if show_confirmation %}
-    // Este código só é executado se a view detetar uma duplicidade
     try {
         const confirmModalElement = document.getElementById('confirmDuplicateModal');
         const confirmModal = new bootstrap.Modal(confirmModalElement);
@@ -298,18 +191,12 @@ document.addEventListener('DOMContentLoaded', (event) => {
         const confirmButton = document.getElementById('confirmForceCreateBtn');
 
         if (confirmModal && mainForm && confirmButton) {
-            // Mostra o modal
             confirmModal.show();
-
-            // Adiciona o evento ao botão de confirmação
             confirmButton.addEventListener('click', () => {
-                // Cria o input oculto
                 const hiddenInput = document.createElement('input');
                 hiddenInput.type = 'hidden';
                 hiddenInput.name = 'force_create';
                 hiddenInput.value = 'true';
-                
-                // Adiciona ao formulário e envia
                 mainForm.appendChild(hiddenInput);
                 mainForm.submit();
             });
@@ -319,26 +206,17 @@ document.addEventListener('DOMContentLoaded', (event) => {
     }
     {% endif %}
 
-
-    // --- 4. NOVO: Lógica de Background Sync ---
+    // --- 4. Lógica de Background Sync (Mantida) ---
     const clienteForm = document.getElementById('clienteForm');
-    
-    // Apenas para formulários de CRIAÇÃO
     {% if not form.instance.pk %}
     if (clienteForm) {
         clienteForm.addEventListener('submit', async (e) => {
-            // Se estiver online, deixa o formulário ser enviado normalmente
-            if (navigator.onLine) {
-                return;
-            }
-
-            // Se estiver OFFLINE:
+            if (navigator.onLine) { return; }
             e.preventDefault();
             console.log('Offline: Capturando envio de formulário.');
 
-            // Verifica se o navegador suporta as APIs necessárias
             if (!('serviceWorker' in navigator && 'SyncManager' in window && 'idbKeyval' in window)) {
-                alert('Você está offline e seu navegador não suporta a sincronização em segundo plano. Por favor, tente novamente quando tiver conexão.');
+                alert('Você está offline e seu navegador não suporta a sincronização em segundo plano.');
                 return;
             }
 
@@ -347,36 +225,25 @@ document.addEventListener('DOMContentLoaded', (event) => {
             const csrfToken = data.csrfmiddlewaretoken;
 
             try {
-                // Usamos um ID único para cada entrada do outbox
                 const entryId = `client_${new Date().getTime()}`;
-                const entry = {
-                    id: entryId,
-                    data: data,
-                    csrfToken: csrfToken
-                };
-
+                const entry = { id: entryId, data: data, csrfToken: csrfToken };
                 let outbox = (await idbKeyval.get('client-outbox')) || [];
                 outbox.push(entry);
                 await idbKeyval.set('client-outbox', outbox);
 
-                // Registra o sync
                 const swRegistration = await navigator.serviceWorker.ready;
                 await swRegistration.sync.register('sync-new-client');
 
-                console.log('Cliente salvo no outbox e sync registrado.');
-                
-                // Avisa o usuário e redireciona
                 alert('Você está offline. O novo cliente foi salvo e será cadastrado automaticamente assim que a conexão voltar.');
                 window.location.href = "{% url 'cliente_list' %}";
 
             } catch (error) {
                 console.error('Erro ao salvar cliente no outbox:', error);
-                alert('Erro ao tentar salvar o cliente para envio posterior. Tente novamente.');
+                alert('Erro ao tentar salvar o cliente para envio posterior.');
             }
         });
     }
     {% endif %}
-    // --- FIM DO NOVO BLOCO ---
 });
 </script>
 {% endblock %}

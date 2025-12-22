@@ -16,6 +16,7 @@ import json
 import re 
 from bs4 import BeautifulSoup 
 from requests.exceptions import RequestException, Timeout 
+from django.http import JsonResponse
 
 # --- MÓDULOS GEMINI ---
 from django.conf import settings
@@ -346,27 +347,36 @@ class AvaliacaoDeleteView(LoginRequiredMixin, DeleteView):
             raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
 
+FIPE_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+}
 
 def get_fipe_marcas(request, tipo_veiculo):
     try:
-        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas')
+        # Adicionado headers=FIPE_HEADERS
+        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas', headers=FIPE_HEADERS)
         response.raise_for_status()
         return JsonResponse(response.json(), safe=False)
-    except requests.RequestException:
+    except requests.RequestException as e:
+        print(f"Erro FIPE Marcas: {e}") # Log do erro no terminal para debug
         return JsonResponse({'error': 'Erro ao buscar marcas'}, status=500)
 
 def get_fipe_modelos(request, tipo_veiculo, marca_id):
     try:
-        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas/{marca_id}/modelos')
+        # Adicionado headers=FIPE_HEADERS
+        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas/{marca_id}/modelos', headers=FIPE_HEADERS)
         response.raise_for_status()
         return JsonResponse(response.json().get('modelos', []), safe=False)
-    except requests.RequestException:
+    except requests.RequestException as e:
+        print(f"Erro FIPE Modelos: {e}")
         return JsonResponse({'error': 'Erro ao buscar modelos'}, status=500)
 
 def get_fipe_anos(request, tipo_veiculo, marca_id, modelo_id):
     try:
-        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas/{marca_id}/modelos/{modelo_id}/anos')
+        # Adicionado headers=FIPE_HEADERS
+        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas/{marca_id}/modelos/{modelo_id}/anos', headers=FIPE_HEADERS)
         response.raise_for_status()
         return JsonResponse(response.json(), safe=False)
-    except requests.RequestException:
+    except requests.RequestException as e:
+        print(f"Erro FIPE Anos: {e}")
         return JsonResponse({'error': 'Erro ao buscar anos'}, status=500)

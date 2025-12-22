@@ -21,9 +21,10 @@ class ClienteForm(forms.ModelForm):
             'observacao': forms.Textarea(attrs={'rows': 3}),
             'whatsapp': forms.TextInput(attrs={'placeholder': '(99) 9 9999-9999'}),
             'valor_estimado_veiculo': forms.TextInput(attrs={'placeholder': 'R$ 0,00'}),
-            'marca_veiculo': forms.HiddenInput(),
-            'modelo_veiculo': forms.HiddenInput(),
-            'ano_veiculo': forms.HiddenInput(),
+            # REMOVIDOS os HiddenInput e adicionados TextInput para edição manual
+            'marca_veiculo': forms.TextInput(attrs={'placeholder': 'Ex: Chevrolet'}),
+            'modelo_veiculo': forms.TextInput(attrs={'placeholder': 'Ex: Onix 1.0'}),
+            'ano_veiculo': forms.TextInput(attrs={'placeholder': 'Ex: 2022'}),
         }
 
     def __init__(self, *args, **kwargs):
