@@ -1,0 +1,209 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Comprovante #{{ venda.pk }} - {{ venda.placa }}</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { 
+            background: #e9ecef; /* Fundo cinza na tela */
+            color: #000; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        }
+        
+        /* Folha A4 simulada */
+        .print-container { 
+            background: #fff;
+            max-width: 800px; 
+            margin: 30px auto; 
+            padding: 40px; 
+            border: 1px solid #d3d3d3; 
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .header { 
+            text-align: center; 
+            border-bottom: 2px solid #333; 
+            padding-bottom: 20px; 
+            margin-bottom: 30px; 
+        }
+        
+        .info-group {
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-label {
+            font-size: 0.85rem;
+            color: #6c757d;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .info-value {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: #212529;
+        }
+
+        .valor-destaque {
+            font-size: 1.5rem;
+            color: #198754;
+            font-weight: bold;
+        }
+
+        .signature-section {
+            margin-top: 80px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .sign-line {
+            width: 45%;
+            border-top: 1px solid #000;
+            text-align: center;
+            padding-top: 10px;
+        }
+
+        /* Estilos exclusivos de Impressão */
+        @media print {
+            body { background: #fff; margin: 0; }
+            .print-container { 
+                box-shadow: none; 
+                border: none; 
+                margin: 0; 
+                padding: 0; 
+                max-width: 100%; 
+            }
+            .no-print { display: none !important; }
+            .btn { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container text-center mt-3 no-print">
+        <button onclick="window.print()" class="btn btn-primary btn-lg shadow">
+            <i class="fa fa-print me-2"></i>Imprimir Comprovante
+        </button>
+        <button onclick="window.close()" class="btn btn-secondary btn-lg shadow ms-2">
+            Fechar Janela
+        </button>
+    </div>
+
+    <div class="print-container">
+        
+        <div class="header">
+            <img src="{% static 'images/logo-spagi.png' %}" alt="SPAGI" style="height: 60px; margin-bottom: 10px;">
+            <h3 class="mb-0">Comprovante de Venda Interna</h3>
+            <p class="text-muted mb-0">Produtos e Serviços Adicionais</p>
+            <div class="mt-2 badge bg-dark text-white p-2" style="font-size: 0.9em;">
+                PROTOCOLO #{{ venda.pk }}
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <div class="col-12"><h6 class="text-uppercase fw-bold border-bottom pb-1">Dados da Venda</h6></div>
+        </div>
+        
+        <div class="info-group">
+            <div class="row g-3">
+                <div class="col-8">
+                    <div class="info-label">Cliente</div>
+                    <div class="info-value">{{ venda.cliente_nome }}</div>
+                </div>
+                <div class="col-4">
+                    <div class="info-label">Placa do Veículo</div>
+                    <div class="info-value text-uppercase" style="letter-spacing: 2px;">{{ venda.placa }}</div>
+                </div>
+                
+                <div class="col-12"><hr class="my-1 text-muted"></div>
+
+                <div class="col-6">
+                    <div class="info-label">Produto / Serviço</div>
+                    <div class="info-value">{{ venda.get_tipo_produto_display }}</div>
+                </div>
+                <div class="col-3">
+                    <div class="info-label">Data</div>
+                    <div class="info-value">{{ venda.data_venda|date:"d/m/Y" }}</div>
+                </div>
+                <div class="col-3">
+                    <div class="info-label">Status</div>
+                    <div class="info-value">{{ venda.get_status_display }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-2">
+            <div class="col-12"><h6 class="text-uppercase fw-bold border-bottom pb-1">Detalhes Financeiros</h6></div>
+        </div>
+
+        <div class="info-group bg-light">
+            <div class="row align-items-center">
+                <div class="col-6 border-end">
+                    <div class="info-label">Forma de Pagamento</div>
+                    <div class="info-value mb-2">{{ venda.get_forma_pagamento_display }}</div>
+
+                    {% if venda.forma_pagamento == 'FINANCIAMENTO' %}
+                        <div class="small mt-2 p-2 bg-white border rounded">
+                            <strong>Banco:</strong> {{ venda.banco_financiamento }}<br>
+                            <strong>Proposta:</strong> {{ venda.numero_proposta }}
+                        </div>
+                    {% else %}
+                        {% if venda.comprovante %}
+                            <div class="small mt-2 text-success">
+                                <i class="fa fa-check-circle"></i> Comprovante anexado ao sistema.
+                            </div>
+                        {% else %}
+                             <div class="small mt-2 text-muted">
+                                <em>Sem comprovante (Valor isento ou não anexado)</em>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+                
+                <div class="col-6 text-center">
+                    <div class="info-label">Valor Total Cobrado</div>
+                    <div class="valor-destaque">R$ {{ venda.valor_venda }}</div>
+                </div>
+            </div>
+        </div>
+
+        {% if venda.observacoes %}
+        <div class="info-group">
+            <div class="info-label">Observações / Detalhes Adicionais</div>
+            <p class="mb-0 mt-1">{{ venda.observacoes|linebreaksbr }}</p>
+        </div>
+        {% endif %}
+
+        <p class="small text-muted text-justify mt-4">
+            Declaro ter conferido os dados acima descritos referente à venda de produto/serviço agregado. 
+            Este documento comprova o lançamento no sistema para fins de comissionamento e faturamento da loja.
+        </p>
+
+        <div class="signature-section">
+            <div class="sign-line">
+                <strong>{{ venda.vendedor.get_full_name|default:venda.vendedor.username }}</strong><br>
+                <span class="small text-muted">Vendedor Responsável</span>
+            </div>
+            <div class="sign-line">
+                <br>
+                <strong>Gerência / Administrativo</strong><br>
+                <span class="small text-muted">Visto de Conferência</span>
+            </div>
+        </div>
+
+        <div class="text-center mt-5 pt-3 border-top text-muted" style="font-size: 0.75rem;">
+            SPAGI Sistemas - Gerado em {% now "d/m/Y \à\s H:i" %} - Usuário: {{ user.username }}
+        </div>
+
+    </div>
+</body>
+</html>

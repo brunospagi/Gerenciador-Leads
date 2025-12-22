@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'webpush',
     'documentos',
     'autorizacoes',
+    'vendas_produtos',
 ]
 
 MIDDLEWARE = [
