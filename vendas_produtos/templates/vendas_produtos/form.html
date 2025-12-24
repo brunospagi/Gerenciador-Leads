@@ -1,211 +1,138 @@
 {% extends 'base.html' %}
+{% load static %}
+
 {% block content %}
 <div class="container mt-4">
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white py-3">
-            <h5 class="mb-0 text-success"><i class="fa fa-cash-register me-2"></i>Registrar Venda (Produtos/Serviços)</h5>
-        </div>
-        <div class="card-body p-4">
-            <div class="alert alert-warning small">
-                <i class="fa fa-exclamation-circle"></i> Atenção: Não é possível realizar lançamentos com data retroativa.
-            </div>
-
-            <form method="post" id="vendaForm" enctype="multipart/form-data">
-                {% csrf_token %}
-                
-                {% if form.errors %}
-                <div class="alert alert-danger">
-                    Por favor, corrija os erros abaixo.
-                    {{ form.non_field_errors }}
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fa fa-edit me-2"></i>
+                        {% if object %}Editar Venda{% else %}Nova Venda{% endif %}
+                    </h5>
                 </div>
-                {% endif %}
+                <div class="card-body p-4">
+                    <form method="post" enctype="multipart/form-data" id="vendaForm">
+                        {% csrf_token %}
 
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold">Tipo de Produto</label>
-                        {{ form.tipo_produto }}
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Placa</label>
-                        {{ form.placa }}
-                        <div class="text-danger small">{{ form.placa.errors }}</div>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Data</label>
-                        <input type="text" class="form-control" value="{% now 'd/m/Y' %}" disabled>
-                    </div>
-
-                    <div class="col-md-12">
-                        <label class="form-label">Nome do Cliente</label>
-                        {{ form.cliente_nome }}
-                    </div>
-                    
-                    <div class="col-md-12" id="divAdesao" style="display:none;">
-                        <div class="card bg-light border-info">
-                            <div class="card-body py-2">
-                                <label class="form-label fw-bold text-info">Cobrança de Adesão</label>
-                                {{ form.cobrou_adesao }}
-                                <div class="form-text small">Se marcar "Não", a forma de pagamento não será exigida.</div>
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                        {% endif %}
+                        
+                        <h6 class="text-primary border-bottom pb-2 mb-3">Dados da Venda</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Tipo de Produto/Serviço</label>
+                                {{ form.tipo_produto }}
+                                <div class="text-danger small">{{ form.tipo_produto.errors }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Data da Venda</label>
+                                {{ form.data_venda }}
+                                <div class="text-danger small">{{ form.data_venda.errors }}</div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="col-md-6">
-                        <label class="form-label fw-bold text-success">Valor Cobrado (Venda)</label>
-                        <div class="input-group">
-                            <span class="input-group-text">R$</span>
-                            {{ form.valor_venda }}
-                        </div>
-                        <div class="text-danger small">{{ form.valor_venda.errors }}</div>
-                    </div>
-
-                    <div class="col-md-6" id="divCustoBase" style="display:none;">
-                        <label class="form-label fw-bold text-danger">Custo Despachante</label>
-                        <div class="input-group">
-                            <span class="input-group-text">R$</span>
-                            {{ form.custo_base }}
-                        </div>
-                    </div>
-                    
-                    <div class="col-12"><hr></div>
-
-                    <div class="col-12 row g-3" id="containerPagamento">
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold">Forma de Pagamento</label>
-                            {{ form.forma_pagamento }}
+                        <h6 class="text-primary border-bottom pb-2 mb-3 mt-4">Cliente e Veículo</h6>
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold">Nome do Cliente</label>
+                                {{ form.cliente_nome }}
+                                <div class="text-danger small">{{ form.cliente_nome.errors }}</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Placa do Veículo</label>
+                                {{ form.placa }}
+                                <div class="text-danger small">{{ form.placa.errors }}</div>
+                            </div>
                         </div>
 
-                        <div class="col-md-8" id="divComprovante">
-                            <label class="form-label fw-bold text-primary">Comprovante de Pagamento</label>
+                        <h6 class="text-primary border-bottom pb-2 mb-3 mt-4">Pagamento</h6>
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Valor Cobrado (R$)</label>
+                                {{ form.valor_venda }}
+                                <div class="text-danger small">{{ form.valor_venda.errors }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Forma de Pagamento</label>
+                                {{ form.forma_pagamento }} <div class="text-danger small">{{ form.forma_pagamento.errors }}</div>
+                            </div>
+                        </div>
+
+                        <div id="bloco_comprovante" class="mt-3 p-3 bg-light border rounded">
+                            <label class="form-label fw-bold text-dark"><i class="fa fa-file-upload me-2"></i>Comprovante de Pagamento</label>
                             {{ form.comprovante }}
-                            <div class="form-text">Obrigatório para Pix, Transferência e Cartões.</div>
+                            <div class="form-text text-muted small">Obrigatório para Pix, Cartões e Transferência.</div>
                             <div class="text-danger small">{{ form.comprovante.errors }}</div>
                         </div>
 
-                        <div class="col-md-8 row" id="divFinanciamento" style="display:none;">
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold text-primary">Banco Financiador</label>
-                                {{ form.banco_financiamento }}
-                                <div class="text-danger small">{{ form.banco_financiamento.errors }}</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold text-primary">Nº da Proposta</label>
-                                {{ form.numero_proposta }}
-                                <div class="text-danger small">{{ form.numero_proposta.errors }}</div>
+                        <div id="bloco_financiamento" class="mt-3 p-3 bg-light border rounded d-none">
+                            <h6 class="text-secondary small text-uppercase fw-bold mb-3"><i class="fa fa-university me-2"></i>Dados do Financiamento</h6>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Banco Financiador</label>
+                                    {{ form.banco_financiamento }}
+                                    <div class="text-danger small">{{ form.banco_financiamento.errors }}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Número da Proposta</label>
+                                    {{ form.numero_proposta }}
+                                    <div class="text-danger small">{{ form.numero_proposta.errors }}</div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label">Observações</label>
-                        {{ form.observacoes }}
-                    </div>
-                </div>
 
-                <div class="mt-4 text-end">
-                    <a href="{% url 'venda_produto_list' %}" class="btn btn-light border">Cancelar</a>
-                    <button type="submit" class="btn btn-success px-4">Salvar Venda</button>
+                        <div class="mt-4">
+                            <label class="form-label">Observações (Opcional)</label>
+                            {{ form.observacoes }}
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <a href="{% url 'venda_produto_list' %}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-success px-4">Salvar Venda</button>
+                        </div>
+                    </form>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        const selectTipo = document.getElementById('tipoProdutoSelect');
-        const selectAdesao = document.getElementById('cobrouAdesaoSelect');
-        const selectPagamento = document.getElementById('formaPagamentoSelect');
+        const selectPagamento = document.getElementById('id_forma_pagamento');
+        const blocoComprovante = document.getElementById('bloco_comprovante');
+        const blocoFinanciamento = document.getElementById('bloco_financiamento');
         
-        const divCusto = document.getElementById('divCustoBase');
-        const divAdesao = document.getElementById('divAdesao');
-        const containerPagamento = document.getElementById('containerPagamento');
-        
-        const divComprovante = document.getElementById('divComprovante');
-        const divFinanciamento = document.getElementById('divFinanciamento');
-        
-        const inputCusto = document.getElementById('custoBaseInput');
-        const inputValor = document.getElementById('valorVendaInput');
-        
-        // Inputs Pagamento
-        const inputBanco = document.getElementById('bancoInput');
-        const inputProposta = document.getElementById('propostaInput');
+        // Campos inputs (para limpar ou exigir, se quiser fazer validação front-end extra)
+        const inputBanco = document.getElementById('id_banco_financiamento');
+        const inputProposta = document.getElementById('id_numero_proposta');
+        const inputComprovante = document.getElementById('id_comprovante');
 
-        function atualizarInterface() {
-            const tipo = selectTipo.value;
-            
-            // 1. Controle do CUSTO (Transferência)
-            if (tipo === 'TRANSFERENCIA') {
-                divCusto.style.display = 'block';
-                inputCusto.required = true;
-            } else {
-                divCusto.style.display = 'none';
-                inputCusto.required = false;
-                inputCusto.value = '0'; 
-            }
+        function alternarCampos() {
+            const metodo = selectPagamento.value;
 
-            // 2. Controle do SEGURO (Adesão)
-            if (tipo === 'SEGURO') {
-                divAdesao.style.display = 'block';
-                verificarAdesao(); // Aqui decide se mostra pagamento ou não
+            if (metodo === 'FINANCIAMENTO') {
+                // Se for Financiamento: Mostra Banco/Proposta e Esconde Comprovante
+                blocoFinanciamento.classList.remove('d-none');
+                blocoComprovante.classList.add('d-none');
             } else {
-                divAdesao.style.display = 'none';
-                
-                // Se não é seguro, o pagamento aparece normal e o valor é livre
-                containerPagamento.style.display = 'flex';
-                inputValor.readOnly = false;
-                if(inputValor.value == '0') inputValor.value = '';
-                togglePagamento();
-            }
-        }
-        
-        function togglePagamento() {
-            // Se o container estiver escondido, não faz nada
-            if (containerPagamento.style.display === 'none') return;
-
-            const forma = selectPagamento.value;
-            
-            if (forma === 'FINANCIAMENTO') {
-                divComprovante.style.display = 'none';
-                divFinanciamento.style.display = 'flex';
-                inputBanco.required = true;
-                inputProposta.required = true;
-            } else {
-                divComprovante.style.display = 'block';
-                divFinanciamento.style.display = 'none';
-                inputBanco.required = false;
-                inputProposta.required = false;
+                // Qualquer outro: Mostra Comprovante e Esconde Banco/Proposta
+                blocoFinanciamento.classList.add('d-none');
+                blocoComprovante.classList.remove('d-none');
             }
         }
 
-        function verificarAdesao() {
-            if (selectTipo.value === 'SEGURO') {
-                if (selectAdesao.value === 'NAO') {
-                    // --- MODO: SEM ADESÃO ---
-                    // Zera valor, bloqueia input e ESCONDE pagamento
-                    inputValor.value = '0';
-                    inputValor.readOnly = true;
-                    inputValor.style.backgroundColor = '#e9ecef';
-                    
-                    containerPagamento.style.display = 'none';
-                } else {
-                    // --- MODO: COM ADESÃO ---
-                    // Libera valor e MOSTRA pagamento
-                    inputValor.readOnly = false;
-                    inputValor.style.backgroundColor = '#fff';
-                    if(inputValor.value == '0') inputValor.value = '299.00';
-                    
-                    containerPagamento.style.display = 'flex';
-                    togglePagamento();
-                }
-            }
-        }
+        // Executa ao carregar a página (caso seja edição ou erro de validação)
+        alternarCampos();
 
-        selectTipo.addEventListener('change', atualizarInterface);
-        selectAdesao.addEventListener('change', verificarAdesao);
-        selectPagamento.addEventListener('change', togglePagamento);
-        
-        // Inicializa
-        atualizarInterface();
+        // Executa sempre que mudar o select
+        selectPagamento.addEventListener('change', alternarCampos);
     });
 </script>
 {% endblock %}
