@@ -8,7 +8,7 @@ class VendaProdutoForm(forms.ModelForm):
         fields = [
             'tipo_produto', 'cliente_nome', 'placa', 'valor_venda', 
             'forma_pagamento', 'comprovante', 'banco_financiamento', 
-            'numero_proposta', 'custo_base', 'observacoes', 'data_venda'
+            'numero_proposta', 'observacoes', 'data_venda'
         ]
         widgets = {
             # OBRIGATÓRIO: format='%Y-%m-%d' faz o navegador reconhecer a data vinda do banco
@@ -19,7 +19,6 @@ class VendaProdutoForm(forms.ModelForm):
             'placa': forms.TextInput(attrs={'style': 'text-transform:uppercase', 'class': 'form-control'}),
             'cliente_nome': forms.TextInput(attrs={'class': 'form-control'}),
             'valor_venda': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control'}),
-            'custo_base': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control'}),
             'observacoes': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
             'tipo_produto': forms.Select(attrs={'class': 'form-select'}),
             'forma_pagamento': forms.Select(attrs={'class': 'form-select'}),
