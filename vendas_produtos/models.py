@@ -6,17 +6,24 @@ from decimal import Decimal
 import os
 import uuid
 
-# Importa a classe de armazenamento do MinIO configurada no projeto
+# Import da classe de armazenamento MinIO (certifique-se que o caminho está correto)
 from crmspagi.storage_backends import PublicMediaStorage
 
 User = get_user_model()
 
 def get_comprovante_upload_path(instance, filename):
-    """Gera caminho único: vendas_produtos/PLACA/uuid.ext"""
+    """Gera caminho único para comprovantes de pagamento (Cliente -> Loja)"""
     ext = os.path.splitext(filename)[1]
     unique_filename = f"{uuid.uuid4()}{ext}"
     folder = instance.placa if instance.placa else 'geral'
-    return f"vendas_produtos/{folder}/{unique_filename}"
+    return f"vendas_produtos/comprovantes/{folder}/{unique_filename}"
+
+def get_apolice_upload_path(instance, filename):
+    """Gera caminho único para o PDF da Apólice (Gerente -> MinIO)"""
+    ext = os.path.splitext(filename)[1]
+    unique_filename = f"apolice_{uuid.uuid4()}{ext}"
+    folder = instance.placa if instance.placa else 'geral'
+    return f"vendas_produtos/apolices/{folder}/{unique_filename}"
 
 class VendaProduto(models.Model):
     TIPO_CHOICES = [
@@ -48,17 +55,28 @@ class VendaProduto(models.Model):
     
     forma_pagamento = models.CharField(max_length=20, choices=PAGAMENTO_CHOICES, default='PIX', verbose_name="Forma de Pagamento")
     
-    # Upload MinIO
+    # Upload do Comprovante (Vendedor)
     comprovante = models.FileField(
         upload_to=get_comprovante_upload_path,
         storage=PublicMediaStorage(), 
         blank=True, 
-        null=True, 
+        null=True,
         verbose_name="Comprovante de Pagamento"
     )
     
     banco_financiamento = models.CharField(max_length=100, blank=True, null=True, verbose_name="Banco Financiador")
     numero_proposta = models.CharField(max_length=50, blank=True, null=True, verbose_name="Nº da Proposta")
+
+    # === NOVOS CAMPOS: APÓLICE (GERENTE) ===
+    numero_apolice = models.CharField(max_length=50, blank=True, null=True, verbose_name="Nº da Apólice")
+    arquivo_apolice = models.FileField(
+        upload_to=get_apolice_upload_path,
+        storage=PublicMediaStorage(),
+        blank=True, 
+        null=True,
+        verbose_name="PDF da Apólice"
+    )
+    # =======================================
 
     custo_base = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Custo Real / Base")
     valor_venda = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Valor Cobrado do Cliente")
@@ -81,6 +99,7 @@ class VendaProduto(models.Model):
         ordering = ['-data_venda', '-data_criacao']
 
     def clean(self):
+        # Validação de Data Retroativa
         hoje = timezone.now().date()
         data_lancamento = self.data_venda
         if isinstance(data_lancamento, timezone.datetime):
@@ -89,11 +108,12 @@ class VendaProduto(models.Model):
         if self._state.adding and data_lancamento < hoje:
             raise ValidationError("Não é permitido lançar vendas com data retroativa.")
 
+        # Validação Valor Mínimo Garantia
         if self.tipo_produto == 'GARANTIA':
             if self.valor_venda < 1300:
                 raise ValidationError({'valor_venda': 'O valor mínimo para Seguro Garantia é R$ 1.300,00.'})
 
-        # Regra de Pagamento Condicional (só exige se valor > 0)
+        # Validação Pagamento
         if self.valor_venda > 0:
             if self.forma_pagamento == 'FINANCIAMENTO':
                 if not self.banco_financiamento:
@@ -105,7 +125,7 @@ class VendaProduto(models.Model):
                     raise ValidationError({'comprovante': 'O comprovante é obrigatório.'})
 
     def save(self, *args, **kwargs):
-        # 1. GARANTIA
+        # 1. CÁLCULO DE COMISSÕES E LUCRO
         if self.tipo_produto == 'GARANTIA':
             custo_real_provider = Decimal('997.00')
             preco_base_loja = Decimal('1300.00')
@@ -117,21 +137,17 @@ class VendaProduto(models.Model):
             else:
                 self.comissao_vendedor = Decimal('0.00')
 
-        # 2. SEGURO VEÍCULO
         elif self.tipo_produto == 'SEGURO':
             referencia_comissao = Decimal('150.00')
             self.custo_base = Decimal('0.00')
             
-            if self.valor_venda >= 150:
-                # Com Adesão: Loja fica com TUDO. Vendedor recebe por fora.
+            if self.valor_venda >= 299:
                 self.comissao_vendedor = referencia_comissao
                 self.lucro_loja = self.valor_venda 
             else:
-                # Sem Adesão: Porcentagem
                 self.comissao_vendedor = referencia_comissao * Decimal('0.40')
                 self.lucro_loja = referencia_comissao * Decimal('0.60')
 
-        # 3. TRANSFERÊNCIA
         elif self.tipo_produto == 'TRANSFERENCIA':
             lucro_operacao = self.valor_venda - self.custo_base
             if lucro_operacao > 0:

@@ -3,49 +3,18 @@
 
 {% block content %}
 <div class="container-fluid mt-3">
-    
     <div class="alert alert-light border shadow-sm d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <i class="fa fa-calendar-alt text-primary me-2"></i>
-            <strong>Período:</strong> {{ periodo_inicio|date:"d/m" }} a {{ periodo_fim|date:"d/m/Y" }}
-        </div>
-        <div class="d-flex align-items-center gap-2">
-            <span class="text-muted small me-2">Mês Atual</span>
-            {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-            <a href="{% url 'venda_produto_relatorio' %}" class="btn btn-dark btn-sm">
-                <i class="fa fa-file-invoice-dollar me-2"></i> Relatório
-            </a>
-            {% endif %}
-        </div>
+        <div><i class="fa fa-calendar-alt text-primary me-2"></i> <strong>Período:</strong> {{ periodo_inicio|date:"d/m" }} a {{ periodo_fim|date:"d/m/Y" }}</div>
+        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+        <a href="{% url 'venda_produto_relatorio' %}" class="btn btn-dark btn-sm"><i class="fa fa-file-invoice-dollar me-2"></i> Relatório</a>
+        {% endif %}
     </div>
 
     <div class="row mb-4">
-        <div class="col-md-4 mb-3">
-            <div class="card bg-primary text-white h-100 shadow-sm border-0">
-                <div class="card-body">
-                    <h6>Minha Comissão</h6>
-                    <h3 class="fw-bold">R$ {{ minha_comissao|floatformat:2 }}</h3>
-                </div>
-            </div>
-        </div>
-
+        <div class="col-md-4 mb-3"><div class="card bg-primary text-white h-100 shadow-sm border-0"><div class="card-body"><h6>Minha Comissão</h6><h3 class="fw-bold">R$ {{ minha_comissao|floatformat:2 }}</h3></div></div></div>
         {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-        <div class="col-md-4 mb-3">
-            <div class="card bg-info text-dark h-100 shadow-sm border-0">
-                <div class="card-body">
-                    <h6>Total Equipe</h6>
-                    <h3 class="fw-bold">R$ {{ total_comissao_equipe|floatformat:2 }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4 mb-3">
-            <div class="card bg-success text-white h-100 shadow-sm border-0">
-                <div class="card-body">
-                    <h6>Lucro Loja</h6>
-                    <h3 class="fw-bold">R$ {{ total_loja|floatformat:2 }}</h3>
-                </div>
-            </div>
-        </div>
+        <div class="col-md-4 mb-3"><div class="card bg-info text-dark h-100 shadow-sm border-0"><div class="card-body"><h6>Total Equipe</h6><h3 class="fw-bold">R$ {{ total_comissao_equipe|floatformat:2 }}</h3></div></div></div>
+        <div class="col-md-4 mb-3"><div class="card bg-success text-white h-100 shadow-sm border-0"><div class="card-body"><h6>Lucro Loja</h6><h3 class="fw-bold">R$ {{ total_loja|floatformat:2 }}</h3></div></div></div>
         {% endif %}
     </div>
 
@@ -61,94 +30,94 @@
                         <tr>
                             <th>Data</th>
                             {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}<th>Vendedor</th>{% endif %}
-                            <th>Produto</th>
-                            <th>Cliente / Placa</th>
+                            <th>Produto / Apólice</th>
+                            <th>Cliente</th>
                             <th>Valores</th>
                             <th>Status</th>
-                            <th class="text-end" style="min-width: 150px;">Ações</th>
+                            <th class="text-end">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in vendas %}
                         <tr class="{% if item.status == 'REJEITADO' %}table-danger bg-opacity-10{% endif %}">
-                            
                             <td>{{ item.data_venda|date:"d/m/y" }}</td>
                             
                             {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                            <td>
-                                <span class="fw-bold text-dark">{{ item.vendedor.get_full_name|default:item.vendedor.username }}</span>
-                            </td>
+                            <td>{{ item.vendedor.get_full_name|default:item.vendedor.username }}</td>
                             {% endif %}
 
                             <td>
-                                {{ item.get_tipo_produto_display }}<br>
+                                <div class="fw-bold">{{ item.get_tipo_produto_display }}</div>
                                 <span class="badge bg-light text-dark border">{{ item.get_forma_pagamento_display }}</span>
-                            </td>
-
-                            <td>
-                                <strong>{{ item.cliente_nome }}</strong><br>
-                                <small class="text-muted">{{ item.placa }}</small>
-                            </td>
-
-                            <td>
-                                <div style="font-size:0.9em">
-                                    Venda: R$ {{ item.valor_venda }}<br>
-                                    <span class="text-success fw-bold">Com: R$ {{ item.comissao_vendedor }}</span>
-                                </div>
-                            </td>
-
-                            <td>
-                                {% if item.status == 'APROVADO' %}
-                                    <span class="badge bg-success"><i class="fa fa-check"></i> Aprovado</span>
-                                {% elif item.status == 'REJEITADO' %}
-                                    <span class="badge bg-danger"><i class="fa fa-times"></i> Rejeitado</span>
-                                    {% if item.motivo_recusa %}
-                                    <i class="fa fa-info-circle text-danger ms-1" title="{{ item.motivo_recusa }}"></i>
-                                    {% endif %}
-                                {% else %}
-                                    <span class="badge bg-warning text-dark"><i class="fa fa-clock"></i> Pendente</span>
+                                
+                                {% if item.numero_apolice %}
+                                    <div class="mt-1 small border-top pt-1">
+                                        <strong>Apólice:</strong> {{ item.numero_apolice }}
+                                        {% if item.arquivo_apolice %}
+                                            <a href="{{ item.arquivo_apolice.url }}" target="_blank" class="text-danger ms-1 text-decoration-none fw-bold">
+                                                <i class="fa fa-file-pdf"></i> PDF
+                                            </a>
+                                        {% endif %}
+                                    </div>
                                 {% endif %}
+                            </td>
+                            <td><strong>{{ item.cliente_nome }}</strong><br><small class="text-muted">{{ item.placa }}</small></td>
+                            <td><small>Venda: {{ item.valor_venda }}</small><br><strong class="text-success">Com: {{ item.comissao_vendedor }}</strong></td>
+                            <td>
+                                {% if item.status == 'APROVADO' %}<span class="badge bg-success"><i class="fa fa-check"></i> Aprovado</span>
+                                {% elif item.status == 'REJEITADO' %}<span class="badge bg-danger"><i class="fa fa-times"></i> Rejeitado</span>
+                                {% else %}<span class="badge bg-warning text-dark"><i class="fa fa-clock"></i> Pendente</span>{% endif %}
                             </td>
                             
                             <td class="text-end">
                                 {% if item.comprovante %}
-                                    <button type="button" class="btn btn-sm btn-info text-white" data-bs-toggle="modal" data-bs-target="#modalComprovante{{ item.pk }}" title="Ver Comprovante"><i class="fa fa-eye"></i></button>
+                                    <button class="btn btn-sm btn-info text-white" data-bs-toggle="modal" data-bs-target="#modalComprovante{{ item.pk }}"><i class="fa fa-eye"></i></button>
                                 {% endif %}
-                                
-                                <a href="{% url 'venda_produto_print' item.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Imprimir"><i class="fa fa-print"></i></a>
-                                
+                                <a href="{% url 'venda_produto_print' item.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="fa fa-print"></i></a>
+
                                 {% if item.status != 'APROVADO' or user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                                    <a href="{% url 'venda_produto_update' item.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fa fa-pencil-alt"></i></a>
-                                    <a href="{% url 'venda_produto_delete' item.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fa fa-trash"></i></a>
+                                    <a href="{% url 'venda_produto_update' item.pk %}" class="btn btn-sm btn-outline-primary"><i class="fa fa-pencil-alt"></i></a>
+                                    <a href="{% url 'venda_produto_delete' item.pk %}" class="btn btn-sm btn-outline-danger"><i class="fa fa-trash"></i></a>
                                 {% endif %}
 
                                 {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
                                     {% if item.status == 'PENDENTE' %}
                                         <div class="vr mx-1"></div>
-                                        <a href="{% url 'venda_produto_approve' item.pk %}" class="btn btn-sm btn-success" title="Aprovar"><i class="fa fa-check"></i></a>
-                                        <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#modalRecusa{{ item.pk }}" title="Recusar"><i class="fa fa-times"></i></button>
+                                        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalAprovar{{ item.pk }}"><i class="fa fa-check"></i></button>
+                                        <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#modalRecusa{{ item.pk }}"><i class="fa fa-times"></i></button>
                                     {% endif %}
                                 {% endif %}
 
+                                <div class="modal fade" id="modalAprovar{{ item.pk }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <form action="{% url 'venda_produto_approve' item.pk %}" method="post" enctype="multipart/form-data">
+                                            {% csrf_token %}
+                                            <div class="modal-content">
+                                                <div class="modal-header bg-success text-white"><h5 class="modal-title">Aprovar Venda</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                                                <div class="modal-body text-start">
+                                                    <p class="mb-2"><strong>Cliente:</strong> {{ item.cliente_nome }}</p>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold">Nº Apólice</label>
+                                                        <input type="text" name="numero_apolice" class="form-control" {% if item.tipo_produto == 'GARANTIA' %}required{% endif %}>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold">PDF da Apólice</label>
+                                                        <input type="file" name="arquivo_apolice" class="form-control" accept="application/pdf" {% if item.tipo_produto == 'GARANTIA' %}required{% endif %}>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer"><button type="submit" class="btn btn-success">Confirmar</button></div>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
                                 {% if item.comprovante %}
                                 <div class="modal fade" id="modalComprovante{{ item.pk }}" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog modal-lg">
                                         <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title">Comprovante</h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <div class="modal-body text-center bg-light">
-                                                {% with ext=item.comprovante.url|slice:"-4:"|lower %}
-                                                    {% if ext == ".jpg" or ext == ".png" or item.comprovante.url|slice:"-5:"|lower == ".jpeg" %}
-                                                        <img src="{{ item.comprovante.url }}" class="img-fluid rounded" style="max-height:500px">
-                                                    {% else %}
-                                                        <div class="py-5">
-                                                            <i class="fa fa-file-pdf fa-4x text-danger mb-3"></i><br>
-                                                            <a href="{{ item.comprovante.url }}" target="_blank" class="btn btn-primary">Abrir Documento</a>
-                                                        </div>
-                                                    {% endif %}
-                                                {% endwith %}
+                                            <div class="modal-header"><h5 class="modal-title">Comprovante</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                                            <div class="modal-body text-center">
+                                                <img src="{{ item.comprovante.url }}" class="img-fluid" style="max-height:500px">
+                                                <div class="mt-2"><a href="{{ item.comprovante.url }}" target="_blank" class="btn btn-primary btn-sm">Baixar</a></div>
                                             </div>
                                         </div>
                                     </div>
@@ -160,45 +129,22 @@
                                         <form action="{% url 'venda_produto_reject' item.pk %}" method="post">
                                             {% csrf_token %}
                                             <div class="modal-content">
-                                                <div class="modal-header bg-danger text-white">
-                                                    <h5 class="modal-title">Motivo da Recusa</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                </div>
-                                                <div class="modal-body text-start">
-                                                    <textarea name="motivo_recusa" class="form-control" rows="3" required placeholder="Digite o motivo..."></textarea>
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="submit" class="btn btn-danger">Confirmar Recusa</button>
-                                                </div>
+                                                <div class="modal-header bg-danger text-white"><h5 class="modal-title">Recusar</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                                                <div class="modal-body"><textarea name="motivo_recusa" class="form-control" rows="3" required placeholder="Motivo..."></textarea></div>
+                                                <div class="modal-footer"><button type="submit" class="btn btn-danger">Confirmar</button></div>
                                             </div>
                                         </form>
                                     </div>
                                 </div>
-                                </td>
+
+                            </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="8" class="text-center py-5 text-muted">Nenhuma venda registrada neste mês.</td></tr>
+                        <tr><td colspan="8" class="text-center py-5">Nenhum registro.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-
-            {% if is_paginated %}
-            <div class="d-flex justify-content-center py-3">
-                <nav>
-                    <ul class="pagination">
-                        {% if page_obj.has_previous %}
-                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a></li>
-                        {% endif %}
-                        <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
-                        {% if page_obj.has_next %}
-                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Próxima</a></li>
-                        {% endif %}
-                    </ul>
-                </nav>
-            </div>
-            {% endif %}
-
         </div>
     </div>
 </div>
