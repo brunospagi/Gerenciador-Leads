@@ -16,37 +16,43 @@
                     <form method="post" enctype="multipart/form-data" id="vendaForm">
                         {% csrf_token %}
 
-                        {% if form.non_field_errors %}
+                        {% if form.errors %}
                         <div class="alert alert-danger">
-                            {{ form.non_field_errors }}
+                            <strong>Erro ao salvar:</strong>
+                            <ul>
+                                {% for field in form %}
+                                    {% for error in field.errors %}
+                                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% for error in form.non_field_errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
                         </div>
                         {% endif %}
                         
                         <h6 class="text-primary border-bottom pb-2 mb-3">Dados da Venda</h6>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">Tipo de Produto/Serviço</label>
+                                <label class="form-label fw-bold">Tipo de Produto/Serviço *</label>
                                 {{ form.tipo_produto }}
-                                <div class="text-danger small">{{ form.tipo_produto.errors }}</div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">Data da Venda</label>
+                                <label class="form-label fw-bold">Data da Venda *</label>
                                 {{ form.data_venda }}
-                                <div class="text-danger small">{{ form.data_venda.errors }}</div>
                             </div>
                         </div>
 
                         <h6 class="text-primary border-bottom pb-2 mb-3 mt-4">Cliente e Veículo</h6>
                         <div class="row g-3">
                             <div class="col-md-8">
-                                <label class="form-label fw-bold">Nome do Cliente</label>
+                                <label class="form-label fw-bold">Nome do Cliente *</label>
                                 {{ form.cliente_nome }}
-                                <div class="text-danger small">{{ form.cliente_nome.errors }}</div>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold">Placa do Veículo</label>
+                                <label class="form-label fw-bold">Placa do Veículo *</label>
                                 {{ form.placa }}
-                                <div class="text-danger small">{{ form.placa.errors }}</div>
                             </div>
                         </div>
 
@@ -54,13 +60,12 @@
                         
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">Valor Cobrado (R$)</label>
+                                <label class="form-label fw-bold">Valor Cobrado (R$) *</label>
                                 {{ form.valor_venda }}
-                                <div class="text-danger small">{{ form.valor_venda.errors }}</div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">Forma de Pagamento</label>
-                                {{ form.forma_pagamento }} <div class="text-danger small">{{ form.forma_pagamento.errors }}</div>
+                                <label class="form-label fw-bold">Forma de Pagamento *</label>
+                                {{ form.forma_pagamento }}
                             </div>
                         </div>
 
@@ -68,7 +73,6 @@
                             <label class="form-label fw-bold text-dark"><i class="fa fa-file-upload me-2"></i>Comprovante de Pagamento</label>
                             {{ form.comprovante }}
                             <div class="form-text text-muted small">Obrigatório para Pix, Cartões e Transferência.</div>
-                            <div class="text-danger small">{{ form.comprovante.errors }}</div>
                         </div>
 
                         <div id="bloco_financiamento" class="mt-3 p-3 bg-light border rounded d-none">
@@ -77,18 +81,16 @@
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Banco Financiador</label>
                                     {{ form.banco_financiamento }}
-                                    <div class="text-danger small">{{ form.banco_financiamento.errors }}</div>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Número da Proposta</label>
                                     {{ form.numero_proposta }}
-                                    <div class="text-danger small">{{ form.numero_proposta.errors }}</div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="mt-4">
-                            <label class="form-label">Observações (Opcional)</label>
+                            <label class="form-label">Observações</label>
                             {{ form.observacoes }}
                         </div>
 
@@ -106,32 +108,57 @@
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         const selectPagamento = document.getElementById('id_forma_pagamento');
-        const blocoComprovante = document.getElementById('bloco_comprovante');
-        const blocoFinanciamento = document.getElementById('bloco_financiamento');
         
-        // Campos inputs (para limpar ou exigir, se quiser fazer validação front-end extra)
+        const blocoComprovante = document.getElementById('bloco_comprovante');
+        const inputComprovante = document.getElementById('id_comprovante');
+        
+        const blocoFinanciamento = document.getElementById('bloco_financiamento');
         const inputBanco = document.getElementById('id_banco_financiamento');
         const inputProposta = document.getElementById('id_numero_proposta');
-        const inputComprovante = document.getElementById('id_comprovante');
 
         function alternarCampos() {
             const metodo = selectPagamento.value;
 
             if (metodo === 'FINANCIAMENTO') {
-                // Se for Financiamento: Mostra Banco/Proposta e Esconde Comprovante
+                // MODO FINANCIAMENTO
+                // 1. Mostra bloco
                 blocoFinanciamento.classList.remove('d-none');
+                
+                // 2. Torna Inputs Obrigatórios (HTML)
+                inputBanco.setAttribute('required', 'required');
+                inputProposta.setAttribute('required', 'required');
+
+                // 3. Esconde Comprovante
                 blocoComprovante.classList.add('d-none');
+                
+                // 4. Remove Obrigatório do Comprovante (ESSENCIAL PARA O FORMULÁRIO ENVIAR)
+                inputComprovante.removeAttribute('required');
+                inputComprovante.value = ""; // Limpa arquivo se tiver selecionado
+
             } else {
-                // Qualquer outro: Mostra Comprovante e Esconde Banco/Proposta
+                // MODO PIX / OUTROS
+                // 1. Esconde bloco financiamento
                 blocoFinanciamento.classList.add('d-none');
+                
+                // 2. Remove Obrigatório dos campos ocultos
+                inputBanco.removeAttribute('required');
+                inputProposta.removeAttribute('required');
+                inputBanco.value = "";
+                inputProposta.value = "";
+
+                // 3. Mostra Comprovante
                 blocoComprovante.classList.remove('d-none');
+                
+                // 4. Torna Comprovante Obrigatório (se for nova venda)
+                // Nota: Em edição, se já tiver arquivo, o Django lida, mas para HTML5 puro "required" sempre pede
+                {% if not object.comprovante %}
+                inputComprovante.setAttribute('required', 'required');
+                {% endif %}
             }
         }
 
-        // Executa ao carregar a página (caso seja edição ou erro de validação)
+        // Executa ao carregar e ao mudar
         alternarCampos();
-
-        // Executa sempre que mudar o select
         selectPagamento.addEventListener('change', alternarCampos);
     });
 </script>
