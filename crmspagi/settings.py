@@ -69,8 +69,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'mozilla_django_oidc.auth.OIDCAuthenticationBackend',
 ]
+
 #--- Configuração da API Gemini (LIDA DO .ENV) ---
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') 
 
