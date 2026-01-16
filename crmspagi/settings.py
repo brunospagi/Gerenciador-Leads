@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'vendas_produtos',
     'financiamentos',
     'core',
+    'mozilla_django_oidc',
 ]
 
 MIDDLEWARE = [
@@ -68,9 +69,21 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'mozilla_django_oidc.auth.OIDCAuthenticationBackend',
 ]
 #--- Configuração da API Gemini (LIDA DO .ENV) ---
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') 
+
+# Configurações do OIDC (Lidas do .ENV)
+OIDC_RP_CLIENT_ID = os.getenv('OIDC_RP_CLIENT_ID')
+OIDC_RP_CLIENT_SECRET = os.getenv('OIDC_RP_CLIENT_SECRET')
+OIDC_RP_SIGN_ALGO = 'HS256' # Ou 'RS256', dependendo da config no Authentik
+
+# Endpoints do Authentik (Substitua a URL base pela do seu Authentik)
+# Exemplo: https://authentik.spagisistemas.com.br/application/o/<slug-da-aplicacao>/
+OIDC_OP_AUTHORIZATION_ENDPOINT = os.getenv('OIDC_OP_AUTHORIZATION_ENDPOINT')
+OIDC_OP_TOKEN_ENDPOINT = os.getenv('OIDC_OP_TOKEN_ENDPOINT')
+OIDC_OP_USER_ENDPOINT = os.getenv('OIDC_OP_USER_ENDPOINT')
 
 # --- Configuração da API do Google Maps (Necessária para a API Weather) ---
 # Você precisa criar esta variável no seu .env para usar o weather.googleapis.com
@@ -141,6 +154,11 @@ DATABASES = {
     }
 }
 
+
+AUTHENTICATION_BACKENDS = [
+    'crmspagi.oidc.SpagiOIDCBackend', 
+    'django.contrib.auth.backends.ModelBackend',
+]
 
 # Password validation, Internationalization, etc.
 AUTH_PASSWORD_VALIDATORS = [

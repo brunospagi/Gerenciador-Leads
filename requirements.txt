@@ -16,3 +16,4 @@ bs4
 django-webpush
 pdfplumber
 google.generativeai
+mozilla-django-oidc==4.0.0
