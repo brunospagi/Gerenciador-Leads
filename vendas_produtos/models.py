@@ -6,20 +6,17 @@ from decimal import Decimal
 import os
 import uuid
 
-# Import da classe de armazenamento MinIO (certifique-se que o caminho está correto)
 from crmspagi.storage_backends import PublicMediaStorage
 
 User = get_user_model()
 
 def get_comprovante_upload_path(instance, filename):
-    """Gera caminho único para comprovantes de pagamento (Cliente -> Loja)"""
     ext = os.path.splitext(filename)[1]
     unique_filename = f"{uuid.uuid4()}{ext}"
     folder = instance.placa if instance.placa else 'geral'
     return f"vendas_produtos/comprovantes/{folder}/{unique_filename}"
 
 def get_apolice_upload_path(instance, filename):
-    """Gera caminho único para o PDF da Apólice (Gerente -> MinIO)"""
     ext = os.path.splitext(filename)[1]
     unique_filename = f"apolice_{uuid.uuid4()}{ext}"
     folder = instance.placa if instance.placa else 'geral'
@@ -27,6 +24,7 @@ def get_apolice_upload_path(instance, filename):
 
 class VendaProduto(models.Model):
     TIPO_CHOICES = [
+        ('VENDA_VEICULO', 'Venda de Veículo'),
         ('GARANTIA', 'Seguro Garantia (Mecânica)'),
         ('SEGURO', 'Seguro Veículo (Novo)'),
         ('TRANSFERENCIA', 'Transferência / Despachante'),
@@ -38,24 +36,27 @@ class VendaProduto(models.Model):
         ('REJEITADO', 'Rejeitado'),
     ]
 
-    PAGAMENTO_CHOICES = [
-        ('PIX', 'Pix'),
-        ('TRANSFERENCIA', 'Transferência Bancária'),
-        ('DEBITO', 'Cartão de Débito'),
-        ('CREDITO', 'Cartão de Crédito'),
-        ('FINANCIAMENTO', 'Incluso no Financiamento'),
-    ]
-
     vendedor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='vendas_produtos')
     gerente = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='conferencias_produtos')
     
-    placa = models.CharField(max_length=10)
+    # === DADOS DO VEÍCULO / CLIENTE (AGORA GERAIS) ===
     cliente_nome = models.CharField(max_length=150, verbose_name="Nome do Cliente")
+    placa = models.CharField(max_length=10)
+    modelo_veiculo = models.CharField(max_length=100, blank=True, null=True, verbose_name="Modelo")
+    cor = models.CharField(max_length=50, blank=True, null=True, verbose_name="Cor")
+    ano = models.CharField(max_length=9, blank=True, null=True, verbose_name="Ano (Ex: 2023/2024)")
+    
     tipo_produto = models.CharField(max_length=20, choices=TIPO_CHOICES)
     
-    forma_pagamento = models.CharField(max_length=20, choices=PAGAMENTO_CHOICES, default='PIX', verbose_name="Forma de Pagamento")
+    # === FINANCEIRO ===
+    pgto_pix = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Valor em Pix")
+    pgto_transferencia = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Valor em Transferência")
+    pgto_debito = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Valor no Débito")
+    pgto_credito = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Valor no Crédito")
+    pgto_financiamento = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Valor Financiado")
     
-    # Upload do Comprovante (Vendedor)
+    com_desconto = models.BooleanField(default=False, verbose_name="Houve desconto na venda?")
+
     comprovante = models.FileField(
         upload_to=get_comprovante_upload_path,
         storage=PublicMediaStorage(), 
@@ -67,7 +68,6 @@ class VendaProduto(models.Model):
     banco_financiamento = models.CharField(max_length=100, blank=True, null=True, verbose_name="Banco Financiador")
     numero_proposta = models.CharField(max_length=50, blank=True, null=True, verbose_name="Nº da Proposta")
 
-    # === NOVOS CAMPOS: APÓLICE (GERENTE) ===
     numero_apolice = models.CharField(max_length=50, blank=True, null=True, verbose_name="Nº da Apólice")
     arquivo_apolice = models.FileField(
         upload_to=get_apolice_upload_path,
@@ -76,7 +76,6 @@ class VendaProduto(models.Model):
         null=True,
         verbose_name="PDF da Apólice"
     )
-    # =======================================
 
     custo_base = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Custo Real / Base")
     valor_venda = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Valor Cobrado do Cliente")
@@ -99,7 +98,6 @@ class VendaProduto(models.Model):
         ordering = ['-data_venda', '-data_criacao']
 
     def clean(self):
-        # Validação de Data Retroativa
         hoje = timezone.now().date()
         data_lancamento = self.data_venda
         if isinstance(data_lancamento, timezone.datetime):
@@ -108,25 +106,45 @@ class VendaProduto(models.Model):
         if self._state.adding and data_lancamento < hoje:
             raise ValidationError("Não é permitido lançar vendas com data retroativa.")
 
-        # Validação Valor Mínimo Garantia
-        if self.tipo_produto == 'GARANTIA':
-            if self.valor_venda < 1300:
-                raise ValidationError({'valor_venda': 'O valor mínimo para Seguro Garantia é R$ 1.300,00.'})
+        # VALIDAÇÃO GERAL: Dados do carro são obrigatórios para qualquer serviço
+        if not self.modelo_veiculo:
+            raise ValidationError({'modelo_veiculo': 'O Modelo do Veículo é obrigatório.'})
+        if not self.placa:
+            raise ValidationError({'placa': 'A Placa do Veículo é obrigatória.'})
 
-        # Validação Pagamento
-        if self.valor_venda > 0:
-            if self.forma_pagamento == 'FINANCIAMENTO':
-                if not self.banco_financiamento:
-                    raise ValidationError({'banco_financiamento': 'Informe o Banco.'})
-                if not self.numero_proposta:
-                    raise ValidationError({'numero_proposta': 'Informe a Proposta.'})
-            else:
-                if not self.comprovante:
-                    raise ValidationError({'comprovante': 'O comprovante é obrigatório.'})
+        if self.tipo_produto == 'GARANTIA' and self.valor_venda < 1300:
+            raise ValidationError({'valor_venda': 'O valor mínimo para Seguro Garantia é R$ 1.300,00.'})
+        
+        total_pagamentos = (
+            (self.pgto_pix or 0) + 
+            (self.pgto_transferencia or 0) + 
+            (self.pgto_debito or 0) + 
+            (self.pgto_credito or 0) + 
+            (self.pgto_financiamento or 0)
+        )
+        
+        if self.valor_venda > 0 and abs(total_pagamentos - self.valor_venda) > Decimal('0.05'):
+             raise ValidationError(f"A soma dos pagamentos (R$ {total_pagamentos}) não bate com o Valor Total (R$ {self.valor_venda}).")
+
+        if self.pgto_financiamento > 0:
+            if not self.banco_financiamento:
+                raise ValidationError({'banco_financiamento': 'Informe o Banco.'})
+            if not self.numero_proposta:
+                raise ValidationError({'numero_proposta': 'Informe a Proposta.'})
+        
+        if (self.pgto_pix > 0 or self.pgto_transferencia > 0) and not self.comprovante:
+             raise ValidationError({'comprovante': 'Comprovante obrigatório para Pix/Transferência.'})
 
     def save(self, *args, **kwargs):
-        # 1. CÁLCULO DE COMISSÕES E LUCRO
-        if self.tipo_produto == 'GARANTIA':
+        if self.tipo_produto == 'VENDA_VEICULO':
+            self.custo_base = Decimal('0.00')
+            self.lucro_loja = Decimal('0.00')
+            if self.com_desconto:
+                self.comissao_vendedor = Decimal('200.00')
+            else:
+                self.comissao_vendedor = Decimal('500.00')
+
+        elif self.tipo_produto == 'GARANTIA':
             custo_real_provider = Decimal('997.00')
             preco_base_loja = Decimal('1300.00')
             self.custo_base = custo_real_provider
@@ -140,7 +158,6 @@ class VendaProduto(models.Model):
         elif self.tipo_produto == 'SEGURO':
             referencia_comissao = Decimal('150.00')
             self.custo_base = Decimal('0.00')
-            
             if self.valor_venda >= 299:
                 self.comissao_vendedor = referencia_comissao
                 self.lucro_loja = self.valor_venda 
@@ -160,7 +177,11 @@ class VendaProduto(models.Model):
         super().save(*args, **kwargs)
 
     @property
-    def comprovante_url(self):
-        if self.comprovante:
-            return self.comprovante.url
-        return '#'
+    def resumo_pagamento(self):
+        metodos = []
+        if self.pgto_pix > 0: metodos.append(f"Pix ({self.pgto_pix})")
+        if self.pgto_transferencia > 0: metodos.append(f"Transf ({self.pgto_transferencia})")
+        if self.pgto_debito > 0: metodos.append(f"Débito ({self.pgto_debito})")
+        if self.pgto_credito > 0: metodos.append(f"Crédito ({self.pgto_credito})")
+        if self.pgto_financiamento > 0: metodos.append(f"Finan ({self.pgto_financiamento})")
+        return ", ".join(metodos)

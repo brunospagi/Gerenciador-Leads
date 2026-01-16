@@ -17,3 +17,7 @@ local_settings.py
 # OS-specific
 .DS_Store
 Thumbs.db
+bin/
+lib/
+pyvenv.cfg
+lib64
