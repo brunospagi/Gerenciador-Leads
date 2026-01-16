@@ -15,4 +15,5 @@ urlpatterns = [
     path('vendas/', include('vendas_produtos.urls')),
     path('autorizacoes/', include('autorizacoes.urls')),
     path('financiamentos/', include('financiamentos.urls')),
+    path('oidc/', include('mozilla_django_oidc.urls')),
 ]
