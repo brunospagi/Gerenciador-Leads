@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'financiamentos',
     'core',
     'mozilla_django_oidc',
+    'distribuicao',
 ]
 
 MIDDLEWARE = [
@@ -134,6 +135,8 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/contas/login/'
 LOGIN_URL = '/contas/login/'
 
+'''
+
 # --- Database (LIDO DO .ENV) ---
 DATABASES = {
     "default": {
@@ -153,7 +156,6 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-'''
 
 
 AUTHENTICATION_BACKENDS = [
