@@ -1,6 +1,5 @@
-# distribuicao/views.py
 from django.views.generic import CreateView
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.contrib import messages
 from clientes.models import Cliente
@@ -14,33 +13,32 @@ class PainelDistribuicaoView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy('painel-distribuicao')
 
     def form_valid(self, form):
-        # 1. Distribuição Automática (Round-Robin)
+        # 1. Busca quem é o próximo da vez
         vendedor_selecionado = definir_proximo_vendedor()
         
         if not vendedor_selecionado:
-            form.add_error(None, "Nenhum vendedor disponível no rodízio!")
+            form.add_error(None, "ERRO CRÍTICO: Nenhum vendedor ativo no rodízio!")
             return self.form_invalid(form)
 
-        # Atribui o vendedor ao objeto ANTES de salvar no banco
+        # 2. Preenche os dados automáticos do Lead
         form.instance.vendedor = vendedor_selecionado
-        
-        # Define outros campos obrigatórios do seu model com valores padrão para leads novos
         form.instance.status_negociacao = Cliente.StatusNegociacao.NOVO
         form.instance.prioridade = Cliente.Prioridade.MORNO
-        form.instance.tipo_contato = Cliente.TipoContato.MENSAGEM # Padrão inicial
+        form.instance.tipo_contato = Cliente.TipoContato.MENSAGEM
         form.instance.proximo_passo = Cliente.ProximoPasso.MENSAGEM
         
-        # Salva o cliente
+        # 3. Salva no banco
         response = super().form_valid(form)
         
-        # 2. Envio para Webhook (Após salvar, para termos o ID)
+        # 4. Envia para o n8n
         enviar_webhook_n8n(self.object)
         
-        messages.success(self.request, f"Lead distribuído para: {vendedor_selecionado.username}")
+        # 5. Feedback visual
+        messages.success(self.request, f"Lead cadastrado e enviado para: {vendedor_selecionado.username}")
         return response
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Mostra os últimos 10 leads distribuídos para controle visual
+        # Lista os 10 últimos para conferência visual
         context['ultimos_leads'] = Cliente.objects.order_by('-id')[:10]
         return context
