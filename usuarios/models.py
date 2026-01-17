@@ -13,13 +13,18 @@ class Profile(models.Model):
         VENDEDOR = 'VENDEDOR', 'Vendedor'
         GERENTE = 'GERENTE', 'Gerente'
         ADMIN = 'ADMIN', 'Administrador'
-        DISTRIBUIDOR = 'DISTRIBUIDOR', 'Distribuidor de Leads'
+        DISTRIBUIDOR = 'DISTRIBUIDOR', 'Distribuidor (Apenas)'
 
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     nivel_acesso = models.CharField(
         max_length=20,
         choices=NivelAcesso.choices,
         default=NivelAcesso.VENDEDOR
+    )
+    
+    pode_distribuir_leads = models.BooleanField(
+        default=False,
+        verbose_name="Permissão Extra: Pode Distribuir Leads?"
     )
     
     avatar = models.ImageField(
@@ -39,7 +44,7 @@ class Profile(models.Model):
             return self.avatar.url
         return 'https://cdn.quasar.dev/img/boy-avatar.png'
 
-# --- SINAIS (Correção do Erro 500 incluída) ---
+# --- SINAIS (Com proteção contra erro 500) ---
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:

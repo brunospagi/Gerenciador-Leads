@@ -31,7 +31,7 @@
                 </div>
                 {% endfor %}
             </div>
-
+            
             <button class="carousel-control-prev" type="button" data-bs-target="#portalCarousel" data-bs-slide="prev">
                 <span class="carousel-control-prev-icon" aria-hidden="true"></span>
                 <span class="visually-hidden">Anterior</span>
@@ -54,8 +54,7 @@
     </div>
     {% endif %}
 
-
-    {% if user.profile.nivel_acesso == 'DISTRIBUIDOR' or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' or user.is_superuser %}
+    {% if user.profile.nivel_acesso == 'DISTRIBUIDOR' or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' or user.profile.pode_distribuir_leads or user.is_superuser %}
     <div class="card mb-4 shadow-sm border-info border-top border-3">
         <div class="section-title border-bottom pb-2 mb-3 mx-3 mt-3 fw-bold text-info">
             <i class="fa fa-bullhorn me-2"></i> Central de Distribuição
@@ -83,7 +82,6 @@
         </div>
     </div>
     {% endif %}
-
 
     <div class="card mb-4 shadow-sm">
         <div class="section-title border-bottom pb-2 mb-3 mx-3 mt-3 fw-bold text-secondary">
@@ -117,7 +115,6 @@
 
         </div>
     </div>
-
 
     <div class="card mb-4 shadow-sm">
         <div class="section-title border-bottom pb-2 mb-3 mx-3 mt-3 fw-bold text-secondary">
@@ -186,7 +183,6 @@
         </div>
     </div>
     
-
     {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
     <div class="card mb-4 shadow-sm border-danger border-top border-3">
         <div class="section-title border-bottom pb-2 mb-3 mx-3 mt-3 fw-bold text-danger">
