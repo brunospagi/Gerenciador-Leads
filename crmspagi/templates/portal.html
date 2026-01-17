@@ -55,6 +55,36 @@
     {% endif %}
 
 
+    {% if user.profile.nivel_acesso == 'DISTRIBUIDOR' or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' or user.is_superuser %}
+    <div class="card mb-4 shadow-sm border-info border-top border-3">
+        <div class="section-title border-bottom pb-2 mb-3 mx-3 mt-3 fw-bold text-info">
+            <i class="fa fa-bullhorn me-2"></i> Central de Distribuição
+        </div>
+        <div class="system-grid p-3 pt-0">
+            
+            <a href="{% url 'painel-distribuicao' %}" class="system-item">
+                <div>
+                    <span class="system-name text-info">Entrada de Leads</span>
+                    <div class="system-desc text-muted">Cadastrar e Distribuir</div>
+                </div>
+                <i class="fa fa-random system-icon text-info opacity-50"></i>
+            </a>
+
+            {% if user.profile.nivel_acesso == 'ADMIN' or user.is_superuser %}
+             <a href="{% url 'cliente_list' %}" class="system-item">
+                <div>
+                    <span class="system-name text-secondary">Ver Todos</span>
+                    <div class="system-desc text-muted">Listagem geral</div>
+                </div>
+                <i class="fa fa-list system-icon text-secondary opacity-50"></i>
+            </a>
+            {% endif %}
+
+        </div>
+    </div>
+    {% endif %}
+
+
     <div class="card mb-4 shadow-sm">
         <div class="section-title border-bottom pb-2 mb-3 mx-3 mt-3 fw-bold text-secondary">
             <i class="fa fa-users me-2"></i> Gestão de Clientes
