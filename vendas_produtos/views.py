@@ -94,12 +94,17 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
             adicionais_criados = 0
             
             # Função auxiliar para criar cada serviço extra selecionado no Modal
-            def processar_adicional(tipo_prod, check_field, valor_field, metodo_field):
+            def processar_adicional(tipo_prod, check_field, valor_field, metodo_field, custo_field=None):
                 # Verifica se o checkbox foi marcado no form
                 if form.cleaned_data.get(check_field):
                     valor = form.cleaned_data.get(valor_field) or Decimal('0.00')
                     # Pega o nome do campo de pagamento escolhido no modal (ex: 'pgto_pix')
                     metodo_key = form.cleaned_data.get(metodo_field) 
+                    
+                    # Captura o custo se o campo foi informado (Lógica nova para Transferência)
+                    custo = Decimal('0.00')
+                    if custo_field:
+                         custo = form.cleaned_data.get(custo_field) or Decimal('0.00')
                     
                     if valor > 0 and metodo_key:
                         # Cria um novo registro separado para este serviço
@@ -112,8 +117,9 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
                             modelo_veiculo=main_venda.modelo_veiculo,
                             cor=main_venda.cor,
                             ano=main_venda.ano,
-                            # Valor específico deste serviço
+                            # Valor e Custo específico deste serviço
                             valor_venda=valor,
+                            custo_base=custo,
                             # Copia dados financeiros auxiliares (caso seja útil rastrear)
                             banco_financiamento=main_venda.banco_financiamento,
                             numero_proposta=main_venda.numero_proposta,
@@ -133,7 +139,8 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
             # Processa os 3 tipos possíveis de adicionais
             c1 = processar_adicional('GARANTIA', 'adicional_garantia', 'valor_garantia', 'metodo_garantia')
             c2 = processar_adicional('SEGURO', 'adicional_seguro', 'valor_seguro', 'metodo_seguro')
-            c3 = processar_adicional('TRANSFERENCIA', 'adicional_transferencia', 'valor_transferencia', 'metodo_transferencia')
+            # Passa o nome do campo do formulário que contém o custo da transferência
+            c3 = processar_adicional('TRANSFERENCIA', 'adicional_transferencia', 'valor_transferencia', 'metodo_transferencia', custo_field='custo_transferencia')
             
             total_extras = c1 + c2 + c3
 

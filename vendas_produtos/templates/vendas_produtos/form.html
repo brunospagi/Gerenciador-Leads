@@ -7,6 +7,7 @@
 
 {% block content %}
 <style>
+    /* Estilos Originais do seu Layout */
     .clean-card { border: none; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); margin-bottom: 24px; background: #fff; }
     .clean-header { padding: 20px 24px; border-bottom: 1px solid #f0f2f5; font-weight: 700; color: #2c3e50; display: flex; align-items: center; background: linear-gradient(to right, #ffffff, #f8f9fa); border-radius: 12px 12px 0 0; }
     .clean-header i { margin-right: 12px; color: #3498db; font-size: 1.1em; }
@@ -129,10 +130,16 @@
             </div>
             <div class="clean-body bg-light-subtle">
                 <div class="row align-items-center mb-4">
-                    <div class="col-md-6">
+                    <div class="col-md-3">
                         <label class="form-label fw-bold text-success fs-5">Valor Total (R$)</label>
                         {{ form.valor_venda }}
                     </div>
+                    
+                    <div class="col-md-3" id="div-custo-base" style="display:none;">
+                        <label class="form-label fw-bold text-danger fs-5">Custo Despachante</label>
+                        {{ form.custo_base }}
+                    </div>
+
                     <div class="col-md-6 text-end">
                         <span id="feedback-pagamento" class="badge bg-secondary p-2">Preencha os valores</span>
                     </div>
@@ -189,6 +196,7 @@
                                 <div class="col-6"><label class="small fw-bold">Pagamento</label>{{ form.metodo_garantia }}</div>
                             </div>
                         </div>
+
                         <div class="modal-item">
                             <div class="form-check mb-2">
                                 {{ form.adicional_seguro }}
@@ -199,14 +207,16 @@
                                 <div class="col-6"><label class="small fw-bold">Pagamento</label>{{ form.metodo_seguro }}</div>
                             </div>
                         </div>
+
                         <div class="modal-item">
                             <div class="form-check mb-2">
                                 {{ form.adicional_transferencia }}
                                 <label class="form-check-label fw-bold" for="{{ form.adicional_transferencia.id_for_label }}">Transferência</label>
                             </div>
                             <div class="row g-2 ps-4 inputs-wrapper" style="display:none;">
-                                <div class="col-6"><label class="small fw-bold">Valor</label>{{ form.valor_transferencia }}</div>
-                                <div class="col-6"><label class="small fw-bold">Pagamento</label>{{ form.metodo_transferencia }}</div>
+                                <div class="col-4"><label class="small fw-bold">Valor</label>{{ form.valor_transferencia }}</div>
+                                <div class="col-4"><label class="small fw-bold text-danger">Custo</label>{{ form.custo_transferencia }}</div>
+                                <div class="col-4"><label class="small fw-bold">Pagamento</label>{{ form.metodo_transferencia }}</div>
                             </div>
                         </div>
 
@@ -236,6 +246,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const divDescontoContainer = document.getElementById('div-desconto-container');
     const labelFinanceiro = document.getElementById('label-financeiro-main');
     
+    // Custo Base
+    const divCustoBase = document.getElementById('div-custo-base');
+    
     // Inputs Obrigatórios
     const inputModelo = document.getElementById('id_modelo_veiculo');
     const inputPlaca = document.getElementById('id_placa');
@@ -250,15 +263,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const divFinan = document.getElementById('div-financiamento');
     const divComp = document.getElementById('div-comprovante');
 
+    function checkCustoVisibility(isVeiculo, tipo) {
+        // Mostra custo apenas se for Serviço Avulso DE Transferência
+        if (!isVeiculo && tipo === 'TRANSFERENCIA') {
+            divCustoBase.style.display = 'block';
+        } else {
+            divCustoBase.style.display = 'none';
+        }
+    }
+
     function updateMode() {
         let isVeiculo = false;
         if (modoVeiculoBtn && modoVeiculoBtn.checked) isVeiculo = true;
         else if (!modoVeiculoBtn && realTipoSelect.value === 'VENDA_VEICULO') isVeiculo = true;
 
-        // Bloco de detalhes do veículo é sempre visível agora
         rowVeiculo.style.display = 'block';
         
-        // Dados do carro são sempre obrigatórios
         inputModelo.required = true;
         inputPlaca.required = true;
         inputCor.required = true;
@@ -269,24 +289,30 @@ document.addEventListener('DOMContentLoaded', function() {
             divSelectTipo.style.display = 'none';
             labelVeiculoDisplay.style.display = 'block';
             
-            divBtnModal.style.display = 'block'; // Permite venda casada
-            divDescontoContainer.style.display = 'flex'; // Exibe o select de desconto
+            divBtnModal.style.display = 'block'; 
+            divDescontoContainer.style.display = 'flex'; 
             labelFinanceiro.innerText = "Pagamento do Veículo";
+            
+            checkCustoVisibility(true, 'VENDA_VEICULO');
         } else {
             realTipoSelect.value = fakeTipoSelect.value;
             divSelectTipo.style.display = 'block';
             labelVeiculoDisplay.style.display = 'none';
             
-            divBtnModal.style.display = 'none'; // Sem venda casada em serviço avulso
+            divBtnModal.style.display = 'none'; 
             divDescontoContainer.style.display = 'none';
             labelFinanceiro.innerText = "Pagamento do Serviço";
             
-            // Reseta modal
+            checkCustoVisibility(false, fakeTipoSelect.value);
             updateModalUI(true); 
         }
     }
 
-    fakeTipoSelect.addEventListener('change', function() { realTipoSelect.value = this.value; });
+    fakeTipoSelect.addEventListener('change', function() { 
+        realTipoSelect.value = this.value; 
+        checkCustoVisibility(false, this.value);
+    });
+
     if(modoVeiculoBtn) {
         modoVeiculoBtn.addEventListener('change', updateMode);
         modoServicoBtn.addEventListener('change', updateMode);

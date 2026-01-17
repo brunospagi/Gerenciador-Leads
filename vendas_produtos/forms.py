@@ -12,7 +12,6 @@ class VendaProdutoForm(forms.ModelForm):
         ('pgto_financiamento', 'Incluso no Financiamento'),
     ]
 
-    # --- CAMPO DESCONTO (ALTERADO PARA SELECT) ---
     com_desconto = forms.TypedChoiceField(
         choices=[(False, 'Não'), (True, 'Sim')],
         coerce=lambda x: str(x).lower() == 'true',
@@ -32,6 +31,16 @@ class VendaProdutoForm(forms.ModelForm):
     
     adicional_transferencia = forms.BooleanField(required=False, label="Incluir Transferência?")
     valor_transferencia = forms.DecimalField(required=False, label="Valor (R$)", max_digits=10, decimal_places=2)
+    
+    # Campo EXCLUSIVO para o custo na Venda Casada de Transferência
+    custo_transferencia = forms.DecimalField(
+        required=False, 
+        label="Custo Despachante (R$)", 
+        max_digits=10, 
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm'})
+    )
+    
     metodo_transferencia = forms.ChoiceField(required=False, choices=METODO_CHOICES, label="Pagamento")
 
     class Meta:
@@ -39,6 +48,7 @@ class VendaProdutoForm(forms.ModelForm):
         fields = [
             'tipo_produto', 'com_desconto', 'cliente_nome', 
             'modelo_veiculo', 'placa', 'cor', 'ano',
+            'custo_base',  # Usado para Custo Despachante na venda Avulsa
             'valor_venda', 
             'pgto_pix', 'pgto_transferencia', 'pgto_debito', 'pgto_credito', 'pgto_financiamento',
             'comprovante', 'banco_financiamento', 
@@ -51,7 +61,11 @@ class VendaProdutoForm(forms.ModelForm):
             'placa': forms.TextInput(attrs={'style': 'text-transform:uppercase', 'class': 'form-control'}),
             'cor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Prata'}),
             'ano': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 2023/2024'}),
-            'tipo_produto': forms.Select(attrs={'class': 'form-select', 'style': 'display:none;'}), 
+            'tipo_produto': forms.Select(attrs={'class': 'form-select'}), 
+            
+            # Custo Base (Avulsa) - Iniciamos oculto, o JS controla
+            'custo_base': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control'}),
+            
             'valor_venda': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control fw-bold fs-5 text-success'}),
             
             'pgto_pix': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control payment-input'}),
@@ -78,7 +92,10 @@ class VendaProdutoForm(forms.ModelForm):
         self.fields['cor'].required = False
         self.fields['ano'].required = False
         
-        # Estilização
+        # IMPORTANTE: Deixamos custo_base opcional para não travar vendas de Veículo/Garantia
+        self.fields['custo_base'].required = False 
+
+        # Estilização dos campos extras
         for field in ['metodo_garantia', 'metodo_seguro', 'metodo_transferencia']:
             self.fields[field].widget.attrs.update({'class': 'form-select form-select-sm'})
         for field in ['valor_garantia', 'valor_seguro', 'valor_transferencia']:
