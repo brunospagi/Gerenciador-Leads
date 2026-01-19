@@ -1,4 +1,5 @@
 # distribuicao/forms.py
+import re
 from django import forms
 from clientes.models import Cliente
 
@@ -16,21 +17,29 @@ class LeadEntradaForm(forms.ModelForm):
 
     def clean_whatsapp(self):
         """
-        Valida se o WhatsApp já existe no banco de dados para evitar duplicidade.
+        Remove formatação (pontos, traços, parênteses) e verifica duplicidade apenas com números.
         """
         whatsapp = self.cleaned_data.get('whatsapp')
         
-        # Remove espaços em branco antes e depois, se houver
         if whatsapp:
-            whatsapp = whatsapp.strip()
+            # Remove tudo que NÃO for dígito (0-9)
+            whatsapp_limpo = re.sub(r'\D', '', whatsapp)
+            
+            # Validação básica de tamanho (opcional, ajustável conforme necessidade)
+            if len(whatsapp_limpo) < 10:
+                raise forms.ValidationError("O número de telefone parece inválido (muito curto).")
 
-        # Verifica se já existe algum cliente com esse número
-        # Exclui a própria instância caso seja uma edição (embora este form seja usado para criação)
-        qs = Cliente.objects.filter(whatsapp=whatsapp)
-        if self.instance.pk:
-            qs = qs.exclude(pk=self.instance.pk)
+            # Verifica duplicidade usando o número LIMPO
+            qs = Cliente.objects.filter(whatsapp=whatsapp_limpo)
+            
+            # Se for edição, exclui o próprio ID da checagem
+            if self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
 
-        if qs.exists():
-            raise forms.ValidationError(f"Já existe um cliente cadastrado com este WhatsApp ({whatsapp}).")
+            if qs.exists():
+                raise forms.ValidationError(f"Duplicidade: Já existe um cliente com o número {whatsapp_limpo}.")
+            
+            # Retorna o número limpo para ser salvo no banco
+            return whatsapp_limpo
             
         return whatsapp

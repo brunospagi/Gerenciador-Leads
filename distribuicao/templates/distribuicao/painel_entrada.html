@@ -12,15 +12,29 @@
                     <form method="post">
                         {% csrf_token %}
                         
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {{ form.non_field_errors }}
+                            </div>
+                        {% endif %}
+
                         <div class="mb-3">
                             <label>Nome do Cliente</label>
                             {{ form.nome_cliente }}
+                            {% if form.nome_cliente.errors %}
+                                <div class="text-danger small">{{ form.nome_cliente.errors.0 }}</div>
+                            {% endif %}
                         </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label>Telefone / WhatsApp</label>
                                 {{ form.whatsapp }}
+                                {% if form.whatsapp.errors %}
+                                    <div class="text-danger small fw-bold mt-1">
+                                        <i class="fas fa-exclamation-circle"></i> {{ form.whatsapp.errors.0 }}
+                                    </div>
+                                {% endif %}
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label>Canal de Origem</label>
