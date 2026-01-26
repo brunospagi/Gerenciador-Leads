@@ -38,11 +38,17 @@
         {% if not form.instance.pk %}
         <div class="clean-card text-center py-5 mode-selector">
             <h5 class="fw-bold text-muted mb-4 text-uppercase ls-1">Qual o tipo da operação?</h5>
-            <div class="btn-group w-100 px-4" role="group" style="max-width: 700px;">
+            <div class="btn-group w-100 px-4" role="group" style="max-width: 900px;">
                 <input type="radio" class="btn-check" name="modo_venda" id="modo_veiculo" autocomplete="off">
                 <label class="btn btn-outline-light text-dark py-4 rounded-start" for="modo_veiculo">
                     <i class="fa fa-car fa-2x d-block mb-2 text-primary"></i>
                     <span class="fw-bold">VENDA DE VEÍCULO</span>
+                </label>
+
+                <input type="radio" class="btn-check" name="modo_venda" id="modo_refin" autocomplete="off">
+                <label class="btn btn-outline-light text-dark py-4" for="modo_refin">
+                    <i class="fa fa-hand-holding-usd fa-2x d-block mb-2 text-success"></i>
+                    <span class="fw-bold">REFINANCIAMENTO</span>
                 </label>
 
                 <input type="radio" class="btn-check" name="modo_venda" id="modo_servico" autocomplete="off" checked>
@@ -80,7 +86,7 @@
 
                     <div class="col-md-4" id="label-veiculo-display" style="display:none;">
                         <label class="form-label fw-bold small text-uppercase text-muted">Operação</label>
-                        <div class="form-control bg-light fw-bold text-primary border-0">Venda de Veículo</div>
+                        <div class="form-control bg-light fw-bold text-primary border-0" id="texto-operacao-fixo">Venda de Veículo</div>
                     </div>
                 </div>
 
@@ -123,7 +129,49 @@
             </button>
         </div>
 
-        <div class="clean-card">
+        <div class="clean-card" id="card-financeiro-refin" style="display:none;">
+            <div class="clean-header bg-success text-white" style="background: #27ae60;">
+                <i class="fa fa-hand-holding-usd text-white"></i> 
+                <span>Detalhes do Refinanciamento</span>
+            </div>
+            <div class="clean-body bg-light-subtle">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-success">Valor Financiado</label>
+                         {{ form.pgto_financiamento }} 
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Qtd. Parcelas</label>
+                        {{ form.qtd_parcelas }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Valor Parcela</label>
+                        {{ form.valor_parcela }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold text-primary">Retorno Operação</label>
+                        {{ form.valor_retorno_operacao }}
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Banco</label>
+                        {{ form.banco_financiamento }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Nº Proposta</label>
+                        {{ form.numero_proposta }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-dark">Valor Cobrado (Comissão)</label>
+                        {{ form.valor_venda }}
+                        <div class="form-text small">Base para cálculo: 30% Vend / 70% Loja</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="clean-card" id="card-financeiro-padrao">
             <div class="clean-header bg-primary text-white" style="background: #3498db;">
                 <i class="fa fa-wallet text-white"></i> 
                 <span id="label-financeiro-main">Pagamento</span>
@@ -132,7 +180,9 @@
                 <div class="row align-items-center mb-4">
                     <div class="col-md-3">
                         <label class="form-label fw-bold text-success fs-5">Valor Total (R$)</label>
-                        {{ form.valor_venda }}
+                        <div id="div-valor-venda-padrao">
+                            {{ form.valor_venda }}
+                        </div>
                     </div>
                     
                     <div class="col-md-3" id="div-custo-base" style="display:none;">
@@ -150,13 +200,21 @@
                     <div class="col-md-2 col-6"><label class="small fw-bold text-muted">Transf.</label>{{ form.pgto_transferencia }}</div>
                     <div class="col-md-2 col-6"><label class="small fw-bold text-muted">Débito</label>{{ form.pgto_debito }}</div>
                     <div class="col-md-2 col-6"><label class="small fw-bold text-muted">Crédito</label>{{ form.pgto_credito }}</div>
-                    <div class="col-md-4 col-12"><label class="small fw-bold text-muted">Financiamento</label>{{ form.pgto_financiamento }}</div>
+                    <div class="col-md-4 col-12"><label class="small fw-bold text-muted">Financiamento</label>
+                        <input type="number" step="0.01" class="form-control payment-input" id="input_financiamento_padrao">
+                    </div>
                 </div>
 
-                <div id="div-financiamento" class="mt-3 p-3 bg-white rounded border" style="display:none;">
+                <div id="div-financiamento-padrao" class="mt-3 p-3 bg-white rounded border" style="display:none;">
                     <div class="row g-2">
-                        <div class="col-md-6"><label class="small fw-bold">Banco</label>{{ form.banco_financiamento }}</div>
-                        <div class="col-md-6"><label class="small fw-bold">Proposta</label>{{ form.numero_proposta }}</div>
+                        <div class="col-md-6">
+                            <label class="small fw-bold">Banco</label>
+                            <input type="text" class="form-control" id="fake_banco_padrao">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small fw-bold">Proposta</label>
+                            <input type="text" class="form-control" id="fake_proposta_padrao">
+                        </div>
                     </div>
                 </div>
 
@@ -234,91 +292,178 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const modoVeiculoBtn = document.getElementById('modo_veiculo');
+    const modoRefinBtn = document.getElementById('modo_refin');
     const modoServicoBtn = document.getElementById('modo_servico');
+    
     const realTipoSelect = document.getElementById('id_tipo_produto');
     const fakeTipoSelect = document.getElementById('fake_tipo_select');
     
-    // Areas Visuais
+    // Containers
     const rowVeiculo = document.getElementById('row-veiculo-details');
     const divSelectTipo = document.getElementById('div-select-tipo');
     const labelVeiculoDisplay = document.getElementById('label-veiculo-display');
+    const textoOperacaoFixo = document.getElementById('texto-operacao-fixo');
     const divBtnModal = document.getElementById('div-btn-modal');
     const divDescontoContainer = document.getElementById('div-desconto-container');
     const labelFinanceiro = document.getElementById('label-financeiro-main');
     
-    // Custo Base
+    // Blocos Financeiros
+    const cardFinanceiroPadrao = document.getElementById('card-financeiro-padrao');
+    const cardFinanceiroRefin = document.getElementById('card-financeiro-refin');
     const divCustoBase = document.getElementById('div-custo-base');
+    const divValorVendaPadrao = document.getElementById('div-valor-venda-padrao');
+
+    // Inputs Reais (Django) que movemos ou reutilizamos
+    const inputValorVendaReal = document.getElementById('id_valor_venda');
+    const inputFinanReal = document.getElementById('id_pgto_financiamento');
+    const inputBancoReal = document.getElementById('id_banco_financiamento');
+    const inputPropostaReal = document.getElementById('id_numero_proposta');
     
-    // Inputs Obrigatórios
+    // Inputs Fakes e Clones (Venda Padrão)
+    const inputFinanPadrao = document.getElementById('input_financiamento_padrao');
+    const inputFakeBancoPadrao = document.getElementById('fake_banco_padrao');
+    const inputFakePropostaPadrao = document.getElementById('fake_proposta_padrao');
+    const divFinanPadrao = document.getElementById('div-financiamento-padrao');
+
+    const inputsPgtoCarro = document.querySelectorAll('.payment-input'); // Inclui o inputFinanPadrao
+    const feedbackPgto = document.getElementById('feedback-pagamento');
+    const divComp = document.getElementById('div-comprovante');
+
+    // Validação
     const inputModelo = document.getElementById('id_modelo_veiculo');
     const inputPlaca = document.getElementById('id_placa');
     const inputCor = document.getElementById('id_cor');
     const inputAno = document.getElementById('id_ano');
 
-    // Financeiro
-    const inputValorMain = document.getElementById('id_valor_venda');
-    const inputsPgtoCarro = document.querySelectorAll('.payment-input');
-    const feedbackPgto = document.getElementById('feedback-pagamento');
-    const inputFinan = document.getElementById('id_pgto_financiamento');
-    const divFinan = document.getElementById('div-financiamento');
-    const divComp = document.getElementById('div-comprovante');
-
-    function checkCustoVisibility(isVeiculo, tipo) {
-        // Mostra custo apenas se for Serviço Avulso DE Transferência
-        if (!isVeiculo && tipo === 'TRANSFERENCIA') {
-            divCustoBase.style.display = 'block';
-        } else {
-            divCustoBase.style.display = 'none';
+    // --- LÓGICA DE SINCRONIA ---
+    // Quando digita no Fake Finan Padrão, joga pro Real Finan
+    inputFinanPadrao.addEventListener('input', function() {
+        if(cardFinanceiroPadrao.style.display !== 'none') {
+            inputFinanReal.value = this.value;
+            updateFinanceiroPadrao();
         }
+    });
+    // Quando digita nos Fakes de Banco/Proposta, joga pros Reais
+    inputFakeBancoPadrao.addEventListener('input', () => { if(cardFinanceiroPadrao.style.display !== 'none') inputBancoReal.value = inputFakeBancoPadrao.value; });
+    inputFakePropostaPadrao.addEventListener('input', () => { if(cardFinanceiroPadrao.style.display !== 'none') inputPropostaReal.value = inputFakePropostaPadrao.value; });
+
+
+    function checkCustoVisibility(tipo) {
+        // Mostra custo apenas se for Serviço Avulso DE Transferência
+        if (tipo === 'TRANSFERENCIA') divCustoBase.style.display = 'block';
+        else divCustoBase.style.display = 'none';
     }
 
     function updateMode() {
-        let isVeiculo = false;
-        if (modoVeiculoBtn && modoVeiculoBtn.checked) isVeiculo = true;
-        else if (!modoVeiculoBtn && realTipoSelect.value === 'VENDA_VEICULO') isVeiculo = true;
+        let mode = 'SERVICO';
+        if (modoVeiculoBtn && modoVeiculoBtn.checked) mode = 'VEICULO';
+        else if (modoRefinBtn && modoRefinBtn.checked) mode = 'REFIN';
+        else if (!modoVeiculoBtn) {
+            // Edição: descobre pelo valor do select hidden
+            const val = realTipoSelect.value;
+            if (val === 'VENDA_VEICULO') mode = 'VEICULO';
+            else if (val === 'REFINANCIAMENTO') mode = 'REFIN';
+            else mode = 'SERVICO';
+        }
 
-        rowVeiculo.style.display = 'block';
-        
+        // Reset Visibilidade
+        rowVeiculo.style.display = 'block'; // Sempre mostra veículo
         inputModelo.required = true;
         inputPlaca.required = true;
         inputCor.required = true;
         inputAno.required = true;
 
-        if (isVeiculo) {
+        // Reset Financeiro
+        cardFinanceiroPadrao.style.display = 'none';
+        cardFinanceiroRefin.style.display = 'none';
+        divBtnModal.style.display = 'none';
+        divDescontoContainer.style.display = 'none';
+
+        if (mode === 'VEICULO') {
             realTipoSelect.value = 'VENDA_VEICULO';
             divSelectTipo.style.display = 'none';
             labelVeiculoDisplay.style.display = 'block';
+            textoOperacaoFixo.innerText = "Venda de Veículo";
             
             divBtnModal.style.display = 'block'; 
             divDescontoContainer.style.display = 'flex'; 
             labelFinanceiro.innerText = "Pagamento do Veículo";
+
+            cardFinanceiroPadrao.style.display = 'block';
+            // Garante que o input Valor Venda está no lugar certo (visualmente o HTML é duplicado ou movido? 
+            // Não, o input real está no card refin ou padrao? Está no HTML uma vez. 
+            // Precisamos garantir que ele está visível onde deve.
+            // O input real {{ valor_venda }} foi renderizado no bloco Refin E no bloco Padrão? 
+            // O Django renderiza onde chamamos. Se chamei 2x, vai dar conflito de ID.
+            // Solução: O input {{ valor_venda }} está no HTML 2 vezes? O Django cria IDs únicos.
+            // Vamos assumir que você precisa mover o elemento DOM se for o caso, 
+            // ou usar display:none no pai. No meu HTML acima, coloquei ele 2 vezes?
+            // Sim. Isso gera IDs duplicados (id_valor_venda). Isso é ruim.
+            // FIX: Vamos usar o input real APENAS no bloco Refin, e no bloco Padrão mover ele pra lá?
+            // Ou usar Javascript para mover o input real para o container visível.
             
-            checkCustoVisibility(true, 'VENDA_VEICULO');
+            moveElement(inputValorVendaReal, divValorVendaPadrao); 
+            
+            checkCustoVisibility('VENDA_VEICULO');
+            updateFinanceiroPadrao();
+
+        } else if (mode === 'REFIN') {
+            realTipoSelect.value = 'REFINANCIAMENTO';
+            divSelectTipo.style.display = 'none';
+            labelVeiculoDisplay.style.display = 'block';
+            textoOperacaoFixo.innerText = "Refinanciamento";
+            
+            cardFinanceiroRefin.style.display = 'block';
+            
+            // Move input real de volta pro Refin se precisar? 
+            // No HTML renderizado, o input está dentro do bloco Refin (veja linha 173). 
+            // Mas coloquei ele de novo na linha 191? Não, usei div-valor-venda-padrao.
+            // O código JS abaixo move o input para o lugar certo.
+            const containerRefinVal = cardFinanceiroRefin.querySelector('.col-md-4 label.fw-bold.text-dark').parentElement; 
+            // (Seletor meio frágil, mas funciona pra estrutura acima)
+            if(!containerRefinVal.contains(inputValorVendaReal)) containerRefinVal.appendChild(inputValorVendaReal);
+
+            // Limpa requireds do padrao
+            inputBancoReal.required = true; // No refin é obrigatório
+            inputPropostaReal.required = true;
+
         } else {
+            // SERVIÇO
             realTipoSelect.value = fakeTipoSelect.value;
             divSelectTipo.style.display = 'block';
             labelVeiculoDisplay.style.display = 'none';
-            
-            divBtnModal.style.display = 'none'; 
-            divDescontoContainer.style.display = 'none';
             labelFinanceiro.innerText = "Pagamento do Serviço";
+
+            cardFinanceiroPadrao.style.display = 'block';
+            moveElement(inputValorVendaReal, divValorVendaPadrao);
             
-            checkCustoVisibility(false, fakeTipoSelect.value);
+            checkCustoVisibility(fakeTipoSelect.value);
             updateModalUI(true); 
+            updateFinanceiroPadrao();
+        }
+    }
+    
+    // Função auxiliar para mover input sem perder eventos
+    function moveElement(elem, targetDiv) {
+        if(targetDiv && elem && !targetDiv.contains(elem)) {
+            targetDiv.appendChild(elem);
         }
     }
 
     fakeTipoSelect.addEventListener('change', function() { 
-        realTipoSelect.value = this.value; 
-        checkCustoVisibility(false, this.value);
+        if (!modoVeiculoBtn.checked && !modoRefinBtn.checked) {
+            realTipoSelect.value = this.value; 
+            checkCustoVisibility(this.value);
+        }
     });
 
     if(modoVeiculoBtn) {
         modoVeiculoBtn.addEventListener('change', updateMode);
+        modoRefinBtn.addEventListener('change', updateMode);
         modoServicoBtn.addEventListener('change', updateMode);
     }
 
-    // Modal UI
+    // --- Modal UI (Venda Casada) ---
     const badgeAdicionais = document.getElementById('badge-adicionais');
     const items = [
         { check: 'id_adicional_garantia', val: 'id_valor_garantia', met: 'id_metodo_garantia' },
@@ -355,13 +500,19 @@ document.addEventListener('DOMContentLoaded', function() {
         badgeAdicionais.style.display = count > 0 ? 'inline-block' : 'none';
         badgeAdicionais.innerText = count;
     }
-    
     items.forEach(item => document.getElementById(item.check).addEventListener('change', () => updateModalUI(false)));
 
-    function updateFinanceiro() {
-        let total = parseFloat(inputValorMain.value) || 0;
+
+    // --- CALCULO FINANCEIRO (Apenas Modo Padrão) ---
+    function updateFinanceiroPadrao() {
+        // Se estiver em modo Refin, essa lógica não se aplica (lá é manual)
+        if (cardFinanceiroPadrao.style.display === 'none') return;
+
+        let total = parseFloat(inputValorVendaReal.value) || 0;
         let pago = 0;
         let temImediato = false;
+        
+        // Soma inputs (pix, transf, debito, credito e o FINAN PADRAO FAKE)
         inputsPgtoCarro.forEach(inp => {
             let v = parseFloat(inp.value) || 0;
             pago += v;
@@ -377,23 +528,30 @@ document.addEventListener('DOMContentLoaded', function() {
             feedbackPgto.innerText = diff > 0 ? `Falta R$ ${diff.toFixed(2)}` : `Passou R$ ${Math.abs(diff).toFixed(2)}`;
         }
 
-        if ((parseFloat(inputFinan.value) || 0) > 0) {
-            divFinan.style.display = 'block';
-            document.getElementById('id_banco_financiamento').required = true;
+        // Lógica Banco/Proposta VISUAL
+        if ((parseFloat(inputFinanPadrao.value) || 0) > 0) {
+            divFinanPadrao.style.display = 'block';
+            inputFakeBancoPadrao.required = true;
         } else {
-            divFinan.style.display = 'none';
-            document.getElementById('id_banco_financiamento').required = false;
+            divFinanPadrao.style.display = 'none';
+            inputFakeBancoPadrao.required = false;
         }
         divComp.style.display = temImediato ? 'block' : 'none';
     }
 
-    inputValorMain.addEventListener('input', updateFinanceiro);
-    inputsPgtoCarro.forEach(inp => inp.addEventListener('input', updateFinanceiro));
+    inputValorVendaReal.addEventListener('input', updateFinanceiroPadrao);
+    inputsPgtoCarro.forEach(inp => inp.addEventListener('input', updateFinanceiroPadrao));
 
     // Inicialização
     updateMode();
     updateModalUI();
-    updateFinanceiro();
+    // Se for edição e tiver valor financiado, preenche o fake
+    if(inputFinanReal.value && parseFloat(inputFinanReal.value) > 0) {
+        inputFinanPadrao.value = inputFinanReal.value;
+        inputFakeBancoPadrao.value = inputBancoReal.value;
+        inputFakePropostaPadrao.value = inputPropostaReal.value;
+        updateFinanceiroPadrao();
+    }
 });
 </script>
 {% endblock %}

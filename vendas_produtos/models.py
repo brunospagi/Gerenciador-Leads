@@ -28,6 +28,7 @@ class VendaProduto(models.Model):
         ('GARANTIA', 'Seguro Garantia (Mecânica)'),
         ('SEGURO', 'Seguro Veículo (Novo)'),
         ('TRANSFERENCIA', 'Transferência / Despachante'),
+        ('REFINANCIAMENTO', 'Refinanciamento de Veículo'), # Novo Tipo
     ]
 
     STATUS_CHOICES = [
@@ -39,7 +40,7 @@ class VendaProduto(models.Model):
     vendedor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='vendas_produtos')
     gerente = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='conferencias_produtos')
     
-    # === DADOS DO VEÍCULO / CLIENTE (AGORA GERAIS) ===
+    # === DADOS DO VEÍCULO / CLIENTE ===
     cliente_nome = models.CharField(max_length=150, verbose_name="Nome do Cliente")
     placa = models.CharField(max_length=10)
     modelo_veiculo = models.CharField(max_length=100, blank=True, null=True, verbose_name="Modelo")
@@ -48,7 +49,7 @@ class VendaProduto(models.Model):
     
     tipo_produto = models.CharField(max_length=20, choices=TIPO_CHOICES)
     
-    # === FINANCEIRO ===
+    # === FINANCEIRO GERAL ===
     pgto_pix = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Valor em Pix")
     pgto_transferencia = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Valor em Transferência")
     pgto_debito = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Valor no Débito")
@@ -67,6 +68,12 @@ class VendaProduto(models.Model):
     
     banco_financiamento = models.CharField(max_length=100, blank=True, null=True, verbose_name="Banco Financiador")
     numero_proposta = models.CharField(max_length=50, blank=True, null=True, verbose_name="Nº da Proposta")
+
+    # === CAMPOS ESPECÍFICOS DE REFINANCIAMENTO ===
+    qtd_parcelas = models.IntegerField(null=True, blank=True, verbose_name="Qtd. Parcelas")
+    valor_parcela = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Valor da Parcela")
+    valor_retorno_operacao = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Retorno da Operação")
+    # ============================================
 
     numero_apolice = models.CharField(max_length=50, blank=True, null=True, verbose_name="Nº da Apólice")
     arquivo_apolice = models.FileField(
@@ -106,7 +113,7 @@ class VendaProduto(models.Model):
         if self._state.adding and data_lancamento < hoje:
             raise ValidationError("Não é permitido lançar vendas com data retroativa.")
 
-        # VALIDAÇÃO GERAL: Dados do carro são obrigatórios para qualquer serviço
+        # VALIDAÇÃO GERAL
         if not self.modelo_veiculo:
             raise ValidationError({'modelo_veiculo': 'O Modelo do Veículo é obrigatório.'})
         if not self.placa:
@@ -115,27 +122,38 @@ class VendaProduto(models.Model):
         if self.tipo_produto == 'GARANTIA' and self.valor_venda < 1300:
             raise ValidationError({'valor_venda': 'O valor mínimo para Seguro Garantia é R$ 1.300,00.'})
         
-        total_pagamentos = (
-            (self.pgto_pix or 0) + 
-            (self.pgto_transferencia or 0) + 
-            (self.pgto_debito or 0) + 
-            (self.pgto_credito or 0) + 
-            (self.pgto_financiamento or 0)
-        )
-        
-        if self.valor_venda > 0 and abs(total_pagamentos - self.valor_venda) > Decimal('0.05'):
-             raise ValidationError(f"A soma dos pagamentos (R$ {total_pagamentos}) não bate com o Valor Total (R$ {self.valor_venda}).")
+        # Validação de pagamentos (soma) apenas se NÃO for Refinanciamento
+        # (No refinanciamento, o valor cobrado pode ser diferente da simples soma de meios de pagto se houver troco)
+        if self.tipo_produto != 'REFINANCIAMENTO':
+            total_pagamentos = (
+                (self.pgto_pix or 0) + 
+                (self.pgto_transferencia or 0) + 
+                (self.pgto_debito or 0) + 
+                (self.pgto_credito or 0) + 
+                (self.pgto_financiamento or 0)
+            )
+            
+            if self.valor_venda > 0 and abs(total_pagamentos - self.valor_venda) > Decimal('0.05'):
+                 raise ValidationError(f"A soma dos pagamentos (R$ {total_pagamentos}) não bate com o Valor Total (R$ {self.valor_venda}).")
 
-        if self.pgto_financiamento > 0:
+        # Validações condicionais
+        if self.pgto_financiamento > 0 or self.tipo_produto == 'REFINANCIAMENTO':
             if not self.banco_financiamento:
                 raise ValidationError({'banco_financiamento': 'Informe o Banco.'})
             if not self.numero_proposta:
                 raise ValidationError({'numero_proposta': 'Informe a Proposta.'})
         
+        if self.tipo_produto == 'REFINANCIAMENTO':
+            if not self.qtd_parcelas:
+                raise ValidationError({'qtd_parcelas': 'Informe a Qtd. de Parcelas.'})
+            if not self.valor_parcela:
+                raise ValidationError({'valor_parcela': 'Informe o Valor da Parcela.'})
+        
         if (self.pgto_pix > 0 or self.pgto_transferencia > 0) and not self.comprovante:
              raise ValidationError({'comprovante': 'Comprovante obrigatório para Pix/Transferência.'})
 
     def save(self, *args, **kwargs):
+        # Lógica de Cálculo de Comissão
         if self.tipo_produto == 'VENDA_VEICULO':
             self.custo_base = Decimal('0.00')
             self.lucro_loja = Decimal('0.00')
@@ -174,10 +192,25 @@ class VendaProduto(models.Model):
                 self.lucro_loja = Decimal('0.00')
                 self.comissao_vendedor = Decimal('0.00')
 
+        elif self.tipo_produto == 'REFINANCIAMENTO':
+            # REGRA: Valor Cobrado (valor_venda) -> 30% Vendedor / 70% Loja
+            base_calculo = self.valor_venda
+            self.custo_base = Decimal('0.00') # Assume-se custo 0 ou já deduzido no retorno
+            
+            if base_calculo > 0:
+                self.comissao_vendedor = base_calculo * Decimal('0.30')
+                self.lucro_loja = base_calculo * Decimal('0.70')
+            else:
+                self.comissao_vendedor = Decimal('0.00')
+                self.lucro_loja = Decimal('0.00')
+
         super().save(*args, **kwargs)
 
     @property
     def resumo_pagamento(self):
+        if self.tipo_produto == 'REFINANCIAMENTO':
+            return f"Refin: {self.qtd_parcelas}x R${self.valor_parcela} (Fin: {self.pgto_financiamento})"
+
         metodos = []
         if self.pgto_pix > 0: metodos.append(f"Pix ({self.pgto_pix})")
         if self.pgto_transferencia > 0: metodos.append(f"Transf ({self.pgto_transferencia})")
