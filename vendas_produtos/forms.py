@@ -50,9 +50,7 @@ class VendaProdutoForm(forms.ModelForm):
             'modelo_veiculo', 'placa', 'cor', 'ano',
             'custo_base', 
             'valor_venda', 
-            # Novos campos Refinanciamento
             'qtd_parcelas', 'valor_parcela', 'valor_retorno_operacao',
-            
             'pgto_pix', 'pgto_transferencia', 'pgto_debito', 'pgto_credito', 'pgto_financiamento',
             'comprovante', 'banco_financiamento', 
             'numero_proposta', 'observacoes', 'data_venda'
