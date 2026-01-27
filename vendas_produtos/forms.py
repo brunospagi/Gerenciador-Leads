@@ -32,7 +32,6 @@ class VendaProdutoForm(forms.ModelForm):
     adicional_transferencia = forms.BooleanField(required=False, label="Incluir Transferência?")
     valor_transferencia = forms.DecimalField(required=False, label="Valor (R$)", max_digits=10, decimal_places=2)
     
-    # Campo EXCLUSIVO para o custo na Venda Casada de Transferência
     custo_transferencia = forms.DecimalField(
         required=False, 
         label="Custo Despachante (R$)", 
@@ -53,7 +52,8 @@ class VendaProdutoForm(forms.ModelForm):
             'qtd_parcelas', 'valor_parcela', 'valor_retorno_operacao',
             'pgto_pix', 'pgto_transferencia', 'pgto_debito', 'pgto_credito', 'pgto_financiamento',
             'comprovante', 'banco_financiamento', 
-            'numero_proposta', 'observacoes', 'data_venda'
+            'numero_proposta', 'observacoes', 'data_venda',
+            'vendedor_ajudante' 
         ]
         widgets = {
             'data_venda': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control'}),
@@ -64,18 +64,14 @@ class VendaProdutoForm(forms.ModelForm):
             'ano': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 2023/2024'}),
             'tipo_produto': forms.Select(attrs={'class': 'form-select'}), 
             
-            # Custo Base
             'custo_base': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control'}),
             
-            # Valor Venda (Cobrado)
             'valor_venda': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control fw-bold fs-5 text-success'}),
             
-            # Campos Refinanciamento
             'qtd_parcelas': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 48'}),
             'valor_parcela': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control'}),
             'valor_retorno_operacao': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control'}),
 
-            # Pagamentos
             'pgto_pix': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control payment-input'}),
             'pgto_transferencia': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control payment-input'}),
             'pgto_debito': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control payment-input'}),
@@ -86,6 +82,8 @@ class VendaProdutoForm(forms.ModelForm):
             'comprovante': forms.ClearableFileInput(attrs={'class': 'form-control'}),
             'banco_financiamento': forms.TextInput(attrs={'class': 'form-control'}),
             'numero_proposta': forms.TextInput(attrs={'class': 'form-control'}),
+
+            'vendedor_ajudante': forms.Select(attrs={'class': 'form-select'}), 
         }
 
     def __init__(self, *args, **kwargs):
@@ -93,7 +91,6 @@ class VendaProdutoForm(forms.ModelForm):
         if 'data_venda' not in self.initial or not self.initial['data_venda']:
             self.initial['data_venda'] = timezone.now().date()
             
-        # Campos opcionais no form (validado no Model clean())
         self.fields['banco_financiamento'].required = False
         self.fields['numero_proposta'].required = False
         self.fields['comprovante'].required = False
@@ -102,12 +99,14 @@ class VendaProdutoForm(forms.ModelForm):
         self.fields['ano'].required = False
         self.fields['custo_base'].required = False
         
-        # Novos campos também iniciam opcionais no form
         self.fields['qtd_parcelas'].required = False
         self.fields['valor_parcela'].required = False
         self.fields['valor_retorno_operacao'].required = False
 
-        # Estilização dos campos extras
+        # Config Helper
+        self.fields['vendedor_ajudante'].required = False
+        self.fields['vendedor_ajudante'].label = "Teve ajuda? (Divide 50%)"
+
         for field in ['metodo_garantia', 'metodo_seguro', 'metodo_transferencia']:
             self.fields[field].widget.attrs.update({'class': 'form-select form-select-sm'})
         for field in ['valor_garantia', 'valor_seguro', 'valor_transferencia']:

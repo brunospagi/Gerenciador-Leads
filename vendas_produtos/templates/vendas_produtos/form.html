@@ -153,7 +153,7 @@
                         {{ form.valor_retorno_operacao }}
                     </div>
                 </div>
-                <div class="row g-3">
+                <div class="row g-3 align-items-end">
                     <div class="col-md-4">
                         <label class="form-label">Banco</label>
                         {{ form.banco_financiamento }}
@@ -163,6 +163,11 @@
                         {{ form.numero_proposta }}
                     </div>
                     <div class="col-md-4">
+                         <label class="form-label text-success fw-bold">Teve Ajuda? (Divide 50% Com.)</label>
+                         {{ form.vendedor_ajudante }}
+                    </div>
+                    
+                    <div class="col-md-4 mt-3">
                         <label class="form-label fw-bold text-dark">Valor Cobrado (Loja)</label>
                         <div id="target-valor-venda-refin"></div>
                     </div>

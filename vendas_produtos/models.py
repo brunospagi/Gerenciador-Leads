@@ -28,7 +28,7 @@ class VendaProduto(models.Model):
         ('GARANTIA', 'Seguro Garantia (Mecânica)'),
         ('SEGURO', 'Seguro Veículo (Novo)'),
         ('TRANSFERENCIA', 'Transferência / Despachante'),
-        ('REFINANCIAMENTO', 'Refinanciamento de Veículo'), # Novo Tipo
+        ('REFINANCIAMENTO', 'Refinanciamento de Veículo'),
     ]
 
     STATUS_CHOICES = [
@@ -40,6 +40,22 @@ class VendaProduto(models.Model):
     vendedor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='vendas_produtos')
     gerente = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='conferencias_produtos')
     
+    # === CAMPO NOVO: AJUDANTE ===
+    vendedor_ajudante = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='vendas_ajudadas',
+        verbose_name="Vendedor Ajudante (Split)"
+    )
+    comissao_ajudante = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0, 
+        editable=False
+    )
+
     # === DADOS DO VEÍCULO / CLIENTE ===
     cliente_nome = models.CharField(max_length=150, verbose_name="Nome do Cliente")
     placa = models.CharField(max_length=10)
@@ -122,8 +138,6 @@ class VendaProduto(models.Model):
         if self.tipo_produto == 'GARANTIA' and self.valor_venda < 1300:
             raise ValidationError({'valor_venda': 'O valor mínimo para Seguro Garantia é R$ 1.300,00.'})
         
-        # Validação de pagamentos (soma) apenas se NÃO for Refinanciamento
-        # (No refinanciamento, o valor cobrado pode ser diferente da simples soma de meios de pagto se houver troco)
         if self.tipo_produto != 'REFINANCIAMENTO':
             total_pagamentos = (
                 (self.pgto_pix or 0) + 
@@ -157,6 +171,7 @@ class VendaProduto(models.Model):
         if self.tipo_produto == 'VENDA_VEICULO':
             self.custo_base = Decimal('0.00')
             self.lucro_loja = Decimal('0.00')
+            self.comissao_ajudante = Decimal('0.00')
             if self.com_desconto:
                 self.comissao_vendedor = Decimal('200.00')
             else:
@@ -167,6 +182,7 @@ class VendaProduto(models.Model):
             preco_base_loja = Decimal('1300.00')
             self.custo_base = custo_real_provider
             self.lucro_loja = preco_base_loja - custo_real_provider
+            self.comissao_ajudante = Decimal('0.00')
             
             if self.valor_venda >= preco_base_loja:
                 self.comissao_vendedor = self.valor_venda - preco_base_loja
@@ -176,6 +192,7 @@ class VendaProduto(models.Model):
         elif self.tipo_produto == 'SEGURO':
             referencia_comissao = Decimal('150.00')
             self.custo_base = Decimal('0.00')
+            self.comissao_ajudante = Decimal('0.00')
             if self.valor_venda >= 299:
                 self.comissao_vendedor = referencia_comissao
                 self.lucro_loja = self.valor_venda 
@@ -185,6 +202,7 @@ class VendaProduto(models.Model):
 
         elif self.tipo_produto == 'TRANSFERENCIA':
             lucro_operacao = self.valor_venda - self.custo_base
+            self.comissao_ajudante = Decimal('0.00')
             if lucro_operacao > 0:
                 self.lucro_loja = lucro_operacao * Decimal('0.70')
                 self.comissao_vendedor = lucro_operacao * Decimal('0.30')
@@ -195,13 +213,22 @@ class VendaProduto(models.Model):
         elif self.tipo_produto == 'REFINANCIAMENTO':
             # REGRA: Valor Cobrado (valor_venda) -> 30% Vendedor / 70% Loja
             base_calculo = self.valor_venda
-            self.custo_base = Decimal('0.00') # Assume-se custo 0 ou já deduzido no retorno
+            self.custo_base = Decimal('0.00') 
             
             if base_calculo > 0:
-                self.comissao_vendedor = base_calculo * Decimal('0.30')
+                comissao_total = base_calculo * Decimal('0.30')
                 self.lucro_loja = base_calculo * Decimal('0.70')
+
+                # LÓGICA DE SPLIT (AJUDANTE)
+                if self.vendedor_ajudante:
+                    self.comissao_vendedor = comissao_total * Decimal('0.50')
+                    self.comissao_ajudante = comissao_total * Decimal('0.50')
+                else:
+                    self.comissao_vendedor = comissao_total
+                    self.comissao_ajudante = Decimal('0.00')
             else:
                 self.comissao_vendedor = Decimal('0.00')
+                self.comissao_ajudante = Decimal('0.00')
                 self.lucro_loja = Decimal('0.00')
 
         super().save(*args, **kwargs)
