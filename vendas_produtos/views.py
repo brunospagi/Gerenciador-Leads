@@ -39,7 +39,7 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
         # Se não for Admin, vê apenas as suas vendas OU onde é ajudante
         if not (user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN'):
             qs = qs.filter(Q(vendedor=user) | Q(vendedor_ajudante=user))
-        return qs.order_by('-data_venda', '-id')
+        return qs.order_by('-data_venda', '-id').distinct() # Distinct adicionado aqui também por segurança
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -51,7 +51,7 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
         vendas_do_mes = self.get_queryset()
         
         if user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN':
-             todas_vendas = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim])
+             todas_vendas = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim]).distinct()
              
              # Soma total (Principal + Ajudantes)
              soma_princ = todas_vendas.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
@@ -61,7 +61,7 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
              context['total_loja'] = todas_vendas.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
              
              # Admin dashboard pessoal (se ele vender tb)
-             minhas_vendas = VendaProduto.objects.filter(vendedor=user, data_venda__range=[data_inicio, data_fim])
+             minhas_vendas = VendaProduto.objects.filter(vendedor=user, data_venda__range=[data_inicio, data_fim]).distinct()
              total_minha = minhas_vendas.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum']
         else:
              # Vendedor: Soma Principal + Soma Ajudante
@@ -224,7 +224,7 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
             data_fim = hoje.replace(day=ultimo_dia)
             data_fim_str = data_fim.strftime('%Y-%m-%d')
 
-        # [CORREÇÃO] Adicionado .distinct() para evitar duplicatas na QuerySet base
+        # [CORREÇÃO DUPLICIDADE] .distinct() garante que cada venda apareça apenas uma vez
         qs = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim]).distinct()
         
         if vendedor_id:
