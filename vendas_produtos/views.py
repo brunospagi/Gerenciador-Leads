@@ -4,7 +4,7 @@ from django.urls import reverse_lazy
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
 from django.utils import timezone
-from django.db.models import Sum, Q # Importar Q
+from django.db.models import Sum, Q
 from django.contrib.auth import get_user_model
 from datetime import datetime
 from decimal import Decimal
@@ -38,7 +38,7 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
 
         # Se não for Admin, vê apenas as suas vendas OU onde é ajudante
         if not (user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN'):
-            qs = qs.filter(Q(vendedor=user) | Q(vendedor_ajudante=user)) # Lógica OR
+            qs = qs.filter(Q(vendedor=user) | Q(vendedor_ajudante=user))
         return qs.order_by('-data_venda', '-id')
 
     def get_context_data(self, **kwargs):
@@ -224,12 +224,16 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
             data_fim = hoje.replace(day=ultimo_dia)
             data_fim_str = data_fim.strftime('%Y-%m-%d')
 
-        qs = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim])
+        # [CORREÇÃO] Adicionado .distinct() para evitar duplicatas na QuerySet base
+        qs = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim]).distinct()
+        
         if vendedor_id:
             qs = qs.filter(vendedor_id=vendedor_id)
 
+        # Agregações
         total_loja = qs.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
         total_comissao = qs.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
+        total_bruto = qs.aggregate(Sum('valor_venda'))['valor_venda__sum'] or 0
         qtd_vendas = qs.count()
 
         vendedores_ids = qs.values_list('vendedor', flat=True).distinct()
@@ -238,22 +242,28 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         for vid in vendedores_ids:
             vendas_vendedor = qs.filter(vendedor_id=vid).select_related('vendedor', 'gerente').order_by('data_venda')
             soma_comissao = vendas_vendedor.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
-            vendedor_obj = User.objects.get(pk=vid)
             
-            relatorio_vendedores.append({
-                'vendedor': vendedor_obj,
-                'vendas': vendas_vendedor,
-                'total_comissao': soma_comissao
-            })
+            # Pega o objeto User
+            vendedor_obj = User.objects.filter(pk=vid).first()
+            if vendedor_obj:
+                relatorio_vendedores.append({
+                    'vendedor': vendedor_obj,
+                    'vendas': vendas_vendedor,
+                    'total_comissao': soma_comissao
+                })
 
         context['periodo_inicio'] = data_inicio
         context['periodo_fim'] = data_fim
         context['periodo_inicio_str'] = data_inicio_str
         context['periodo_fim_str'] = data_fim_str
+        
         context['total_geral_loja'] = total_loja
         context['total_geral_comissao'] = total_comissao
+        context['total_geral_bruto'] = total_bruto
         context['qtd_vendas'] = qtd_vendas
+        
         context['relatorio_vendedores'] = relatorio_vendedores
+        # Lista de vendedores para o filtro (apenas quem tem vendas)
         context['lista_vendedores'] = User.objects.filter(vendas_produtos__isnull=False).distinct()
         context['vendedor_selecionado'] = int(vendedor_id) if vendedor_id else None
 
