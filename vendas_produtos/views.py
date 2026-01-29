@@ -31,17 +31,17 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         user = self.request.user
-        # .distinct() previne duplicatas caso haja joins implícitos
         qs = VendaProduto.objects.all().select_related('vendedor', 'gerente', 'vendedor_ajudante')
         
         data_inicio, data_fim = self.get_periodo_mes_atual()
         qs = qs.filter(data_venda__range=[data_inicio, data_fim])
 
-        # Se não for Admin, vê apenas as suas vendas OU onde é ajudante
         if not (user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN'):
             qs = qs.filter(Q(vendedor=user) | Q(vendedor_ajudante=user))
         
-        return qs.order_by('-data_venda', '-id').distinct()
+        # Removemos distinct() aqui para evitar conflito com ordering na paginação
+        # A duplicidade na lista geralmente não ocorre sem joins complexos
+        return qs.order_by('-data_venda', '-id')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -51,8 +51,8 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
         context['periodo_fim'] = data_fim
 
         if user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN':
-             # Consulta isolada com distinct para garantir somas corretas
-             todas_vendas = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim]).distinct()
+             # Query limpa para totais
+             todas_vendas = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim])
              
              soma_princ = todas_vendas.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
              soma_ajud = todas_vendas.aggregate(Sum('comissao_ajudante'))['comissao_ajudante__sum'] or 0
@@ -60,13 +60,12 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
              context['total_comissao_equipe'] = soma_princ + soma_ajud
              context['total_loja'] = todas_vendas.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
              
-             minhas_vendas = VendaProduto.objects.filter(vendedor=user, data_venda__range=[data_inicio, data_fim]).distinct()
+             minhas_vendas = VendaProduto.objects.filter(vendedor=user, data_venda__range=[data_inicio, data_fim])
              total_minha = minhas_vendas.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum']
         else:
-             # Para vendedor comum, usamos o queryset já filtrado
-             vendas_do_mes = self.get_queryset()
-             ganho_principal = vendas_do_mes.filter(vendedor=user).aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
-             ganho_ajudante = vendas_do_mes.filter(vendedor_ajudante=user).aggregate(Sum('comissao_ajudante'))['comissao_ajudante__sum'] or 0
+             qs = self.get_queryset()
+             ganho_principal = qs.filter(vendedor=user).aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
+             ganho_ajudante = qs.filter(vendedor_ajudante=user).aggregate(Sum('comissao_ajudante'))['comissao_ajudante__sum'] or 0
              total_minha = ganho_principal + ganho_ajudante
         
         context['minha_comissao'] = total_minha or 0
@@ -91,7 +90,7 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
         response = super().form_valid(form)
         
         if main_venda.tipo_produto == 'VENDA_VEICULO':
-            adicionais_criados = 0
+            total_extras = 0
             
             def processar_adicional(tipo_prod, check_field, valor_field, metodo_field, custo_field=None):
                 if form.cleaned_data.get(check_field):
@@ -130,15 +129,15 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
             total_extras = c1 + c2 + c3
 
             if total_extras > 0:
-                messages.success(self.request, f"Venda do Veículo registrada + {total_extras} serviços adicionais criados com sucesso!")
+                messages.success(self.request, f"Venda principal + {total_extras} adicionais registrados!")
             else:
-                messages.success(self.request, "Venda do Veículo registrada com sucesso!")
+                messages.success(self.request, "Venda registrada com sucesso!")
         else:
             messages.success(self.request, "Serviço registrado com sucesso!")
             
         return response
 
-# --- 3. EDIÇÃO ---
+# --- 3. EDIÇÃO E EXCLUSÃO ---
 class VendaProdutoUpdateView(LoginRequiredMixin, UpdateView):
     model = VendaProduto
     form_class = VendaProdutoForm
@@ -159,12 +158,9 @@ class VendaProdutoUpdateView(LoginRequiredMixin, UpdateView):
             form.instance.status = 'PENDENTE'
             form.instance.gerente = None
             form.instance.data_aprovacao = None
-            messages.info(self.request, "Venda atualizada e retornada para análise.")
-        else:
-            messages.success(self.request, "Venda atualizada com sucesso.")
+        messages.success(self.request, "Venda atualizada.")
         return super().form_valid(form)
 
-# --- 4. EXCLUSÃO ---
 class VendaProdutoDeleteView(LoginRequiredMixin, DeleteView):
     model = VendaProduto
     template_name = 'vendas_produtos/delete_confirm.html'
@@ -173,19 +169,16 @@ class VendaProdutoDeleteView(LoginRequiredMixin, DeleteView):
     def dispatch(self, request, *args, **kwargs):
         venda = self.get_object()
         is_admin = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'
-        
         if venda.vendedor != request.user and not is_admin:
             messages.error(request, "Permissão negada.")
             return redirect('venda_produto_list')
-
         if venda.status == 'APROVADO' and not is_admin:
             messages.error(request, "Vendas APROVADAS não podem ser excluídas.")
             return redirect('venda_produto_list')
-
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        messages.success(self.request, "Venda excluída com sucesso.")
+        messages.success(self.request, "Venda excluída.")
         return super().form_valid(form)
 
 # --- 5. RELATÓRIOS E AÇÕES ---
@@ -199,7 +192,7 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
     
     def dispatch(self, request, *args, **kwargs):
         if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
-            messages.error(request, "Acesso negado. Apenas administradores podem ver o relatório.")
+            messages.error(request, "Acesso negado.")
             return redirect('venda_produto_list')
         return super().dispatch(request, *args, **kwargs)
 
@@ -224,38 +217,54 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
             data_fim = hoje.replace(day=ultimo_dia)
             data_fim_str = data_fim.strftime('%Y-%m-%d')
 
-        # [CORREÇÃO] Base da Query com .distinct()
-        qs_base = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim]).distinct()
+        # 1. Base Query - Filtro de Data
+        qs_base = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim])
         
         if vendedor_id:
             qs_base = qs_base.filter(vendedor_id=vendedor_id)
 
-        # Agregações Gerais
+        # 2. Agregações Globais (Totalizadores)
         total_loja = qs_base.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
         total_comissao = qs_base.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
         total_bruto = qs_base.aggregate(Sum('valor_venda'))['valor_venda__sum'] or 0
         qtd_vendas = qs_base.count()
 
-        # Lista de Vendedores Únicos
-        vendedores_ids = qs_base.values_list('vendedor', flat=True).distinct()
+        # 3. Lista de Vendedores Únicos (CORREÇÃO DA DUPLICIDADE)
+        # Usamos set() do Python para forçar unicidade real, ignorando ordenação do SQL
+        todos_ids = qs_base.values_list('vendedor', flat=True)
+        vendedores_ids = list(set(todos_ids)) 
+        
         relatorio_vendedores = []
         
         for vid in vendedores_ids:
-            # [CRUCIAL] Re-executa query limpa para cada vendedor para evitar herança de duplicidade
-            vendas_vendedor = VendaProduto.objects.filter(
+            # Busca as vendas deste vendedor específico
+            vendas_list_raw = VendaProduto.objects.filter(
                 vendedor_id=vid, 
                 data_venda__range=[data_inicio, data_fim]
-            ).select_related('vendedor', 'gerente').order_by('data_venda', 'id').distinct()
+            ).select_related('vendedor', 'gerente').order_by('data_venda', 'id')
+
+            # Dedupicação extra (garantia final) por ID da venda
+            vendas_unicas = {}
+            for v in vendas_list_raw:
+                vendas_unicas[v.id] = v
             
-            soma_comissao = vendas_vendedor.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
+            vendas_vendedor = list(vendas_unicas.values())
+            # Reordenar após dedupilicação (opcional, pois dict mantém ordem no Python moderno, mas garantimos)
+            vendas_vendedor.sort(key=lambda x: (x.data_venda, x.id), reverse=True)
+
+            # Recalcula soma comissão deste vendedor (em Python para bater com a lista visual)
+            soma_comissao = sum(v.comissao_vendedor for v in vendas_vendedor)
             
             vendedor_obj = User.objects.filter(pk=vid).first()
-            if vendedor_obj:
+            if vendedor_obj and vendas_vendedor:
                 relatorio_vendedores.append({
                     'vendedor': vendedor_obj,
                     'vendas': vendas_vendedor,
                     'total_comissao': soma_comissao
                 })
+
+        # Ordena a lista de vendedores por nome
+        relatorio_vendedores.sort(key=lambda x: x['vendedor'].get_full_name() or x['vendedor'].username)
 
         context['periodo_inicio'] = data_inicio
         context['periodo_fim'] = data_fim
@@ -268,43 +277,41 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         context['qtd_vendas'] = qtd_vendas
         
         context['relatorio_vendedores'] = relatorio_vendedores
-        # Filtro dropdown: apenas usuários que possuem vendas
-        context['lista_vendedores'] = User.objects.filter(vendas_produtos__isnull=False).distinct()
+        
+        # Filtro dropdown: apenas usuários únicos que possuem vendas
+        ids_com_venda = set(VendaProduto.objects.values_list('vendedor', flat=True))
+        context['lista_vendedores'] = User.objects.filter(id__in=ids_com_venda).order_by('username')
         context['vendedor_selecionado'] = int(vendedor_id) if vendedor_id else None
 
         return context
 
+# Aprovacao/Rejeicao mantidas iguais
 def aprovar_venda_produto(request, pk):
     if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
         messages.error(request, "Permissão negada.")
         return redirect('venda_produto_list')
 
     venda = get_object_or_404(VendaProduto, pk=pk)
-
     if request.method == 'POST':
         numero_apolice = request.POST.get('numero_apolice')
         arquivo_apolice = request.FILES.get('arquivo_apolice')
 
         if venda.tipo_produto == 'GARANTIA':
             if not numero_apolice:
-                messages.error(request, "Erro: Para Seguro Garantia, o Nº da Apólice é obrigatório.")
+                messages.error(request, "Nº da Apólice é obrigatório para Garantia.")
                 return redirect('venda_produto_list')
             if not arquivo_apolice and not venda.arquivo_apolice:
-                messages.error(request, "Erro: Para Seguro Garantia, o upload do PDF da Apólice é obrigatório.")
+                messages.error(request, "Upload da Apólice é obrigatório para Garantia.")
                 return redirect('venda_produto_list')
 
         venda.status = 'APROVADO'
         venda.motivo_recusa = None
         venda.gerente = request.user
         venda.data_aprovacao = timezone.now()
-        
         if numero_apolice: venda.numero_apolice = numero_apolice
         if arquivo_apolice: venda.arquivo_apolice = arquivo_apolice
-
         venda.save()
         messages.success(request, "Venda APROVADA.")
-        return redirect('venda_produto_list')
-    
     return redirect('venda_produto_list')
 
 def rejeitar_venda_produto(request, pk):
