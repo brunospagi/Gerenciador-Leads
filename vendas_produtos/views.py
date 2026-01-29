@@ -31,7 +31,7 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         user = self.request.user
-        # .distinct() adicionado para evitar duplicatas causadas por joins
+        # .distinct() previne duplicatas caso haja joins implícitos
         qs = VendaProduto.objects.all().select_related('vendedor', 'gerente', 'vendedor_ajudante')
         
         data_inicio, data_fim = self.get_periodo_mes_atual()
@@ -50,10 +50,8 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
         context['periodo_inicio'] = data_inicio
         context['periodo_fim'] = data_fim
 
-        vendas_do_mes = self.get_queryset()
-        
         if user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN':
-             # Query isolada com distinct() para garantir somas corretas
+             # Consulta isolada com distinct para garantir somas corretas
              todas_vendas = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim]).distinct()
              
              soma_princ = todas_vendas.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
@@ -65,6 +63,8 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
              minhas_vendas = VendaProduto.objects.filter(vendedor=user, data_venda__range=[data_inicio, data_fim]).distinct()
              total_minha = minhas_vendas.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum']
         else:
+             # Para vendedor comum, usamos o queryset já filtrado
+             vendas_do_mes = self.get_queryset()
              ganho_principal = vendas_do_mes.filter(vendedor=user).aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
              ganho_ajudante = vendas_do_mes.filter(vendedor_ajudante=user).aggregate(Sum('comissao_ajudante'))['comissao_ajudante__sum'] or 0
              total_minha = ganho_principal + ganho_ajudante
@@ -224,25 +224,24 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
             data_fim = hoje.replace(day=ultimo_dia)
             data_fim_str = data_fim.strftime('%Y-%m-%d')
 
-        # [CORREÇÃO DUPLICIDADE] - distinct() aplicado aqui
+        # [CORREÇÃO] Base da Query com .distinct()
         qs_base = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim]).distinct()
         
         if vendedor_id:
             qs_base = qs_base.filter(vendedor_id=vendedor_id)
 
-        # Agregações
+        # Agregações Gerais
         total_loja = qs_base.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
         total_comissao = qs_base.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
         total_bruto = qs_base.aggregate(Sum('valor_venda'))['valor_venda__sum'] or 0
         qtd_vendas = qs_base.count()
 
-        # [CORREÇÃO] Lista de IDs únicos de vendedores
+        # Lista de Vendedores Únicos
         vendedores_ids = qs_base.values_list('vendedor', flat=True).distinct()
         relatorio_vendedores = []
         
         for vid in vendedores_ids:
-            # [CORREÇÃO CRÍTICA] Re-filtramos diretamente do Model para garantir limpeza
-            # Isso evita herdar joins estranhos se 'qs_base' tiver sido contaminado
+            # [CRUCIAL] Re-executa query limpa para cada vendedor para evitar herança de duplicidade
             vendas_vendedor = VendaProduto.objects.filter(
                 vendedor_id=vid, 
                 data_venda__range=[data_inicio, data_fim]
@@ -250,7 +249,6 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
             
             soma_comissao = vendas_vendedor.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
             
-            # Pega o objeto User
             vendedor_obj = User.objects.filter(pk=vid).first()
             if vendedor_obj:
                 relatorio_vendedores.append({
@@ -270,7 +268,7 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         context['qtd_vendas'] = qtd_vendas
         
         context['relatorio_vendedores'] = relatorio_vendedores
-        # [CORREÇÃO] Lista para o filtro dropdown também única
+        # Filtro dropdown: apenas usuários que possuem vendas
         context['lista_vendedores'] = User.objects.filter(vendas_produtos__isnull=False).distinct()
         context['vendedor_selecionado'] = int(vendedor_id) if vendedor_id else None
 
