@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+
+{% block title %}Gerenciador de Senhas{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-dark"><i class="fa fa-key me-2 text-warning"></i> Acessos Bancários</h2>
+        
+        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
+        <a href="{% url 'credencial_create' %}" class="btn btn-primary fw-bold shadow-sm">
+            <i class="fa fa-plus me-2"></i> Novo Acesso
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="row">
+        {% for item in credenciais %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-start">
+                    <h5 class="fw-bold text-primary mb-0">{{ item.nome }}</h5>
+                    
+                    {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
+                    <div class="dropdown">
+                        <button class="btn btn-light btn-sm rounded-circle" type="button" data-bs-toggle="dropdown">
+                            <i class="fa fa-ellipsis-v text-muted"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'credencial_update' item.pk %}"><i class="fa fa-edit me-2"></i> Editar</a></li>
+                            <li><a class="dropdown-item text-danger" href="{% url 'credencial_delete' item.pk %}"><i class="fa fa-trash me-2"></i> Excluir</a></li>
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if item.link %}
+                    <div class="mb-3">
+                        <a href="{{ item.link }}" target="_blank" class="btn btn-outline-primary btn-sm w-100">
+                            <i class="fa fa-external-link-alt me-1"></i> Acessar Link
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <div class="bg-light p-3 rounded mb-3">
+                        <div class="mb-2">
+                            <small class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Usuário</small>
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control bg-white border-0" value="{{ item.usuario }}" readonly id="user_{{ item.pk }}">
+                                <button class="btn btn-outline-secondary bg-white border-0" onclick="copyToClipboard('user_{{ item.pk }}')">
+                                    <i class="fa fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <small class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Senha</small>
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control bg-white border-0 text-danger fw-bold" value="{{ item.senha }}" readonly id="pass_{{ item.pk }}">
+                                <button class="btn btn-outline-secondary bg-white border-0" onclick="copyToClipboard('pass_{{ item.pk }}')">
+                                    <i class="fa fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if item.observacao %}
+                        <div class="alert alert-warning py-2 px-3 mb-0">
+                            <small><i class="fa fa-info-circle me-1"></i> {{ item.observacao|linebreaksbr }}</small>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer bg-white border-0 pt-0 pb-3">
+                    <small class="text-muted" style="font-size: 0.75rem;">
+                        Atualizado por <strong>{{ item.atualizado_por.username|default:"Sistema" }}</strong> em {{ item.ultima_atualizacao|date:"d/m H:i" }}
+                    </small>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5">
+            <p class="text-muted fs-5">Nenhum acesso cadastrado.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+function copyToClipboard(elementId) {
+    var copyText = document.getElementById(elementId);
+    copyText.select();
+    copyText.setSelectionRange(0, 99999); 
+    navigator.clipboard.writeText(copyText.value).then(() => {
+        const btn = copyText.nextElementSibling;
+        const icon = btn.querySelector('i');
+        icon.className = 'fa fa-check text-success';
+        setTimeout(() => { icon.className = 'fa fa-copy'; }, 1000);
+    });
+}
+</script>
+{% endblock %}

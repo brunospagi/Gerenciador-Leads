@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Cadastro de Acesso{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 600px;">
+    <div class="card border-0 shadow-lg">
+        <div class="card-header bg-primary text-white py-3">
+            <h4 class="mb-0 fw-bold"><i class="fa fa-lock me-2"></i> Dados de Acesso</h4>
+        </div>
+        <div class="card-body p-4">
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="fw-bold text-muted small text-uppercase">Banco / Serviço</label>
+                    {{ form.nome }}
+                </div>
+                <div class="mb-3">
+                    <label class="fw-bold text-muted small text-uppercase">Link (URL)</label>
+                    {{ form.link }}
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="fw-bold text-muted small text-uppercase">Usuário</label>
+                        {{ form.usuario }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="fw-bold text-muted small text-uppercase">Senha</label>
+                        {{ form.senha }}
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="fw-bold text-muted small text-uppercase">Observações</label>
+                    {{ form.observacao }}
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg fw-bold">Salvar Acesso</button>
+                    <a href="{% url 'credencial_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

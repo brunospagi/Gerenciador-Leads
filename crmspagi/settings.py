@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'core',
     'mozilla_django_oidc',
     'distribuicao',
+    'credenciais',
 ]
 
 MIDDLEWARE = [

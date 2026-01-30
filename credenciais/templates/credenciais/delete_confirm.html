@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-5 text-center" style="max-width: 500px;">
+    <div class="card shadow border-0">
+        <div class="card-body p-5">
+            <i class="fa fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+            <h3 class="fw-bold">Tem certeza?</h3>
+            <p class="text-muted">Você vai excluir o acesso ao <strong>{{ object.nome }}</strong>. Isso não pode ser desfeito.</p>
+            <form method="post">
+                {% csrf_token %}
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-danger fw-bold">Sim, Excluir</button>
+                    <a href="{% url 'credencial_list' %}" class="btn btn-light">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

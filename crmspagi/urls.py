@@ -17,4 +17,5 @@ urlpatterns = [
     path('financiamentos/', include('financiamentos.urls')),
     path('oidc/', include('mozilla_django_oidc.urls')),
     path('distribuicao/', include('distribuicao.urls')),
+    path('acessos/', include('credenciais.urls')),
 ]
