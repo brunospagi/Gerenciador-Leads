@@ -204,7 +204,7 @@
                     <div class="col-md-2 col-6"><label class="small fw-bold text-muted">Débito</label>{{ form.pgto_debito }}</div>
                     <div class="col-md-2 col-6"><label class="small fw-bold text-muted">Crédito</label>{{ form.pgto_credito }}</div>
                     <div class="col-md-4 col-12"><label class="small fw-bold text-muted">Financiamento</label>
-                        <input type="number" step="0.01" class="form-control payment-input" id="input_financiamento_padrao">
+                        <input type="text" class="form-control payment-input money-mask" id="input_financiamento_padrao">
                     </div>
                 </div>
 
@@ -294,6 +294,59 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // --- 1. CONFIGURAÇÃO DA MÁSCARA DE DINHEIRO (R$) ---
+    const moneyInputs = document.querySelectorAll('.money-mask');
+    
+    function mascaraMoeda(event) {
+        const value = event.target.value.replace(/\D/g, ""); // Remove tudo que não é dígito
+        
+        // Se estiver vazio, limpa
+        if (value === "") {
+            event.target.value = "";
+            updateFinanceiroPadrao();
+            return;
+        }
+
+        // Converte para float (ex: 123456 -> 1234.56)
+        const digitsFloat = (parseFloat(value) / 100);
+        
+        // Formata para BRL
+        event.target.value = maskCurrency(digitsFloat);
+        
+        // Dispara evento para recalcular totais
+        updateFinanceiroPadrao(); 
+    }
+
+    function maskCurrency(valor, locale = 'pt-BR', currency = 'BRL') {
+        return new Intl.NumberFormat(locale, {
+            style: 'currency',
+            currency: currency
+        }).format(valor);
+    }
+    
+    // Função auxiliar para converter "R$ 1.000,00" em float JS (1000.00)
+    function parseMonetary(val) {
+        if(!val) return 0;
+        // Remove tudo que não for dígito ou vírgula
+        let clean = val.replace(/[^\d,]/g, ''); 
+        // Troca vírgula por ponto
+        clean = clean.replace(',', '.');
+        return parseFloat(clean) || 0;
+    }
+
+    moneyInputs.forEach(input => {
+        input.addEventListener('input', mascaraMoeda);
+        // Se já tiver valor (edição), formata ao carregar
+        if(input.value) {
+            let valStr = input.value.toString().replace(',', '.');
+            let val = parseFloat(valStr);
+            if (!isNaN(val)) {
+                input.value = maskCurrency(val);
+            }
+        }
+    });
+
+    // --- 2. LÓGICA DO FORMULÁRIO ---
     const modoVeiculoBtn = document.getElementById('modo_veiculo');
     const modoRefinBtn = document.getElementById('modo_refin');
     const modoServicoBtn = document.getElementById('modo_servico');
@@ -315,17 +368,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const cardFinanceiroRefin = document.getElementById('card-financeiro-refin');
     const divCustoBase = document.getElementById('div-custo-base');
     
-    // === Targets para mover o input de Valor Venda ===
+    // Inputs
     const inputValorVendaReal = document.getElementById('id_valor_venda');
     const targetRefinValorVenda = document.getElementById('target-valor-venda-refin');
     const targetPadraoValorVenda = document.getElementById('target-valor-venda-padrao');
 
-    // Inputs Reais
     const inputFinanReal = document.getElementById('id_pgto_financiamento');
     const inputBancoReal = document.getElementById('id_banco_financiamento');
     const inputPropostaReal = document.getElementById('id_numero_proposta');
     
-    // Inputs Fakes
     const inputFinanPadrao = document.getElementById('input_financiamento_padrao');
     const inputFakeBancoPadrao = document.getElementById('fake_banco_padrao');
     const inputFakePropostaPadrao = document.getElementById('fake_proposta_padrao');
@@ -340,7 +391,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputCor = document.getElementById('id_cor');
     const inputAno = document.getElementById('id_ano');
 
-    // Sync Fakes -> Reais
+    // Sync Fakes -> Reais (Copia o valor formatado mesmo, limparemos no submit)
     inputFinanPadrao.addEventListener('input', function() {
         if(cardFinanceiroPadrao.style.display !== 'none') {
             inputFinanReal.value = this.value;
@@ -349,7 +400,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     inputFakeBancoPadrao.addEventListener('input', () => { if(cardFinanceiroPadrao.style.display !== 'none') inputBancoReal.value = inputFakeBancoPadrao.value; });
     inputFakePropostaPadrao.addEventListener('input', () => { if(cardFinanceiroPadrao.style.display !== 'none') inputPropostaReal.value = inputFakePropostaPadrao.value; });
-
 
     function checkCustoVisibility(tipo) {
         if (tipo === 'TRANSFERENCIA') divCustoBase.style.display = 'block';
@@ -360,8 +410,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let mode = 'SERVICO';
         if (modoVeiculoBtn && modoVeiculoBtn.checked) mode = 'VEICULO';
         else if (modoRefinBtn && modoRefinBtn.checked) mode = 'REFIN';
-        else if (!modoVeiculoBtn) {
-            // Edição
+        else if (!modoVeiculoBtn) { // Edição
             const val = realTipoSelect.value;
             if (val === 'VENDA_VEICULO') mode = 'VEICULO';
             else if (val === 'REFINANCIAMENTO') mode = 'REFIN';
@@ -384,16 +433,11 @@ document.addEventListener('DOMContentLoaded', function() {
             divSelectTipo.style.display = 'none';
             labelVeiculoDisplay.style.display = 'block';
             textoOperacaoFixo.innerText = "Venda de Veículo";
-            
             divBtnModal.style.display = 'block'; 
             divDescontoContainer.style.display = 'flex'; 
             labelFinanceiro.innerText = "Pagamento do Veículo";
-
             cardFinanceiroPadrao.style.display = 'block';
-            
-            // Move input para bloco padrão
             if(inputValorVendaReal && targetPadraoValorVenda) targetPadraoValorVenda.appendChild(inputValorVendaReal);
-            
             checkCustoVisibility('VENDA_VEICULO');
             updateFinanceiroPadrao();
 
@@ -402,27 +446,18 @@ document.addEventListener('DOMContentLoaded', function() {
             divSelectTipo.style.display = 'none';
             labelVeiculoDisplay.style.display = 'block';
             textoOperacaoFixo.innerText = "Refinanciamento";
-            
             cardFinanceiroRefin.style.display = 'block';
-            
-            // Move input para bloco refin
             if(inputValorVendaReal && targetRefinValorVenda) targetRefinValorVenda.appendChild(inputValorVendaReal);
-
             inputBancoReal.required = true; 
             inputPropostaReal.required = true;
 
         } else {
-            // SERVIÇO
             realTipoSelect.value = fakeTipoSelect.value;
             divSelectTipo.style.display = 'block';
             labelVeiculoDisplay.style.display = 'none';
             labelFinanceiro.innerText = "Pagamento do Serviço";
-
             cardFinanceiroPadrao.style.display = 'block';
-            
-            // Move input para bloco padrão
             if(inputValorVendaReal && targetPadraoValorVenda) targetPadraoValorVenda.appendChild(inputValorVendaReal);
-
             checkCustoVisibility(fakeTipoSelect.value);
             updateModalUI(true); 
             updateFinanceiroPadrao();
@@ -484,26 +519,38 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateFinanceiroPadrao() {
         if (cardFinanceiroPadrao.style.display === 'none') return;
 
-        let total = parseFloat(inputValorVendaReal.value) || 0;
+        let total = parseMonetary(inputValorVendaReal.value) || 0;
         let pago = 0;
         let temImediato = false;
         
         inputsPgtoCarro.forEach(inp => {
-            let v = parseFloat(inp.value) || 0;
+            // Ignora o input fake ("input_financiamento_padrao") se ele estiver sendo usado, 
+            // porque o valor dele é copiado para o "id_pgto_financiamento" que também tem a classe payment-input
+            if (inp.id === 'input_financiamento_padrao') return;
+            
+            let v = parseMonetary(inp.value) || 0;
             pago += v;
             if (v > 0 && (inp.id.includes('pix') || inp.id.includes('transferencia'))) temImediato = true;
         });
+        
+        // CORREÇÃO: Removemos a soma manual duplicada aqui. 
+        // O "id_pgto_financiamento" já foi somado no loop acima.
 
         let diff = total - pago;
+        
         if (total > 0 && Math.abs(diff) < 0.05) {
             feedbackPgto.className = 'badge bg-success p-2';
             feedbackPgto.innerHTML = '<i class="fa fa-check"></i> OK';
         } else {
             feedbackPgto.className = 'badge bg-danger p-2';
-            feedbackPgto.innerText = diff > 0 ? `Falta R$ ${diff.toFixed(2)}` : `Passou R$ ${Math.abs(diff).toFixed(2)}`;
+            if (diff > 0) {
+                 feedbackPgto.innerText = `Falta R$ ${maskCurrency(diff).replace('R$', '')}`;
+            } else {
+                 feedbackPgto.innerText = `Passou R$ ${maskCurrency(Math.abs(diff)).replace('R$', '')}`;
+            }
         }
 
-        if ((parseFloat(inputFinanPadrao.value) || 0) > 0) {
+        if ((parseMonetary(inputFinanPadrao.value) || 0) > 0) {
             divFinanPadrao.style.display = 'block';
             inputFakeBancoPadrao.required = true;
         } else {
@@ -516,16 +563,30 @@ document.addEventListener('DOMContentLoaded', function() {
     inputValorVendaReal.addEventListener('input', updateFinanceiroPadrao);
     inputsPgtoCarro.forEach(inp => inp.addEventListener('input', updateFinanceiroPadrao));
 
+    // --- 3. LIMPEZA NO SUBMIT (IMPORTANTE) ---
+    const form = document.getElementById('vendaForm');
+    form.addEventListener('submit', function(e) {
+        moneyInputs.forEach(input => {
+            if (input.value) {
+                // Converte para formato float puro (1234.56) antes de enviar
+                input.value = parseMonetary(input.value);
+            }
+        });
+    });
+
     // Inicialização
     updateMode();
     updateModalUI();
     
     // Se for edição e tiver valor financiado, preenche o fake
-    if(inputFinanReal.value && parseFloat(inputFinanReal.value) > 0) {
-        inputFinanPadrao.value = inputFinanReal.value;
-        inputFakeBancoPadrao.value = inputBancoReal.value;
-        inputFakePropostaPadrao.value = inputPropostaReal.value;
-        updateFinanceiroPadrao();
+    if(inputFinanReal.value) {
+        let valFin = parseFloat(inputFinanReal.value);
+        if (valFin > 0) {
+            inputFinanPadrao.value = maskCurrency(valFin);
+            inputFakeBancoPadrao.value = inputBancoReal.value;
+            inputFakePropostaPadrao.value = inputPropostaReal.value;
+            updateFinanceiroPadrao();
+        }
     }
 });
 </script>

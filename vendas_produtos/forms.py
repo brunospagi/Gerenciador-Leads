@@ -37,7 +37,7 @@ class VendaProdutoForm(forms.ModelForm):
         label="Custo Despachante (R$)", 
         max_digits=10, 
         decimal_places=2,
-        widget=forms.NumberInput(attrs={'class': 'form-control form-control-sm'})
+        widget=forms.TextInput(attrs={'class': 'form-control form-control-sm money-mask'})
     )
     
     metodo_transferencia = forms.ChoiceField(required=False, choices=METODO_CHOICES, label="Pagamento")
@@ -64,19 +64,23 @@ class VendaProdutoForm(forms.ModelForm):
             'ano': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 2023/2024'}),
             'tipo_produto': forms.Select(attrs={'class': 'form-select'}), 
             
-            'custo_base': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control'}),
+            # Mudança: NumberInput -> TextInput e adição da classe money-mask
+            'custo_base': forms.TextInput(attrs={'class': 'form-control money-mask'}),
             
-            'valor_venda': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control fw-bold fs-5 text-success'}),
+            'valor_venda': forms.TextInput(attrs={'class': 'form-control fw-bold fs-5 text-success money-mask'}),
             
             'qtd_parcelas': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 48'}),
-            'valor_parcela': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control'}),
-            'valor_retorno_operacao': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control'}),
+            
+            # Mudança: NumberInput -> TextInput e adição da classe money-mask
+            'valor_parcela': forms.TextInput(attrs={'class': 'form-control money-mask'}),
+            'valor_retorno_operacao': forms.TextInput(attrs={'class': 'form-control money-mask'}),
 
-            'pgto_pix': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control payment-input'}),
-            'pgto_transferencia': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control payment-input'}),
-            'pgto_debito': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control payment-input'}),
-            'pgto_credito': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control payment-input'}),
-            'pgto_financiamento': forms.NumberInput(attrs={'step': '0.01', 'class': 'form-control payment-input'}),
+            # Pagamentos
+            'pgto_pix': forms.TextInput(attrs={'class': 'form-control payment-input money-mask'}),
+            'pgto_transferencia': forms.TextInput(attrs={'class': 'form-control payment-input money-mask'}),
+            'pgto_debito': forms.TextInput(attrs={'class': 'form-control payment-input money-mask'}),
+            'pgto_credito': forms.TextInput(attrs={'class': 'form-control payment-input money-mask'}),
+            'pgto_financiamento': forms.TextInput(attrs={'class': 'form-control payment-input money-mask'}),
             
             'observacoes': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
             'comprovante': forms.ClearableFileInput(attrs={'class': 'form-control'}),
@@ -109,5 +113,8 @@ class VendaProdutoForm(forms.ModelForm):
 
         for field in ['metodo_garantia', 'metodo_seguro', 'metodo_transferencia']:
             self.fields[field].widget.attrs.update({'class': 'form-select form-select-sm'})
+        
+        # Adicionar money-mask aos campos de valores extras
         for field in ['valor_garantia', 'valor_seguro', 'valor_transferencia']:
-            self.fields[field].widget.attrs.update({'class': 'form-control form-control-sm'})
+            css_classes = self.fields[field].widget.attrs.get('class', '')
+            self.fields[field].widget = forms.TextInput(attrs={'class': f'form-control form-control-sm money-mask {css_classes}'})
