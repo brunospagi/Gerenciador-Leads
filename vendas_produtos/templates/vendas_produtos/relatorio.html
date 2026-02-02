@@ -74,6 +74,43 @@
                 <h5 class="mb-0 fw-bold text-gray-800"><i class="fa fa-file-invoice-dollar me-2 text-primary"></i>Relatório Financeiro</h5>
             </div>
             
+            <div class="d-flex align-items-center bg-light rounded p-1 border">
+                <a href="?data_inicio={{ nav_anterior_inicio }}" class="btn btn-sm btn-link text-decoration-none text-secondary">
+                    <i class="fa fa-chevron-left"></i>
+                </a>
+                
+                <div class="px-3 text-center border-start border-end">
+                    <div class="fw-bold text-dark" style="font-size: 0.9rem;">{{ periodo_inicio|date:"F Y"|upper }}</div>
+                    {% if mes_fechado %}
+                        <span class="badge bg-danger" style="font-size: 0.65rem;">FECHADO <i class="fa fa-lock ms-1"></i></span>
+                    {% else %}
+                        <span class="badge bg-success" style="font-size: 0.65rem;">ABERTO <i class="fa fa-lock-open ms-1"></i></span>
+                    {% endif %}
+                </div>
+
+                <a href="?data_inicio={{ nav_proximo_inicio }}" class="btn btn-sm btn-link text-decoration-none text-secondary">
+                    <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+
+            <form action="{% url 'toggle_fechamento_mes' %}" method="POST" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="mes" value="{{ periodo_inicio.month }}">
+                <input type="hidden" name="ano" value="{{ periodo_inicio.year }}">
+                
+                {% if mes_fechado %}
+                    <input type="hidden" name="acao" value="reabrir">
+                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Reabrir Mês para Edição" onclick="return confirm('Deseja REABRIR este mês para edições?')">
+                        <i class="fa fa-unlock"></i> Reabrir
+                    </button>
+                {% else %}
+                    <input type="hidden" name="acao" value="fechar">
+                    <button type="submit" class="btn btn-success btn-sm text-white" title="Fechar Mês e Bloquear Edições" onclick="return confirm('Deseja FECHAR este mês? Ninguém poderá lançar ou editar vendas neste período.')">
+                        <i class="fa fa-lock"></i> Fechar Mês
+                    </button>
+                {% endif %}
+            </form>
+
             <form method="get" class="d-flex align-items-center gap-2 flex-grow-1 justify-content-end">
                 <input type="hidden" name="data_inicio" value="{{ periodo_inicio_str }}">
                 <input type="hidden" name="data_fim" value="{{ periodo_fim_str }}">

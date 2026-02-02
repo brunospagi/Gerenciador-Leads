@@ -9,8 +9,9 @@ from django.contrib.auth import get_user_model
 from datetime import datetime
 from decimal import Decimal
 import calendar
+from dateutil.relativedelta import relativedelta  # Necessário para navegação de meses
 
-from .models import VendaProduto
+from .models import VendaProduto, FechamentoMensal
 from .forms import VendaProdutoForm
 
 User = get_user_model()
@@ -39,8 +40,6 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
         if not (user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN'):
             qs = qs.filter(Q(vendedor=user) | Q(vendedor_ajudante=user))
         
-        # Removemos distinct() aqui para evitar conflito com ordering na paginação
-        # A duplicidade na lista geralmente não ocorre sem joins complexos
         return qs.order_by('-data_venda', '-id')
 
     def get_context_data(self, **kwargs):
@@ -208,14 +207,29 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
             data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
         else:
             data_inicio = hoje.replace(day=1)
-            data_inicio_str = data_inicio.strftime('%Y-%m-%d')
-
+        
         if data_fim_str:
             data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
         else:
-            ultimo_dia = calendar.monthrange(hoje.year, hoje.month)[1]
-            data_fim = hoje.replace(day=ultimo_dia)
-            data_fim_str = data_fim.strftime('%Y-%m-%d')
+            ultimo_dia = calendar.monthrange(data_inicio.year, data_inicio.month)[1]
+            data_fim = data_inicio.replace(day=ultimo_dia)
+
+        # Formatação para string
+        data_inicio_str = data_inicio.strftime('%Y-%m-%d')
+        data_fim_str = data_fim.strftime('%Y-%m-%d')
+
+        # --- LÓGICA DE NAVEGAÇÃO E FECHAMENTO ---
+        # Verifica se o período selecionado corresponde a um mês fechado
+        mes_fechado_obj = FechamentoMensal.objects.filter(mes=data_inicio.month, ano=data_inicio.year).first()
+        context['mes_fechado'] = mes_fechado_obj
+
+        # Datas para navegação (Mês Anterior / Próximo Mês)
+        mes_anterior = data_inicio - relativedelta(months=1)
+        proximo_mes = data_inicio + relativedelta(months=1)
+        
+        context['nav_anterior_inicio'] = mes_anterior.replace(day=1).strftime('%Y-%m-%d')
+        context['nav_proximo_inicio'] = proximo_mes.replace(day=1).strftime('%Y-%m-%d')
+        # ----------------------------------------
 
         # 1. Base Query - Filtro de Data
         qs_base = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim])
@@ -223,36 +237,31 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         if vendedor_id:
             qs_base = qs_base.filter(vendedor_id=vendedor_id)
 
-        # 2. Agregações Globais (Totalizadores)
+        # 2. Agregações Globais
         total_loja = qs_base.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
         total_comissao = qs_base.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
         total_bruto = qs_base.aggregate(Sum('valor_venda'))['valor_venda__sum'] or 0
         qtd_vendas = qs_base.count()
 
-        # 3. Lista de Vendedores Únicos (CORREÇÃO DA DUPLICIDADE)
-        # Usamos set() do Python para forçar unicidade real, ignorando ordenação do SQL
+        # 3. Lista de Vendedores Únicos
         todos_ids = qs_base.values_list('vendedor', flat=True)
         vendedores_ids = list(set(todos_ids)) 
         
         relatorio_vendedores = []
         
         for vid in vendedores_ids:
-            # Busca as vendas deste vendedor específico
             vendas_list_raw = VendaProduto.objects.filter(
                 vendedor_id=vid, 
                 data_venda__range=[data_inicio, data_fim]
             ).select_related('vendedor', 'gerente').order_by('data_venda', 'id')
 
-            # Dedupicação extra (garantia final) por ID da venda
             vendas_unicas = {}
             for v in vendas_list_raw:
                 vendas_unicas[v.id] = v
             
             vendas_vendedor = list(vendas_unicas.values())
-            # Reordenar após dedupilicação (opcional, pois dict mantém ordem no Python moderno, mas garantimos)
             vendas_vendedor.sort(key=lambda x: (x.data_venda, x.id), reverse=True)
 
-            # Recalcula soma comissão deste vendedor (em Python para bater com a lista visual)
             soma_comissao = sum(v.comissao_vendedor for v in vendas_vendedor)
             
             vendedor_obj = User.objects.filter(pk=vid).first()
@@ -263,7 +272,6 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
                     'total_comissao': soma_comissao
                 })
 
-        # Ordena a lista de vendedores por nome
         relatorio_vendedores.sort(key=lambda x: x['vendedor'].get_full_name() or x['vendedor'].username)
 
         context['periodo_inicio'] = data_inicio
@@ -278,14 +286,13 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         
         context['relatorio_vendedores'] = relatorio_vendedores
         
-        # Filtro dropdown: apenas usuários únicos que possuem vendas
         ids_com_venda = set(VendaProduto.objects.values_list('vendedor', flat=True))
         context['lista_vendedores'] = User.objects.filter(id__in=ids_com_venda).order_by('username')
         context['vendedor_selecionado'] = int(vendedor_id) if vendedor_id else None
 
         return context
 
-# Aprovacao/Rejeicao mantidas iguais
+# Aprovacao/Rejeicao
 def aprovar_venda_produto(request, pk):
     if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
         messages.error(request, "Permissão negada.")
@@ -327,3 +334,33 @@ def rejeitar_venda_produto(request, pk):
         venda.save()
         messages.warning(request, "Venda REJEITADA.")
     return redirect('venda_produto_list')
+
+# --- NOVA VIEW PARA FECHAR/REABRIR MÊS ---
+def toggle_fechamento_mes(request):
+    if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
+        messages.error(request, "Permissão negada.")
+        return redirect('venda_produto_list')
+
+    if request.method == 'POST':
+        mes = request.POST.get('mes')
+        ano = request.POST.get('ano')
+        acao = request.POST.get('acao') # 'fechar' ou 'reabrir'
+        
+        if mes and ano:
+            if acao == 'fechar':
+                FechamentoMensal.objects.get_or_create(
+                    mes=mes, ano=ano,
+                    defaults={'responsavel': request.user}
+                )
+                messages.success(request, f"Mês {mes}/{ano} FECHADO com sucesso.")
+            elif acao == 'reabrir':
+                FechamentoMensal.objects.filter(mes=mes, ano=ano).delete()
+                messages.warning(request, f"Mês {mes}/{ano} REABERTO.")
+    
+    # Redireciona de volta para o relatório na data correta
+    redirect_url = reverse_lazy('venda_produto_relatorio') # Certifique-se que o name na url confere
+    try:
+        data_inicio = f"{ano}-{int(mes):02d}-01"
+        return redirect(f"{redirect_url}?data_inicio={data_inicio}")
+    except:
+        return redirect(redirect_url)

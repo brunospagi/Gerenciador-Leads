@@ -22,6 +22,21 @@ def get_apolice_upload_path(instance, filename):
     folder = instance.placa if instance.placa else 'geral'
     return f"vendas_produtos/apolices/{folder}/{unique_filename}"
 
+# === NOVO MODELO: FECHAMENTO MENSAL ===
+class FechamentoMensal(models.Model):
+    mes = models.IntegerField(verbose_name="Mês")
+    ano = models.IntegerField(verbose_name="Ano")
+    data_fechamento = models.DateTimeField(auto_now=True, verbose_name="Data do Fechamento")
+    responsavel = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Fechado por")
+    
+    class Meta:
+        unique_together = ['mes', 'ano']
+        verbose_name = "Fechamento Mensal"
+        verbose_name_plural = "Fechamentos Mensais"
+
+    def __str__(self):
+        return f"Fechamento {self.mes}/{self.ano}"
+
 class VendaProduto(models.Model):
     TIPO_CHOICES = [
         ('VENDA_VEICULO', 'Venda de Veículo'),
@@ -126,8 +141,11 @@ class VendaProduto(models.Model):
         if isinstance(data_lancamento, timezone.datetime):
              data_lancamento = data_lancamento.date()
 
-        if self._state.adding and data_lancamento < hoje:
-            raise ValidationError("Não é permitido lançar vendas com data retroativa.")
+        # --- ALTERADO: VERIFICA SE O MÊS ESTÁ FECHADO ---
+        if FechamentoMensal.objects.filter(mes=data_lancamento.month, ano=data_lancamento.year).exists():
+            raise ValidationError(f"O mês {data_lancamento.month}/{data_lancamento.year} está FECHADO. Não é possível lançar ou alterar vendas neste período.")
+        
+        # REMOVIDA A TRAVA DE DATA RETROATIVA SIMPLES (if self._state.adding and data_lancamento < hoje...)
 
         # VALIDAÇÃO GERAL
         if not self.modelo_veiculo:
