@@ -16,4 +16,5 @@ bs4
 django-webpush
 pdfplumber
 google.generativeai
+python-dateutil==2.9.0.post0
 mozilla-django-oidc==4.0.0
