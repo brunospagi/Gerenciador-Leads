@@ -7,7 +7,8 @@ from .views import (
     VendaProdutoPrintView,
     VendaProdutoRelatorioView,
     aprovar_venda_produto,
-    rejeitar_venda_produto
+    rejeitar_venda_produto,
+    toggle_fechamento_mes,
 )
 
 urlpatterns = [
@@ -19,4 +20,5 @@ urlpatterns = [
     path('<int:pk>/aprovar/', aprovar_venda_produto, name='venda_produto_approve'),
     path('<int:pk>/rejeitar/', rejeitar_venda_produto, name='venda_produto_reject'),
     path('relatorio/', VendaProdutoRelatorioView.as_view(), name='venda_produto_relatorio'),
+    path('relatorio/fechamento/', toggle_fechamento_mes, name='toggle_fechamento_mes'),
 ]
