@@ -208,6 +208,7 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
     template_name = 'vendas_produtos/relatorio.html'
     
     def dispatch(self, request, *args, **kwargs):
+        # MANTIDO: Apenas ADMIN tem acesso, Gerente NÃO.
         if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
             messages.error(request, "Acesso restrito ao Administrador.")
             return redirect('venda_produto_list')
@@ -244,6 +245,7 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         vendedores_ids = list(set(qs_base.values_list('vendedor', flat=True)))
         relatorio_vendedores = []
         for vid in vendedores_ids:
+            # Correção para garantir que o loop respeite a data e mostre apenas os dados relevantes
             vendas_vendedor = list(VendaProduto.objects.filter(vendedor_id=vid, data_venda__range=[data_inicio, data_fim]).order_by('data_venda'))
             vendedor_obj = User.objects.filter(pk=vid).first()
             if vendedor_obj and vendas_vendedor:
@@ -334,7 +336,9 @@ def toggle_fechamento_mes(request):
                 messages.warning(request, f"Mês {mes}/{ano} REABERTO.")
     
     try:
-        url = reverse_lazy('venda_produto_relatorio') + f"?data_inicio={ano}-{int(mes):02d}-01"
+        # CORREÇÃO CRÍTICA: Converte reverse_lazy para string antes de concatenar
+        base_url = str(reverse_lazy('venda_produto_relatorio'))
+        url = base_url + f"?data_inicio={ano}-{int(mes):02d}-01"
         return redirect(url)
     except:
         return redirect('venda_produto_list')

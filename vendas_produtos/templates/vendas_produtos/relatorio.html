@@ -93,7 +93,7 @@
                 </a>
             </div>
 
-            <form action="{% url 'toggle_fechamento_mes' %}" method="POST" class="d-inline">
+            <form action="{% url 'venda_produto_fechamento' %}" method="POST" class="d-inline">
                 {% csrf_token %}
                 <input type="hidden" name="mes" value="{{ periodo_inicio.month }}">
                 <input type="hidden" name="ano" value="{{ periodo_inicio.year }}">
