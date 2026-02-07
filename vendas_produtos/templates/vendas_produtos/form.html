@@ -7,19 +7,19 @@
 
 {% block content %}
 <style>
-    /* Estilos Originais */
     .clean-card { border: none; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); margin-bottom: 24px; background: #fff; }
     .clean-header { padding: 20px 24px; border-bottom: 1px solid #f0f2f5; font-weight: 700; color: #2c3e50; display: flex; align-items: center; background: linear-gradient(to right, #ffffff, #f8f9fa); border-radius: 12px 12px 0 0; }
     .clean-header i { margin-right: 12px; color: #3498db; font-size: 1.1em; }
     .clean-body { padding: 24px; }
-    .mode-selector label { transition: all 0.2s; border: 2px solid #e9ecef; }
-    .mode-selector .btn-check:checked + label { border-color: #3498db; background-color: #f1f9fe; color: #2980b9; }
+    .mode-selector .btn-group { display: flex; flex-wrap: wrap; }
+    .mode-selector label { flex: 1; white-space: nowrap; min-width: 100px; padding: 15px 5px; border: 1px solid #e9ecef; margin: 0; }
+    .mode-selector .btn-check:checked + label { border-color: #3498db; background-color: #f1f9fe; color: #2980b9; z-index: 1; }
     .modal-item { border: 1px solid #eee; border-radius: 8px; padding: 15px; margin-bottom: 10px; transition: 0.2s; }
     .modal-item:hover { background-color: #fcfcfc; }
     .modal-item.active { border-color: #27ae60; background-color: #f0f9f4; }
 </style>
 
-<div class="container py-5" style="max-width: 1000px;">
+<div class="container py-5" style="max-width: 1100px;">
     
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -35,32 +35,47 @@
             <div class="alert alert-danger rounded-3 mb-4 shadow-sm">{{ form.non_field_errors }}</div>
         {% endif %}
 
-        {% if not form.instance.pk %}
-        <div class="clean-card text-center py-5 mode-selector">
-            <h5 class="fw-bold text-muted mb-4 text-uppercase ls-1">Qual o tipo da operação?</h5>
-            <div class="btn-group w-100 px-4" role="group" style="max-width: 900px;">
+        {% if not form.instance.pk %} 
+        <div class="clean-card text-center py-4 mode-selector" id="div-mode-selector">
+            <h5 class="fw-bold text-muted mb-3 text-uppercase small ls-1">Selecione o Tipo de Operação</h5>
+            <div class="btn-group w-100 px-3" role="group">
                 <input type="radio" class="btn-check" name="modo_venda" id="modo_veiculo" autocomplete="off">
-                <label class="btn btn-outline-light text-dark py-4 rounded-start" for="modo_veiculo">
-                    <i class="fa fa-car fa-2x d-block mb-2 text-primary"></i>
-                    <span class="fw-bold">VENDA DE VEÍCULO</span>
-                </label>
+                <label class="btn btn-outline-light text-dark rounded-start" for="modo_veiculo"><i class="fa fa-car fa-2x d-block mb-2 text-primary"></i><span class="fw-bold small">CARRO</span></label>
+
+                <input type="radio" class="btn-check" name="modo_venda" id="modo_moto" autocomplete="off">
+                <label class="btn btn-outline-light text-dark" for="modo_moto"><i class="fa fa-motorcycle fa-2x d-block mb-2 text-warning"></i><span class="fw-bold small">MOTO</span></label>
+
+                {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'CONSIGNADOR' %}
+                <input type="radio" class="btn-check" name="modo_venda" id="modo_captacao" autocomplete="off">
+                <label class="btn btn-outline-light text-dark" for="modo_captacao"><i class="fa fa-handshake fa-2x d-block mb-2 text-info"></i><span class="fw-bold small">CAPTAÇÃO</span></label>
+                {% endif %}
 
                 <input type="radio" class="btn-check" name="modo_venda" id="modo_refin" autocomplete="off">
-                <label class="btn btn-outline-light text-dark py-4" for="modo_refin">
-                    <i class="fa fa-hand-holding-usd fa-2x d-block mb-2 text-success"></i>
-                    <span class="fw-bold">REFINANCIAMENTO</span>
-                </label>
+                <label class="btn btn-outline-light text-dark" for="modo_refin"><i class="fa fa-hand-holding-usd fa-2x d-block mb-2 text-success"></i><span class="fw-bold small">REFIN</span></label>
 
-                <input type="radio" class="btn-check" name="modo_venda" id="modo_servico" autocomplete="off" checked>
-                <label class="btn btn-outline-light text-dark py-4 rounded-end" for="modo_servico">
-                    <i class="fa fa-file-contract fa-2x d-block mb-2 text-secondary"></i>
-                    <span class="fw-bold">SERVIÇO AVULSO</span>
-                </label>
+                <input type="radio" class="btn-check" name="modo_venda" id="modo_servico" autocomplete="off">
+                <label class="btn btn-outline-light text-dark rounded-end" for="modo_servico"><i class="fa fa-file-contract fa-2x d-block mb-2 text-secondary"></i><span class="fw-bold small">SERVIÇO</span></label>
             </div>
         </div>
         {% endif %}
 
+        <div class="clean-card text-center py-3 mb-4 bg-light-subtle border-info" id="div-selector-interno" style="display:none; border: 1px dashed #17a2b8;">
+            <h6 class="fw-bold text-info mb-3 text-uppercase">Qual a modalidade da Captação?</h6>
+            <div class="btn-group shadow-sm" role="group">
+                <input type="radio" class="btn-check" name="interno_tipo" id="opt_consignacao" value="CONSIGNACAO">
+                <label class="btn btn-outline-info fw-bold px-4" for="opt_consignacao"><i class="fa fa-tag me-2"></i>CONSIGNAÇÃO</label>
+                <input type="radio" class="btn-check" name="interno_tipo" id="opt_compra" value="COMPRA">
+                <label class="btn btn-outline-danger fw-bold px-4" for="opt_compra"><i class="fa fa-money-bill-wave me-2"></i>COMPRA (LOJA)</label>
+            </div>
+            <div class="mt-2 text-muted small"></div>
+        </div>
+
         <div style="display:none;">{{ form.tipo_produto }}</div>
+
+        <div class="alert alert-warning border-warning d-flex align-items-center shadow-sm mb-4" id="alert-consignacao" style="display:none;">
+            <i class="fa fa-info-circle fa-2x me-3"></i>
+            <div><h5 class="fw-bold mb-0" id="titulo-alerta-interno">Modo de Captação</h5><small></small></div>
+        </div>
 
         <div class="clean-card">
             <div class="clean-header"><i class="fa fa-user-circle"></i> Dados Gerais</div>
@@ -71,11 +86,11 @@
                         {{ form.data_venda }}
                     </div>
                     <div class="col-md-5">
-                        <label class="form-label fw-bold small text-uppercase text-muted">Cliente *</label>
+                        <label class="form-label fw-bold small text-uppercase text-muted">Cliente / Proprietário *</label>
                         {{ form.cliente_nome }}
                     </div>
                     
-                    <div class="col-md-4" id="div-select-tipo">
+                    <div class="col-md-4" id="div-select-tipo" style="display:none;">
                         <label class="form-label fw-bold small text-uppercase text-muted">Serviço *</label>
                         <select class="form-select" id="fake_tipo_select">
                             <option value="GARANTIA">Seguro Garantia</option>
@@ -93,30 +108,13 @@
                 <div id="row-veiculo-details" class="mt-4 pt-3 border-top">
                     <h6 class="text-primary small fw-bold mb-3"><i class="fa fa-car me-1"></i> Dados do Veículo</h6>
                     <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small text-uppercase text-muted">Modelo *</label>
-                            {{ form.modelo_veiculo }}
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label fw-bold small text-uppercase text-muted">Placa *</label>
-                            {{ form.placa }}
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small text-uppercase text-muted">Cor *</label>
-                            {{ form.cor }}
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small text-uppercase text-muted">Ano *</label>
-                            {{ form.ano }}
-                        </div>
+                        <div class="col-md-4"><label class="form-label fw-bold small text-uppercase text-muted">Modelo *</label>{{ form.modelo_veiculo }}</div>
+                        <div class="col-md-2"><label class="form-label fw-bold small text-uppercase text-muted">Placa *</label>{{ form.placa }}</div>
+                        <div class="col-md-3"><label class="form-label fw-bold small text-uppercase text-muted">Cor *</label>{{ form.cor }}</div>
+                        <div class="col-md-3"><label class="form-label fw-bold small text-uppercase text-muted">Ano *</label>{{ form.ano }}</div>
                     </div>
-                    
                     <div class="mt-3 row" id="div-desconto-container" style="display:none;">
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small text-uppercase text-danger">Deu Desconto?</label>
-                            {{ form.com_desconto }}
-                            <div class="form-text small text-muted">Se Sim, a comissão será fixa em R$ 200.</div>
-                        </div>
+                        <div class="col-md-4"><label class="form-label fw-bold small text-uppercase text-danger">Deu Desconto?</label>{{ form.com_desconto }}<div class="form-text small text-muted">Se Sim, a comissão será ajustada.</div></div>
                     </div>
                 </div>
             </div>
@@ -130,245 +128,115 @@
         </div>
 
         <div class="clean-card" id="card-financeiro-refin" style="display:none;">
-            <div class="clean-header bg-success text-white" style="background: #27ae60;">
-                <i class="fa fa-hand-holding-usd text-white"></i> 
-                <span>Detalhes do Refinanciamento</span>
-            </div>
+            <div class="clean-header bg-success text-white" style="background: #27ae60;"><i class="fa fa-hand-holding-usd text-white"></i> <span>Detalhes do Refinanciamento</span></div>
             <div class="clean-body bg-light-subtle">
                 <div class="row g-3 mb-3">
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold text-success">Valor Financiado</label>
-                         {{ form.pgto_financiamento }} 
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold">Qtd. Parcelas</label>
-                        {{ form.qtd_parcelas }}
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold">Valor Parcela</label>
-                        {{ form.valor_parcela }}
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold text-primary">Retorno Operação</label>
-                        {{ form.valor_retorno_operacao }}
-                    </div>
+                    <div class="col-md-3"><label class="form-label fw-bold text-success">Valor Financiado</label>{{ form.pgto_financiamento }}</div>
+                    <div class="col-md-3"><label class="form-label fw-bold">Qtd. Parcelas</label>{{ form.qtd_parcelas }}</div>
+                    <div class="col-md-3"><label class="form-label fw-bold">Valor Parcela</label>{{ form.valor_parcela }}</div>
+                    <div class="col-md-3"><label class="form-label fw-bold text-primary">Retorno Operação</label>{{ form.valor_retorno_operacao }}</div>
                 </div>
                 <div class="row g-3 align-items-end">
-                    <div class="col-md-4">
-                        <label class="form-label">Banco</label>
-                        {{ form.banco_financiamento }}
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Nº Proposta</label>
-                        {{ form.numero_proposta }}
-                    </div>
-                    <div class="col-md-4">
-                         <label class="form-label text-success fw-bold">Teve Ajuda? (Divide 50% Com.)</label>
-                         {{ form.vendedor_ajudante }}
-                    </div>
-                    
-                    <div class="col-md-4 mt-3">
-                        <label class="form-label fw-bold text-dark">Valor Cobrado (Loja)</label>
-                        <div id="target-valor-venda-refin"></div>
-                    </div>
+                    <div class="col-md-4"><label class="form-label">Banco</label>{{ form.banco_financiamento }}</div>
+                    <div class="col-md-4"><label class="form-label">Nº Proposta</label>{{ form.numero_proposta }}</div>
+                    <div class="col-md-4"><label class="form-label text-success fw-bold">Teve Ajuda? (Divide 50% Com.)</label>{{ form.vendedor_ajudante }}</div>
+                    <div class="col-md-4 mt-3"><label class="form-label fw-bold text-dark">Valor Cobrado (Loja)</label><div id="target-valor-venda-refin"></div></div>
                 </div>
             </div>
         </div>
+
         <div class="clean-card" id="card-financeiro-padrao">
-            <div class="clean-header bg-primary text-white" style="background: #3498db;">
-                <i class="fa fa-wallet text-white"></i> 
-                <span id="label-financeiro-main">Pagamento</span>
-            </div>
+            <div class="clean-header bg-primary text-white" style="background: #3498db;"><i class="fa fa-wallet text-white"></i> <span id="label-financeiro-main">Pagamento</span></div>
             <div class="clean-body bg-light-subtle">
                 <div class="row align-items-center mb-4">
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold text-success fs-5">Valor Total (R$)</label>
-                        <div id="target-valor-venda-padrao">
-                            {{ form.valor_venda }}
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-3" id="div-custo-base" style="display:none;">
-                        <label class="form-label fw-bold text-danger fs-5">Custo Despachante</label>
-                        {{ form.custo_base }}
-                    </div>
-
-                    <div class="col-md-6 text-end">
-                        <span id="feedback-pagamento" class="badge bg-secondary p-2">Preencha os valores</span>
-                    </div>
+                    <div class="col-md-3"><label class="form-label fw-bold text-success fs-5">Valor Total (R$)</label><div id="target-valor-venda-padrao">{{ form.valor_venda }}</div></div>
+                    <div class="col-md-3" id="div-custo-base" style="display:none;"><label class="form-label fw-bold text-danger fs-5">Custo Despachante</label>{{ form.custo_base }}</div>
+                    <div class="col-md-6 text-end"><span id="feedback-pagamento" class="badge bg-secondary p-2">Preencha os valores</span></div>
                 </div>
-
                 <div class="row g-2">
                     <div class="col-md-2 col-6"><label class="small fw-bold text-muted">Pix</label>{{ form.pgto_pix }}</div>
                     <div class="col-md-2 col-6"><label class="small fw-bold text-muted">Transf.</label>{{ form.pgto_transferencia }}</div>
                     <div class="col-md-2 col-6"><label class="small fw-bold text-muted">Débito</label>{{ form.pgto_debito }}</div>
                     <div class="col-md-2 col-6"><label class="small fw-bold text-muted">Crédito</label>{{ form.pgto_credito }}</div>
-                    <div class="col-md-4 col-12"><label class="small fw-bold text-muted">Financiamento</label>
-                        <input type="text" class="form-control payment-input money-mask" id="input_financiamento_padrao">
-                    </div>
+                    <div class="col-md-4 col-12"><label class="small fw-bold text-muted">Financiamento</label><input type="text" class="form-control payment-input money-mask" id="input_financiamento_padrao"></div>
                 </div>
-
                 <div id="div-financiamento-padrao" class="mt-3 p-3 bg-white rounded border" style="display:none;">
                     <div class="row g-2">
-                        <div class="col-md-6">
-                            <label class="small fw-bold">Banco</label>
-                            <input type="text" class="form-control" id="fake_banco_padrao">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="small fw-bold">Proposta</label>
-                            <input type="text" class="form-control" id="fake_proposta_padrao">
-                        </div>
+                        <div class="col-md-6"><label class="small fw-bold">Banco</label><input type="text" class="form-control" id="fake_banco_padrao"></div>
+                        <div class="col-md-6"><label class="small fw-bold">Proposta</label><input type="text" class="form-control" id="fake_proposta_padrao"></div>
                     </div>
                 </div>
-
-                <div id="div-comprovante" class="mt-3" style="display:none;">
-                    <label class="small fw-bold">Comprovante</label>
-                    {{ form.comprovante }}
-                </div>
+                <div id="div-comprovante" class="mt-3" style="display:none;"><label class="small fw-bold">Comprovante</label>{{ form.comprovante }}</div>
             </div>
         </div>
 
-        <div class="mb-5">
-            <label class="form-label fw-bold small text-muted">Observações</label>
-            {{ form.observacoes }}
-        </div>
-
-        <div class="d-grid">
-            <button type="submit" class="btn btn-primary btn-lg fw-bold shadow-sm">SALVAR VENDA</button>
-        </div>
+        <div class="mb-5"><label class="form-label fw-bold small text-muted">Observações</label>{{ form.observacoes }}</div>
+        <div class="d-grid"><button type="submit" class="btn btn-primary btn-lg fw-bold shadow-sm">SALVAR LANÇAMENTO</button></div>
 
         <div class="modal fade" id="modalAdicionais" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content border-0">
-                    <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title fw-bold"><i class="fa fa-cart-plus me-2"></i> Serviços Adicionais</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
+                    <div class="modal-header bg-success text-white"><h5 class="modal-title fw-bold">Serviços Adicionais</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
                     <div class="modal-body bg-light">
-                        <p class="text-muted text-center mb-4 small">Informe o valor e como cada serviço extra foi pago.</p>
-                        
-                        <div class="modal-item">
-                            <div class="form-check mb-2">
-                                {{ form.adicional_garantia }}
-                                <label class="form-check-label fw-bold" for="{{ form.adicional_garantia.id_for_label }}">Garantia Mecânica</label>
-                            </div>
-                            <div class="row g-2 ps-4 inputs-wrapper" style="display:none;">
-                                <div class="col-6"><label class="small fw-bold">Valor</label>{{ form.valor_garantia }}</div>
-                                <div class="col-6"><label class="small fw-bold">Pagamento</label>{{ form.metodo_garantia }}</div>
-                            </div>
-                        </div>
-
-                        <div class="modal-item">
-                            <div class="form-check mb-2">
-                                {{ form.adicional_seguro }}
-                                <label class="form-check-label fw-bold" for="{{ form.adicional_seguro.id_for_label }}">Seguro Novo</label>
-                            </div>
-                            <div class="row g-2 ps-4 inputs-wrapper" style="display:none;">
-                                <div class="col-6"><label class="small fw-bold">Valor</label>{{ form.valor_seguro }}</div>
-                                <div class="col-6"><label class="small fw-bold">Pagamento</label>{{ form.metodo_seguro }}</div>
-                            </div>
-                        </div>
-
-                        <div class="modal-item">
-                            <div class="form-check mb-2">
-                                {{ form.adicional_transferencia }}
-                                <label class="form-check-label fw-bold" for="{{ form.adicional_transferencia.id_for_label }}">Transferência</label>
-                            </div>
-                            <div class="row g-2 ps-4 inputs-wrapper" style="display:none;">
-                                <div class="col-4"><label class="small fw-bold">Valor</label>{{ form.valor_transferencia }}</div>
-                                <div class="col-4"><label class="small fw-bold text-danger">Custo</label>{{ form.custo_transferencia }}</div>
-                                <div class="col-4"><label class="small fw-bold">Pagamento</label>{{ form.metodo_transferencia }}</div>
-                            </div>
-                        </div>
-
+                        <div class="modal-item"><div class="form-check mb-2">{{ form.adicional_garantia }} <label class="form-check-label fw-bold" for="{{ form.adicional_garantia.id_for_label }}">Garantia</label></div><div class="row g-2 ps-4 inputs-wrapper" style="display:none;"><div class="col-6"><label class="small fw-bold">Valor</label>{{ form.valor_garantia }}</div><div class="col-6"><label class="small fw-bold">Pagto</label>{{ form.metodo_garantia }}</div></div></div>
+                        <div class="modal-item"><div class="form-check mb-2">{{ form.adicional_seguro }} <label class="form-check-label fw-bold" for="{{ form.adicional_seguro.id_for_label }}">Seguro</label></div><div class="row g-2 ps-4 inputs-wrapper" style="display:none;"><div class="col-6"><label class="small fw-bold">Valor</label>{{ form.valor_seguro }}</div><div class="col-6"><label class="small fw-bold">Pagto</label>{{ form.metodo_seguro }}</div></div></div>
+                        <div class="modal-item"><div class="form-check mb-2">{{ form.adicional_transferencia }} <label class="form-check-label fw-bold" for="{{ form.adicional_transferencia.id_for_label }}">Transferência</label></div><div class="row g-2 ps-4 inputs-wrapper" style="display:none;"><div class="col-4"><label class="small fw-bold">Valor</label>{{ form.valor_transferencia }}</div><div class="col-4"><label class="small fw-bold text-danger">Custo</label>{{ form.custo_transferencia }}</div><div class="col-4"><label class="small fw-bold">Pagto</label>{{ form.metodo_transferencia }}</div></div></div>
                     </div>
-                    <div class="modal-footer bg-light border-0">
-                        <button type="button" class="btn btn-success w-100 fw-bold" data-bs-dismiss="modal">Confirmar</button>
-                    </div>
+                    <div class="modal-footer bg-light border-0"><button type="button" class="btn btn-success w-100 fw-bold" data-bs-dismiss="modal">Confirmar</button></div>
                 </div>
             </div>
         </div>
-
     </form>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // --- 1. CONFIGURAÇÃO DA MÁSCARA DE DINHEIRO (R$) ---
     const moneyInputs = document.querySelectorAll('.money-mask');
-    
     function mascaraMoeda(event) {
-        const value = event.target.value.replace(/\D/g, ""); // Remove tudo que não é dígito
-        
-        // Se estiver vazio, limpa
-        if (value === "") {
-            event.target.value = "";
-            updateFinanceiroPadrao();
-            return;
-        }
-
-        // Converte para float (ex: 123456 -> 1234.56)
+        const value = event.target.value.replace(/\D/g, ""); 
+        if (value === "") { event.target.value = ""; updateFinanceiroPadrao(); return; }
         const digitsFloat = (parseFloat(value) / 100);
-        
-        // Formata para BRL
         event.target.value = maskCurrency(digitsFloat);
-        
-        // Dispara evento para recalcular totais
         updateFinanceiroPadrao(); 
     }
-
     function maskCurrency(valor, locale = 'pt-BR', currency = 'BRL') {
-        return new Intl.NumberFormat(locale, {
-            style: 'currency',
-            currency: currency
-        }).format(valor);
+        return new Intl.NumberFormat(locale, { style: 'currency', currency: currency }).format(valor);
     }
-    
-    // Função auxiliar para converter "R$ 1.000,00" em float JS (1000.00)
     function parseMonetary(val) {
         if(!val) return 0;
-        // Remove tudo que não for dígito ou vírgula
-        let clean = val.replace(/[^\d,]/g, ''); 
-        // Troca vírgula por ponto
-        clean = clean.replace(',', '.');
+        let clean = val.replace(/[^\d,]/g, '').replace(',', '.');
         return parseFloat(clean) || 0;
     }
+    moneyInputs.forEach(input => input.addEventListener('input', mascaraMoeda));
 
-    moneyInputs.forEach(input => {
-        input.addEventListener('input', mascaraMoeda);
-        // Se já tiver valor (edição), formata ao carregar
-        if(input.value) {
-            let valStr = input.value.toString().replace(',', '.');
-            let val = parseFloat(valStr);
-            if (!isNaN(val)) {
-                input.value = maskCurrency(val);
-            }
-        }
-    });
-
-    // --- 2. LÓGICA DO FORMULÁRIO ---
     const modoVeiculoBtn = document.getElementById('modo_veiculo');
+    const modoMotoBtn = document.getElementById('modo_moto');
+    const modoCaptacaoBtn = document.getElementById('modo_captacao');
     const modoRefinBtn = document.getElementById('modo_refin');
     const modoServicoBtn = document.getElementById('modo_servico');
     
+    const divSelectorInterno = document.getElementById('div-selector-interno');
+    const optConsignacao = document.getElementById('opt_consignacao');
+    const optCompra = document.getElementById('opt_compra');
+
     const realTipoSelect = document.getElementById('id_tipo_produto');
     const fakeTipoSelect = document.getElementById('fake_tipo_select');
     
-    // Containers
     const rowVeiculo = document.getElementById('row-veiculo-details');
     const divSelectTipo = document.getElementById('div-select-tipo');
     const labelVeiculoDisplay = document.getElementById('label-veiculo-display');
     const textoOperacaoFixo = document.getElementById('texto-operacao-fixo');
+    const alertConsignacao = document.getElementById('alert-consignacao');
+    const tituloAlertaInterno = document.getElementById('titulo-alerta-interno');
+    
+    const divModeSelector = document.getElementById('div-mode-selector');
     const divBtnModal = document.getElementById('div-btn-modal');
     const divDescontoContainer = document.getElementById('div-desconto-container');
     const labelFinanceiro = document.getElementById('label-financeiro-main');
     
-    // Blocos Financeiros
     const cardFinanceiroPadrao = document.getElementById('card-financeiro-padrao');
     const cardFinanceiroRefin = document.getElementById('card-financeiro-refin');
     const divCustoBase = document.getElementById('div-custo-base');
-    
-    // Inputs
     const inputValorVendaReal = document.getElementById('id_valor_venda');
     const targetRefinValorVenda = document.getElementById('target-valor-venda-refin');
     const targetPadraoValorVenda = document.getElementById('target-valor-venda-padrao');
@@ -376,12 +244,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputFinanReal = document.getElementById('id_pgto_financiamento');
     const inputBancoReal = document.getElementById('id_banco_financiamento');
     const inputPropostaReal = document.getElementById('id_numero_proposta');
-    
     const inputFinanPadrao = document.getElementById('input_financiamento_padrao');
     const inputFakeBancoPadrao = document.getElementById('fake_banco_padrao');
     const inputFakePropostaPadrao = document.getElementById('fake_proposta_padrao');
     const divFinanPadrao = document.getElementById('div-financiamento-padrao');
-
     const inputsPgtoCarro = document.querySelectorAll('.payment-input'); 
     const feedbackPgto = document.getElementById('feedback-pagamento');
     const divComp = document.getElementById('div-comprovante');
@@ -391,15 +257,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputCor = document.getElementById('id_cor');
     const inputAno = document.getElementById('id_ano');
 
-    // Sync Fakes -> Reais (Copia o valor formatado mesmo, limparemos no submit)
-    inputFinanPadrao.addEventListener('input', function() {
-        if(cardFinanceiroPadrao.style.display !== 'none') {
-            inputFinanReal.value = this.value;
-            updateFinanceiroPadrao();
-        }
-    });
-    inputFakeBancoPadrao.addEventListener('input', () => { if(cardFinanceiroPadrao.style.display !== 'none') inputBancoReal.value = inputFakeBancoPadrao.value; });
-    inputFakePropostaPadrao.addEventListener('input', () => { if(cardFinanceiroPadrao.style.display !== 'none') inputPropostaReal.value = inputFakePropostaPadrao.value; });
+    if(inputFinanPadrao) {
+        inputFinanPadrao.addEventListener('input', function() {
+            if(cardFinanceiroPadrao.style.display !== 'none') {
+                inputFinanReal.value = this.value;
+                updateFinanceiroPadrao();
+            }
+        });
+    }
+    if(inputFakeBancoPadrao) inputFakeBancoPadrao.addEventListener('input', () => { if(cardFinanceiroPadrao.style.display !== 'none') inputBancoReal.value = inputFakeBancoPadrao.value; });
+    if(inputFakePropostaPadrao) inputFakePropostaPadrao.addEventListener('input', () => { if(cardFinanceiroPadrao.style.display !== 'none') inputPropostaReal.value = inputFakePropostaPadrao.value; });
 
     function checkCustoVisibility(tipo) {
         if (tipo === 'TRANSFERENCIA') divCustoBase.style.display = 'block';
@@ -408,51 +275,105 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateMode() {
         let mode = 'SERVICO';
+        const val = realTipoSelect ? realTipoSelect.value : ''; 
+
         if (modoVeiculoBtn && modoVeiculoBtn.checked) mode = 'VEICULO';
+        else if (modoMotoBtn && modoMotoBtn.checked) mode = 'MOTO';
+        else if (modoCaptacaoBtn && modoCaptacaoBtn.checked) mode = 'CAPTACAO';
         else if (modoRefinBtn && modoRefinBtn.checked) mode = 'REFIN';
-        else if (!modoVeiculoBtn) { // Edição
-            const val = realTipoSelect.value;
-            if (val === 'VENDA_VEICULO') mode = 'VEICULO';
-            else if (val === 'REFINANCIAMENTO') mode = 'REFIN';
-            else mode = 'SERVICO';
+        else if (modoServicoBtn && modoServicoBtn.checked) mode = 'SERVICO';
+        else if (val === 'CONSIGNACAO' || val === 'COMPRA') {
+            mode = 'CAPTACAO';
+            if(modoCaptacaoBtn) modoCaptacaoBtn.checked = true;
+        } else if (val === 'VENDA_VEICULO' && modoVeiculoBtn) {
+            mode = 'VEICULO'; modoVeiculoBtn.checked = true;
+        } else if (val === 'VENDA_MOTO' && modoMotoBtn) {
+            mode = 'MOTO'; modoMotoBtn.checked = true;
+        } else if (val === 'REFINANCIAMENTO' && modoRefinBtn) {
+            mode = 'REFIN'; modoRefinBtn.checked = true;
+        } else if (modoServicoBtn) {
+            mode = 'SERVICO'; modoServicoBtn.checked = true;
         }
 
         rowVeiculo.style.display = 'block'; 
-        inputModelo.required = true;
-        inputPlaca.required = true;
-        inputCor.required = true;
-        inputAno.required = true;
-
+        if(inputModelo) inputModelo.required = true; 
+        if(inputPlaca) inputPlaca.required = true; 
+        if(inputCor) inputCor.required = true; 
+        if(inputAno) inputAno.required = true;
+        
         cardFinanceiroPadrao.style.display = 'none';
         cardFinanceiroRefin.style.display = 'none';
         divBtnModal.style.display = 'none';
         divDescontoContainer.style.display = 'none';
+        divSelectorInterno.style.display = 'none';
+        alertConsignacao.style.display = 'none';
+        if (divModeSelector) divModeSelector.style.display = 'block';
 
-        if (mode === 'VEICULO') {
-            realTipoSelect.value = 'VENDA_VEICULO';
+        if (mode !== 'REFIN') {
+            if(inputBancoReal) inputBancoReal.required = false;
+            if(inputPropostaReal) inputPropostaReal.required = false;
+        }
+
+        if (mode === 'CAPTACAO') {
+            divSelectorInterno.style.display = 'block';
             divSelectTipo.style.display = 'none';
             labelVeiculoDisplay.style.display = 'block';
-            textoOperacaoFixo.innerText = "Venda de Veículo";
+            textoOperacaoFixo.innerText = "Captação";
+            alertConsignacao.style.display = 'flex';
+            
+            if (val === 'COMPRA') {
+                if(optCompra) optCompra.checked = true;
+                realTipoSelect.value = 'COMPRA';
+                if(tituloAlertaInterno) tituloAlertaInterno.innerText = "Modo de Compra";
+            } else {
+                if(optConsignacao) optConsignacao.checked = true;
+                realTipoSelect.value = 'CONSIGNACAO';
+                if(tituloAlertaInterno) tituloAlertaInterno.innerText = "Modo de Consignação";
+            }
+            if(inputValorVendaReal) {
+                inputValorVendaReal.value = '0,00';
+                inputValorVendaReal.required = false; 
+            }
+
+        } else if (mode === 'VEICULO') {
+            if(realTipoSelect) realTipoSelect.value = 'VENDA_VEICULO';
+            divSelectTipo.style.display = 'none';
+            labelVeiculoDisplay.style.display = 'block';
+            textoOperacaoFixo.innerText = "Venda de Carro";
             divBtnModal.style.display = 'block'; 
             divDescontoContainer.style.display = 'flex'; 
-            labelFinanceiro.innerText = "Pagamento do Veículo";
+            labelFinanceiro.innerText = "Pagamento do Carro";
             cardFinanceiroPadrao.style.display = 'block';
             if(inputValorVendaReal && targetPadraoValorVenda) targetPadraoValorVenda.appendChild(inputValorVendaReal);
             checkCustoVisibility('VENDA_VEICULO');
+            if(inputValorVendaReal) inputValorVendaReal.required = true;
+            updateFinanceiroPadrao();
+
+        } else if (mode === 'MOTO') {
+            if(realTipoSelect) realTipoSelect.value = 'VENDA_MOTO';
+            divSelectTipo.style.display = 'none';
+            labelVeiculoDisplay.style.display = 'block';
+            textoOperacaoFixo.innerText = "Venda de Moto";
+            divDescontoContainer.style.display = 'none'; 
+            labelFinanceiro.innerText = "Pagamento da Moto";
+            cardFinanceiroPadrao.style.display = 'block';
+            if(inputValorVendaReal && targetPadraoValorVenda) targetPadraoValorVenda.appendChild(inputValorVendaReal);
+            if(inputValorVendaReal) inputValorVendaReal.required = true;
             updateFinanceiroPadrao();
 
         } else if (mode === 'REFIN') {
-            realTipoSelect.value = 'REFINANCIAMENTO';
+            if(realTipoSelect) realTipoSelect.value = 'REFINANCIAMENTO';
             divSelectTipo.style.display = 'none';
             labelVeiculoDisplay.style.display = 'block';
             textoOperacaoFixo.innerText = "Refinanciamento";
             cardFinanceiroRefin.style.display = 'block';
             if(inputValorVendaReal && targetRefinValorVenda) targetRefinValorVenda.appendChild(inputValorVendaReal);
-            inputBancoReal.required = true; 
-            inputPropostaReal.required = true;
+            if(inputBancoReal) inputBancoReal.required = true; 
+            if(inputPropostaReal) inputPropostaReal.required = true;
+            if(inputValorVendaReal) inputValorVendaReal.required = true;
 
         } else {
-            realTipoSelect.value = fakeTipoSelect.value;
+            if(realTipoSelect) realTipoSelect.value = fakeTipoSelect.value;
             divSelectTipo.style.display = 'block';
             labelVeiculoDisplay.style.display = 'none';
             labelFinanceiro.innerText = "Pagamento do Serviço";
@@ -460,24 +381,79 @@ document.addEventListener('DOMContentLoaded', function() {
             if(inputValorVendaReal && targetPadraoValorVenda) targetPadraoValorVenda.appendChild(inputValorVendaReal);
             checkCustoVisibility(fakeTipoSelect.value);
             updateModalUI(true); 
+            if(inputValorVendaReal) inputValorVendaReal.required = true;
             updateFinanceiroPadrao();
         }
     }
     
-    fakeTipoSelect.addEventListener('change', function() { 
-        if (!modoVeiculoBtn.checked && !modoRefinBtn.checked) {
-            realTipoSelect.value = this.value; 
-            checkCustoVisibility(this.value);
-        }
-    });
-
-    if(modoVeiculoBtn) {
-        modoVeiculoBtn.addEventListener('change', updateMode);
-        modoRefinBtn.addEventListener('change', updateMode);
-        modoServicoBtn.addEventListener('change', updateMode);
+    if(fakeTipoSelect) {
+        fakeTipoSelect.addEventListener('change', function() { 
+            if (modoVeiculoBtn && !modoVeiculoBtn.checked && !modoRefinBtn.checked && !modoMotoBtn.checked && (!modoCaptacaoBtn || !modoCaptacaoBtn.checked)) {
+                realTipoSelect.value = this.value; 
+                checkCustoVisibility(this.value);
+            }
+        });
     }
 
-    // Modal UI
+    if(modoVeiculoBtn) modoVeiculoBtn.addEventListener('change', updateMode);
+    if(modoMotoBtn) modoMotoBtn.addEventListener('change', updateMode);
+    if(modoRefinBtn) modoRefinBtn.addEventListener('change', updateMode);
+    if(modoServicoBtn) modoServicoBtn.addEventListener('change', updateMode);
+    if(modoCaptacaoBtn) modoCaptacaoBtn.addEventListener('change', updateMode);
+
+    if(optConsignacao && optCompra) {
+        function updateInternalType() {
+            if(optConsignacao.checked) {
+                realTipoSelect.value = 'CONSIGNACAO';
+                if(tituloAlertaInterno) tituloAlertaInterno.innerText = "Modo de Consignação";
+            } else {
+                realTipoSelect.value = 'COMPRA';
+                if(tituloAlertaInterno) tituloAlertaInterno.innerText = "Modo de Compra";
+            }
+        }
+        optConsignacao.addEventListener('change', updateInternalType);
+        optCompra.addEventListener('change', updateInternalType);
+    }
+
+    const form = document.getElementById('vendaForm');
+    if(form) {
+        form.addEventListener('submit', function(e) {
+            if (modoCaptacaoBtn && modoCaptacaoBtn.checked) {
+                if (optCompra && optCompra.checked) realTipoSelect.value = 'COMPRA';
+                else realTipoSelect.value = 'CONSIGNACAO';
+            }
+            moneyInputs.forEach(input => { if (input.value) input.value = parseMonetary(input.value); });
+        });
+    }
+
+    function updateFinanceiroPadrao() {
+        if (cardFinanceiroPadrao.style.display === 'none') return;
+        let total = parseMonetary(inputValorVendaReal.value) || 0;
+        let pago = 0;
+        inputsPgtoCarro.forEach(inp => { if (inp.id === 'input_financiamento_padrao') return; let v = parseMonetary(inp.value) || 0; pago += v; });
+        let diff = total - pago;
+        if (total > 0 && Math.abs(diff) < 0.05) {
+            feedbackPgto.className = 'badge bg-success p-2'; feedbackPgto.innerHTML = '<i class="fa fa-check"></i> OK';
+        } else {
+            feedbackPgto.className = 'badge bg-danger p-2'; if (diff > 0) feedbackPgto.innerText = `Falta R$ ${maskCurrency(diff).replace('R$', '')}`; else feedbackPgto.innerText = `Passou R$ ${maskCurrency(Math.abs(diff)).replace('R$', '')}`;
+        }
+        if ((parseMonetary(inputFinanPadrao.value) || 0) > 0) {
+            divFinanPadrao.style.display = 'block';
+            if(inputFakeBancoPadrao) inputFakeBancoPadrao.required = true;
+            if(inputFakePropostaPadrao) inputFakePropostaPadrao.required = true;
+        } else {
+            divFinanPadrao.style.display = 'none';
+            if(inputFakeBancoPadrao) { inputFakeBancoPadrao.required = false; inputFakeBancoPadrao.value = ''; }
+            if(inputFakePropostaPadrao) { inputFakePropostaPadrao.required = false; inputFakePropostaPadrao.value = ''; }
+            if(inputBancoReal) inputBancoReal.value = '';
+            if(inputPropostaReal) inputPropostaReal.value = '';
+        }
+        divComp.style.display = 'block';
+    }
+
+    if(inputValorVendaReal) inputValorVendaReal.addEventListener('input', updateFinanceiroPadrao);
+    inputsPgtoCarro.forEach(inp => inp.addEventListener('input', updateFinanceiroPadrao));
+
     const badgeAdicionais = document.getElementById('badge-adicionais');
     const items = [
         { check: 'id_adicional_garantia', val: 'id_valor_garantia', met: 'id_metodo_garantia' },
@@ -490,101 +466,36 @@ document.addEventListener('DOMContentLoaded', function() {
         items.forEach(item => {
             const chk = document.getElementById(item.check);
             if (reset && chk) chk.checked = false;
-            
             const val = document.getElementById(item.val);
             const met = document.getElementById(item.met);
-            const wrapper = val.closest('.inputs-wrapper');
-            const card = chk.closest('.modal-item');
-
-            if (chk.checked) {
-                wrapper.style.display = 'flex';
-                val.required = true;
-                met.required = true;
-                card.classList.add('active');
-                count++;
+            const wrapper = val ? val.closest('.inputs-wrapper') : null;
+            const card = chk ? chk.closest('.modal-item') : null;
+            if (chk && chk.checked) {
+                if(wrapper) wrapper.style.display = 'flex'; if(val) val.required = true; if(met) met.required = true; if(card) card.classList.add('active'); count++;
             } else {
-                wrapper.style.display = 'none';
-                val.required = false;
-                met.required = false;
-                val.value = '';
-                met.value = '';
-                card.classList.remove('active');
+                if(wrapper) wrapper.style.display = 'none'; if(val) { val.required = false; val.value = ''; } if(met) { met.required = false; met.value = ''; } if(card) card.classList.remove('active');
             }
         });
-        badgeAdicionais.style.display = count > 0 ? 'inline-block' : 'none';
-        badgeAdicionais.innerText = count;
+        if(badgeAdicionais) { badgeAdicionais.style.display = count > 0 ? 'inline-block' : 'none'; badgeAdicionais.innerText = count; }
     }
-    items.forEach(item => document.getElementById(item.check).addEventListener('change', () => updateModalUI(false)));
+    items.forEach(item => { const el = document.getElementById(item.check); if(el) el.addEventListener('change', () => updateModalUI(false)); });
 
-    function updateFinanceiroPadrao() {
-        if (cardFinanceiroPadrao.style.display === 'none') return;
-
-        let total = parseMonetary(inputValorVendaReal.value) || 0;
-        let pago = 0;
-        let temImediato = false;
-        
-        inputsPgtoCarro.forEach(inp => {
-            // Ignora o input fake ("input_financiamento_padrao") se ele estiver sendo usado, 
-            // porque o valor dele é copiado para o "id_pgto_financiamento" que também tem a classe payment-input
-            if (inp.id === 'input_financiamento_padrao') return;
-            
-            let v = parseMonetary(inp.value) || 0;
-            pago += v;
-            if (v > 0 && (inp.id.includes('pix') || inp.id.includes('transferencia'))) temImediato = true;
-        });
-        
-        // CORREÇÃO: Removemos a soma manual duplicada aqui. 
-        // O "id_pgto_financiamento" já foi somado no loop acima.
-
-        let diff = total - pago;
-        
-        if (total > 0 && Math.abs(diff) < 0.05) {
-            feedbackPgto.className = 'badge bg-success p-2';
-            feedbackPgto.innerHTML = '<i class="fa fa-check"></i> OK';
-        } else {
-            feedbackPgto.className = 'badge bg-danger p-2';
-            if (diff > 0) {
-                 feedbackPgto.innerText = `Falta R$ ${maskCurrency(diff).replace('R$', '')}`;
-            } else {
-                 feedbackPgto.innerText = `Passou R$ ${maskCurrency(Math.abs(diff)).replace('R$', '')}`;
-            }
-        }
-
-        if ((parseMonetary(inputFinanPadrao.value) || 0) > 0) {
-            divFinanPadrao.style.display = 'block';
-            inputFakeBancoPadrao.required = true;
-        } else {
-            divFinanPadrao.style.display = 'none';
-            inputFakeBancoPadrao.required = false;
-        }
-        divComp.style.display = temImediato ? 'block' : 'none';
+    const urlParams = new URLSearchParams(window.location.search);
+    const tipoUrl = urlParams.get('tipo');
+    if (tipoUrl === 'CONSIGNACAO' && modoCaptacaoBtn) {
+        modoCaptacaoBtn.checked = true;
+        if(optConsignacao) optConsignacao.checked = true;
     }
 
-    inputValorVendaReal.addEventListener('input', updateFinanceiroPadrao);
-    inputsPgtoCarro.forEach(inp => inp.addEventListener('input', updateFinanceiroPadrao));
-
-    // --- 3. LIMPEZA NO SUBMIT (IMPORTANTE) ---
-    const form = document.getElementById('vendaForm');
-    form.addEventListener('submit', function(e) {
-        moneyInputs.forEach(input => {
-            if (input.value) {
-                // Converte para formato float puro (1234.56) antes de enviar
-                input.value = parseMonetary(input.value);
-            }
-        });
-    });
-
-    // Inicialização
     updateMode();
     updateModalUI();
     
-    // Se for edição e tiver valor financiado, preenche o fake
-    if(inputFinanReal.value) {
+    if(inputFinanReal && inputFinanReal.value) {
         let valFin = parseFloat(inputFinanReal.value);
         if (valFin > 0) {
-            inputFinanPadrao.value = maskCurrency(valFin);
-            inputFakeBancoPadrao.value = inputBancoReal.value;
-            inputFakePropostaPadrao.value = inputPropostaReal.value;
+            if(inputFinanPadrao) inputFinanPadrao.value = maskCurrency(valFin);
+            if(inputFakeBancoPadrao) inputFakeBancoPadrao.value = inputBancoReal.value;
+            if(inputFakePropostaPadrao) inputFakePropostaPadrao.value = inputPropostaReal.value;
             updateFinanceiroPadrao();
         }
     }

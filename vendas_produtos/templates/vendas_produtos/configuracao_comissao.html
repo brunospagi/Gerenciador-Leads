@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Configuração de Comissões{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-header bg-dark text-white py-3">
+                    <h5 class="mb-0 fw-bold"><i class="fa fa-cogs me-2"></i> Configuração Geral de Comissões</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        {% if form.errors %}
+                            <div class="alert alert-danger">Corrija os erros abaixo.</div>
+                        {% endif %}
+
+                        <h6 class="text-primary fw-bold border-bottom pb-2 mb-3">Vendas de Veículos</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Carro (Padrão)</label>
+                                <div class="input-group"><span class="input-group-text">R$</span>{{ form.comissao_carro_padrao }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Carro (Com Desconto)</label>
+                                <div class="input-group"><span class="input-group-text">R$</span>{{ form.comissao_carro_desconto }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Moto</label>
+                                <div class="input-group"><span class="input-group-text">R$</span>{{ form.comissao_moto }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Consignação / Compra</label>
+                                <div class="input-group"><span class="input-group-text">R$</span>{{ form.comissao_consignacao }}</div>
+                            </div>
+                        </div>
+
+                        <h6 class="text-success fw-bold border-bottom pb-2 mb-3">Serviços e Seguros</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Garantia (Custo Provider)</label>
+                                <div class="input-group"><span class="input-group-text">R$</span>{{ form.garantia_custo }}</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Garantia (Preço Base)</label>
+                                <div class="input-group"><span class="input-group-text">R$</span>{{ form.garantia_base }}</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Ref. Seguro Novo</label>
+                                <div class="input-group"><span class="input-group-text">R$</span>{{ form.seguro_novo_ref }}</div>
+                            </div>
+                        </div>
+
+                        <h6 class="text-danger fw-bold border-bottom pb-2 mb-3">Percentuais de Repasse (Split)</h6>
+                        <div class="alert alert-light border small text-muted">
+                            <i class="fa fa-info-circle me-1"></i> Use valores decimais. Exemplo: <strong>0.35</strong> representa <strong>35%</strong>.
+                        </div>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Split Refinanciamento</label>
+                                {{ form.split_refin }}
+                                <div class="form-text">Parte do Vendedor (Padrão 0.35)</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Split Transferência</label>
+                                {{ form.split_transferencia }}
+                                <div class="form-text">Parte do Vendedor</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-muted">Split Ajudante</label>
+                                {{ form.split_ajudante }}
+                                <div class="form-text">% dividida da comissão principal</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <a href="{% url 'venda_produto_list' %}" class="btn btn-outline-secondary">Voltar</a>
+                            <button type="submit" class="btn btn-primary px-4 fw-bold"><i class="fa fa-save me-2"></i> Salvar Alterações</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>document.addEventListener("DOMContentLoaded", function() { if (typeof $ !== 'undefined' && $.fn.mask) { $('.money-mask').mask('000.000.000.000.000,00', {reverse: true}); } });</script>
+{% endblock %}

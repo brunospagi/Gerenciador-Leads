@@ -14,6 +14,7 @@ class Profile(models.Model):
         GERENTE = 'GERENTE', 'Gerente'
         ADMIN = 'ADMIN', 'Administrador'
         DISTRIBUIDOR = 'DISTRIBUIDOR', 'Distribuidor (Apenas)'
+        CONSIGNADOR = 'CONSIGNADOR', 'Consignador'  # <--- NOVA OPÇÃO ADICIONADA
 
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     nivel_acesso = models.CharField(
@@ -44,7 +45,7 @@ class Profile(models.Model):
             return self.avatar.url
         return 'https://cdn.quasar.dev/img/boy-avatar.png'
 
-# --- SINAIS (Com proteção contra erro 500) ---
+# --- SINAIS (Mantidos iguais) ---
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:

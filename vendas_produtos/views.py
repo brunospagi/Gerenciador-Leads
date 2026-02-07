@@ -9,14 +9,35 @@ from django.contrib.auth import get_user_model
 from datetime import datetime
 from decimal import Decimal
 import calendar
-from dateutil.relativedelta import relativedelta  # Necessário para navegação de meses
+from dateutil.relativedelta import relativedelta
 
-from .models import VendaProduto, FechamentoMensal
-from .forms import VendaProdutoForm
+from .models import VendaProduto, FechamentoMensal, ParametrosComissao
+from .forms import VendaProdutoForm, ParametrosComissaoForm
 
 User = get_user_model()
 
-# --- 1. LISTAGEM (DASHBOARD) ---
+# --- NOVA VIEW: CONFIGURAÇÃO DE COMISSÃO (ADMIN ONLY) ---
+class ConfiguracaoComissaoView(LoginRequiredMixin, UpdateView):
+    model = ParametrosComissao
+    form_class = ParametrosComissaoForm
+    template_name = 'vendas_produtos/configuracao_comissao.html'
+    success_url = reverse_lazy('configuracao_comissao')
+
+    def get_object(self, queryset=None):
+        return ParametrosComissao.get_solo()
+
+    def dispatch(self, request, *args, **kwargs):
+        # Apenas ADMIN pode acessar
+        if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
+            messages.error(request, "Acesso restrito ao Administrador.")
+            return redirect('venda_produto_list')
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        messages.success(self.request, "Configurações de comissão atualizadas com sucesso!")
+        return super().form_valid(form)
+
+# --- VIEWS EXISTENTES ---
 class VendaProdutoListView(LoginRequiredMixin, ListView):
     model = VendaProduto
     template_name = 'vendas_produtos/lista.html'
@@ -33,13 +54,11 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         user = self.request.user
         qs = VendaProduto.objects.all().select_related('vendedor', 'gerente', 'vendedor_ajudante')
-        
         data_inicio, data_fim = self.get_periodo_mes_atual()
         qs = qs.filter(data_venda__range=[data_inicio, data_fim])
-
-        if not (user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN'):
+        is_gestor = user.is_superuser or getattr(user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
+        if not is_gestor:
             qs = qs.filter(Q(vendedor=user) | Q(vendedor_ajudante=user))
-        
         return qs.order_by('-data_venda', '-id')
 
     def get_context_data(self, **kwargs):
@@ -49,16 +68,17 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
         context['periodo_inicio'] = data_inicio
         context['periodo_fim'] = data_fim
 
-        if user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN':
-             # Query limpa para totais
+        is_admin = user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN'
+        is_gerente = getattr(user.profile, 'nivel_acesso', '') == 'GERENTE'
+        is_gestor = is_admin or is_gerente
+
+        if is_gestor:
              todas_vendas = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim])
-             
              soma_princ = todas_vendas.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
              soma_ajud = todas_vendas.aggregate(Sum('comissao_ajudante'))['comissao_ajudante__sum'] or 0
-             
              context['total_comissao_equipe'] = soma_princ + soma_ajud
-             context['total_loja'] = todas_vendas.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
-             
+             if is_admin:
+                 context['total_loja'] = todas_vendas.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
              minhas_vendas = VendaProduto.objects.filter(vendedor=user, data_venda__range=[data_inicio, data_fim])
              total_minha = minhas_vendas.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum']
         else:
@@ -70,35 +90,36 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
         context['minha_comissao'] = total_minha or 0
         return context
 
-# --- 2. REGISTRO DE VENDA ---
 class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
     model = VendaProduto
     form_class = VendaProdutoForm
     template_name = 'vendas_produtos/form.html'
     success_url = reverse_lazy('venda_produto_list')
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
     def get_initial(self):
         initial = super().get_initial()
         initial['data_venda'] = timezone.now().date()
+        tipo_url = self.request.GET.get('tipo')
+        if tipo_url: initial['tipo_produto'] = tipo_url
         return initial
 
     def form_valid(self, form):
         main_venda = form.instance
         main_venda.vendedor = self.request.user
-        
         response = super().form_valid(form)
         
         if main_venda.tipo_produto == 'VENDA_VEICULO':
             total_extras = 0
-            
             def processar_adicional(tipo_prod, check_field, valor_field, metodo_field, custo_field=None):
                 if form.cleaned_data.get(check_field):
                     valor = form.cleaned_data.get(valor_field) or Decimal('0.00')
                     metodo_key = form.cleaned_data.get(metodo_field) 
-                    custo = Decimal('0.00')
-                    if custo_field:
-                         custo = form.cleaned_data.get(custo_field) or Decimal('0.00')
-                    
+                    custo = form.cleaned_data.get(custo_field) or Decimal('0.00') if custo_field else Decimal('0.00')
                     if valor > 0 and metodo_key:
                         nova_venda = VendaProduto(
                             vendedor=self.request.user,
@@ -120,40 +141,38 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
                         nova_venda.save()
                         return 1
                 return 0
-
             c1 = processar_adicional('GARANTIA', 'adicional_garantia', 'valor_garantia', 'metodo_garantia')
             c2 = processar_adicional('SEGURO', 'adicional_seguro', 'valor_seguro', 'metodo_seguro')
             c3 = processar_adicional('TRANSFERENCIA', 'adicional_transferencia', 'valor_transferencia', 'metodo_transferencia', custo_field='custo_transferencia')
-            
             total_extras = c1 + c2 + c3
-
-            if total_extras > 0:
-                messages.success(self.request, f"Venda principal + {total_extras} adicionais registrados!")
-            else:
-                messages.success(self.request, "Venda registrada com sucesso!")
+            if total_extras > 0: messages.success(self.request, f"Venda principal + {total_extras} adicionais registrados!")
+            else: messages.success(self.request, "Venda registrada com sucesso!")
         else:
-            messages.success(self.request, "Serviço registrado com sucesso!")
-            
+            messages.success(self.request, "Lançamento registrado com sucesso!")
         return response
 
-# --- 3. EDIÇÃO E EXCLUSÃO ---
 class VendaProdutoUpdateView(LoginRequiredMixin, UpdateView):
     model = VendaProduto
     form_class = VendaProdutoForm
     template_name = 'vendas_produtos/form.html'
     success_url = reverse_lazy('venda_produto_list')
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
     def dispatch(self, request, *args, **kwargs):
         venda = self.get_object()
-        is_admin = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'
-        if venda.status == 'APROVADO' and not is_admin:
+        is_gestor = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
+        if venda.status == 'APROVADO' and not is_gestor:
             messages.error(request, "Vendas aprovadas não podem ser alteradas.")
             return redirect('venda_produto_list')
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        is_admin = self.request.user.is_superuser or getattr(self.request.user.profile, 'nivel_acesso', '') == 'ADMIN'
-        if not is_admin:
+        is_gestor = self.request.user.is_superuser or getattr(self.request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
+        if not is_gestor:
             form.instance.status = 'PENDENTE'
             form.instance.gerente = None
             form.instance.data_aprovacao = None
@@ -167,11 +186,11 @@ class VendaProdutoDeleteView(LoginRequiredMixin, DeleteView):
 
     def dispatch(self, request, *args, **kwargs):
         venda = self.get_object()
-        is_admin = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'
-        if venda.vendedor != request.user and not is_admin:
+        is_gestor = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
+        if venda.vendedor != request.user and not is_gestor:
             messages.error(request, "Permissão negada.")
             return redirect('venda_produto_list')
-        if venda.status == 'APROVADO' and not is_admin:
+        if venda.status == 'APROVADO' and not is_gestor:
             messages.error(request, "Vendas APROVADAS não podem ser excluídas.")
             return redirect('venda_produto_list')
         return super().dispatch(request, *args, **kwargs)
@@ -180,7 +199,6 @@ class VendaProdutoDeleteView(LoginRequiredMixin, DeleteView):
         messages.success(self.request, "Venda excluída.")
         return super().form_valid(form)
 
-# --- 5. RELATÓRIOS E AÇÕES ---
 class VendaProdutoPrintView(LoginRequiredMixin, DetailView):
     model = VendaProduto
     template_name = 'vendas_produtos/comprovante.html'
@@ -191,117 +209,76 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
     
     def dispatch(self, request, *args, **kwargs):
         if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
-            messages.error(request, "Acesso negado.")
+            messages.error(request, "Acesso restrito ao Administrador.")
             return redirect('venda_produto_list')
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
         data_inicio_str = self.request.GET.get('data_inicio')
         data_fim_str = self.request.GET.get('data_fim')
         vendedor_id = self.request.GET.get('vendedor')
 
         hoje = timezone.now().date()
-        if data_inicio_str:
-            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
-        else:
-            data_inicio = hoje.replace(day=1)
+        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje.replace(day=1)
+        if data_fim_str: data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+        else: data_fim = data_inicio.replace(day=calendar.monthrange(data_inicio.year, data_inicio.month)[1])
+
+        context['periodo_inicio_str'] = data_inicio.strftime('%Y-%m-%d')
+        context['periodo_fim_str'] = data_fim.strftime('%Y-%m-%d')
+        context['mes_fechado'] = FechamentoMensal.objects.filter(mes=data_inicio.month, ano=data_inicio.year).first()
         
-        if data_fim_str:
-            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
-        else:
-            ultimo_dia = calendar.monthrange(data_inicio.year, data_inicio.month)[1]
-            data_fim = data_inicio.replace(day=ultimo_dia)
-
-        # Formatação para string
-        data_inicio_str = data_inicio.strftime('%Y-%m-%d')
-        data_fim_str = data_fim.strftime('%Y-%m-%d')
-
-        # --- LÓGICA DE NAVEGAÇÃO E FECHAMENTO ---
-        # Verifica se o período selecionado corresponde a um mês fechado
-        mes_fechado_obj = FechamentoMensal.objects.filter(mes=data_inicio.month, ano=data_inicio.year).first()
-        context['mes_fechado'] = mes_fechado_obj
-
-        # Datas para navegação (Mês Anterior / Próximo Mês)
         mes_anterior = data_inicio - relativedelta(months=1)
         proximo_mes = data_inicio + relativedelta(months=1)
-        
         context['nav_anterior_inicio'] = mes_anterior.replace(day=1).strftime('%Y-%m-%d')
         context['nav_proximo_inicio'] = proximo_mes.replace(day=1).strftime('%Y-%m-%d')
-        # ----------------------------------------
 
-        # 1. Base Query - Filtro de Data
         qs_base = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim])
-        
-        if vendedor_id:
-            qs_base = qs_base.filter(vendedor_id=vendedor_id)
+        if vendedor_id: qs_base = qs_base.filter(vendedor_id=vendedor_id)
 
-        # 2. Agregações Globais
-        total_loja = qs_base.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
-        total_comissao = qs_base.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
-        total_bruto = qs_base.aggregate(Sum('valor_venda'))['valor_venda__sum'] or 0
-        qtd_vendas = qs_base.count()
+        context['total_geral_loja'] = qs_base.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
+        context['total_geral_comissao'] = qs_base.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
+        context['total_geral_bruto'] = qs_base.aggregate(Sum('valor_venda'))['valor_venda__sum'] or 0
+        context['qtd_vendas'] = qs_base.count()
 
-        # 3. Lista de Vendedores Únicos
-        todos_ids = qs_base.values_list('vendedor', flat=True)
-        vendedores_ids = list(set(todos_ids)) 
-        
+        vendedores_ids = list(set(qs_base.values_list('vendedor', flat=True)))
         relatorio_vendedores = []
-        
         for vid in vendedores_ids:
-            vendas_list_raw = VendaProduto.objects.filter(
-                vendedor_id=vid, 
-                data_venda__range=[data_inicio, data_fim]
-            ).select_related('vendedor', 'gerente').order_by('data_venda', 'id')
-
-            vendas_unicas = {}
-            for v in vendas_list_raw:
-                vendas_unicas[v.id] = v
-            
-            vendas_vendedor = list(vendas_unicas.values())
-            vendas_vendedor.sort(key=lambda x: (x.data_venda, x.id), reverse=True)
-
-            soma_comissao = sum(v.comissao_vendedor for v in vendas_vendedor)
-            
+            vendas_vendedor = list(VendaProduto.objects.filter(vendedor_id=vid, data_venda__range=[data_inicio, data_fim]).order_by('data_venda'))
             vendedor_obj = User.objects.filter(pk=vid).first()
             if vendedor_obj and vendas_vendedor:
                 relatorio_vendedores.append({
                     'vendedor': vendedor_obj,
                     'vendas': vendas_vendedor,
-                    'total_comissao': soma_comissao
+                    'total_comissao': sum(v.comissao_vendedor for v in vendas_vendedor)
                 })
-
+        
         relatorio_vendedores.sort(key=lambda x: x['vendedor'].get_full_name() or x['vendedor'].username)
-
+        context['relatorio_vendedores'] = relatorio_vendedores
+        context['lista_vendedores'] = User.objects.filter(id__in=set(VendaProduto.objects.values_list('vendedor', flat=True))).order_by('username')
+        context['vendedor_selecionado'] = int(vendedor_id) if vendedor_id else None
         context['periodo_inicio'] = data_inicio
         context['periodo_fim'] = data_fim
-        context['periodo_inicio_str'] = data_inicio_str
-        context['periodo_fim_str'] = data_fim_str
-        
-        context['total_geral_loja'] = total_loja
-        context['total_geral_comissao'] = total_comissao
-        context['total_geral_bruto'] = total_bruto
-        context['qtd_vendas'] = qtd_vendas
-        
-        context['relatorio_vendedores'] = relatorio_vendedores
-        
-        ids_com_venda = set(VendaProduto.objects.values_list('vendedor', flat=True))
-        context['lista_vendedores'] = User.objects.filter(id__in=ids_com_venda).order_by('username')
-        context['vendedor_selecionado'] = int(vendedor_id) if vendedor_id else None
-
         return context
 
-# Aprovacao/Rejeicao
 def aprovar_venda_produto(request, pk):
-    if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
+    is_gestor = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
+    if not is_gestor:
         messages.error(request, "Permissão negada.")
         return redirect('venda_produto_list')
 
     venda = get_object_or_404(VendaProduto, pk=pk)
+    
     if request.method == 'POST':
         numero_apolice = request.POST.get('numero_apolice')
         arquivo_apolice = request.FILES.get('arquivo_apolice')
+        
+        for campo in ['custo_base', 'valor_venda']:
+            valor_str = request.POST.get(campo)
+            if valor_str:
+                limpo = valor_str.replace('R$', '').replace('.', '').replace(',', '.').strip()
+                try: setattr(venda, campo, Decimal(limpo))
+                except: pass
 
         if venda.tipo_produto == 'GARANTIA':
             if not numero_apolice:
@@ -315,16 +292,20 @@ def aprovar_venda_produto(request, pk):
         venda.motivo_recusa = None
         venda.gerente = request.user
         venda.data_aprovacao = timezone.now()
+        
         if numero_apolice: venda.numero_apolice = numero_apolice
         if arquivo_apolice: venda.arquivo_apolice = arquivo_apolice
-        venda.save()
+        
+        venda.save() 
         messages.success(request, "Venda APROVADA.")
     return redirect('venda_produto_list')
 
 def rejeitar_venda_produto(request, pk):
-    if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
+    is_gestor = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
+    if not is_gestor:
         messages.error(request, "Permissão negada.")
         return redirect('venda_produto_list')
+    
     if request.method == 'POST':
         venda = get_object_or_404(VendaProduto, pk=pk)
         venda.status = 'REJEITADO'
@@ -335,7 +316,6 @@ def rejeitar_venda_produto(request, pk):
         messages.warning(request, "Venda REJEITADA.")
     return redirect('venda_produto_list')
 
-# --- NOVA VIEW PARA FECHAR/REABRIR MÊS ---
 def toggle_fechamento_mes(request):
     if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
         messages.error(request, "Permissão negada.")
@@ -344,23 +324,17 @@ def toggle_fechamento_mes(request):
     if request.method == 'POST':
         mes = request.POST.get('mes')
         ano = request.POST.get('ano')
-        acao = request.POST.get('acao') # 'fechar' ou 'reabrir'
-        
+        acao = request.POST.get('acao')
         if mes and ano:
             if acao == 'fechar':
-                FechamentoMensal.objects.get_or_create(
-                    mes=mes, ano=ano,
-                    defaults={'responsavel': request.user}
-                )
+                FechamentoMensal.objects.get_or_create(mes=mes, ano=ano, defaults={'responsavel': request.user})
                 messages.success(request, f"Mês {mes}/{ano} FECHADO com sucesso.")
             elif acao == 'reabrir':
                 FechamentoMensal.objects.filter(mes=mes, ano=ano).delete()
                 messages.warning(request, f"Mês {mes}/{ano} REABERTO.")
     
-    # Redireciona de volta para o relatório na data correta
-    redirect_url = reverse_lazy('venda_produto_relatorio') # Certifique-se que o name na url confere
     try:
-        data_inicio = f"{ano}-{int(mes):02d}-01"
-        return redirect(f"{redirect_url}?data_inicio={data_inicio}")
+        url = reverse_lazy('venda_produto_relatorio') + f"?data_inicio={ano}-{int(mes):02d}-01"
+        return redirect(url)
     except:
-        return redirect(redirect_url)
+        return redirect('venda_produto_list')
