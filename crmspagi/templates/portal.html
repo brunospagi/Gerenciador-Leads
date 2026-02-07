@@ -177,7 +177,7 @@
                 </div>
                 <i class="fa fa-robot system-icon text-info"></i>
             </a>
-
+            
             {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
             <a href="{% url 'venda_produto_relatorio' %}" class="system-item">
                 <div>
@@ -191,6 +191,35 @@
         </div>
     </div>
     
+    {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
+    <div class="card mb-4 shadow-sm border-secondary border-top border-3">
+        <div class="section-title border-bottom pb-2 mb-3 mx-3 mt-3 fw-bold text-secondary">
+            <i class="fa fa-briefcase me-2"></i> Recursos Humanos
+        </div>
+        <div class="system-grid p-3 pt-0">
+            
+            {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+            <a href="{% url 'rh_dashboard' %}" class="system-item" style="border-left: 4px solid #dc3545;">
+                <div>
+                    <span class="system-name text-danger">Financeiro RH</span>
+                    <div class="system-desc text-muted">Folha e Pagamentos</div>
+                </div>
+                <i class="fa fa-file-invoice-dollar system-icon text-danger opacity-50"></i>
+            </a>
+            {% endif %}
+
+            <a href="{% if user.profile.nivel_acesso == 'ADMIN' or user.is_superuser %}{% url 'rh_dashboard' %}{% else %}{% url 'lista_funcionarios' %}{% endif %}" class="system-item" style="border-left: 4px solid #0d6efd;">
+                <div>
+                    <span class="system-name text-primary">Gestão de Equipe</span>
+                    <div class="system-desc text-muted">Cadastro de Colaboradores</div>
+                </div>
+                <i class="fa fa-users system-icon text-primary opacity-50"></i>
+            </a>
+
+        </div>
+    </div>
+    {% endif %}
+
     {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
     <div class="card mb-4 shadow-sm border-danger border-top border-3">
         <div class="section-title border-bottom pb-2 mb-3 mx-3 mt-3 fw-bold text-danger">

@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Novo Colaborador{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 900px;">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-dark mb-0">Cadastro de Colaborador</h2>
+        <a href="{% url 'rh_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="fa fa-arrow-left me-2"></i> Voltar ao RH
+        </a>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-3">
+        <div class="card-header bg-primary text-white py-3">
+            <h5 class="mb-0 fw-bold"><i class="fa fa-user-plus me-2"></i> Preencha os dados</h5>
+        </div>
+        <div class="card-body p-4">
+            <form method="post">
+                {% csrf_token %}
+                
+                {% if user_form.errors or func_form.errors %}
+                    <div class="alert alert-danger shadow-sm">
+                        <strong>Atenção!</strong> Verifique os erros abaixo.
+                        {{ user_form.errors }}
+                        {{ func_form.errors }}
+                    </div>
+                {% endif %}
+
+                <h6 class="text-primary fw-bold border-bottom pb-2 mb-3 mt-2">1. Acesso ao Sistema (Login)</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold text-muted">Nome *</label>
+                        {{ user_form.first_name }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold text-muted">Sobrenome *</label>
+                        {{ user_form.last_name }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">Usuário (Login) *</label>
+                        {{ user_form.username }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">E-mail *</label>
+                        {{ user_form.email }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">Senha Inicial *</label>
+                        {{ user_form.password }}
+                    </div>
+                </div>
+
+                <h6 class="text-success fw-bold border-bottom pb-2 mb-3">2. Dados Pessoais & Contratuais</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted">CPF *</label>
+                        {{ func_form.cpf }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted">RG</label>
+                        {{ func_form.rg }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted">Nascimento</label>
+                        {{ func_form.data_nascimento }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted">Celular/WhatsApp</label>
+                        {{ func_form.telefone }}
+                    </div>
+                    
+                    <div class="col-md-9">
+                        <label class="form-label small fw-bold text-muted">Endereço Completo</label>
+                        {{ func_form.endereco }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted">CEP</label>
+                        {{ func_form.cep }}
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">Cargo *</label>
+                        {{ func_form.cargo }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">Data Admissão *</label>
+                        {{ func_form.data_admissao }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">Salário Base *</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light">R$</span>
+                            {{ func_form.salario_base }}
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="text-danger fw-bold border-bottom pb-2 mb-3">3. Dados Bancários (Pagamento)</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">Banco</label>
+                        {{ func_form.banco }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-muted">Agência</label>
+                        {{ func_form.agencia }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted">Conta</label>
+                        {{ func_form.conta }}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted">Tipo</label>
+                        {{ func_form.tipo_conta }}
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label small fw-bold text-muted">Chave Pix</label>
+                        {{ func_form.chave_pix }}
+                    </div>
+                </div>
+                
+                <div class="form-check mb-4">
+                    {{ func_form.ativo }}
+                    <label class="form-check-label" for="{{ func_form.ativo.id_for_label }}">
+                        Cadastro Ativo (Acesso Liberado)
+                    </label>
+                </div>
+
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end border-top pt-4">
+                    <a href="{% url 'rh_dashboard' %}" class="btn btn-light btn-lg border px-4">Cancelar</a>
+                    <button type="submit" class="btn btn-success btn-lg px-5 fw-bold shadow-sm">
+                        <i class="fa fa-check-circle me-2"></i> Salvar Cadastro
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        if (typeof $ !== 'undefined' && $.fn.mask) {
+            $('.money-mask').mask('000.000.000.000.000,00', {reverse: true});
+            $('.cpf-mask').mask('000.000.000-00', {reverse: true});
+            $('.cep-mask').mask('00000-000');
+            $('.phone-mask').mask('(00) 00000-0000');
+        }
+    });
+</script>
+{% endblock %}

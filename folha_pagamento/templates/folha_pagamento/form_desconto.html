@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-5" style="max-width: 600px;">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-danger text-white py-3">
+            <h5 class="mb-0"><i class="fa fa-money-bill-wave me-2"></i> Lançar Desconto / Vale</h5>
+        </div>
+        <div class="card-body p-4">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Colaborador</label>
+                    {{ form.funcionario }}
+                </div>
+                
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Tipo</label>
+                        {{ form.tipo }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Valor Total (R$)</label>
+                        {{ form.valor_total }}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Descrição</label>
+                    {{ form.descricao }}
+                </div>
+
+                <hr>
+                
+                <div class="form-check mb-3">
+                    {{ form.parcelado }}
+                    <label class="form-check-label" for="{{ form.parcelado.id_for_label }}">Parcelar este valor?</label>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small">Qtd. Parcelas</label>
+                        {{ form.qtd_parcelas }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Mês Início</label>
+                        {{ form.mes_inicio }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Ano Início</label>
+                        {{ form.ano_inicio }}
+                    </div>
+                </div>
+
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-danger fw-bold">Confirmar Lançamento</button>
+                    <a href="{% url 'rh_dashboard' %}" class="btn btn-link text-muted mt-2">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        if (typeof $ !== 'undefined' && $.fn.mask) {
+            $('.money-mask').mask('000.000.000.000.000,00', {reverse: true});
+        }
+    });
+</script>
+{% endblock %}

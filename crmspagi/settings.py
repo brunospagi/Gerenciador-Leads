@@ -60,6 +60,8 @@ INSTALLED_APPS = [
     'mozilla_django_oidc',
     'distribuicao',
     'credenciais',
+    'funcionarios',  
+    'folha_pagamento',
 ]
 
 MIDDLEWARE = [
@@ -135,6 +137,7 @@ WSGI_APPLICATION = 'crmspagi.wsgi.application'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/contas/login/'
 LOGIN_URL = '/contas/login/'
+
 
 
 # --- Database (LIDO DO .ENV) ---

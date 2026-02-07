@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-primary"><i class="fa fa-users me-2"></i> Gestão de RH e Folha</h3>
+        <a href="{% url 'rh_lancar_desconto' %}" class="btn btn-danger shadow-sm">
+            <i class="fa fa-minus-circle me-2"></i> Lançar Desconto / Vale
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-dark text-white">Processar Folha Mensal</div>
+        <div class="card-body">
+            <form method="post" class="row g-3 align-items-end">
+                {% csrf_token %}
+                <div class="col-md-4">
+                    <label class="form-label">Mês</label>
+                    {{ form_folha.mes }}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Ano</label>
+                    {{ form_folha.ano }}
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">
+                        <i class="fa fa-sync me-2"></i> Calcular Folhas
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3 fw-bold">Folhas Recentes</div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>Colaborador</th>
+                            <th>Mês/Ano</th>
+                            <th>Salário Base</th>
+                            <th>Comissões</th>
+                            <th>Descontos</th>
+                            <th>Líquido</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for folha in folhas %}
+                        <tr>
+                            <td class="fw-bold">
+                                {{ folha.funcionario.nome_completo }}
+                                <small class="text-muted d-block">{{ folha.funcionario.cargo }}</small>
+                            </td>
+                            
+                            <td>{{ folha.mes }}/{{ folha.ano }}</td>
+                            <td>R$ {{ folha.salario_base|floatformat:2 }}</td>
+                            <td class="text-success fw-bold">+ {{ folha.total_comissoes|floatformat:2 }}</td>
+                            <td class="text-danger fw-bold">- {{ folha.total_descontos|floatformat:2 }}</td>
+                            <td class="fw-bold fs-6">R$ {{ folha.salario_liquido|floatformat:2 }}</td>
+                            <td>
+                                {% if folha.fechada %}
+                                    <span class="badge bg-success">Fechada</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">Aberta</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'rh_detalhe_folha' folha.pk %}" class="btn btn-sm btn-outline-secondary" title="Ver Detalhes">
+                                    <i class="fa fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="8" class="text-center p-4 text-muted">Nenhuma folha gerada recentemente.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,186 +1,207 @@
 {% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard Administrativo{% endblock %}
 
 {% block content %}
-<style>
-    .metric-card {
-        border: none;
-        border-left: 5px solid #0d6efd;
-    }
-    .metric-card .card-body {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-    .metric-card i {
-        font-size: 2.5rem;
-        color: #0d6efd;
-        opacity: 0.3;
-    }
-    .chart-card .card-header {
-        background-color: #f8f9fa;
-        font-weight: 500;
-    }
-    .quick-actions {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
-</style>
+<div class="container-fluid">
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Painel do Administrador</h1>
-</div>
+    <div class="d-sm-flex align-items-center justify-content-between mb-4 mt-4">
+        <h1 class="h3 mb-0 text-gray-800 fw-bold">Dashboard Geral</h1>
+        
+        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+        <a href="{% url 'venda_produto_relatorio' %}" class="d-none d-sm-inline-block btn btn-sm btn-dark shadow-sm">
+            <i class="fas fa-chart-line fa-sm text-white-50 me-2"></i> Relatório Financeiro
+        </a>
+        {% endif %}
+    </div>
 
-<div class="row">
-    {# --- NOVO CARD: CONFIGURAÇÃO DE VÍDEO PARA TV E LINKS RÁPIDOS --- #}
-    <div class="col-lg-6 mb-4">
-        <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-display-fill me-2"></i>Configuração de Vídeo e Ações Rápidas</h5>
-            </div>
-            <div class="card-body">
-                <form method="post" class="mb-4" enctype="multipart/form-data">
-                    {% csrf_token %}
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ tv_video_form.titulo.id_for_label }}" class="form-label">{{ tv_video_form.titulo.label }}</label>
-                            {{ tv_video_form.titulo }}
+    <div class="row">
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Vendas (Mês Atual)</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ total_vendas_mes|default:"0,00" }}
+                            </div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ tv_video_form.video_url.id_for_label }}" class="form-label">{{ tv_video_form.video_url.label }}</label>
-                            {{ tv_video_form.video_url }}
-                        </div>
-                        
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ tv_video_form.video_mp4.id_for_label }}" class="form-label">{{ tv_video_form.video_mp4.label }}</label>
-                            {{ tv_video_form.video_mp4 }}
-                            <div class="form-text">Selecione um MP4. Isso terá prioridade sobre a URL do YouTube.</div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ tv_video_form.newsdata_api_key.id_for_label }}" class="form-label">{{ tv_video_form.newsdata_api_key.label }}</label>
-                            {{ tv_video_form.newsdata_api_key }}
-                            <div class="form-text">Usado para buscar notícias do G1.</div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="{{ tv_video_form.manual_news_ticker.id_for_label }}" class="form-label">{{ tv_video_form.manual_news_ticker.label }}</label>
-                            {{ tv_video_form.manual_news_ticker }}
-                            <div class="form-text">Se preenchido, este texto terá prioridade sobre as notícias da API.</div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar fa-2x text-gray-300"></i>
                         </div>
                     </div>
-                    <button type="submit" name="tv_video_submit" class="btn btn-success"><i class="bi bi-save me-1"></i>Salvar Configuração</button>
-                    <a href="{% url 'tv_video_display' %}" target="_blank" class="btn btn-info ms-2"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir Tela da TV</a>
-                </form>
+                </div>
             </div>
         </div>
-    </div>
-    
-    {# --- LINKS RÁPIDOS E GESTÃO DE USUÁRIOS (Nova Coluna) --- #}
-    <div class="col-lg-6 mb-4">
-        <div class="card shadow-sm">
-            <div class="card-header bg-dark text-white">
-                <h5 class="mb-0"><i class="bi bi-gear-fill me-2"></i>Gestão de Usuários e Acessos</h5>
-            </div>
-            <div class="card-body quick-actions">
-                <a href="{% url 'user_list' %}" class="btn btn-outline-primary w-100"><i class="bi bi-people-fill me-2"></i>Gerenciar Usuários</a>
-                <a href="{% url 'user_create' %}" class="btn btn-outline-success w-100"><i class="bi bi-person-plus-fill me-2"></i>Adicionar Novo Usuário</a>
-                <a href="{% url 'relatorios' %}" class="btn btn-outline-warning w-100"><i class="bi bi-bar-chart-line-fill me-2"></i>Visualizar Relatórios de Leads</a>
-            </div>
-             <div class="card-footer">
-                <p class="mb-0 text-muted small">Use os links acima para gerenciar permissões e contas.</p>
-            </div>
-        </div>
-    </div>
-</div>
 
-<div class="row">
-    <div class="col-12 mb-4">
-        <div class="card shadow-sm chart-card">
-            <div class="card-header">Logins nos Últimos 15 Dias</div>
-            <div class="card-body">
-                <canvas id="loginsChart"></canvas>
+        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Lucro Loja (Mês Atual)</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                R$ {{ lucro_loja_mes|default:"0,00" }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="col-lg-6 mb-4">
-        <div class="card shadow-sm">
-            <div class="card-header">Usuários Mais Ativos</div>
-            <div class="card-body">
-                <ul class="list-group list-group-flush">
-                    {% for user in usuarios_ativos %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-person-circle me-2"></i>{{ user.username }}</span>
-                        <span class="badge bg-primary rounded-pill">{{ user.total_logins }} logins</span>
-                    </li>
-                    {% empty %}
-                    <li class="list-group-item text-center">Nenhuma atividade registrada.</li>
-                    {% endfor %}
-                </ul>
+        {% endif %}
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Pendente Aprovação</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ pendentes_count|default:"0" }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clipboard-check fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="col-lg-6 mb-4">
-        <div class="card shadow-sm">
-            <div class="card-header">Últimos Acessos</div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover">
-                        <tbody>
-                            {% for login in ultimos_logins %}
-                            <tr>
-                                <td><i class="bi bi-box-arrow-in-right text-success me-2"></i><strong>{{ login.user.username }}</strong></td>
-                                <td class="text-muted">{{ login.login_timestamp|date:"d/m/Y H:i" }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td class="text-center">Nenhum login recente.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Equipe Ativa</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ equipe_count|default:"--" }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-users fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
-{% endblock %}
 
-{% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    // Gráfico de Logins
-    const ctxLogins = document.getElementById('loginsChart').getContext('d');
-    new Chart(ctxLogins, {
-        type: 'line',
-        data: {
-            labels: {{ labels_grafico|safe }},
-            datasets: [{
-                label: 'Total de Logins',
-                data: {{ data_grafico|safe }},
-                backgroundColor: 'rgba(13, 110, 253, 0.2)',
-                borderColor: 'rgba(13, 110, 253, 1)',
-                borderWidth: 2,
-                tension: 0.3,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1
-                    }
-                }
-            }
-        }
-    });
-});
-</script>
+    <h4 class="mb-3 text-secondary mt-4 border-bottom pb-2"><i class="fa fa-cogs me-2"></i> Operacional</h4>
+    <div class="row mb-4">
+        
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4 h-100">
+                <div class="card-header py-3 bg-white">
+                    <h6 class="m-0 font-weight-bold text-primary">Vendas & Negociações</h6>
+                </div>
+                <div class="card-body d-flex flex-wrap gap-2">
+                    <a href="{% url 'venda_produto_create' %}" class="btn btn-primary btn-icon-split shadow-sm flex-fill">
+                        <span class="icon text-white-50"><i class="fas fa-plus"></i></span>
+                        <span class="text">Nova Venda</span>
+                    </a>
+                    <a href="{% url 'venda_produto_list' %}" class="btn btn-secondary btn-icon-split shadow-sm flex-fill">
+                        <span class="icon text-white-50"><i class="fas fa-list"></i></span>
+                        <span class="text">Listar Vendas</span>
+                    </a>
+                    
+                    {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+                    <a href="{% url 'configuracao_comissao' %}" class="btn btn-dark btn-icon-split shadow-sm flex-fill w-100 mt-2">
+                        <span class="icon text-white-50"><i class="fas fa-cog"></i></span>
+                        <span class="text">Configurar Comissões</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' or user.profile.nivel_acesso == 'CONSIGNADOR' %}
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow mb-4 h-100 border-left-warning">
+                <div class="card-header py-3 bg-white">
+                    <h6 class="m-0 font-weight-bold text-warning">Captação & Consignação</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-3">Acesso rápido para registro de entrada de veículos em estoque.</p>
+                    <a href="{% url 'venda_produto_create' %}?tipo=CONSIGNACAO" class="btn btn-warning text-dark fw-bold w-100">
+                        <i class="fa fa-handshake me-2"></i> Registrar Nova Captação
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
+    <h4 class="mb-3 text-secondary mt-2 border-bottom pb-2"><i class="fa fa-briefcase me-2"></i> Recursos Humanos</h4>
+    <div class="row mb-4">
+        
+        <div class="col-xl-4 col-md-6 mb-4">
+            <a href="{% url 'rh_dashboard' %}" class="text-decoration-none">
+                <div class="card border-left-danger shadow h-100 py-2 element-hover">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                    Folha de Pagamento</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">Processar Mês</div>
+                                <small class="text-muted">Cálculo de comissões, descontos e holerites.</small>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-file-invoice-dollar fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-xl-4 col-md-6 mb-4">
+            <a href="{% url 'funcionario_create' %}" class="text-decoration-none">
+                <div class="card border-left-info shadow h-100 py-2 element-hover">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                    Novo Colaborador</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">Cadastrar Equipe</div>
+                                <small class="text-muted">Criar login e dados funcionais (RH).</small>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-user-plus fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+    </div>
+    {% endif %}
+
+</div>
+
+<style>
+    .border-left-primary { border-left: 0.25rem solid #4e73df !important; }
+    .border-left-success { border-left: 0.25rem solid #1cc88a !important; }
+    .border-left-info { border-left: 0.25rem solid #36b9cc !important; }
+    .border-left-warning { border-left: 0.25rem solid #f6c23e !important; }
+    .border-left-danger { border-left: 0.25rem solid #e74a3b !important; }
+    
+    .text-gray-300 { color: #dddfeb !important; }
+    .text-gray-800 { color: #5a5c69 !important; }
+    
+    /* Efeito Hover nos Cards clicáveis */
+    .element-hover { transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    .element-hover:hover { transform: translateY(-5px); cursor: pointer; }
+</style>
 {% endblock %}

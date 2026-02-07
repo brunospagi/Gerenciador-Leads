@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4"><i class="fa fa-file-invoice-dollar"></i> Gestão de Folha de Pagamento</h2>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">Processar Mês</div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        {{ form_gerar.as_p }}
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fa fa-sync"></i> Calcular/Recalcular Folha
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <a href="{% url 'lancar_desconto' %}" class="btn btn-danger w-100 py-3 mb-3">
+                <i class="fa fa-minus-circle"></i> Lançar Desconto / Vale
+            </a>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header">Folhas Geradas Recentemente</div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Colaborador</th>
+                                <th>Ref</th>
+                                <th>Base</th>
+                                <th>Comissão</th>
+                                <th>Descontos</th>
+                                <th>Líquido</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for folha in folhas %}
+                            <tr>
+                                <td>{{ folha.funcionario.user.first_name }}</td>
+                                <td>{{ folha.mes }}/{{ folha.ano }}</td>
+                                <td>{{ folha.salario_base }}</td>
+                                <td class="text-success fw-bold">+ {{ folha.total_comissoes }}</td>
+                                <td class="text-danger">- {{ folha.total_descontos }}</td>
+                                <td class="fw-bold">R$ {{ folha.salario_liquido }}</td>
+                                <td>
+                                    {% if folha.fechada %}
+                                        <span class="badge bg-success">Fechada</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">Aberta</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="7" class="text-center p-3">Nenhuma folha gerada.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

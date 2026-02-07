@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Holerite - {{ folha.mes }}/{{ folha.ano }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <a href="{% url 'rh_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="fa fa-arrow-left me-2"></i> Voltar
+        </a>
+        <button onclick="window.print()" class="btn btn-primary shadow-sm">
+            <i class="fa fa-print me-2"></i> Imprimir Holerite
+        </button>
+    </div>
+
+    <div class="holerite-container bg-white border shadow-sm mx-auto p-4" style="max-width: 850px; min-height: 600px;">
+        
+        <div class="row border-bottom pb-3 mb-3 align-items-center">
+            <div class="col-2">
+                <i class="fa fa-car fa-3x text-dark"></i>
+            </div>
+            <div class="col-6">
+                <h4 class="fw-bold mb-0 text-uppercase">SPAGI MOTORS COMERCIO DE VEICULOS LTDA.</h4>
+                <small class="text-muted">CNPJ: 08.824.721/0001-28</small><br>
+                <small class="text-muted">Rua Senador Accioly Filho, 440 - Afonso Pena - São José dos Pinhais/PR</small>
+            </div>
+            <div class="col-4 text-end">
+                <div class="border p-2 rounded bg-light">
+                    <small class="d-block fw-bold text-muted">RECIBO DE PAGAMENTO</small>
+                    <h5 class="fw-bold mb-0">MÊS: {{ folha.mes|stringformat:"02d" }}/{{ folha.ano }}</h5>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <table class="table table-bordered table-sm mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>Código</th>
+                            <th>Nome do Colaborador</th>
+                            <th>CBO / Cargo</th>
+                            <th>Admissão</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ folha.funcionario.id|stringformat:"04d" }}</td>
+                            <td class="fw-bold">{{ folha.funcionario.nome_completo|upper }}</td>
+                            <td>{{ folha.funcionario.cargo|upper }}</td>
+                            <td>{{ folha.funcionario.data_admissao|date:"d/m/Y" }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="holerite-body mb-4" style="min-height: 300px;">
+            <table class="table table-bordered table-striped table-sm">
+                <thead>
+                    <tr class="table-dark">
+                        <th style="width: 80px;">Cód.</th>
+                        <th>Descrição</th>
+                        <th class="text-center" style="width: 100px;">Ref.</th>
+                        <th class="text-end" style="width: 120px;">Vencimentos</th>
+                        <th class="text-end" style="width: 120px;">Descontos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in itens %}
+                    <tr>
+                        <td>{{ item.codigo }}</td>
+                        <td>{{ item.descricao }}</td>
+                        <td class="text-center">{{ item.referencia }}</td>
+                        <td class="text-end text-success">
+                            {% if item.vencimentos > 0 %}{{ item.vencimentos|floatformat:2 }}{% endif %}
+                        </td>
+                        <td class="text-end text-danger">
+                            {% if item.descontos > 0 %}{{ item.descontos|floatformat:2 }}{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    
+                    {% for i in "12345" %}
+                    <tr style="height: 25px;"><td></td><td></td><td></td><td></td><td></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <table class="table table-bordered table-sm">
+                    <tfoot class="bg-light fw-bold">
+                        <tr>
+                            <td colspan="3" class="text-end">TOTAIS</td>
+                            <td class="text-end text-success">{{ total_vencimentos|floatformat:2 }}</td>
+                            <td class="text-end text-danger">{{ total_descontos|floatformat:2 }}</td>
+                        </tr>
+                        <tr class="bg-white">
+                            <td colspan="3" class="align-middle">
+                                <small class="text-muted">Banco: {{ folha.funcionario.banco }} | Ag: {{ folha.funcionario.agencia }} | CC: {{ folha.funcionario.conta }}</small>
+                            </td>
+                            <td class="text-end bg-dark text-white align-middle">LÍQUIDO A RECEBER</td>
+                            <td class="text-end bg-dark text-white fs-5">R$ {{ folha.salario_liquido|floatformat:2 }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="mt-5 pt-4 border-top border-dark border-2 border-dashed">
+            <div class="row">
+                <div class="col-6 text-center">
+                    <p class="mb-0">__________________________________________</p>
+                    <small>ASSINATURA DA EMPRESA</small>
+                </div>
+                <div class="col-6 text-center">
+                    <p class="mb-0">__________________________________________</p>
+                    <small>ASSINATURA DO COLABORADOR</small><br>
+                    <small class="text-muted">DATA: _____/_____/__________</small>
+                </div>
+            </div>
+            <p class="text-center mt-3 mb-0 text-muted small">Declaramos ter recebido a importância líquida discriminada neste recibo.</p>
+        </div>
+
+    </div>
+</div>
+
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        .holerite-container, .holerite-container * {
+            visibility: visible;
+        }
+        .holerite-container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        .no-print {
+            display: none !important;
+        }
+        /* Ajuste para forçar impressão de cores de fundo (opcional, depende do navegador) */
+        .table-dark {
+            background-color: #212529 !important;
+            color: white !important;
+            -webkit-print-color-adjust: exact;
+        }
+        .bg-light {
+            background-color: #f8f9fa !important;
+            -webkit-print-color-adjust: exact;
+        }
+    }
+</style>
+{% endblock %}

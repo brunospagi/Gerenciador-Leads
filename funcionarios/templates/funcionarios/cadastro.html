@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-5">
+    <div class="card shadow border-0">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0"><i class="fa fa-user-plus me-2"></i> Novo Colaborador</h4>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <h5 class="text-secondary border-bottom pb-2 mb-3">1. Dados de Acesso (Login)</h5>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">{{ user_form.first_name.label_tag }} {{ user_form.first_name }}</div>
+                    <div class="col-md-6">{{ user_form.last_name.label_tag }} {{ user_form.last_name }}</div>
+                    <div class="col-md-4">{{ user_form.username.label_tag }} {{ user_form.username }}</div>
+                    <div class="col-md-4">{{ user_form.email.label_tag }} {{ user_form.email }}</div>
+                    <div class="col-md-4">{{ user_form.password.label_tag }} {{ user_form.password }}</div>
+                </div>
+
+                <h5 class="text-secondary border-bottom pb-2 mb-3">2. Dados Pessoais & Contratuais</h5>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">{{ func_form.cpf.label_tag }} {{ func_form.cpf }}</div>
+                    <div class="col-md-3">{{ func_form.rg.label_tag }} {{ func_form.rg }}</div>
+                    <div class="col-md-3">{{ func_form.data_nascimento.label_tag }} {{ func_form.data_nascimento }}</div>
+                    <div class="col-md-3">{{ func_form.telefone.label_tag }} {{ func_form.telefone }}</div>
+                    
+                    <div class="col-md-6">{{ func_form.endereco.label_tag }} {{ func_form.endereco }}</div>
+                    <div class="col-md-2">{{ func_form.cep.label_tag }} {{ func_form.cep }}</div>
+                    
+                    <div class="col-md-4">{{ func_form.cargo.label_tag }} {{ func_form.cargo }}</div>
+                    <div class="col-md-4">{{ func_form.data_admissao.label_tag }} {{ func_form.data_admissao }}</div>
+                    <div class="col-md-4">{{ func_form.salario_base.label_tag }} 
+                        <div class="input-group">
+                            <span class="input-group-text">R$</span>
+                            {{ func_form.salario_base }}
+                        </div>
+                    </div>
+                </div>
+
+                <h5 class="text-secondary border-bottom pb-2 mb-3">3. Dados Bancários (Pagamento)</h5>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">{{ func_form.banco.label_tag }} {{ func_form.banco }}</div>
+                    <div class="col-md-2">{{ func_form.agencia.label_tag }} {{ func_form.agencia }}</div>
+                    <div class="col-md-3">{{ func_form.conta.label_tag }} {{ func_form.conta }}</div>
+                    <div class="col-md-3">{{ func_form.tipo_conta.label_tag }} {{ func_form.tipo_conta }}</div>
+                    <div class="col-md-4">{{ func_form.chave_pix.label_tag }} {{ func_form.chave_pix }}</div>
+                </div>
+
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <a href="{% url 'rh_dashboard' %}" class="btn btn-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-success px-5 fw-bold">Cadastrar Funcionário</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
