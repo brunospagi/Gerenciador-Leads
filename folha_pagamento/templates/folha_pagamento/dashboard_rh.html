@@ -3,12 +3,20 @@
 
 {% block content %}
 <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="fw-bold text-primary"><i class="fa fa-users me-2"></i> Gestão de RH e Folha</h3>
-        <a href="{% url 'rh_lancar_desconto' %}" class="btn btn-danger shadow-sm">
-            <i class="fa fa-minus-circle me-2"></i> Lançar Desconto / Vale
-        </a>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Painel de RH e Folha</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{% url 'lancar_desconto' %}" class="btn btn-sm btn-outline-danger">
+                <i class="fas fa-minus-circle"></i> Lançar Desconto
+            </a>
+            
+            <a href="{% url 'lancar_credito' %}" class="btn btn-sm btn-outline-success">
+                <i class="fas fa-plus-circle"></i> Lançar Bônus/Crédito
+            </a>
+        </div>
     </div>
+</div>
 
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-dark text-white">Processar Folha Mensal</div>

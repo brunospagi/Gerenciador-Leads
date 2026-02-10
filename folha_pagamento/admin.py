@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import FolhaPagamento, Desconto, ParcelaDesconto, Feriado
+from .models import FolhaPagamento, Desconto, ParcelaDesconto, Feriado, Credito, ParcelaCredito
 
 @admin.register(Feriado)
 class FeriadoAdmin(admin.ModelAdmin):
@@ -8,6 +8,20 @@ class FeriadoAdmin(admin.ModelAdmin):
     search_fields = ('descricao',)
     ordering = ('data',)
 
+# --- CRÉDITOS ---
+class ParcelaCreditoInline(admin.TabularInline):
+    model = ParcelaCredito
+    extra = 0
+    readonly_fields = ('processada_na_folha',)
+
+@admin.register(Credito)
+class CreditoAdmin(admin.ModelAdmin):
+    list_display = ('funcionario', 'tipo', 'valor_total', 'qtd_parcelas', 'data_lancamento')
+    list_filter = ('tipo', 'data_lancamento')
+    search_fields = ('funcionario__user__username', 'descricao')
+    inlines = [ParcelaCreditoInline]
+
+# --- DESCONTOS ---
 class ParcelaDescontoInline(admin.TabularInline):
     model = ParcelaDesconto
     extra = 0
@@ -22,7 +36,7 @@ class DescontoAdmin(admin.ModelAdmin):
 
 @admin.register(FolhaPagamento)
 class FolhaPagamentoAdmin(admin.ModelAdmin):
-    list_display = ('funcionario', 'mes', 'ano', 'salario_base', 'total_comissoes', 'salario_liquido', 'fechada', 'pago')
-    list_filter = ('mes', 'ano', 'fechada', 'pago')
+    list_display = ('funcionario', 'mes', 'ano', 'salario_base', 'total_comissoes', 'salario_liquido', 'fechada')
+    list_filter = ('mes', 'ano', 'fechada')
     search_fields = ('funcionario__user__username',)
     readonly_fields = ('data_geracao',)

@@ -1,8 +1,9 @@
 from django.urls import path
-from .views import dashboard_rh, lancar_desconto, detalhe_folha
+from . import views
 
 urlpatterns = [
-    path('', dashboard_rh, name='rh_dashboard'),
-    path('desconto/novo/', lancar_desconto, name='rh_lancar_desconto'),
-    path('folha/<int:pk>/', detalhe_folha, name='rh_detalhe_folha'),
+    path('dashboard/', views.dashboard_rh, name='rh_dashboard'),
+    path('lancar-desconto/', views.lancar_desconto, name='lancar_desconto'),
+    path('lancar-credito/', views.lancar_credito, name='lancar_credito'),
+    path('folha/<int:pk>/', views.detalhe_folha, name='detalhe_folha'),
 ]
