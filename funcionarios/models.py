@@ -27,6 +27,15 @@ class Funcionario(models.Model):
     salario_base = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Salário Base (R$)", validators=[MinValueValidator(0)])
     ativo = models.BooleanField(default=True, verbose_name="Colaborador Ativo?")
 
+    # === NOVOS CAMPOS VT ===
+    opta_vt = models.BooleanField(default=False, verbose_name="Opta por Vale Transporte?")
+    valor_diario_vt = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        default=0, 
+        verbose_name="Valor Diário VT (Ida+Volta)"
+    )
+
     # Dados Bancários
     banco = models.CharField(max_length=100, verbose_name="Nome do Banco")
     agencia = models.CharField(max_length=20, verbose_name="Agência")
@@ -34,7 +43,6 @@ class Funcionario(models.Model):
     tipo_conta = models.CharField(max_length=20, choices=TIPO_CONTA_CHOICES, default='CORRENTE', verbose_name="Tipo de Conta")
     chave_pix = models.CharField(max_length=100, blank=True, null=True, verbose_name="Chave Pix")
 
-    # === CORREÇÃO DE EXIBIÇÃO ===
     @property
     def nome_completo(self):
         """Retorna Nome Completo. Se vazio, retorna o Username (Login)."""
@@ -44,7 +52,6 @@ class Funcionario(models.Model):
         return self.user.username
 
     def __str__(self):
-        # Garante a exibição correta nos Dropdowns (Selects)
         return f"{self.nome_completo} - {self.cargo}"
 
     class Meta:

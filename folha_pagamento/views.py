@@ -110,7 +110,17 @@ def detalhe_folha(request, pk):
             'vencimentos': valor_ajuda, 'descontos': 0
         })
 
-    # 3. Descontos
+    # 3. Vale Transporte (Novo)
+    if folha.desconto_vt > 0:
+        itens_holerite.append({
+            'codigo': '105', 
+            'descricao': 'VALE TRANSPORTE (LEI)', 
+            'referencia': '6.00 %',
+            'vencimentos': 0, 
+            'descontos': folha.desconto_vt
+        })
+
+    # 4. Outros Descontos
     parcelas = ParcelaDesconto.objects.filter(
         desconto_pai__funcionario=folha.funcionario,
         mes_referencia=folha.mes, ano_referencia=folha.ano
