@@ -1,6 +1,9 @@
 from django import forms
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 from .models import VendaProduto, ParametrosComissao
+
+User = get_user_model()
 
 # --- FORMULÁRIO DE CONFIGURAÇÃO (ADMIN) ---
 class ParametrosComissaoForm(forms.ModelForm):
@@ -57,8 +60,9 @@ class VendaProdutoForm(forms.ModelForm):
 
     class Meta:
         model = VendaProduto
+        # Incluímos 'vendedor' na lista de campos possíveis
         fields = [
-            'tipo_produto', 'com_desconto', 'cliente_nome', 
+            'vendedor', 'tipo_produto', 'com_desconto', 'cliente_nome', 
             'modelo_veiculo', 'placa', 'cor', 'ano',
             'custo_base', 
             'valor_venda', 
@@ -69,6 +73,9 @@ class VendaProdutoForm(forms.ModelForm):
             'vendedor_ajudante' 
         ]
         widgets = {
+            # Widget especial para o admin selecionar o vendedor
+            'vendedor': forms.Select(attrs={'class': 'form-select fw-bold border-danger text-danger'}),
+            
             'data_venda': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control'}),
             'cliente_nome': forms.TextInput(attrs={'class': 'form-control'}),
             'modelo_veiculo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Onix LTZ 1.4'}),
@@ -120,15 +127,33 @@ class VendaProdutoForm(forms.ModelForm):
             css_classes = self.fields[field].widget.attrs.get('class', '')
             self.fields[field].widget = forms.TextInput(attrs={'class': f'form-control form-control-sm money-mask {css_classes}'})
 
-        # FILTRO DE OPÇÕES
+        # --- LÓGICA DE PERMISSÃO: ADMIN VÊ CAMPO VENDEDOR ---
+        is_admin = False
         is_consignador = False
+        
         if self.user:
             try:
                 nivel = getattr(self.user.profile, 'nivel_acesso', '')
+                if self.user.is_superuser or nivel == 'ADMIN':
+                    is_admin = True
                 if self.user.is_superuser or nivel == 'ADMIN' or nivel == 'CONSIGNADOR':
                     is_consignador = True
             except: pass
         
+        # Se for ADMIN, configura o campo vendedor para aparecer
+        if is_admin:
+            self.fields['vendedor'].required = True
+            self.fields['vendedor'].label = "VENDEDOR (LANÇAMENTO ADMINISTRATIVO)"
+            # Carrega todos os usuários ativos
+            self.fields['vendedor'].queryset = User.objects.filter(is_active=True).order_by('username')
+            # Se for uma nova venda, já deixa o Admin selecionado por padrão para facilitar
+            if not self.instance.pk:
+                self.fields['vendedor'].initial = self.user
+        else:
+            # Se não for admin, removemos o campo do formulário para evitar erros
+            if 'vendedor' in self.fields:
+                del self.fields['vendedor']
+
         if not is_consignador:
             novas_choices = [c for c in self.fields['tipo_produto'].choices if c[0] not in ['CONSIGNACAO', 'COMPRA']]
             self.fields['tipo_produto'].choices = novas_choices

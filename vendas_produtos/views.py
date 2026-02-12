@@ -27,7 +27,6 @@ class ConfiguracaoComissaoView(LoginRequiredMixin, UpdateView):
         return ParametrosComissao.get_solo()
 
     def dispatch(self, request, *args, **kwargs):
-        # Apenas ADMIN pode acessar
         if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
             messages.error(request, "Acesso restrito ao Administrador.")
             return redirect('venda_produto_list')
@@ -44,17 +43,30 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
     context_object_name = 'vendas'
     paginate_by = 20
 
-    def get_periodo_mes_atual(self):
+    # --- ALTERAÇÃO: Método dinâmico para pegar o mês da URL ou o atual ---
+    def get_periodo(self):
+        data_inicio_str = self.request.GET.get('data_inicio')
         hoje = timezone.now().date()
-        data_inicio = hoje.replace(day=1)
-        ultimo_dia = calendar.monthrange(hoje.year, hoje.month)[1]
-        data_fim = hoje.replace(day=ultimo_dia)
+        
+        if data_inicio_str:
+            try:
+                data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date().replace(day=1)
+            except ValueError:
+                data_inicio = hoje.replace(day=1)
+        else:
+            data_inicio = hoje.replace(day=1)
+            
+        ultimo_dia = calendar.monthrange(data_inicio.year, data_inicio.month)[1]
+        data_fim = data_inicio.replace(day=ultimo_dia)
         return data_inicio, data_fim
 
     def get_queryset(self):
         user = self.request.user
         qs = VendaProduto.objects.all().select_related('vendedor', 'gerente', 'vendedor_ajudante')
-        data_inicio, data_fim = self.get_periodo_mes_atual()
+        
+        # Usa o novo método get_periodo
+        data_inicio, data_fim = self.get_periodo()
+        
         qs = qs.filter(data_venda__range=[data_inicio, data_fim])
         is_gestor = user.is_superuser or getattr(user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
         if not is_gestor:
@@ -64,7 +76,16 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        data_inicio, data_fim = self.get_periodo_mes_atual()
+        
+        # Usa o novo método get_periodo
+        data_inicio, data_fim = self.get_periodo()
+        
+        # Lógica de Navegação (Mês Anterior / Próximo)
+        mes_anterior = data_inicio - relativedelta(months=1)
+        proximo_mes = data_inicio + relativedelta(months=1)
+        context['nav_anterior'] = mes_anterior.replace(day=1).strftime('%Y-%m-%d')
+        context['nav_proximo'] = proximo_mes.replace(day=1).strftime('%Y-%m-%d')
+
         context['periodo_inicio'] = data_inicio
         context['periodo_fim'] = data_fim
 
@@ -110,7 +131,12 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         main_venda = form.instance
-        main_venda.vendedor = self.request.user
+        
+        # Se o form trouxe um vendedor (Admin escolheu), usamos ele.
+        # Se não (vendedor comum), forçamos o usuário logado.
+        if not main_venda.vendedor_id:
+            main_venda.vendedor = self.request.user
+            
         response = super().form_valid(form)
         
         if main_venda.tipo_produto == 'VENDA_VEICULO':
@@ -122,7 +148,7 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
                     custo = form.cleaned_data.get(custo_field) or Decimal('0.00') if custo_field else Decimal('0.00')
                     if valor > 0 and metodo_key:
                         nova_venda = VendaProduto(
-                            vendedor=self.request.user,
+                            vendedor=main_venda.vendedor, 
                             tipo_produto=tipo_prod,
                             cliente_nome=main_venda.cliente_nome,
                             placa=main_venda.placa,
@@ -145,8 +171,9 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
             c2 = processar_adicional('SEGURO', 'adicional_seguro', 'valor_seguro', 'metodo_seguro')
             c3 = processar_adicional('TRANSFERENCIA', 'adicional_transferencia', 'valor_transferencia', 'metodo_transferencia', custo_field='custo_transferencia')
             total_extras = c1 + c2 + c3
-            if total_extras > 0: messages.success(self.request, f"Venda principal + {total_extras} adicionais registrados!")
-            else: messages.success(self.request, "Venda registrada com sucesso!")
+            msg_autor = f" para {main_venda.vendedor.get_full_name() or main_venda.vendedor.username}" if self.request.user != main_venda.vendedor else ""
+            if total_extras > 0: messages.success(self.request, f"Venda principal + {total_extras} adicionais registrados{msg_autor}!")
+            else: messages.success(self.request, f"Venda registrada com sucesso{msg_autor}!")
         else:
             messages.success(self.request, "Lançamento registrado com sucesso!")
         return response
@@ -208,7 +235,6 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
     template_name = 'vendas_produtos/relatorio.html'
     
     def dispatch(self, request, *args, **kwargs):
-        # MANTIDO: Apenas ADMIN tem acesso, Gerente NÃO.
         if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
             messages.error(request, "Acesso restrito ao Administrador.")
             return redirect('venda_produto_list')
@@ -218,12 +244,14 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         data_inicio_str = self.request.GET.get('data_inicio')
         data_fim_str = self.request.GET.get('data_fim')
-        vendedor_id = self.request.GET.get('vendedor')
+        vendedor_id_filter = self.request.GET.get('vendedor')
 
         hoje = timezone.now().date()
         data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje.replace(day=1)
-        if data_fim_str: data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
-        else: data_fim = data_inicio.replace(day=calendar.monthrange(data_inicio.year, data_inicio.month)[1])
+        if data_fim_str: 
+            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+        else: 
+            data_fim = data_inicio.replace(day=calendar.monthrange(data_inicio.year, data_inicio.month)[1])
 
         context['periodo_inicio_str'] = data_inicio.strftime('%Y-%m-%d')
         context['periodo_fim_str'] = data_fim.strftime('%Y-%m-%d')
@@ -234,31 +262,61 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         context['nav_anterior_inicio'] = mes_anterior.replace(day=1).strftime('%Y-%m-%d')
         context['nav_proximo_inicio'] = proximo_mes.replace(day=1).strftime('%Y-%m-%d')
 
+        # Base Query
         qs_base = VendaProduto.objects.filter(data_venda__range=[data_inicio, data_fim])
-        if vendedor_id: qs_base = qs_base.filter(vendedor_id=vendedor_id)
+        
+        # Filtro de Vendedor (Opcional)
+        if vendedor_id_filter:
+            vid = int(vendedor_id_filter)
+            qs_base = qs_base.filter(Q(vendedor_id=vid) | Q(vendedor_ajudante_id=vid))
 
+        # Totais Gerais da Loja (Independente de quem vendeu, soma tudo)
         context['total_geral_loja'] = qs_base.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
-        context['total_geral_comissao'] = qs_base.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
+        
+        # Total de comissão paga (Soma comissão titular + comissão ajudante)
+        total_comissao_titular = qs_base.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
+        total_comissao_ajudante = qs_base.aggregate(Sum('comissao_ajudante'))['comissao_ajudante__sum'] or 0
+        context['total_geral_comissao'] = total_comissao_titular + total_comissao_ajudante
+
         context['total_geral_bruto'] = qs_base.aggregate(Sum('valor_venda'))['valor_venda__sum'] or 0
         context['qtd_vendas'] = qs_base.count()
 
-        vendedores_ids = list(set(qs_base.values_list('vendedor', flat=True)))
+        # --- LÓGICA DE AGRUPAMENTO POR VENDEDOR ---
+        if vendedor_id_filter:
+            ids_para_processar = [int(vendedor_id_filter)]
+        else:
+            ids_titulares = set(qs_base.values_list('vendedor', flat=True))
+            ids_ajudantes = set(qs_base.values_list('vendedor_ajudante', flat=True))
+            ids_para_processar = list(ids_titulares | ids_ajudantes)
+            if None in ids_para_processar: ids_para_processar.remove(None)
+        
         relatorio_vendedores = []
-        for vid in vendedores_ids:
-            # Correção para garantir que o loop respeite a data e mostre apenas os dados relevantes
-            vendas_vendedor = list(VendaProduto.objects.filter(vendedor_id=vid, data_venda__range=[data_inicio, data_fim]).order_by('data_venda'))
+        
+        for vid in ids_para_processar:
             vendedor_obj = User.objects.filter(pk=vid).first()
-            if vendedor_obj and vendas_vendedor:
-                relatorio_vendedores.append({
-                    'vendedor': vendedor_obj,
-                    'vendas': vendas_vendedor,
-                    'total_comissao': sum(v.comissao_vendedor for v in vendas_vendedor)
-                })
+            if vendedor_obj:
+                vendas_titular = qs_base.filter(vendedor_id=vid)
+                soma_titular = vendas_titular.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
+                
+                vendas_ajudante = qs_base.filter(vendedor_ajudante_id=vid)
+                soma_ajudante = vendas_ajudante.aggregate(Sum('comissao_ajudante'))['comissao_ajudante__sum'] or 0
+                
+                todas_vendas = list(vendas_titular) + list(vendas_ajudante)
+                todas_vendas.sort(key=lambda x: x.data_venda)
+
+                total_geral = soma_titular + soma_ajudante
+                
+                if todas_vendas:
+                    relatorio_vendedores.append({
+                        'vendedor': vendedor_obj,
+                        'vendas': todas_vendas,
+                        'total_comissao': total_geral
+                    })
         
         relatorio_vendedores.sort(key=lambda x: x['vendedor'].get_full_name() or x['vendedor'].username)
         context['relatorio_vendedores'] = relatorio_vendedores
-        context['lista_vendedores'] = User.objects.filter(id__in=set(VendaProduto.objects.values_list('vendedor', flat=True))).order_by('username')
-        context['vendedor_selecionado'] = int(vendedor_id) if vendedor_id else None
+        context['lista_vendedores'] = User.objects.filter(id__in=ids_para_processar).order_by('username')
+        context['vendedor_selecionado'] = int(vendedor_id_filter) if vendedor_id_filter else None
         context['periodo_inicio'] = data_inicio
         context['periodo_fim'] = data_fim
         return context
@@ -336,7 +394,6 @@ def toggle_fechamento_mes(request):
                 messages.warning(request, f"Mês {mes}/{ano} REABERTO.")
     
     try:
-        # CORREÇÃO CRÍTICA: Converte reverse_lazy para string antes de concatenar
         base_url = str(reverse_lazy('venda_produto_relatorio'))
         url = base_url + f"?data_inicio={ano}-{int(mes):02d}-01"
         return redirect(url)

@@ -3,18 +3,34 @@
 
 {% block content %}
 <div class="container-fluid mt-3">
+    {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+    {# --- BARRA DE NAVEGAÇÃO DE DATA --- #}
     <div class="alert alert-light border shadow-sm d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <i class="fa fa-calendar-alt text-primary me-2"></i> 
-            <strong>Período:</strong> {{ periodo_inicio|date:"d/m" }} a {{ periodo_fim|date:"d/m/Y" }}
+        <div class="d-flex align-items-center">
+            <a href="?data_inicio={{ nav_anterior }}" class="btn btn-outline-secondary btn-sm me-2" title="Mês Anterior">
+                <i class="fa fa-chevron-left"></i>
+            </a>
+            
+            <div class="text-center px-3">
+                <div class="fw-bold text-uppercase text-dark" style="letter-spacing: 1px;">
+                    <i class="fa fa-calendar-alt text-primary me-2"></i>{{ periodo_inicio|date:"F Y" }}
+                </div>
+                <small class="text-muted" style="font-size: 0.8rem;">
+                    {{ periodo_inicio|date:"d/m" }} a {{ periodo_fim|date:"d/m" }}
+                </small>
+            </div>
+
+            <a href="?data_inicio={{ nav_proximo }}" class="btn btn-outline-secondary btn-sm ms-2" title="Próximo Mês">
+                <i class="fa fa-chevron-right"></i>
+            </a>
         </div>
         
-        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
         <div>
             <a href="{% url 'configuracao_comissao' %}" class="btn btn-outline-dark btn-sm me-2">
                 <i class="fa fa-cogs me-2"></i> Configurações
             </a>
-            <a href="{% url 'venda_produto_relatorio' %}" class="btn btn-dark btn-sm">
+            {# Mantém o parâmetro de data ao ir para o relatório #}
+            <a href="{% url 'venda_produto_relatorio' %}?data_inicio={{ periodo_inicio|date:'Y-m-d' }}" class="btn btn-dark btn-sm">
                 <i class="fa fa-file-invoice-dollar me-2"></i> Relatório
             </a>
         </div>
@@ -68,9 +84,17 @@
                         {% for item in vendas %}
                         <tr class="{% if item.status == 'REJEITADO' %}table-danger bg-opacity-10{% endif %}">
                             <td>{{ item.data_venda|date:"d/m/y" }}</td>
+                            
+                            {# --- Coluna Vendedor (Apenas Gestores) --- #}
                             {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
-                            <td>{{ item.vendedor.get_full_name|default:item.vendedor.username }}</td>
+                            <td>
+                                {{ item.vendedor.get_full_name|default:item.vendedor.username }}
+                                {% if item.vendedor_ajudante %}
+                                    <br><small class="text-muted"><i class="fa fa-handshake"></i> c/ {{ item.vendedor_ajudante.first_name }}</small>
+                                {% endif %}
+                            </td>
                             {% endif %}
+                            
                             <td>
                                 <div class="fw-bold">{{ item.get_tipo_produto_display }}</div>
                                 {% if item.tipo_produto != 'CONSIGNACAO' and item.tipo_produto != 'COMPRA' %}
@@ -78,10 +102,30 @@
                                 {% else %}
                                     <span class="badge bg-warning text-dark border">Processo Interno</span>
                                 {% endif %}
+                                
+                                {# --- Mostra quem foi ajudado se eu for o ajudante --- #}
+                                {% if item.vendedor_ajudante_id == user.id %}
+                                    <div class="mt-1 small text-primary fw-bold"><i class="fa fa-exchange-alt"></i> Split com {{ item.vendedor.first_name }}</div>
+                                {% endif %}
+
                                 {% if item.numero_apolice %}<div class="mt-1 small border-top pt-1"><strong>Apólice:</strong> {{ item.numero_apolice }} <a href="{{ item.arquivo_apolice.url }}" target="_blank" class="text-danger ms-1 fw-bold"><i class="fa fa-file-pdf"></i> PDF</a></div>{% endif %}
                             </td>
                             <td><strong>{{ item.cliente_nome }}</strong><br><small class="text-muted">{{ item.placa }}</small></td>
-                            <td><small>Venda: {{ item.valor_venda }}</small><br><strong class="text-success">Com: {{ item.comissao_vendedor }}</strong></td>
+                            
+                            {# --- LÓGICA DE EXIBIÇÃO DA COMISSÃO --- #}
+                            <td>
+                                <small>Venda: {{ item.valor_venda }}</small><br>
+                                
+                                {% if item.vendedor_ajudante_id == user.id %}
+                                    {# Sou o Ajudante: Mostra Minha Comissão #}
+                                    <strong class="text-primary">Com: {{ item.comissao_ajudante }}</strong>
+                                    <span class="badge bg-info text-dark ms-1" style="font-size: 0.6em;">AJUDA</span>
+                                {% else %}
+                                    {# Sou o Titular ou Gestor: Mostra Comissão do Vendedor #}
+                                    <strong class="text-success">Com: {{ item.comissao_vendedor }}</strong>
+                                {% endif %}
+                            </td>
+
                             <td>
                                 {% if item.status == 'APROVADO' %}<span class="badge bg-success"><i class="fa fa-check"></i> Aprovado</span>
                                 {% elif item.status == 'REJEITADO' %}<span class="badge bg-danger"><i class="fa fa-times"></i> Rejeitado</span>
@@ -90,10 +134,13 @@
                             <td class="text-end">
                                 {% if item.comprovante %}<button class="btn btn-sm btn-info text-white" data-bs-toggle="modal" data-bs-target="#modalComprovante{{ item.pk }}" title="Ver Comprovante"><i class="fa fa-eye"></i></button>{% endif %}
                                 <a href="{% url 'venda_produto_print' item.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Imprimir"><i class="fa fa-print"></i></a>
+                                
+                                {# Permite editar se não estiver aprovado, ou se for admin #}
                                 {% if item.status != 'APROVADO' or user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
                                     <a href="{% url 'venda_produto_update' item.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fa fa-pencil-alt"></i></a>
                                     <a href="{% url 'venda_produto_delete' item.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fa fa-trash"></i></a>
                                 {% endif %}
+                                
                                 {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
                                     {% if item.status == 'PENDENTE' %}
                                         <div class="vr mx-1"></div>

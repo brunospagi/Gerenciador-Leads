@@ -35,8 +35,8 @@
             <div class="alert alert-danger rounded-3 mb-4 shadow-sm">{{ form.non_field_errors }}</div>
         {% endif %}
 
-        {% if not form.instance.pk %} 
-        <div class="clean-card text-center py-4 mode-selector" id="div-mode-selector">
+        {# Seletor de Modo (Oculto se for edição) #}
+        <div class="clean-card text-center py-4 mode-selector" id="div-mode-selector" {% if form.instance.pk %}style="display:none;"{% endif %}>
             <h5 class="fw-bold text-muted mb-3 text-uppercase small ls-1">Selecione o Tipo de Operação</h5>
             <div class="btn-group w-100 px-3" role="group">
                 <input type="radio" class="btn-check" name="modo_venda" id="modo_veiculo" autocomplete="off">
@@ -57,7 +57,6 @@
                 <label class="btn btn-outline-light text-dark rounded-end" for="modo_servico"><i class="fa fa-file-contract fa-2x d-block mb-2 text-secondary"></i><span class="fw-bold small">SERVIÇO</span></label>
             </div>
         </div>
-        {% endif %}
 
         <div class="clean-card text-center py-3 mb-4 bg-light-subtle border-info" id="div-selector-interno" style="display:none; border: 1px dashed #17a2b8;">
             <h6 class="fw-bold text-info mb-3 text-uppercase">Qual a modalidade da Captação?</h6>
@@ -80,6 +79,15 @@
         <div class="clean-card">
             <div class="clean-header"><i class="fa fa-user-circle"></i> Dados Gerais</div>
             <div class="clean-body">
+                {# --- SE FOR ADMIN, EXIBE O SELETOR DE VENDEDOR --- #}
+                {% if form.vendedor %}
+                <div class="alert alert-danger border-danger mb-4 shadow-sm">
+                    <div class="mb-2 fw-bold text-uppercase"><i class="fa fa-user-cog me-2"></i>Lançamento Administrativo</div>
+                    <label class="form-label small text-muted mb-1">Selecione o dono da venda:</label>
+                    {{ form.vendedor }}
+                </div>
+                {% endif %}
+
                 <div class="row g-3">
                     <div class="col-md-3">
                         <label class="form-label fw-bold small text-uppercase text-muted">Data</label>
@@ -191,6 +199,48 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- INICIALIZAÇÃO ROBUSTA DO MODO (CORREÇÃO DE EDIÇÃO) ---
+    // Lê o valor salvo no banco e marca o radio correto antes da tela carregar
+    const tipoSelectInit = document.getElementById('id_tipo_produto');
+    const valorInicial = tipoSelectInit ? tipoSelectInit.value : '';
+
+    if (valorInicial) {
+        // Remove seleção padrão/anterior
+        if(document.getElementById('modo_veiculo')) document.getElementById('modo_veiculo').checked = false;
+        if(document.getElementById('modo_moto')) document.getElementById('modo_moto').checked = false;
+        if(document.getElementById('modo_captacao')) document.getElementById('modo_captacao').checked = false;
+        if(document.getElementById('modo_refin')) document.getElementById('modo_refin').checked = false;
+        if(document.getElementById('modo_servico')) document.getElementById('modo_servico').checked = false;
+
+        // Marca o botão correto
+        if (valorInicial === 'VENDA_VEICULO' && document.getElementById('modo_veiculo')) {
+            document.getElementById('modo_veiculo').checked = true;
+            if(document.getElementById('div-mode-selector')) document.getElementById('div-mode-selector').style.display = 'block';
+
+        } else if (valorInicial === 'VENDA_MOTO' && document.getElementById('modo_moto')) {
+            document.getElementById('modo_moto').checked = true;
+            if(document.getElementById('div-mode-selector')) document.getElementById('div-mode-selector').style.display = 'block';
+        
+        } else if (valorInicial === 'REFINANCIAMENTO' && document.getElementById('modo_refin')) {
+            document.getElementById('modo_refin').checked = true;
+            if(document.getElementById('div-mode-selector')) document.getElementById('div-mode-selector').style.display = 'block';
+        
+        } else if (['CONSIGNACAO', 'COMPRA'].includes(valorInicial)) {
+            if(document.getElementById('modo_captacao')) document.getElementById('modo_captacao').checked = true;
+            if(valorInicial === 'CONSIGNACAO' && document.getElementById('opt_consignacao')) document.getElementById('opt_consignacao').checked = true;
+            if(valorInicial === 'COMPRA' && document.getElementById('opt_compra')) document.getElementById('opt_compra').checked = true;
+            if(document.getElementById('div-mode-selector')) document.getElementById('div-mode-selector').style.display = 'block';
+        
+        } else if (['GARANTIA', 'SEGURO', 'TRANSFERENCIA'].includes(valorInicial)) {
+            if(document.getElementById('modo_servico')) document.getElementById('modo_servico').checked = true;
+            const fakeSelect = document.getElementById('fake_tipo_select');
+            if(fakeSelect) fakeSelect.value = valorInicial;
+            if(document.getElementById('div-mode-selector')) document.getElementById('div-mode-selector').style.display = 'block';
+        }
+    }
+    // -----------------------------------------------------------
+
     const moneyInputs = document.querySelectorAll('.money-mask');
     function mascaraMoeda(event) {
         const value = event.target.value.replace(/\D/g, ""); 
@@ -277,11 +327,14 @@ document.addEventListener('DOMContentLoaded', function() {
         let mode = 'SERVICO';
         const val = realTipoSelect ? realTipoSelect.value : ''; 
 
+        // Ordem de prioridade
         if (modoVeiculoBtn && modoVeiculoBtn.checked) mode = 'VEICULO';
         else if (modoMotoBtn && modoMotoBtn.checked) mode = 'MOTO';
         else if (modoCaptacaoBtn && modoCaptacaoBtn.checked) mode = 'CAPTACAO';
         else if (modoRefinBtn && modoRefinBtn.checked) mode = 'REFIN';
         else if (modoServicoBtn && modoServicoBtn.checked) mode = 'SERVICO';
+        
+        // Fallback
         else if (val === 'CONSIGNACAO' || val === 'COMPRA') {
             mode = 'CAPTACAO';
             if(modoCaptacaoBtn) modoCaptacaoBtn.checked = true;
@@ -307,7 +360,6 @@ document.addEventListener('DOMContentLoaded', function() {
         divDescontoContainer.style.display = 'none';
         divSelectorInterno.style.display = 'none';
         alertConsignacao.style.display = 'none';
-        if (divModeSelector) divModeSelector.style.display = 'block';
 
         if (mode !== 'REFIN') {
             if(inputBancoReal) inputBancoReal.required = false;
@@ -373,12 +425,21 @@ document.addEventListener('DOMContentLoaded', function() {
             if(inputValorVendaReal) inputValorVendaReal.required = true;
 
         } else {
-            if(realTipoSelect) realTipoSelect.value = fakeTipoSelect.value;
+            // SERVICO (Default ou específico)
+            if(realTipoSelect && ['GARANTIA','SEGURO','TRANSFERENCIA'].includes(realTipoSelect.value)) {
+                // Mantem
+            } else {
+                realTipoSelect.value = fakeTipoSelect.value;
+            }
+            
             divSelectTipo.style.display = 'block';
             labelVeiculoDisplay.style.display = 'none';
             labelFinanceiro.innerText = "Pagamento do Serviço";
             cardFinanceiroPadrao.style.display = 'block';
             if(inputValorVendaReal && targetPadraoValorVenda) targetPadraoValorVenda.appendChild(inputValorVendaReal);
+            
+            if(fakeTipoSelect && realTipoSelect) fakeTipoSelect.value = realTipoSelect.value;
+            
             checkCustoVisibility(fakeTipoSelect.value);
             updateModalUI(true); 
             if(inputValorVendaReal) inputValorVendaReal.required = true;

@@ -216,11 +216,25 @@
                                     {% if venda.com_desconto %}
                                         <span class="badge bg-danger mt-1" style="font-size: 0.6rem;">COM DESCONTO</span>
                                     {% endif %}
+                                    
+                                    {% if venda.vendedor_ajudante == item.vendedor %}
+                                        <div class="small text-primary fst-italic mt-1">
+                                            <i class="fa fa-handshake"></i> Split com {{ venda.vendedor.first_name }}
+                                        </div>
+                                    {% endif %}
                                 </td>
                                 <td class="align-middle">{{ venda.cliente_nome|truncatechars:25 }}</td>
                                 <td class="small align-middle text-muted">{{ venda.resumo_pagamento }}</td> 
                                 <td class="text-end align-middle">R$ {{ venda.valor_venda|floatformat:2 }}</td>
-                                <td class="text-end align-middle fw-bold text-success pe-3">R$ {{ venda.comissao_vendedor|floatformat:2 }}</td>
+                                
+                                <td class="text-end align-middle fw-bold pe-3">
+                                    {% if venda.vendedor_ajudante == item.vendedor %}
+                                        <span class="text-primary">R$ {{ venda.comissao_ajudante|floatformat:2 }}</span>
+                                        <span class="badge bg-light text-primary border border-primary ms-1" style="font-size: 0.6rem;">AJUDA</span>
+                                    {% else %}
+                                        <span class="text-success">R$ {{ venda.comissao_vendedor|floatformat:2 }}</span>
+                                    {% endif %}
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
