@@ -4,8 +4,9 @@ from django.contrib import messages
 from django.db.models import Sum, Count
 from django.utils import timezone
 import calendar
-from datetime import date
+from datetime import datetime, date
 from decimal import Decimal
+from dateutil.relativedelta import relativedelta
 
 from .models import FolhaPagamento, Desconto, ParcelaDesconto, Credito, ParcelaCredito
 from funcionarios.models import Funcionario
@@ -56,13 +57,16 @@ def lancar_desconto(request):
         if form.is_valid():
             form.save()
             messages.success(request, "Desconto lançado com sucesso.")
-            return redirect('rh_dashboard')
+            return redirect('rh_lista_lancamentos') # Redireciona para a lista
     else:
         form = LancarDescontoForm()
     
     return render(request, 'folha_pagamento/form_desconto.html', {
         'form': form, 
-        'titulo': 'Lançar Débito/Desconto'
+        'titulo': 'Lançar Débito/Desconto',
+        'cor_card': 'danger',      # Define cor Vermelha
+        'icone': 'fa-minus-circle',
+        'btn_label': 'Confirmar Desconto'
     })
 
 @login_required
@@ -73,13 +77,63 @@ def lancar_credito(request):
         if form.is_valid():
             form.save()
             messages.success(request, "Crédito/Bônus lançado com sucesso.")
-            return redirect('rh_dashboard')
+            return redirect('rh_lista_lancamentos') # Redireciona para a lista
     else:
         form = LancarCreditoForm()
     
+    # Reutiliza o template, mas muda as cores e textos
     return render(request, 'folha_pagamento/form_desconto.html', {
         'form': form, 
-        'titulo': 'Lançar Crédito/Bônus'
+        'titulo': 'Lançar Crédito/Bônus',
+        'cor_card': 'success',     # Define cor Verde
+        'icone': 'fa-plus-circle',
+        'btn_label': 'Confirmar Crédito'
+    })
+
+@login_required
+@user_passes_test(is_admin_financeiro)
+def lista_lancamentos_manuais(request):
+    # Filtro de Data
+    data_inicio_str = request.GET.get('data_inicio')
+    hoje = timezone.now().date()
+    
+    if data_inicio_str:
+        try:
+            data_referencia = datetime.strptime(data_inicio_str, '%Y-%m-%d').date().replace(day=1)
+        except ValueError:
+            data_referencia = hoje.replace(day=1)
+    else:
+        data_referencia = hoje.replace(day=1)
+
+    mes = data_referencia.month
+    ano = data_referencia.year
+
+    # Navegação
+    mes_anterior = data_referencia - relativedelta(months=1)
+    proximo_mes = data_referencia + relativedelta(months=1)
+
+    # Buscando as PARCELAS que caem neste mês (pois é isso que vai pra folha)
+    descontos = ParcelaDesconto.objects.filter(
+        mes_referencia=mes, 
+        ano_referencia=ano
+    ).select_related('desconto_pai', 'desconto_pai__funcionario')
+
+    creditos = ParcelaCredito.objects.filter(
+        mes_referencia=mes, 
+        ano_referencia=ano
+    ).select_related('credito_pai', 'credito_pai__funcionario')
+
+    total_descontos = descontos.aggregate(Sum('valor'))['valor__sum'] or 0
+    total_creditos = creditos.aggregate(Sum('valor'))['valor__sum'] or 0
+
+    return render(request, 'folha_pagamento/lista_lancamentos.html', {
+        'descontos': descontos,
+        'creditos': creditos,
+        'total_descontos': total_descontos,
+        'total_creditos': total_creditos,
+        'data_referencia': data_referencia,
+        'nav_anterior': mes_anterior.strftime('%Y-%m-%d'),
+        'nav_proximo': proximo_mes.strftime('%Y-%m-%d'),
     })
 
 @login_required
@@ -94,7 +148,7 @@ def detalhe_folha(request, pk):
     # --- FORÇA O RECÁLCULO PARA ATUALIZAR VALORES (SE A FOLHA ESTIVER ABERTA) ---
     if not folha.fechada:
         folha.calcular_folha()
-        folha.refresh_from_db() # Recarrega do banco para pegar o valor atualizado pelo calcular_folha
+        folha.refresh_from_db() 
 
     itens_holerite = []
     
@@ -215,7 +269,7 @@ def detalhe_folha(request, pk):
             'vencimentos': 0, 'descontos': p.valor
         })
 
-    # Totalizadores para exibição (Usa os valores REAIS do banco)
+    # Totalizadores para exibição
     total_vencimentos = folha.salario_base + folha.total_comissoes + folha.credito_vt + folha.total_creditos_manuais
     
     return render(request, 'folha_pagamento/detalhe_folha.html', {

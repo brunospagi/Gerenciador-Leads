@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold text-secondary"><i class="fa fa-clipboard-list me-2"></i>Lançamentos Manuais</h4>
+            <p class="text-muted small mb-0">Gestão de Créditos e Débitos na Folha</p>
+        </div>
+        <div>
+            <a href="{% url 'rh_lancar_credito' %}" class="btn btn-success btn-sm fw-bold"><i class="fa fa-plus-circle"></i> Novo Crédito</a>
+            <a href="{% url 'rh_lancar_desconto' %}" class="btn btn-danger btn-sm fw-bold ms-2"><i class="fa fa-minus-circle"></i> Novo Desconto</a>
+            <a href="{% url 'rh_dashboard' %}" class="btn btn-outline-secondary btn-sm ms-2">Voltar Dashboard</a>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body py-2 d-flex justify-content-between align-items-center bg-light rounded">
+            <a href="?data_inicio={{ nav_anterior }}" class="btn btn-outline-secondary btn-sm"><i class="fa fa-chevron-left"></i> Anterior</a>
+            <h5 class="fw-bold text-uppercase mb-0 text-primary">{{ data_referencia|date:"F Y" }}</h5>
+            <a href="?data_inicio={{ nav_proximo }}" class="btn btn-outline-secondary btn-sm">Próximo <i class="fa fa-chevron-right"></i></a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100 border-success border-top border-3">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold text-success mb-0"><i class="fa fa-arrow-up me-2"></i>Créditos / Bônus</h6>
+                    <span class="badge bg-success">Total: R$ {{ total_creditos|floatformat:2 }}</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" style="font-size: 0.9rem;">
+                        <thead class="table-light text-secondary">
+                            <tr>
+                                <th>Colaborador</th>
+                                <th>Desc.</th>
+                                <th>Parc.</th>
+                                <th class="text-end">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in creditos %}
+                            <tr>
+                                <td class="fw-bold">{{ item.credito_pai.funcionario.user.username }}</td>
+                                <td>
+                                    <div class="text-dark small fw-bold">{{ item.credito_pai.get_tipo_display }}</div>
+                                    <small class="text-muted">{{ item.credito_pai.descricao|truncatechars:20 }}</small>
+                                </td>
+                                <td>{{ item.numero_parcela }}/{{ item.credito_pai.qtd_parcelas }}</td>
+                                <td class="text-end fw-bold text-success">R$ {{ item.valor|floatformat:2 }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center text-muted py-3">Nenhum crédito neste mês.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100 border-danger border-top border-3">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold text-danger mb-0"><i class="fa fa-arrow-down me-2"></i>Débitos / Descontos</h6>
+                    <span class="badge bg-danger">Total: R$ {{ total_descontos|floatformat:2 }}</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" style="font-size: 0.9rem;">
+                        <thead class="table-light text-secondary">
+                            <tr>
+                                <th>Colaborador</th>
+                                <th>Desc.</th>
+                                <th>Parc.</th>
+                                <th class="text-end">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in descontos %}
+                            <tr>
+                                <td class="fw-bold">{{ item.desconto_pai.funcionario.user.username }}</td>
+                                <td>
+                                    <div class="text-dark small fw-bold">{{ item.desconto_pai.get_tipo_display }}</div>
+                                    <small class="text-muted">{{ item.desconto_pai.descricao|truncatechars:20 }}</small>
+                                </td>
+                                <td>{{ item.numero_parcela }}/{{ item.desconto_pai.qtd_parcelas }}</td>
+                                <td class="text-end fw-bold text-danger">R$ {{ item.valor|floatformat:2 }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center text-muted py-3">Nenhum desconto neste mês.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="container-fluid mt-3">
-    {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+    
     {# --- BARRA DE NAVEGAÇÃO DE DATA --- #}
     <div class="alert alert-light border shadow-sm d-flex justify-content-between align-items-center mb-4">
         <div class="d-flex align-items-center">
@@ -25,11 +25,11 @@
             </a>
         </div>
         
+        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
         <div>
             <a href="{% url 'configuracao_comissao' %}" class="btn btn-outline-dark btn-sm me-2">
                 <i class="fa fa-cogs me-2"></i> Configurações
             </a>
-            {# Mantém o parâmetro de data ao ir para o relatório #}
             <a href="{% url 'venda_produto_relatorio' %}?data_inicio={{ periodo_inicio|date:'Y-m-d' }}" class="btn btn-dark btn-sm">
                 <i class="fa fa-file-invoice-dollar me-2"></i> Relatório
             </a>
@@ -73,7 +73,7 @@
                         <tr>
                             <th>Data</th>
                             {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}<th>Vendedor</th>{% endif %}
-                            <th>Produto / Apólice</th>
+                            <th>Produto / Veículo</th>
                             <th>Cliente</th>
                             <th>Valores</th>
                             <th>Status</th>
@@ -97,11 +97,27 @@
                             
                             <td>
                                 <div class="fw-bold">{{ item.get_tipo_produto_display }}</div>
+                                
+                                {# --- NOVA EXIBIÇÃO: MODELO, ANO E PLACA --- #}
+                                {% if item.modelo_veiculo %}
+                                    <div class="mt-1" style="line-height: 1.2;">
+                                        <span class="fw-bold text-dark">{{ item.modelo_veiculo }}</span>
+                                        <span class="text-muted small mx-1">|</span> 
+                                        <span class="text-muted small">{{ item.ano }}</span>
+                                        <div class="badge bg-light text-primary border mt-1" style="font-size: 0.75em;">
+                                            {{ item.placa }}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                {# ------------------------------------------ #}
+
+                                <div class="mt-2">
                                 {% if item.tipo_produto != 'CONSIGNACAO' and item.tipo_produto != 'COMPRA' %}
                                     <span class="badge bg-light text-dark border">{{ item.resumo_pagamento|truncatechars:30 }}</span>
                                 {% else %}
                                     <span class="badge bg-warning text-dark border">Processo Interno</span>
                                 {% endif %}
+                                </div>
                                 
                                 {# --- Mostra quem foi ajudado se eu for o ajudante --- #}
                                 {% if item.vendedor_ajudante_id == user.id %}
@@ -110,7 +126,11 @@
 
                                 {% if item.numero_apolice %}<div class="mt-1 small border-top pt-1"><strong>Apólice:</strong> {{ item.numero_apolice }} <a href="{{ item.arquivo_apolice.url }}" target="_blank" class="text-danger ms-1 fw-bold"><i class="fa fa-file-pdf"></i> PDF</a></div>{% endif %}
                             </td>
-                            <td><strong>{{ item.cliente_nome }}</strong><br><small class="text-muted">{{ item.placa }}</small></td>
+                            
+                            {# --- Cliente (Removido Placa daqui) --- #}
+                            <td>
+                                <strong>{{ item.cliente_nome }}</strong>
+                            </td>
                             
                             {# --- LÓGICA DE EXIBIÇÃO DA COMISSÃO --- #}
                             <td>
