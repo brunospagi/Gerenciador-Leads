@@ -43,7 +43,6 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
     context_object_name = 'vendas'
     paginate_by = 20
 
-    # --- ALTERAÇÃO: Método dinâmico para pegar o mês da URL ou o atual ---
     def get_periodo(self):
         data_inicio_str = self.request.GET.get('data_inicio')
         hoje = timezone.now().date()
@@ -63,10 +62,7 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         user = self.request.user
         qs = VendaProduto.objects.all().select_related('vendedor', 'gerente', 'vendedor_ajudante')
-        
-        # Usa o novo método get_periodo
         data_inicio, data_fim = self.get_periodo()
-        
         qs = qs.filter(data_venda__range=[data_inicio, data_fim])
         is_gestor = user.is_superuser or getattr(user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
         if not is_gestor:
@@ -76,15 +72,12 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        
-        # Usa o novo método get_periodo
         data_inicio, data_fim = self.get_periodo()
         
-        # Lógica de Navegação (Mês Anterior / Próximo)
         mes_anterior = data_inicio - relativedelta(months=1)
         proximo_mes = data_inicio + relativedelta(months=1)
-        context['nav_anterior'] = mes_anterior.replace(day=1).strftime('%Y-%m-%d')
-        context['nav_proximo'] = proximo_mes.replace(day=1).strftime('%Y-%m-%d')
+        context['nav_anterior_inicio'] = mes_anterior.replace(day=1).strftime('%Y-%m-%d')
+        context['nav_proximo_inicio'] = proximo_mes.replace(day=1).strftime('%Y-%m-%d')
 
         context['periodo_inicio'] = data_inicio
         context['periodo_fim'] = data_fim
@@ -131,12 +124,8 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         main_venda = form.instance
-        
-        # Se o form trouxe um vendedor (Admin escolheu), usamos ele.
-        # Se não (vendedor comum), forçamos o usuário logado.
         if not main_venda.vendedor_id:
             main_venda.vendedor = self.request.user
-            
         response = super().form_valid(form)
         
         if main_venda.tipo_produto == 'VENDA_VEICULO':
@@ -270,10 +259,9 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
             vid = int(vendedor_id_filter)
             qs_base = qs_base.filter(Q(vendedor_id=vid) | Q(vendedor_ajudante_id=vid))
 
-        # Totais Gerais da Loja (Independente de quem vendeu, soma tudo)
+        # --- TOTAIS GERAIS ---
         context['total_geral_loja'] = qs_base.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
         
-        # Total de comissão paga (Soma comissão titular + comissão ajudante)
         total_comissao_titular = qs_base.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
         total_comissao_ajudante = qs_base.aggregate(Sum('comissao_ajudante'))['comissao_ajudante__sum'] or 0
         context['total_geral_comissao'] = total_comissao_titular + total_comissao_ajudante
@@ -290,22 +278,56 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
             ids_para_processar = list(ids_titulares | ids_ajudantes)
             if None in ids_para_processar: ids_para_processar.remove(None)
         
+        # Adiciona o próprio usuário logado se ele for admin/gerente e não tiver vendas (para aparecer a seção dele com as comissões de gerência)
+        if not vendedor_id_filter:
+            if self.request.user.id not in ids_para_processar and (self.request.user.is_superuser or getattr(self.request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']):
+                ids_para_processar.append(self.request.user.id)
+
         relatorio_vendedores = []
         
         for vid in ids_para_processar:
             vendedor_obj = User.objects.filter(pk=vid).first()
             if vendedor_obj:
+                # 1. Vendas como Titular
                 vendas_titular = qs_base.filter(vendedor_id=vid)
                 soma_titular = vendas_titular.aggregate(Sum('comissao_vendedor'))['comissao_vendedor__sum'] or 0
                 
+                # 2. Vendas como Ajudante
                 vendas_ajudante = qs_base.filter(vendedor_ajudante_id=vid)
                 soma_ajudante = vendas_ajudante.aggregate(Sum('comissao_ajudante'))['comissao_ajudante__sum'] or 0
                 
                 todas_vendas = list(vendas_titular) + list(vendas_ajudante)
+                
+                total_geral = soma_titular + soma_ajudante
+
+                # 3. Se for GERENTE/ADMIN, busca as vendas da equipe para pagar a comissão de gerência
+                # Regra: R$ 150 Carro / R$ 80 Moto (Apenas Aprovados e de outros vendedores)
+                is_gerente_row = False
+                try:
+                    if vendedor_obj.is_superuser or vendedor_obj.profile.nivel_acesso in ['ADMIN', 'GERENTE']:
+                        is_gerente_row = True
+                except: pass
+
+                if is_gerente_row:
+                    vendas_equipe = qs_base.filter(
+                        status='APROVADO', 
+                        tipo_produto__in=['VENDA_VEICULO', 'VENDA_MOTO']
+                    ).exclude(vendedor=vendedor_obj)
+                    
+                    for v in vendas_equipe:
+                        # Cria uma cópia ou atributo dinâmico para não alterar o objeto original em outras listas
+                        v.is_comissao_gerente = True
+                        if v.tipo_produto == 'VENDA_VEICULO':
+                            v.valor_comissao_gerente = Decimal('150.00')
+                        else:
+                            v.valor_comissao_gerente = Decimal('80.00')
+                        
+                        todas_vendas.append(v)
+                        total_geral += v.valor_comissao_gerente
+
+                # Ordena tudo por data
                 todas_vendas.sort(key=lambda x: x.data_venda)
 
-                total_geral = soma_titular + soma_ajudante
-                
                 if todas_vendas:
                     relatorio_vendedores.append({
                         'vendedor': vendedor_obj,

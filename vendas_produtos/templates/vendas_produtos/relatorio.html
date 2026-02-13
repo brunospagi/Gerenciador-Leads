@@ -5,62 +5,26 @@
 
 {% block content %}
 <style>
-    /* Estilos para visualização em tela */
-    .card-dashboard {
-        transition: transform 0.2s;
-        border: none;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    .card-dashboard:hover {
-        transform: translateY(-5px);
-    }
+    .card-dashboard { transition: transform 0.2s; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .card-dashboard:hover { transform: translateY(-5px); }
+    
+    /* Cores personalizadas */
+    .bg-purple { background-color: #6f42c1 !important; color: white !important; }
+    .text-purple { color: #6f42c1 !important; }
+    .border-purple { border-color: #6f42c1 !important; }
 
-    /* Estilos exclusivos para impressão (PDF) */
     @media print {
         @page { size: A4; margin: 10mm; }
-        body { 
-            background-color: white !important; 
-            font-family: sans-serif; 
-            -webkit-print-color-adjust: exact !important; 
-            print-color-adjust: exact !important; 
-        }
-        
-        /* Oculta menus, botões e barras laterais */
-        .d-print-none, header, footer, nav, .sidebar, .navbar, .btn { 
-            display: none !important; 
-        }
-        
-        /* Ajusta largura para 100% da folha */
-        .container, .container-fluid { 
-            width: 100% !important; 
-            max-width: 100% !important; 
-            padding: 0 !important; 
-            margin: 0 !important; 
-        }
-        
-        .print-sheet { 
-            box-shadow: none !important; 
-            padding: 0 !important; 
-            border: none !important; 
-        }
-        
-        .card-dashboard { 
-            box-shadow: none !important; 
-            border: 1px solid #ccc !important; 
-        }
-        
-        /* Evita quebras de página ruins */
-        .break-inside-avoid { 
-            break-inside: avoid; 
-            page-break-inside: avoid; 
-        }
-        
-        /* Força cores de fundo */
+        body { background-color: white !important; font-family: sans-serif; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        .d-print-none, header, footer, nav, .sidebar, .navbar, .btn { display: none !important; }
+        .container, .container-fluid { width: 100% !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+        .print-sheet { box-shadow: none !important; padding: 0 !important; border: none !important; }
+        .card-dashboard { box-shadow: none !important; border: 1px solid #ccc !important; }
+        .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
         .bg-dark { background-color: #343a40 !important; color: white !important; }
         .bg-warning { background-color: #ffc107 !important; color: black !important; }
         .bg-light { background-color: #f8f9fa !important; }
-        
-        /* Ajuste fino de fontes */
+        .bg-purple { background-color: #6f42c1 !important; color: white !important; }
         .fs-4 { font-size: 1.2rem !important; }
         table { font-size: 0.8rem !important; }
     }
@@ -75,10 +39,7 @@
             </div>
             
             <div class="d-flex align-items-center bg-light rounded p-1 border">
-                <a href="?data_inicio={{ nav_anterior_inicio }}" class="btn btn-sm btn-link text-decoration-none text-secondary">
-                    <i class="fa fa-chevron-left"></i>
-                </a>
-                
+                <a href="?data_inicio={{ nav_anterior_inicio }}" class="btn btn-sm btn-link text-decoration-none text-secondary"><i class="fa fa-chevron-left"></i></a>
                 <div class="px-3 text-center border-start border-end">
                     <div class="fw-bold text-dark" style="font-size: 0.9rem;">{{ periodo_inicio|date:"F Y"|upper }}</div>
                     {% if mes_fechado %}
@@ -87,53 +48,38 @@
                         <span class="badge bg-success" style="font-size: 0.65rem;">ABERTO <i class="fa fa-lock-open ms-1"></i></span>
                     {% endif %}
                 </div>
-
-                <a href="?data_inicio={{ nav_proximo_inicio }}" class="btn btn-sm btn-link text-decoration-none text-secondary">
-                    <i class="fa fa-chevron-right"></i>
-                </a>
+                <a href="?data_inicio={{ nav_proximo_inicio }}" class="btn btn-sm btn-link text-decoration-none text-secondary"><i class="fa fa-chevron-right"></i></a>
             </div>
 
             <form action="{% url 'venda_produto_fechamento' %}" method="POST" class="d-inline">
                 {% csrf_token %}
                 <input type="hidden" name="mes" value="{{ periodo_inicio.month }}">
                 <input type="hidden" name="ano" value="{{ periodo_inicio.year }}">
-                
                 {% if mes_fechado %}
                     <input type="hidden" name="acao" value="reabrir">
-                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Reabrir Mês para Edição" onclick="return confirm('Deseja REABRIR este mês para edições?')">
-                        <i class="fa fa-unlock"></i> Reabrir
-                    </button>
+                    <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Reabrir mês?')"><i class="fa fa-unlock"></i> Reabrir</button>
                 {% else %}
                     <input type="hidden" name="acao" value="fechar">
-                    <button type="submit" class="btn btn-success btn-sm text-white" title="Fechar Mês e Bloquear Edições" onclick="return confirm('Deseja FECHAR este mês? Ninguém poderá lançar ou editar vendas neste período.')">
-                        <i class="fa fa-lock"></i> Fechar Mês
-                    </button>
+                    <button type="submit" class="btn btn-success btn-sm text-white" onclick="return confirm('Fechar mês?')"><i class="fa fa-lock"></i> Fechar Mês</button>
                 {% endif %}
             </form>
 
             <form method="get" class="d-flex align-items-center gap-2 flex-grow-1 justify-content-end">
                 <input type="hidden" name="data_inicio" value="{{ periodo_inicio_str }}">
                 <input type="hidden" name="data_fim" value="{{ periodo_fim_str }}">
-                
                 <div class="input-group input-group-sm" style="max-width: 300px;">
                     <span class="input-group-text bg-white"><i class="fa fa-filter"></i></span>
                     <select name="vendedor" class="form-select" onchange="this.form.submit()">
                         <option value="">Todos os Vendedores</option>
                         {% for v in lista_vendedores %}
-                        <option value="{{ v.id }}" {% if vendedor_selecionado == v.id %}selected{% endif %}>
-                            {{ v.get_full_name|default:v.username }}
-                        </option>
+                        <option value="{{ v.id }}" {% if vendedor_selecionado == v.id %}selected{% endif %}>{{ v.get_full_name|default:v.username }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                {% if vendedor_selecionado %}
-                    <a href="?data_inicio={{ periodo_inicio_str }}&data_fim={{ periodo_fim_str }}" class="btn btn-outline-danger btn-sm" title="Limpar Filtro"><i class="fa fa-times"></i></a>
-                {% endif %}
+                {% if vendedor_selecionado %}<a href="?data_inicio={{ periodo_inicio_str }}&data_fim={{ periodo_fim_str }}" class="btn btn-outline-danger btn-sm"><i class="fa fa-times"></i></a>{% endif %}
             </form>
 
-            <button onclick="window.print()" class="btn btn-primary btn-sm px-4 fw-bold">
-                <i class="fa fa-print me-2"></i> Imprimir / Salvar PDF
-            </button>
+            <button onclick="window.print()" class="btn btn-primary btn-sm px-4 fw-bold"><i class="fa fa-print me-2"></i> Imprimir</button>
         </div>
     </div>
 
@@ -151,27 +97,27 @@
         </div>
 
         <div class="row mb-5 g-3">
-            <div class="col-6 col-md-3">
+            <div class="col-6 col-md">
                 <div class="p-3 rounded border card-dashboard bg-white text-center h-100 d-flex flex-column justify-content-center">
                     <small class="text-uppercase fw-bold text-muted mb-1" style="font-size: 0.7rem;">Qtd. Vendas</small>
                     <div class="fs-3 fw-bold text-secondary">{{ qtd_vendas }}</div>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
+            <div class="col-6 col-md">
                 <div class="p-3 rounded border card-dashboard bg-white text-center h-100 d-flex flex-column justify-content-center">
-                    <small class="text-uppercase fw-bold text-info mb-1" style="font-size: 0.7rem;">Valor Bruto (Total)</small>
+                    <small class="text-uppercase fw-bold text-info mb-1" style="font-size: 0.7rem;">Valor Bruto</small>
                     <div class="fs-3 fw-bold text-dark">R$ {{ total_geral_bruto|floatformat:2 }}</div>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
+            <div class="col-6 col-md">
                 <div class="p-3 rounded border card-dashboard bg-white text-center h-100 d-flex flex-column justify-content-center">
-                    <small class="text-uppercase fw-bold text-primary mb-1" style="font-size: 0.7rem;">Lucro Loja (Est.)</small>
+                    <small class="text-uppercase fw-bold text-primary mb-1" style="font-size: 0.7rem;">Lucro Loja</small>
                     <div class="fs-3 fw-bold text-primary">R$ {{ total_geral_loja|floatformat:2 }}</div>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
+            <div class="col-6 col-md">
                 <div class="p-3 rounded border card-dashboard bg-white text-center h-100 d-flex flex-column justify-content-center">
-                    <small class="text-uppercase fw-bold text-success mb-1" style="font-size: 0.7rem;">Total Comissões</small>
+                    <small class="text-uppercase fw-bold text-success mb-1" style="font-size: 0.7rem;">Comissões Pagas</small>
                     <div class="fs-3 fw-bold text-success">R$ {{ total_geral_comissao|floatformat:2 }}</div>
                 </div>
             </div>
@@ -186,7 +132,7 @@
                         {{ item.vendedor.get_full_name|default:item.vendedor.username|upper }}
                     </div>
                     <div class="bg-warning text-dark px-3 py-1 rounded-pill fw-bold shadow-sm" style="font-size: 0.85rem;">
-                        Comissão: R$ {{ item.total_comissao|floatformat:2 }}
+                        Comissão Total: R$ {{ item.total_comissao|floatformat:2 }}
                     </div>
                 </div>
                 
@@ -213,11 +159,13 @@
                                             {{ venda.modelo_veiculo }} <span class="fw-bold ms-1">{{ venda.placa }}</span>
                                         </small>
                                     {% endif %}
-                                    {% if venda.com_desconto %}
-                                        <span class="badge bg-danger mt-1" style="font-size: 0.6rem;">COM DESCONTO</span>
-                                    {% endif %}
                                     
-                                    {% if venda.vendedor_ajudante == item.vendedor %}
+                                    {# --- MOSTRA SE É UMA VENDA DA EQUIPE (COMISSÃO GERENTE) --- #}
+                                    {% if venda.is_comissao_gerente %}
+                                        <div class="small text-purple fw-bold mt-1">
+                                            <i class="fa fa-users me-1"></i> Venda de: {{ venda.vendedor.first_name|default:venda.vendedor.username }}
+                                        </div>
+                                    {% elif venda.vendedor_ajudante == item.vendedor %}
                                         <div class="small text-primary fst-italic mt-1">
                                             <i class="fa fa-handshake"></i> Split com {{ venda.vendedor.first_name }}
                                         </div>
@@ -227,13 +175,23 @@
                                 <td class="small align-middle text-muted">{{ venda.resumo_pagamento }}</td> 
                                 <td class="text-end align-middle">R$ {{ venda.valor_venda|floatformat:2 }}</td>
                                 
-                                <td class="text-end align-middle fw-bold pe-3">
-                                    {% if venda.vendedor_ajudante == item.vendedor %}
-                                        <span class="text-primary">R$ {{ venda.comissao_ajudante|floatformat:2 }}</span>
-                                        <span class="badge bg-light text-primary border border-primary ms-1" style="font-size: 0.6rem;">AJUDA</span>
-                                    {% else %}
-                                        <span class="text-success">R$ {{ venda.comissao_vendedor|floatformat:2 }}</span>
-                                    {% endif %}
+                                <td class="text-end align-middle pe-3">
+                                    <div class="fw-bold">
+                                        {% if venda.is_comissao_gerente %}
+                                            {# COMISSÃO DE GERÊNCIA #}
+                                            <span class="text-purple">R$ {{ venda.valor_comissao_gerente|floatformat:2 }}</span>
+                                            <span class="badge bg-purple border border-purple text-white ms-1" style="font-size: 0.6rem;">GERÊNCIA</span>
+                                        
+                                        {% elif venda.vendedor_ajudante == item.vendedor %}
+                                            {# COMISSÃO DE AJUDANTE #}
+                                            <span class="text-primary">R$ {{ venda.comissao_ajudante|floatformat:2 }}</span>
+                                            <span class="badge bg-light text-primary border border-primary ms-1" style="font-size: 0.6rem;">AJUDA</span>
+                                        
+                                        {% else %}
+                                            {# COMISSÃO NORMAL (TITULAR) #}
+                                            <span class="text-success">R$ {{ venda.comissao_vendedor|floatformat:2 }}</span>
+                                        {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
