@@ -131,6 +131,38 @@ def detalhe_folha(request, pk):
             'vencimentos': val_ajuda, 'descontos': 0
         })
 
+    # === CÁLCULO VISUAL DE COMISSÃO DE GERÊNCIA ===
+    is_gerente = False
+    try:
+        if folha.funcionario.user.profile.nivel_acesso == 'GERENTE':
+            is_gerente = True
+    except: pass
+
+    if is_gerente:
+        qtd_carros_equipe = VendaProduto.objects.filter(
+            data_venda__range=[data_inicio, data_fim], 
+            status='APROVADO',
+            tipo_produto='VENDA_VEICULO'
+        ).exclude(vendedor=folha.funcionario.user).count()
+
+        qtd_motos_equipe = VendaProduto.objects.filter(
+            data_venda__range=[data_inicio, data_fim], 
+            status='APROVADO',
+            tipo_produto='VENDA_MOTO'
+        ).exclude(vendedor=folha.funcionario.user).count()
+
+        val_gerencia = (qtd_carros_equipe * Decimal('150.00')) + (qtd_motos_equipe * Decimal('80.00'))
+
+        if val_gerencia > 0:
+            itens_holerite.append({
+                'codigo': '060', 
+                'descricao': 'COMISSÃO GERÊNCIA (EQUIPE)', 
+                'referencia': f"{qtd_carros_equipe} Car / {qtd_motos_equipe} Moto",
+                'vencimentos': val_gerencia, 
+                'descontos': 0
+            })
+    # ===============================================
+
     # 3. Auxílio Transporte (Crédito)
     if folha.credito_vt > 0:
         dias_uteis = folha.get_dias_uteis_vt()

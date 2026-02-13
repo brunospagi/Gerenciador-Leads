@@ -218,7 +218,43 @@ class FolhaPagamento(models.Model):
         )
         soma_ajudante = vendas_ajudante.aggregate(Sum('comissao_ajudante'))['comissao_ajudante__sum'] or Decimal(0)
 
-        self.total_comissoes = soma_direta + soma_ajudante
+        # --- NOVA LÓGICA: COMISSÃO DE GERÊNCIA ---
+        comissao_gerencia = Decimal(0)
+        
+        # Verifica se o funcionário tem perfil de GERENTE
+        is_gerente = False
+        try:
+            if self.funcionario.user.profile.nivel_acesso == 'GERENTE':
+                is_gerente = True
+        except:
+            pass
+
+        if is_gerente:
+            # Regra: R$ 150 por Carro, R$ 80 por Moto.
+            # Apenas vendas de OUTROS vendedores (exclude self).
+            # Ignora Consignação, Serviços e Financeiros.
+            
+            # Conta Carros da Equipe
+            qtd_carros_equipe = VendaProduto.objects.filter(
+                data_venda__range=[data_inicio, data_fim], 
+                status='APROVADO',
+                tipo_produto='VENDA_VEICULO'
+            ).exclude(vendedor=self.funcionario.user).count()
+
+            # Conta Motos da Equipe
+            qtd_motos_equipe = VendaProduto.objects.filter(
+                data_venda__range=[data_inicio, data_fim], 
+                status='APROVADO',
+                tipo_produto='VENDA_MOTO'
+            ).exclude(vendedor=self.funcionario.user).count()
+
+            valor_por_carro = Decimal('150.00')
+            valor_por_moto = Decimal('80.00')
+
+            comissao_gerencia = (qtd_carros_equipe * valor_por_carro) + (qtd_motos_equipe * valor_por_moto)
+        # -----------------------------------------
+
+        self.total_comissoes = soma_direta + soma_ajudante + comissao_gerencia
 
         # 3. Créditos Manuais (Bônus)
         creditos = ParcelaCredito.objects.filter(
