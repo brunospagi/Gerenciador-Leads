@@ -77,7 +77,6 @@ def lancar_credito(request):
     else:
         form = LancarCreditoForm()
     
-    # Reutiliza o mesmo template de formulário, mudando apenas o título
     return render(request, 'folha_pagamento/form_desconto.html', {
         'form': form, 
         'titulo': 'Lançar Crédito/Bônus'
@@ -90,7 +89,12 @@ def detalhe_folha(request, pk):
     # Permissão: Apenas Admin ou o próprio dono da folha
     if not is_admin_financeiro(request.user) and folha.funcionario.user != request.user:
         messages.error(request, "Acesso negado aos detalhes financeiros.")
-        return redirect('dashboard')
+        return redirect('rh_dashboard')
+
+    # --- FORÇA O RECÁLCULO PARA ATUALIZAR VALORES (SE A FOLHA ESTIVER ABERTA) ---
+    if not folha.fechada:
+        folha.calcular_folha()
+        folha.refresh_from_db() # Recarrega do banco para pegar o valor atualizado pelo calcular_folha
 
     itens_holerite = []
     
@@ -134,17 +138,20 @@ def detalhe_folha(request, pk):
     # === CÁLCULO VISUAL DE COMISSÃO DE GERÊNCIA ===
     is_gerente = False
     try:
-        if folha.funcionario.user.profile.nivel_acesso == 'GERENTE':
+        nivel = folha.funcionario.user.profile.nivel_acesso
+        if nivel == 'GERENTE' or nivel == 'ADMIN':
             is_gerente = True
     except: pass
 
     if is_gerente:
+        # Conta Vendas da Equipe (Carros)
         qtd_carros_equipe = VendaProduto.objects.filter(
             data_venda__range=[data_inicio, data_fim], 
             status='APROVADO',
             tipo_produto='VENDA_VEICULO'
         ).exclude(vendedor=folha.funcionario.user).count()
 
+        # Conta Vendas da Equipe (Motos)
         qtd_motos_equipe = VendaProduto.objects.filter(
             data_venda__range=[data_inicio, data_fim], 
             status='APROVADO',
@@ -208,7 +215,7 @@ def detalhe_folha(request, pk):
             'vencimentos': 0, 'descontos': p.valor
         })
 
-    # Totalizadores para exibição
+    # Totalizadores para exibição (Usa os valores REAIS do banco)
     total_vencimentos = folha.salario_base + folha.total_comissoes + folha.credito_vt + folha.total_creditos_manuais
     
     return render(request, 'folha_pagamento/detalhe_folha.html', {

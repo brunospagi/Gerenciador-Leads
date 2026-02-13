@@ -218,30 +218,25 @@ class FolhaPagamento(models.Model):
         )
         soma_ajudante = vendas_ajudante.aggregate(Sum('comissao_ajudante'))['comissao_ajudante__sum'] or Decimal(0)
 
-        # --- NOVA LÓGICA: COMISSÃO DE GERÊNCIA ---
+        # --- COMISSÃO GERÊNCIA (CORRIGIDO PARA ACEITAR ADMIN TAMBÉM) ---
         comissao_gerencia = Decimal(0)
-        
-        # Verifica se o funcionário tem perfil de GERENTE
         is_gerente = False
         try:
-            if self.funcionario.user.profile.nivel_acesso == 'GERENTE':
+            nivel = self.funcionario.user.profile.nivel_acesso
+            if nivel == 'GERENTE' or nivel == 'ADMIN':
                 is_gerente = True
         except:
             pass
 
         if is_gerente:
-            # Regra: R$ 150 por Carro, R$ 80 por Moto.
-            # Apenas vendas de OUTROS vendedores (exclude self).
-            # Ignora Consignação, Serviços e Financeiros.
-            
-            # Conta Carros da Equipe
+            # Vendas de OUTROS vendedores (exclude self), Aprovadas, Tipo CARRO
             qtd_carros_equipe = VendaProduto.objects.filter(
                 data_venda__range=[data_inicio, data_fim], 
                 status='APROVADO',
                 tipo_produto='VENDA_VEICULO'
             ).exclude(vendedor=self.funcionario.user).count()
 
-            # Conta Motos da Equipe
+            # Vendas de OUTROS vendedores (exclude self), Aprovadas, Tipo MOTO
             qtd_motos_equipe = VendaProduto.objects.filter(
                 data_venda__range=[data_inicio, data_fim], 
                 status='APROVADO',
@@ -252,7 +247,7 @@ class FolhaPagamento(models.Model):
             valor_por_moto = Decimal('80.00')
 
             comissao_gerencia = (qtd_carros_equipe * valor_por_carro) + (qtd_motos_equipe * valor_por_moto)
-        # -----------------------------------------
+        # ---------------------------------------------------------------
 
         self.total_comissoes = soma_direta + soma_ajudante + comissao_gerencia
 
@@ -276,20 +271,13 @@ class FolhaPagamento(models.Model):
 
         if self.funcionario.opta_vt:
             dias_trabalhados = self.get_dias_uteis_vt()
-            
-            # Crédito: Custo total necessário para transporte
             custo_vt_total = dias_trabalhados * self.funcionario.valor_diario_vt
             self.credito_vt = custo_vt_total
-            
-            # Débito: 6% do salário base (limitado ao custo total)
             teto_6 = self.salario_base * Decimal('0.06')
             self.desconto_vt = min(custo_vt_total, teto_6)
 
         # 6. Totalizadores
-        # Vencimentos = Base + Comissões + VT (Crédito) + Bônus
         total_vencimentos = self.salario_base + self.total_comissoes + self.credito_vt + self.total_creditos_manuais
-        
-        # Descontos = Manuais + VT (Débito)
         self.total_descontos = total_parcelas_desc + self.desconto_vt
 
         # 7. Líquido
