@@ -1,11 +1,11 @@
-from django.views.generic import CreateView, TemplateView
+from django.views.generic import CreateView, TemplateView, UpdateView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from django.shortcuts import redirect
 from django.utils import timezone
-from datetime import timedelta, datetime  # Adicionado datetime
-from clientes.models import Cliente
+from datetime import timedelta, datetime
+from clientes.models import Cliente, Historico
 from .forms import LeadEntradaForm
 from .logic import definir_proximo_vendedor, enviar_webhook_n8n
 
@@ -16,25 +16,10 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
     success_url = reverse_lazy('painel-distribuicao')
 
     def test_func(self):
-        """
-        Verifica se o usuário tem permissão para acessar o painel.
-        """
         user_profile = getattr(self.request.user, 'profile', None)
-        
-        # 1. Se for Superusuário, sempre pode
-        if self.request.user.is_superuser:
-            return True
-
-        if user_profile:
-            # 2. Se tiver um dos cargos de gestão/distribuição
-            cargos_permitidos = ['DISTRIBUIDOR', 'ADMIN', 'GERENTE']
-            if user_profile.nivel_acesso in cargos_permitidos:
-                return True
-            
-            # 3. Se tiver a PERMISSÃO EXTRA ativada (Híbrido)
-            if user_profile.pode_distribuir_leads:
-                return True
-            
+        if self.request.user.is_superuser: return True
+        if user_profile and user_profile.nivel_acesso in ['DISTRIBUIDOR', 'ADMIN', 'GERENTE']: return True
+        if user_profile and user_profile.pode_distribuir_leads: return True
         return False
 
     def handle_no_permission(self):
@@ -42,43 +27,63 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
         return redirect('portal')
 
     def form_valid(self, form):
-        # Lógica de distribuição (Round-Robin)
+        # Verifica se estamos redistribuindo um existente (o ID já existirá na instância se foi capturado no form.clean)
+        is_redistribuicao = form.instance.pk is not None
+        vendedor_antigo = form.instance.vendedor if is_redistribuicao else None
+
+        # 1. Define o novo vendedor (Rodízio)
         vendedor_selecionado = definir_proximo_vendedor()
         
         if not vendedor_selecionado:
             form.add_error(None, "ERRO: Nenhum vendedor ativo no rodízio!")
             return self.form_invalid(form)
 
-        # Preenche os dados automáticos
+        # 2. Atualiza dados obrigatórios da distribuição
         form.instance.vendedor = vendedor_selecionado
+        
+        # Resetamos o status para NOVO para o novo vendedor trabalhar
         form.instance.status_negociacao = Cliente.StatusNegociacao.NOVO
         form.instance.prioridade = Cliente.Prioridade.MORNO
         form.instance.tipo_contato = Cliente.TipoContato.MENSAGEM
         form.instance.proximo_passo = Cliente.ProximoPasso.MENSAGEM
         
+        # Se for redistribuição, atualiza a data de próximo contato para agora (para aparecer no topo da lista do vendedor)
+        form.instance.data_proximo_contato = timezone.now()
+
         response = super().form_valid(form)
         
-        # Envia para n8n e mostra mensagem
+        # 3. Ações pós-salvamento e Feedback
+        if is_redistribuicao:
+            # Registra no histórico que foi redistribuído na entrada
+            Historico.objects.create(
+                cliente=self.object,
+                motivacao=f"Redistribuição via Entrada (Duplicidade detectada). De: {vendedor_antigo.username} Para: {vendedor_selecionado.username}."
+            )
+            msg = f"Lead EXISTENTE atualizado e transferido de {vendedor_antigo.username} para: {vendedor_selecionado.username}"
+            messages.warning(self.request, msg)
+        else:
+            msg = f"Novo lead cadastrado e enviado para: {vendedor_selecionado.username}"
+            messages.success(self.request, msg)
+
+        # Envia webhook
         enviar_webhook_n8n(self.object)
-        messages.success(self.request, f"Lead enviado para: {vendedor_selecionado.username}")
         
         return response
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # Lista os 10 últimos para conferência rápida
         context['ultimos_leads'] = Cliente.objects.order_by('-id')[:10]
         return context
+
 
 class RelatorioDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     template_name = 'distribuicao/relatorio_distribuicao.html'
 
     def test_func(self):
         user_profile = getattr(self.request.user, 'profile', None)
-        if self.request.user.is_superuser:
-            return True
-        # Permite Apenas Gerentes e Admins (Distribuidor não vê relatório gerencial, ajuste se necessário)
-        if user_profile and user_profile.nivel_acesso in ['ADMIN', 'GERENTE']:
-            return True
+        if self.request.user.is_superuser: return True
+        if user_profile and user_profile.nivel_acesso in ['ADMIN', 'GERENTE']: return True
         return False
 
     def handle_no_permission(self):
@@ -90,89 +95,84 @@ class RelatorioDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, Templat
         agora = timezone.localtime(timezone.now())
         hoje = agora.date()
         
-        # --- LÓGICA DE FILTROS ---
-        
-        # 1. Filtro Diário
+        # --- Lógica de Filtros (Dia e Mês) ---
+        # Filtro Diário
         data_diario_str = self.request.GET.get('data_diario')
-        if data_diario_str:
-            try:
-                data_filtro = datetime.strptime(data_diario_str, '%Y-%m-%d').date()
-            except ValueError:
-                data_filtro = hoje
-        else:
-            data_filtro = hoje
+        data_filtro = datetime.strptime(data_diario_str, '%Y-%m-%d').date() if data_diario_str else hoje
 
-        # 2. Filtro Mensal
+        # Filtro Mensal
         mes_mensal_str = self.request.GET.get('mes_mensal')
         if mes_mensal_str:
-            try:
-                # O input type="month" retorna YYYY-MM
-                dt_mes = datetime.strptime(mes_mensal_str, '%Y-%m')
-                mes_ref = dt_mes.month
-                ano_ref = dt_mes.year
-            except ValueError:
-                mes_ref = hoje.month
-                ano_ref = hoje.year
-                mes_mensal_str = hoje.strftime('%Y-%m')
+            dt_mes = datetime.strptime(mes_mensal_str, '%Y-%m')
+            mes_ref, ano_ref = dt_mes.month, dt_mes.year
         else:
-            mes_ref = hoje.month
-            ano_ref = hoje.year
+            mes_ref, ano_ref = hoje.month, hoje.year
             mes_mensal_str = hoje.strftime('%Y-%m')
 
-        # 3. Define qual aba deve ficar ativa no carregamento da página
-        active_tab = 'diario' # Padrão
-        if 'mes_mensal' in self.request.GET:
-            active_tab = 'mensal'
-        elif 'tab' in self.request.GET:
-            active_tab = self.request.GET.get('tab')
+        # Aba Ativa
+        active_tab = self.request.GET.get('tab', 'diario')
+        if 'mes_mensal' in self.request.GET: active_tab = 'mensal'
 
-        # --- FILTRO DIÁRIO ---
-        leads_dia = Cliente.objects.filter(
-            data_primeiro_contato__date=data_filtro
-        ).select_related('vendedor').order_by('data_primeiro_contato')
+        # Consultas
+        leads_dia = Cliente.objects.filter(data_primeiro_contato__date=data_filtro).select_related('vendedor').order_by('data_primeiro_contato')
+        
+        leads_manha = [l for l in leads_dia if timezone.localtime(l.data_primeiro_contato).hour < 12]
+        leads_tarde = [l for l in leads_dia if timezone.localtime(l.data_primeiro_contato).hour >= 12]
 
-        # Separação Manhã (< 12:00) / Tarde (>= 12:00)
-        leads_manha = []
-        leads_tarde = []
-        for lead in leads_dia:
-            # Converte para hora local antes de comparar
-            hora_lead = timezone.localtime(lead.data_primeiro_contato).hour
-            if hora_lead < 12:
-                leads_manha.append(lead)
-            else:
-                leads_tarde.append(lead)
-
-        # --- FILTRO SEMANAL (Início da semana atual - Segunda-feira) ---
         inicio_semana = hoje - timedelta(days=hoje.weekday())
-        leads_semana = Cliente.objects.filter(
-            data_primeiro_contato__date__gte=inicio_semana
-        ).select_related('vendedor').order_by('-data_primeiro_contato')
+        leads_semana = Cliente.objects.filter(data_primeiro_contato__date__gte=inicio_semana).select_related('vendedor').order_by('-data_primeiro_contato')
 
-        # --- FILTRO MENSAL ---
-        leads_mes = Cliente.objects.filter(
-            data_primeiro_contato__month=mes_ref,
-            data_primeiro_contato__year=ano_ref
-        ).select_related('vendedor').order_by('-data_primeiro_contato')
+        leads_mes = Cliente.objects.filter(data_primeiro_contato__month=mes_ref, data_primeiro_contato__year=ano_ref).select_related('vendedor').order_by('-data_primeiro_contato')
 
         context.update({
             'active_tab': active_tab,
-            
-            # Contexto Diário
-            'data_hoje': data_filtro,           # Objeto date usado para exibição
-            'data_diario_val': data_filtro.strftime('%Y-%m-%d'), # String para o input value
-            'leads_manha': leads_manha,
-            'total_manha': len(leads_manha),
-            'leads_tarde': leads_tarde,
-            'total_tarde': len(leads_tarde),
+            'data_hoje': data_filtro,
+            'data_diario_val': data_filtro.strftime('%Y-%m-%d'),
+            'leads_manha': leads_manha, 'total_manha': len(leads_manha),
+            'leads_tarde': leads_tarde, 'total_tarde': len(leads_tarde),
             'total_hoje': len(leads_dia),
-            
-            # Contexto Semanal
-            'leads_semana': leads_semana,
-            'total_semana': leads_semana.count(),
-            
-            # Contexto Mensal
-            'mes_atual_str': mes_mensal_str,    # String YYYY-MM para o input value
-            'leads_mes': leads_mes,
-            'total_mes': leads_mes.count(),
+            'leads_semana': leads_semana, 'total_semana': leads_semana.count(),
+            'mes_atual_str': mes_mensal_str,
+            'leads_mes': leads_mes, 'total_mes': leads_mes.count(),
         })
         return context
+
+
+class RedistribuirLeadView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    model = Cliente
+    template_name = 'distribuicao/redistribuir_confirm.html'
+    fields = [] 
+
+    def test_func(self):
+        user_profile = getattr(self.request.user, 'profile', None)
+        if self.request.user.is_superuser: return True
+        if user_profile and user_profile.nivel_acesso in ['ADMIN', 'GERENTE', 'DISTRIBUIDOR']: return True
+        return False
+
+    def handle_no_permission(self):
+        messages.error(self.request, "Você não tem permissão para redistribuir leads.")
+        return redirect('portal')
+
+    def form_valid(self, form):
+        cliente = self.object
+        vendedor_antigo = cliente.vendedor
+        novo_vendedor = definir_proximo_vendedor()
+
+        if not novo_vendedor:
+            messages.error(self.request, "Não há vendedores ativos no rodízio.")
+            return redirect('painel-distribuicao')
+
+        cliente.vendedor = novo_vendedor
+        cliente.save()
+
+        Historico.objects.create(
+            cliente=cliente,
+            motivacao=f"Redistribuído manualmente (Rodízio). De: {vendedor_antigo.username} Para: {novo_vendedor.username} por {self.request.user.username}."
+        )
+
+        messages.success(self.request, f"Lead redistribuído para {novo_vendedor.username}!")
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        # Retorna para o painel de distribuição após redistribuir pela lista
+        return reverse_lazy('painel-distribuicao')

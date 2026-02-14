@@ -63,6 +63,15 @@
                 <h4 class="mb-0"><i class="bi bi-person-vcard me-2"></i>{{ cliente.nome_cliente }}</h4>
                 <div class="no-print">
                     <button onclick="window.print()" class="btn btn-info btn-sm"><i class="bi bi-printer-fill me-1"></i> Imprimir</button>
+                    
+                    {# --- NOVO BOTÃO DE REDISTRIBUIÇÃO --- #}
+                    {% if user.is_superuser or user.profile.nivel_acesso in 'ADMIN,GERENTE,DISTRIBUIDOR' %}
+                    <a href="{% url 'redistribuir-lead' cliente.pk %}" class="btn btn-outline-warning btn-sm text-white" title="Passar para outro vendedor (Rodízio)">
+                        <i class="bi bi-arrow-repeat me-1"></i> Redistribuir
+                    </a>
+                    {% endif %}
+                    {# --- FIM NOVO BOTÃO --- #}
+
                     <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square me-1"></i> Editar</a>
                     {% if user.is_superuser %}
                         <a href="{% url 'cliente_delete' cliente.pk %}" class="btn btn-danger btn-sm"><i class="bi bi-trash me-1"></i> Excluir</a>

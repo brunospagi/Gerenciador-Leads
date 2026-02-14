@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0"><i class="fa fa-exchange-alt me-2"></i>Redistribuir Lead</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-light border text-center">
+                        <h5 class="text-primary">{{ object.nome_cliente }}</h5>
+                        <p class="mb-1"><strong>Vendedor Atual:</strong> {{ object.vendedor.get_full_name|default:object.vendedor.username }}</p>
+                        <p class="mb-0"><strong>Status:</strong> {{ object.get_status_negociacao_display }}</p>
+                    </div>
+
+                    <p class="text-center mt-4">
+                        Ao confirmar, o sistema irá buscar automaticamente o <strong>próximo vendedor disponível</strong> na fila do rodízio e transferir este lead.
+                    </p>
+                    
+                    <p class="text-center text-danger fw-bold">
+                        Deseja realmente prosseguir?
+                    </p>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
+                            {# Link de cancelar volta para o Painel de Distribuição #}
+                            <a href="{% url 'painel-distribuicao' %}" class="btn btn-secondary me-md-2">
+                                <i class="fa fa-times me-2"></i>Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-warning fw-bold">
+                                <i class="fa fa-check me-2"></i>Sim, Redistribuir
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

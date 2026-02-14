@@ -1,106 +1,159 @@
-{% extends 'base_portal.html' %}
+{% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="container mt-4">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-primary"><i class="fa fa-paper-plane me-2"></i>Entrada de Leads</h2>
+        <a href="{% url 'relatorio-distribuicao' %}" class="btn btn-outline-secondary">
+            <i class="fa fa-chart-line me-2"></i>Relatórios
+        </a>
+    </div>
+
+    {% if messages %}
+        <div class="row mb-3">
+            <div class="col-12">
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
     <div class="row">
-        <div class="col-md-5">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0"><i class="fas fa-bullhorn"></i> Entrada de Leads</h4>
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold text-dark">Novo Lead</h5>
                 </div>
                 <div class="card-body">
                     <form method="post">
                         {% csrf_token %}
                         
-                        {% if form.non_field_errors %}
-                            <div class="alert alert-danger">
-                                {{ form.non_field_errors }}
-                            </div>
-                        {% endif %}
-
-                        <div class="mb-3">
-                            <label>Nome do Cliente</label>
-                            {{ form.nome_cliente }}
-                            {% if form.nome_cliente.errors %}
-                                <div class="text-danger small">{{ form.nome_cliente.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label>Telefone / WhatsApp</label>
-                                {{ form.whatsapp }}
-                                {% if form.whatsapp.errors %}
-                                    <div class="text-danger small fw-bold mt-1">
-                                        <i class="fas fa-exclamation-circle"></i> {{ form.whatsapp.errors.0 }}
+                        {# Campos do Formulário #}
+                        {% for field in form %}
+                            {# Não renderiza o checkbox aqui, faremos condicionalmente abaixo #}
+                            {% if field.name != 'redistribuir' %}
+                            <div class="mb-3">
+                                <label for="{{ field.id_for_label }}" class="form-label fw-bold">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text %}
+                                    <div class="form-text small">{{ field.help_text }}</div>
+                                {% endif %}
+                                {% if field.errors %}
+                                    <div class="text-danger small mt-1 fw-bold">
+                                        <i class="fa fa-exclamation-circle"></i> {{ field.errors|striptags }}
                                     </div>
                                 {% endif %}
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label>Canal de Origem</label>
-                                {{ form.fonte_cliente }}
+                            {% endif %}
+                        {% endfor %}
+
+                        {# === SEÇÃO DE CONFIRMAÇÃO DE REDISTRIBUIÇÃO === #}
+                        {# Só aparece se houver erro no WhatsApp (duplicidade) #}
+                        {% if form.whatsapp.errors %}
+                        <div class="alert alert-warning border-warning mt-3">
+                            <h6 class="alert-heading fw-bold"><i class="fa fa-exchange-alt"></i> Transferência de Lead</h6>
+                            <hr>
+                            <div class="form-check">
+                                {{ form.redistribuir }}
+                                <label class="form-check-label fw-bold text-dark" for="{{ form.redistribuir.id_for_label }}">
+                                    {{ form.redistribuir.label }}
+                                </label>
                             </div>
+                            <small class="d-block mt-2 text-muted">
+                                Ao marcar esta opção, o lead será retirado do vendedor atual e entregue ao próximo da fila do rodízio.
+                            </small>
                         </div>
+                        {% else %}
+                            {# Campo oculto para não quebrar a validação se não houver erro #}
+                            <div class="d-none">
+                                {{ form.redistribuir }}
+                            </div>
+                        {% endif %}
 
-                        <div class="mb-3">
-                            <label>Veículo de Interesse</label>
-                            {{ form.modelo_veiculo }}
-                        </div>
-
-                        <div class="mb-3">
-                            <label>Observações Iniciais</label>
-                            {{ form.observacao }}
-                        </div>
-
-                        <button type="submit" class="btn btn-success w-100 py-3 fw-bold">
-                            <i class="fas fa-check-circle"></i> REGISTRAR E DISTRIBUIR
+                        <button type="submit" class="btn btn-success w-100 mt-3 py-2 fw-bold">
+                            <i class="fa fa-check me-2"></i>Confirmar Entrada
                         </button>
                     </form>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-7">
-            <div class="card shadow">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="mb-0">Últimas Distribuições</h5>
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0 text-muted">Últimos Leads Cadastrados</h5>
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Horário</th>
-                                <th>Cliente</th>
-                                <th>Veículo</th>
-                                <th>Distribuído Para</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for lead in ultimos_leads %}
-                            <tr>
-                                <td>{{ lead.data_primeiro_contato|date:"H:i" }}</td>
-                                <td class="fw-bold">{{ lead.nome_cliente }}</td>
-                                <td>{{ lead.modelo_veiculo|default:"-" }}</td>
-                                <td>
-                                    <span class="badge bg-info text-dark">
-                                        {{ lead.vendedor.username|upper }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="badge bg-secondary">{{ lead.status_negociacao }}</span>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="5" class="text-center py-4">Nenhum lead registrado hoje.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-white text-secondary border-bottom">
+                                <tr>
+                                    <th class="ps-3">Horário</th>
+                                    <th>Cliente</th>
+                                    <th>Telefone</th>
+                                    <th>Veículo</th>
+                                    <th>Vendedor</th>
+                                    <th class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for lead in ultimos_leads %}
+                                <tr>
+                                    <td class="ps-3">{{ lead.data_primeiro_contato|date:"H:i" }} <small class="text-muted">{{ lead.data_primeiro_contato|date:"d/m" }}</small></td>
+                                    <td class="fw-bold text-dark">{{ lead.nome_cliente }}</td>
+                                    <td>{{ lead.whatsapp }}</td>
+                                    <td><small>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</small></td>
+                                    <td>
+                                        <span class="badge bg-primary bg-opacity-75 text-white">{{ lead.vendedor.username }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if user.is_superuser or user.profile.nivel_acesso in 'ADMIN,GERENTE,DISTRIBUIDOR' %}
+                                        <a href="{% url 'redistribuir-lead' lead.pk %}" class="btn btn-sm btn-light border text-warning ms-1" title="Redistribuir">
+                                            <i class="fa fa-exchange-alt"></i>
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-5 text-muted">
+                                        Nenhum lead registrado recentemente.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
+                
+                <div class="card-footer bg-white border-top">
+                    <div class="d-flex align-items-center gap-3">
+                        <small class="fw-bold text-uppercase text-muted" style="font-size: 0.75rem;">Legenda:</small>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="btn btn-sm btn-light border disabled px-2 py-0" style="opacity: 1;"><i class="fa fa-exchange-alt text-warning"></i></span>
+                            <small class="text-muted">Redistribuir (Rodízio)</small>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .form-control, .form-select {
+        border-radius: 6px;
+        padding: 10px;
+    }
+    .btn {
+        border-radius: 6px;
+    }
+</style>
 {% endblock %}
