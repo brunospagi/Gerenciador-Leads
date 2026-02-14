@@ -161,9 +161,15 @@ class RedistribuirLeadView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         if not novo_vendedor:
             messages.error(self.request, "Não há vendedores ativos no rodízio.")
             return redirect('painel-distribuicao')
-
+    
         cliente.vendedor = novo_vendedor
         cliente.save()
+
+        try:
+            enviar_webhook_n8n(cliente)
+        except Exception as e:
+            # Loga o erro mas não trava o sistema se o n8n falhar
+            print(f"Erro ao enviar webhook na redistribuição: {e}")
 
         Historico.objects.create(
             cliente=cliente,
