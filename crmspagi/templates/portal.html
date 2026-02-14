@@ -69,6 +69,16 @@
                 <i class="fa fa-random system-icon text-info opacity-50"></i>
             </a>
 
+            {% if user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' or user.is_superuser %}
+             <a href="{% url 'relatorio-distribuicao' %}" class="system-item">
+                <div>
+                    <span class="system-name" style="color:#0dcaf0">Relatório Leads</span>
+                    <div class="system-desc text-muted">Métricas de Entrada</div>
+                </div>
+                <i class="fa fa-chart-line system-icon text-info opacity-50"></i>
+            </a>
+            {% endif %}
+
             {% if user.profile.nivel_acesso == 'ADMIN' or user.is_superuser %}
              <a href="{% url 'cliente_list' %}" class="system-item">
                 <div>

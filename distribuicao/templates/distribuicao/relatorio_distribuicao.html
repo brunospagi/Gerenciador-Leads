@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <h2 class="text-primary"><i class="fa fa-chart-line me-2"></i>Relatório de Distribuição de Leads</h2>
+        <div>
+            <button onclick="window.print()" class="btn btn-dark">
+                <i class="fa fa-print me-2"></i>Imprimir / PDF
+            </button>
+            <a href="{% url 'portal' %}" class="btn btn-outline-secondary ms-2">Voltar ao Portal</a>
+        </div>
+    </div>
+
+    <ul class="nav nav-tabs mb-4 no-print" id="relatorioTab" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#diario" type="button">
+                <i class="fa fa-calendar-day me-2"></i>Diário
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#semanal" type="button">
+                <i class="fa fa-calendar-week me-2"></i>Semanal
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#mensal" type="button">
+                <i class="fa fa-calendar-alt me-2"></i>Mensal
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="relatorioTabContent">
+        
+        <div class="tab-pane fade show active" id="diario" role="tabpanel">
+            <div class="card shadow-sm mb-4 print-card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Relatório do Dia: {{ data_hoje|date:"d/m/Y" }}</h5>
+                    <span class="badge bg-light text-dark">Total: {{ total_hoje }}</span>
+                </div>
+                <div class="card-body">
+                    
+                    <div class="mb-5">
+                        <h5 class="text-info border-bottom pb-2">
+                            <i class="fa fa-sun me-2"></i>Período da Manhã (Até 12:00) 
+                            <small class="text-muted ms-2">- {{ total_manha }} leads</small>
+                        </h5>
+                        {% if leads_manha %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 80px;">Hora</th>
+                                        <th>Cliente</th>
+                                        <th>Veículo de Interesse</th>
+                                        <th>Canal / Fonte</th>
+                                        <th>Vendedor Atribuído</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for lead in leads_manha %}
+                                    <tr>
+                                        <td class="text-center">{{ lead.data_primeiro_contato|date:"H:i" }}</td>
+                                        <td class="fw-bold">{{ lead.nome_cliente }}</td>
+                                        <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                                        <td><span class="badge bg-secondary">{{ lead.fonte_cliente|default:"Não Inf." }}</span></td>
+                                        <td class="text-primary fw-bold">{{ lead.vendedor.get_full_name|default:lead.vendedor.username }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted fst-italic">Nenhum lead distribuído na parte da manhã.</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <h5 class="text-warning border-bottom pb-2">
+                            <i class="fa fa-cloud-sun me-2"></i>Período da Tarde (Após 12:00)
+                            <small class="text-muted ms-2">- {{ total_tarde }} leads</small>
+                        </h5>
+                        {% if leads_tarde %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 80px;">Hora</th>
+                                        <th>Cliente</th>
+                                        <th>Veículo de Interesse</th>
+                                        <th>Canal / Fonte</th>
+                                        <th>Vendedor Atribuído</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for lead in leads_tarde %}
+                                    <tr>
+                                        <td class="text-center">{{ lead.data_primeiro_contato|date:"H:i" }}</td>
+                                        <td class="fw-bold">{{ lead.nome_cliente }}</td>
+                                        <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                                        <td><span class="badge bg-secondary">{{ lead.fonte_cliente|default:"Não Inf." }}</span></td>
+                                        <td class="text-primary fw-bold">{{ lead.vendedor.get_full_name|default:lead.vendedor.username }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p class="text-muted fst-italic">Nenhum lead distribuído na parte da tarde.</p>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="semanal" role="tabpanel">
+            <div class="card shadow-sm border-success print-card">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Acumulado Semanal</h5>
+                    <span class="badge bg-light text-dark">Total: {{ total_semana }}</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Data / Hora</th>
+                                    <th>Cliente</th>
+                                    <th>Veículo</th>
+                                    <th>Canal</th>
+                                    <th>Vendedor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for lead in leads_semana %}
+                                <tr>
+                                    <td>{{ lead.data_primeiro_contato|date:"d/m/Y H:i" }}</td>
+                                    <td>{{ lead.nome_cliente }}</td>
+                                    <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                                    <td>{{ lead.fonte_cliente }}</td>
+                                    <td class="fw-bold">{{ lead.vendedor.username }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="5" class="text-center p-3">Sem dados nesta semana.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="mensal" role="tabpanel">
+            <div class="card shadow-sm border-info print-card">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Acumulado Mensal</h5>
+                    <span class="badge bg-light text-dark">Total: {{ total_mes }}</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Cliente</th>
+                                    <th>Veículo</th>
+                                    <th>Status Atual</th>
+                                    <th>Vendedor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for lead in leads_mes %}
+                                <tr>
+                                    <td>{{ lead.data_primeiro_contato|date:"d/m/Y" }}</td>
+                                    <td>{{ lead.nome_cliente }}</td>
+                                    <td>{{ lead.marca_veiculo|default:"-" }}</td>
+                                    <td><span class="badge bg-light text-dark border">{{ lead.get_status_negociacao_display }}</span></td>
+                                    <td>{{ lead.vendedor.username }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="5" class="text-center p-3">Sem dados neste mês.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Estilização para Impressão */
+    @media print {
+        @page { size: landscape; margin: 1cm; }
+        body { background: white; -webkit-print-color-adjust: exact; }
+        
+        /* Esconde elementos de navegação */
+        .no-print, .navbar, .sidebar, footer, .nav-tabs { display: none !important; }
+        
+        /* Ajusta o card para ocupar a página */
+        .card { border: none !important; box-shadow: none !important; }
+        .card-header { background-color: #f8f9fa !important; color: black !important; border-bottom: 2px solid #000; }
+        
+        /* Garante que a aba ativa seja impressa */
+        .tab-pane { display: block !important; opacity: 1 !important; }
+        .tab-pane:not(.active) { display: none !important; }
+        
+        /* Tabela compacta */
+        .table { width: 100% !important; border-collapse: collapse !important; }
+        .table th, .table td { border: 1px solid #ddd !important; padding: 6px !important; font-size: 12px; }
+        
+        .badge { border: 1px solid #000; color: #000 !important; background: none !important; }
+    }
+</style>
+{% endblock %}
