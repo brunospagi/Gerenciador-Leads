@@ -15,17 +15,17 @@
 
     <ul class="nav nav-tabs mb-4 no-print" id="relatorioTab" role="tablist">
         <li class="nav-item">
-            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#diario" type="button">
+            <button class="nav-link {% if active_tab == 'diario' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#diario" type="button">
                 <i class="fa fa-calendar-day me-2"></i>Diário
             </button>
         </li>
         <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#semanal" type="button">
+            <button class="nav-link {% if active_tab == 'semanal' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#semanal" type="button">
                 <i class="fa fa-calendar-week me-2"></i>Semanal
             </button>
         </li>
         <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#mensal" type="button">
+            <button class="nav-link {% if active_tab == 'mensal' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#mensal" type="button">
                 <i class="fa fa-calendar-alt me-2"></i>Mensal
             </button>
         </li>
@@ -33,7 +33,19 @@
 
     <div class="tab-content" id="relatorioTabContent">
         
-        <div class="tab-pane fade show active" id="diario" role="tabpanel">
+        <div class="tab-pane fade {% if active_tab == 'diario' %}show active{% endif %}" id="diario" role="tabpanel">
+            
+            <form method="get" class="row align-items-end mb-3 no-print" style="max-width: 400px;">
+                <input type="hidden" name="tab" value="diario">
+                <div class="col-auto">
+                    <label for="data_diario" class="form-label fw-bold">Selecionar Dia:</label>
+                    <input type="date" name="data_diario" id="data_diario" class="form-control" value="{{ data_diario_val }}">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary"><i class="fa fa-filter"></i> Filtrar</button>
+                </div>
+            </form>
+
             <div class="card shadow-sm mb-4 print-card">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Relatório do Dia: {{ data_hoje|date:"d/m/Y" }}</h5>
@@ -53,7 +65,7 @@
                                     <tr>
                                         <th style="width: 80px;">Hora</th>
                                         <th>Cliente</th>
-                                        <th>Veículo de Interesse</th>
+                                        <th style="width: 130px;">Telefone</th> <th>Veículo de Interesse</th>
                                         <th>Canal / Fonte</th>
                                         <th>Vendedor Atribuído</th>
                                     </tr>
@@ -63,7 +75,7 @@
                                     <tr>
                                         <td class="text-center">{{ lead.data_primeiro_contato|date:"H:i" }}</td>
                                         <td class="fw-bold">{{ lead.nome_cliente }}</td>
-                                        <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                                        <td>{{ lead.whatsapp }}</td> <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
                                         <td><span class="badge bg-secondary">{{ lead.fonte_cliente|default:"Não Inf." }}</span></td>
                                         <td class="text-primary fw-bold">{{ lead.vendedor.get_full_name|default:lead.vendedor.username }}</td>
                                     </tr>
@@ -88,7 +100,7 @@
                                     <tr>
                                         <th style="width: 80px;">Hora</th>
                                         <th>Cliente</th>
-                                        <th>Veículo de Interesse</th>
+                                        <th style="width: 130px;">Telefone</th> <th>Veículo de Interesse</th>
                                         <th>Canal / Fonte</th>
                                         <th>Vendedor Atribuído</th>
                                     </tr>
@@ -98,7 +110,7 @@
                                     <tr>
                                         <td class="text-center">{{ lead.data_primeiro_contato|date:"H:i" }}</td>
                                         <td class="fw-bold">{{ lead.nome_cliente }}</td>
-                                        <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                                        <td>{{ lead.whatsapp }}</td> <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
                                         <td><span class="badge bg-secondary">{{ lead.fonte_cliente|default:"Não Inf." }}</span></td>
                                         <td class="text-primary fw-bold">{{ lead.vendedor.get_full_name|default:lead.vendedor.username }}</td>
                                     </tr>
@@ -115,7 +127,7 @@
             </div>
         </div>
 
-        <div class="tab-pane fade" id="semanal" role="tabpanel">
+        <div class="tab-pane fade {% if active_tab == 'semanal' %}show active{% endif %}" id="semanal" role="tabpanel">
             <div class="card shadow-sm border-success print-card">
                 <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Acumulado Semanal</h5>
@@ -123,12 +135,12 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped">
+                        <table class="table table-hover table-striped align-middle">
                             <thead>
                                 <tr>
                                     <th>Data / Hora</th>
                                     <th>Cliente</th>
-                                    <th>Veículo</th>
+                                    <th>Telefone</th> <th>Veículo</th>
                                     <th>Canal</th>
                                     <th>Vendedor</th>
                                 </tr>
@@ -138,12 +150,12 @@
                                 <tr>
                                     <td>{{ lead.data_primeiro_contato|date:"d/m/Y H:i" }}</td>
                                     <td>{{ lead.nome_cliente }}</td>
-                                    <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                                    <td>{{ lead.whatsapp }}</td> <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
                                     <td>{{ lead.fonte_cliente }}</td>
                                     <td class="fw-bold">{{ lead.vendedor.username }}</td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="5" class="text-center p-3">Sem dados nesta semana.</td></tr>
+                                <tr><td colspan="6" class="text-center p-3">Sem dados nesta semana.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -152,7 +164,19 @@
             </div>
         </div>
 
-        <div class="tab-pane fade" id="mensal" role="tabpanel">
+        <div class="tab-pane fade {% if active_tab == 'mensal' %}show active{% endif %}" id="mensal" role="tabpanel">
+            
+            <form method="get" class="row align-items-end mb-3 no-print" style="max-width: 400px;">
+                <input type="hidden" name="tab" value="mensal">
+                <div class="col-auto">
+                    <label for="mes_mensal" class="form-label fw-bold">Selecionar Mês:</label>
+                    <input type="month" name="mes_mensal" id="mes_mensal" class="form-control" value="{{ mes_atual_str }}">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary"><i class="fa fa-filter"></i> Filtrar</button>
+                </div>
+            </form>
+
             <div class="card shadow-sm border-info print-card">
                 <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Acumulado Mensal</h5>
@@ -160,12 +184,12 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped">
+                        <table class="table table-hover table-striped align-middle">
                             <thead>
                                 <tr>
                                     <th>Data</th>
                                     <th>Cliente</th>
-                                    <th>Veículo</th>
+                                    <th>Telefone</th> <th>Veículo</th>
                                     <th>Status Atual</th>
                                     <th>Vendedor</th>
                                 </tr>
@@ -175,12 +199,12 @@
                                 <tr>
                                     <td>{{ lead.data_primeiro_contato|date:"d/m/Y" }}</td>
                                     <td>{{ lead.nome_cliente }}</td>
-                                    <td>{{ lead.marca_veiculo|default:"-" }}</td>
+                                    <td>{{ lead.whatsapp }}</td> <td>{{ lead.marca_veiculo|default:"-" }}</td>
                                     <td><span class="badge bg-light text-dark border">{{ lead.get_status_negociacao_display }}</span></td>
                                     <td>{{ lead.vendedor.username }}</td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="5" class="text-center p-3">Sem dados neste mês.</td></tr>
+                                <tr><td colspan="6" class="text-center p-3">Sem dados neste mês.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>

@@ -4,7 +4,7 @@ from django.urls import reverse_lazy
 from django.contrib import messages
 from django.shortcuts import redirect
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime  # Adicionado datetime
 from clientes.models import Cliente
 from .forms import LeadEntradaForm
 from .logic import definir_proximo_vendedor, enviar_webhook_n8n
@@ -90,9 +90,45 @@ class RelatorioDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, Templat
         agora = timezone.localtime(timezone.now())
         hoje = agora.date()
         
+        # --- LÓGICA DE FILTROS ---
+        
+        # 1. Filtro Diário
+        data_diario_str = self.request.GET.get('data_diario')
+        if data_diario_str:
+            try:
+                data_filtro = datetime.strptime(data_diario_str, '%Y-%m-%d').date()
+            except ValueError:
+                data_filtro = hoje
+        else:
+            data_filtro = hoje
+
+        # 2. Filtro Mensal
+        mes_mensal_str = self.request.GET.get('mes_mensal')
+        if mes_mensal_str:
+            try:
+                # O input type="month" retorna YYYY-MM
+                dt_mes = datetime.strptime(mes_mensal_str, '%Y-%m')
+                mes_ref = dt_mes.month
+                ano_ref = dt_mes.year
+            except ValueError:
+                mes_ref = hoje.month
+                ano_ref = hoje.year
+                mes_mensal_str = hoje.strftime('%Y-%m')
+        else:
+            mes_ref = hoje.month
+            ano_ref = hoje.year
+            mes_mensal_str = hoje.strftime('%Y-%m')
+
+        # 3. Define qual aba deve ficar ativa no carregamento da página
+        active_tab = 'diario' # Padrão
+        if 'mes_mensal' in self.request.GET:
+            active_tab = 'mensal'
+        elif 'tab' in self.request.GET:
+            active_tab = self.request.GET.get('tab')
+
         # --- FILTRO DIÁRIO ---
         leads_dia = Cliente.objects.filter(
-            data_primeiro_contato__date=hoje
+            data_primeiro_contato__date=data_filtro
         ).select_related('vendedor').order_by('data_primeiro_contato')
 
         # Separação Manhã (< 12:00) / Tarde (>= 12:00)
@@ -114,21 +150,28 @@ class RelatorioDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, Templat
 
         # --- FILTRO MENSAL ---
         leads_mes = Cliente.objects.filter(
-            data_primeiro_contato__month=hoje.month,
-            data_primeiro_contato__year=hoje.year
+            data_primeiro_contato__month=mes_ref,
+            data_primeiro_contato__year=ano_ref
         ).select_related('vendedor').order_by('-data_primeiro_contato')
 
         context.update({
-            'data_hoje': hoje,
+            'active_tab': active_tab,
+            
+            # Contexto Diário
+            'data_hoje': data_filtro,           # Objeto date usado para exibição
+            'data_diario_val': data_filtro.strftime('%Y-%m-%d'), # String para o input value
             'leads_manha': leads_manha,
             'total_manha': len(leads_manha),
             'leads_tarde': leads_tarde,
             'total_tarde': len(leads_tarde),
             'total_hoje': len(leads_dia),
             
+            # Contexto Semanal
             'leads_semana': leads_semana,
             'total_semana': leads_semana.count(),
             
+            # Contexto Mensal
+            'mes_atual_str': mes_mensal_str,    # String YYYY-MM para o input value
             'leads_mes': leads_mes,
             'total_mes': leads_mes.count(),
         })
