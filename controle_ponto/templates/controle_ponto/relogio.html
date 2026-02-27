@@ -31,8 +31,8 @@
             <img id="refImage"
                 src="{{ foto_url }}"
                 crossorigin="anonymous"
-                style="display:none;">            
-                {% endif %}
+                style="display:none;">
+            {% endif %}
 
             <!-- ================= CAMERA ================= -->
             <div id="liveCameraSection">
@@ -126,142 +126,205 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
-
 <script>
-const video = document.getElementById('video');
-const statusDiv = document.getElementById('status');
+const video = document.getElementById('videoElement');
+const canvas = document.getElementById('canvasElement');
+const photoPreview = document.getElementById('photoPreview');
 const refImage = document.getElementById('refImage');
+const statusDiv = document.getElementById('ai-status');
 
 let referenceDescriptor = null;
-let blinkValidated = false;
-let blinkState = "open";
-let closedFrames = 0;
+let piscou = false;
+let olhosFechados = false;
+let movimentoScore = 0;
+let framesValidos = 0;
+let framesParados = 0;
+let ultimoNarizX = null;
+let liberado = false;
 
-const EAR_THRESHOLD = 0.27;   // 🔥 Ajuste fino
-const MIN_FRAMES_CLOSED = 2;  // Piscada realista
-const FACE_MATCH_THRESHOLD = 0.55;
+const DISTANCE_THRESHOLD = 0.55;
+const EAR_THRESHOLD = 0.20;
+const MIN_MOVIMENTO = 3;
+const MAX_FRAMES_PARADO = 15;
+const FRAMES_CONFIRMACAO = 5;
+const MOVIMENTO_MINIMO = 5;
 
-function distance(a, b) {
+function distancia(a, b) {
     return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function calcularEAR(eye) {
-    const A = distance(eye[1], eye[5]);
-    const B = distance(eye[2], eye[4]);
-    const C = distance(eye[0], eye[3]);
+    const A = distancia(eye[1], eye[5]);
+    const B = distancia(eye[2], eye[4]);
+    const C = distancia(eye[0], eye[3]);
     return (A + B) / (2.0 * C);
-}
-
-function validarPiscada(landmarks) {
-    const leftEAR = calcularEAR(landmarks.getLeftEye());
-    const rightEAR = calcularEAR(landmarks.getRightEye());
-    const ear = (leftEAR + rightEAR) / 2;
-
-    console.log("EAR:", ear.toFixed(3));
-
-    if (ear < EAR_THRESHOLD) {
-        closedFrames++;
-
-        if (closedFrames >= MIN_FRAMES_CLOSED && blinkState === "open") {
-            blinkState = "closed";
-        }
-    } else {
-        if (blinkState === "closed") {
-            blinkValidated = true;
-            blinkState = "open";
-            console.log("✅ PISCADA VALIDADA");
-        }
-        closedFrames = 0;
-    }
 }
 
 async function iniciarIA() {
     const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
 
     await Promise.all([
-        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
         faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
         faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
     ]);
 
-    console.log("Modelos carregados");
+    if (refImage) {
+        await new Promise(resolve => {
+            if (refImage.complete && refImage.naturalWidth !== 0) resolve();
+            else refImage.onload = resolve;
+        });
 
-    await new Promise((resolve) => {
-        if (refImage.complete) resolve();
-        else refImage.onload = resolve;
-    });
+        const detection = await faceapi
+            .detectSingleFace(refImage, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks()
+            .withFaceDescriptor();
 
+        if (detection) referenceDescriptor = detection.descriptor;
+    }
+
+    statusDiv.className = 'alert alert-info shadow-sm';
+    statusDiv.innerHTML = 'Posicione o rosto e pisque 👁️';
+
+    ligarCamera();
+    monitorar();
+}
+
+function monitorar() {
+    setInterval(async () => {
+
+        if (!referenceDescriptor) return;
+
+        const detection = await faceapi
+            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+
+        if (!detection) {
+            bloquearTudo();
+            statusDiv.className = 'alert alert-warning shadow-sm';
+            statusDiv.innerHTML = 'Nenhum rosto detectado';
+            return;
+        }
+
+        const distance = faceapi.euclideanDistance(
+            referenceDescriptor,
+            detection.descriptor
+        );
+
+        const nose = detection.landmarks.getNose()[3];
+
+        if (ultimoNarizX !== null) {
+            const diff = Math.abs(nose.x - ultimoNarizX);
+
+            if (diff > MIN_MOVIMENTO) {
+                movimentoScore++;
+                framesParados = 0;
+            } else {
+                framesParados++;
+            }
+        }
+
+        ultimoNarizX = nose.x;
+
+        if (framesParados > MAX_FRAMES_PARADO) {
+            bloquearTudo();
+            statusDiv.className = 'alert alert-danger shadow-sm';
+            statusDiv.innerHTML = 'Movimento insuficiente ❌';
+            return;
+        }
+
+        const leftEye = detection.landmarks.getLeftEye();
+        const rightEye = detection.landmarks.getRightEye();
+        const ear = (calcularEAR(leftEye) + calcularEAR(rightEye)) / 2;
+
+        if (ear < EAR_THRESHOLD) olhosFechados = true;
+        if (olhosFechados && ear > EAR_THRESHOLD + 0.05) piscou = true;
+
+        if (distance < DISTANCE_THRESHOLD && piscou && movimentoScore >= MOVIMENTO_MINIMO) {
+            framesValidos++;
+
+            statusDiv.className = 'alert alert-success shadow-sm';
+            statusDiv.innerHTML = `Validando... (${framesValidos}/${FRAMES_CONFIRMACAO})`;
+
+            if (framesValidos >= FRAMES_CONFIRMACAO && !liberado) {
+                liberado = true;
+                liberarBotoes();
+                statusDiv.innerHTML = 'Identidade confirmada com presença real ✅';
+            }
+
+        } else {
+            framesValidos = 0;
+            bloquearTudo();
+            statusDiv.className = 'alert alert-warning shadow-sm';
+        }
+
+    }, 300);
+}
+
+function bloquearTudo() {
+    btnEntrada.disabled = true;
+    btnSaidaAlmoco.disabled = true;
+    btnRetornoAlmoco.disabled = true;
+    btnSaida.disabled = true;
+}
+
+function ligarCamera() {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+        .then(stream => video.srcObject = stream)
+        .catch(() => alert("Permita acesso à câmera."));
+}
+
+function tirarFoto(tipoInterno, nomeAmigavel) {
+    if (!liberado) {
+        alert("Validação biométrica ainda não concluída.");
+        return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+    photoPreview.src = dataURL;
+
+    document.getElementById('fotoBase64Input').value = dataURL;
+    document.getElementById('tipoBatidaInput').value = tipoInterno;
+    document.getElementById('lblTipoBatida').innerText = nomeAmigavel;
+
+    liveCameraSection.style.display = 'none';
+    confirmationSection.style.display = 'block';
+}
+
+async function confirmarPonto() {
     const detection = await faceapi
-        .detectSingleFace(refImage)
+        .detectSingleFace(photoPreview, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
         .withFaceDescriptor();
 
     if (!detection) {
-        statusDiv.innerHTML = "❌ Rosto não encontrado na foto do RH";
+        alert("Nenhum rosto detectado.");
         return;
     }
 
-    referenceDescriptor = detection.descriptor;
+    const distance = faceapi.euclideanDistance(
+        referenceDescriptor,
+        detection.descriptor
+    );
 
-    statusDiv.innerHTML = "👁 Piscando para validar presença...";
-    ligarCamera();
+    if (distance < DISTANCE_THRESHOLD) {
+        pontoForm.submit();
+    } else {
+        alert("Rosto não corresponde.");
+    }
 }
 
-async function ligarCamera() {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    video.srcObject = stream;
-
-    video.addEventListener('play', () => {
-        const canvas = faceapi.createCanvasFromMedia(video);
-        document.body.append(canvas);
-
-        const displaySize = {
-            width: video.width,
-            height: video.height
-        };
-
-        faceapi.matchDimensions(canvas, displaySize);
-
-        setInterval(async () => {
-
-            const detection = await faceapi
-                .detectSingleFace(video)
-                .withFaceLandmarks()
-                .withFaceDescriptor();
-
-            if (!detection) {
-                statusDiv.innerHTML = "❌ Nenhum rosto detectado";
-                return;
-            }
-
-            const resized = faceapi.resizeResults(detection, displaySize);
-
-            canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-
-            faceapi.draw.drawDetections(canvas, resized);
-
-            validarPiscada(detection.landmarks);
-
-            const distance = faceapi.euclideanDistance(
-                referenceDescriptor,
-                detection.descriptor
-            );
-
-            console.log("Distância facial:", distance.toFixed(3));
-
-            if (distance < FACE_MATCH_THRESHOLD && blinkValidated) {
-                statusDiv.innerHTML = "✅ Presença confirmada com liveness!";
-                console.log("ACESSO LIBERADO");
-
-                blinkValidated = false; // evita múltiplas validações
-            }
-
-        }, 150);
-
-    });
+function cancelarFoto(){
+    confirmationSection.style.display = 'none';
+    liveCameraSection.style.display = 'block';
 }
 
-window.onload = iniciarIA;
+iniciarIA();
 </script>
+
 {% endblock %}
