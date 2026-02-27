@@ -1,16 +1,17 @@
+import json
+from datetime import datetime
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
-from .models import RegistroPonto
-from funcionarios.models import Funcionario
-import json
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import UpdateView, DeleteView
+from django.urls import reverse_lazy
 from django.db.models import Q
-from datetime import datetime
 
-# === CONFIGURAÇÃO DO IP DA LOJA ===
-# Se quiser desativar temporariamente para testes, deixe '*'
-IP_PERMITIDO_LOJA = '*' 
+from .models import RegistroPonto, ConfiguracaoPonto
+from funcionarios.models import Funcionario
+from .forms import RegistroPontoForm
 
 def obter_ip_cliente(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -20,18 +21,17 @@ def obter_ip_cliente(request):
 
 @login_required
 def relogio_ponto(request):
-    # Procura a ficha de funcionário do utilizador logado com segurança
     funcionario = getattr(request.user, 'dados_funcionais', None)
     
     if not funcionario:
         messages.error(request, "Acesso Negado: O seu utilizador não possui ficha no RH.")
         return redirect('/')
 
+    config = ConfiguracaoPonto.load()
     ip_atual = obter_ip_cliente(request)
     
-    # --- TRAVA DE IP ---
-    if IP_PERMITIDO_LOJA != '*' and ip_atual != IP_PERMITIDO_LOJA:
-        messages.error(request, f"Acesso Negado 🚫 O ponto só pode ser registado na rede Wi-Fi da Loja! (Seu IP: {ip_atual})")
+    if config.ip_permitido != '*' and ip_atual != config.ip_permitido:
+        messages.error(request, f"Acesso Negado 🚫 O ponto só pode ser registrado na rede Wi-Fi da Loja! (Seu IP atual: {ip_atual})")
         return redirect('/')
 
     hoje = timezone.now().date()
@@ -46,35 +46,29 @@ def relogio_ponto(request):
         lng = request.POST.get('longitude')
         
         if not foto_base64:
-            messages.error(request, "Falha ao receber a foto.")
+            messages.error(request, "Falha ao receber a foto. Tente novamente.")
             return redirect('controle_ponto:relogio')
 
-        # Grava os horários e a foto enviada
         if tipo_batida == 'entrada' and not ponto.entrada:
             ponto.entrada = agora
             ponto.foto_entrada = foto_base64
-            messages.success(request, f"Entrada registada: {agora.strftime('%H:%M')}")
-            
+            messages.success(request, f"Entrada registrada com sucesso às {agora.strftime('%H:%M')}")
         elif tipo_batida == 'saida_almoco' and not ponto.saida_almoco:
             ponto.saida_almoco = agora
             ponto.foto_saida_almoco = foto_base64
-            messages.success(request, f"Saída para almoço: {agora.strftime('%H:%M')}")
-            
+            messages.success(request, f"Saída para almoço às {agora.strftime('%H:%M')}")
         elif tipo_batida == 'retorno_almoco' and not ponto.retorno_almoco:
             ponto.retorno_almoco = agora
             ponto.foto_retorno_almoco = foto_base64
-            messages.success(request, f"Retorno do almoço: {agora.strftime('%H:%M')}")
-            
+            messages.success(request, f"Retorno do almoço às {agora.strftime('%H:%M')}")
         elif tipo_batida == 'saida' and not ponto.saida:
             ponto.saida = agora
             ponto.foto_saida = foto_base64
-            messages.success(request, f"Fim de expediente: {agora.strftime('%H:%M')}. Bom descanso!")
-            
+            messages.success(request, f"Fim de expediente às {agora.strftime('%H:%M')}. Bom descanso!")
         else:
-            messages.warning(request, "Batida inválida.")
+            messages.warning(request, "Batida inválida ou já registrada.")
             return redirect('controle_ponto:relogio')
 
-        # Grava a auditoria de rede e GPS
         ponto.ip_registrado = ip_atual
         if lat and lng:
             ponto.latitude = lat
@@ -83,34 +77,30 @@ def relogio_ponto(request):
         ponto.save()
         return redirect('controle_ponto:relogio')
 
-    # A URL da imagem guardada no S3 para servir de base à Inteligência Artificial
     foto_url = funcionario.foto_biometria.url if funcionario.foto_biometria else None
 
     return render(request, 'controle_ponto/relogio.html', {
         'ponto': ponto,
         'ip_atual': ip_atual,
         'foto_url': foto_url,
+        'config': config,
     })
 
 @login_required
 def mapa_pontos(request):
-    # Proteção de Acesso: Apenas Admin ou Gerente
     nivel = getattr(request.user.profile, 'nivel_acesso', '')
     if not request.user.is_superuser and nivel not in ['ADMIN', 'GERENTE']:
         messages.error(request, "Acesso negado ao mapa de auditoria.")
-        return redirect('dashboard')
+        return redirect('/')
 
-    # Filtro de Data (Padrão: Hoje)
     data_str = request.GET.get('data')
     if data_str:
         data_filtro = datetime.strptime(data_str, '%Y-%m-%d').date()
     else:
         data_filtro = timezone.now().date()
 
-    # Busca apenas pontos do dia selecionado que tenham Latitude preenchida
     pontos = RegistroPonto.objects.filter(data=data_filtro).exclude(latitude__isnull=True).exclude(latitude__exact='')
 
-    # Prepara os dados para o JavaScript (Leaflet)
     pontos_json = []
     for p in pontos:
         try:
@@ -126,7 +116,7 @@ def mapa_pontos(request):
                 'foto': foto_perfil
             })
         except ValueError:
-            pass # Ignora se a latitude/longitude estiver corrompida
+            pass
 
     context = {
         'data_filtro': data_filtro.strftime('%Y-%m-%d'),
@@ -136,18 +126,16 @@ def mapa_pontos(request):
 
 @login_required
 def relatorio_mensal(request):
-    # Proteção de Acesso
     nivel = getattr(request.user.profile, 'nivel_acesso', '')
     if not request.user.is_superuser and nivel not in ['ADMIN', 'GERENTE']:
         messages.error(request, "Acesso negado ao espelho de ponto.")
-        return redirect('dashboard')
+        return redirect('/')
 
     hoje = timezone.now().date()
     mes = int(request.GET.get('mes', hoje.month))
     ano = int(request.GET.get('ano', hoje.year))
     funcionario_id = request.GET.get('funcionario')
 
-    # Busca registros do mês/ano
     pontos = RegistroPonto.objects.filter(data__month=mes, data__year=ano).select_related('funcionario').order_by('data', 'funcionario__user__first_name')
 
     if funcionario_id:
@@ -165,3 +153,40 @@ def relatorio_mensal(request):
         'anos': range(hoje.year - 2, hoje.year + 2),
     }
     return render(request, 'controle_ponto/relatorio.html', context)
+
+# ==========================================
+# VIEWS DE ADMINISTRAÇÃO (EDTAR E EXCLUIR)
+# ==========================================
+
+class RegistroPontoUpdateView(LoginRequiredMixin, UpdateView):
+    model = RegistroPonto
+    form_class = RegistroPontoForm
+    template_name = 'controle_ponto/form_ponto.html'
+    success_url = reverse_lazy('controle_ponto:relatorio_mensal')
+
+    def dispatch(self, request, *args, **kwargs):
+        nivel = getattr(request.user.profile, 'nivel_acesso', '')
+        if not request.user.is_superuser and nivel not in ['ADMIN', 'GERENTE']:
+            messages.error(request, "Acesso Negado: Apenas gestores podem alterar pontos manuais.")
+            return redirect('/')
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        messages.success(self.request, "Registro de ponto atualizado com sucesso! (Correção Manual)")
+        return super().form_valid(form)
+
+class RegistroPontoDeleteView(LoginRequiredMixin, DeleteView):
+    model = RegistroPonto
+    template_name = 'controle_ponto/delete_ponto.html'
+    success_url = reverse_lazy('controle_ponto:relatorio_mensal')
+
+    def dispatch(self, request, *args, **kwargs):
+        nivel = getattr(request.user.profile, 'nivel_acesso', '')
+        if not request.user.is_superuser and nivel not in ['ADMIN', 'GERENTE']:
+            messages.error(request, "Acesso Negado: Sem permissão para excluir pontos.")
+            return redirect('/')
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        messages.warning(self.request, "Registro de ponto excluído permanentemente.")
+        return super().form_valid(form)

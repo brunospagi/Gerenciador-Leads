@@ -4,10 +4,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
 
 <script>
-    // Substitua pelas coordenadas reais da sua loja:
-    const LOJA_LATITUDE = -25.4284;  
-    const LOJA_LONGITUDE = -49.2733; 
-    const RAIO_PERMITIDO_METROS = 100; // Distância máxima permitida para o funcionário bater o ponto
+    const LOJA_LATITUDE = {{ config.latitude_loja|safe|default:"0" }};  
+    const LOJA_LONGITUDE = {{ config.longitude_loja|safe|default:"0" }}; 
+    const RAIO_PERMITIDO_METROS = {{ config.raio_permitido|safe|default:"100" }};
 </script>
 
 <div class="container mt-4 mb-5 text-center" style="max-width: 600px;">
@@ -16,13 +15,13 @@
     </h3>
     
     <div id="ai-status" class="alert alert-warning shadow-sm">
-        <i class="fas fa-spinner fa-spin"></i> A solicitar localização GPS do seu dispositivo...
+        <i class="fas fa-spinner fa-spin"></i> Solicitando localização GPS...
     </div>
 
     {% if not foto_url %}
     <div class="alert alert-danger shadow-sm">
         <i class="fas fa-exclamation-triangle"></i>
-        <strong>Acesso Bloqueado:</strong> Você não possui foto cadastrada no seu perfil de RH.
+        <strong>Acesso Bloqueado:</strong> Você não possui foto cadastrada no RH.
     </div>
     {% endif %}
 
@@ -61,17 +60,15 @@
 
             <div id="confirmationSection" style="display:none;">
                 <div class="alert alert-primary mb-3">
-                    <h5 class="fw-bold mb-0">Confirme a Identidade</h5>
+                    <h5 class="fw-bold mb-0">Confirme sua Identidade</h5>
                     <small id="lblTipoBatida" class="fw-bold"></small>
                 </div>
-                
                 <div class="rounded-4 overflow-hidden mb-4 shadow" style="height:350px;border:4px solid #0d6efd;">
                     <img id="photoPreview" style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);">
                 </div>
-                
                 <div class="row g-2">
                     <div class="col-6"><button type="button" id="btnCancelar" class="btn btn-lg btn-outline-danger w-100 fw-bold" onclick="cancelarFoto()">Cancelar</button></div>
-                    <div class="col-6"><button type="button" id="btnConfirmar" class="btn btn-lg btn-success w-100 fw-bold shadow-sm" onclick="confirmarPonto()">Sim, sou eu!</button></div>
+                    <div class="col-6"><button type="button" id="btnConfirmar" class="btn btn-lg btn-success w-100 fw-bold" onclick="confirmarPonto()">Sim, sou eu!</button></div>
                 </div>
             </div>
 
@@ -88,20 +85,21 @@
 </div>
 
 <script>
+// Variáveis Globais
 const video = document.getElementById('videoElement');
 const statusDiv = document.getElementById('ai-status');
 const refImage = document.getElementById('refImage');
 let referenceDescriptor = null;
-const DISTANCE_THRESHOLD = 0.50; // Tolerância estrita de semelhança facial
+const DISTANCE_THRESHOLD = 0.50; 
 
 const temEntrada = {% if ponto.entrada %}true{% else %}false{% endif %};
 const temSaidaAlmoco = {% if ponto.saida_almoco %}true{% else %}false{% endif %};
 const temRetornoAlmoco = {% if ponto.retorno_almoco %}true{% else %}false{% endif %};
 const temSaida = {% if ponto.saida %}true{% else %}false{% endif %};
 
-// --- FÓRMULA DE DISTÂNCIA GPS (HAVERSINE) ---
+// --- FÓRMULA HAVERSINE (DISTÂNCIA EM METROS) ---
 function calcularDistancia(lat1, lon1, lat2, lon2) {
-    const R = 6371e3;
+    const R = 6371e3; 
     const p1 = lat1 * Math.PI/180;
     const p2 = lat2 * Math.PI/180;
     const dp = (lat2-lat1) * Math.PI/180;
@@ -111,11 +109,11 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// --- 1. VALIDAR GPS (GEOFENCING) ---
+// --- 1. SOLICITA GPS PRIMEIRO ---
 function validarGeolocalizacao() {
     if (!navigator.geolocation) {
         statusDiv.className = 'alert alert-danger';
-        statusDiv.innerHTML = "Seu navegador não suporta Geolocalização.";
+        statusDiv.innerHTML = "Navegador não suporta Geolocalização.";
         return;
     }
 
@@ -131,29 +129,23 @@ function validarGeolocalizacao() {
 
             if (distanciaMetros > RAIO_PERMITIDO_METROS) {
                 statusDiv.className = 'alert alert-danger shadow-sm';
-                statusDiv.innerHTML = `🚫 <strong>FORA DA ÁREA DA LOJA:</strong> Você está a ${distanciaMetros.toFixed(0)}m de distância.`;
+                statusDiv.innerHTML = `🚫 <strong>FORA DA ÁREA:</strong> Você está a ${distanciaMetros.toFixed(0)}m da loja. Raio permitido: ${RAIO_PERMITIDO_METROS}m.`;
             } else {
                 document.getElementById('distanciaText').innerText = `Distância: ${distanciaMetros.toFixed(0)}m da Loja`;
-                iniciarIA(); // O GPS passou, vamos ligar a IA
+                iniciarIA();
             }
         },
         (error) => {
             statusDiv.className = 'alert alert-danger';
-            statusDiv.innerHTML = "🚫 <strong>Permissão de Localização Negada.</strong> Aceite a notificação de localização para bater o ponto.";
+            statusDiv.innerHTML = "🚫 <strong>Permissão de GPS Negada:</strong> Libere a localização do navegador para liberar o ponto.";
         },
         { enableHighAccuracy: true }
     );
 }
 
-// --- 2. INICIAR INTELIGÊNCIA ARTIFICIAL ---
+// --- 2. INICIA A IA ---
 async function iniciarIA() {
-    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-        statusDiv.className = 'alert alert-danger shadow-sm';
-        statusDiv.innerHTML = '<strong>Erro de Segurança:</strong> A câmara necessita de uma ligação HTTPS.';
-        return;
-    }
-
-    statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A carregar módulos Biométricos...';
+    statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando Validação Biométrica...';
     try {
         const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
         await Promise.all([
@@ -169,12 +161,12 @@ async function iniciarIA() {
             if (detection) {
                 referenceDescriptor = detection.descriptor;
                 statusDiv.className = 'alert alert-success shadow-sm';
-                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Localização e Biometria Aprovadas! Pode bater o ponto.';
+                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Localização e Biometria Aprovadas!';
                 document.getElementById('mainCard').style.display = 'block';
                 ligarCamera();
             } else {
                 statusDiv.className = 'alert alert-danger';
-                statusDiv.innerHTML = 'Erro: Não foi possível mapear o seu rosto a partir da foto do RH.';
+                statusDiv.innerHTML = 'Erro: Rosto não identificado no perfil do RH.';
             }
         }
     } catch (e) {
@@ -183,7 +175,7 @@ async function iniciarIA() {
     }
 }
 
-// --- 3. ABRIR CÂMARA ---
+// --- 3. ABRE A CÂMERA E LIBERA BOTÕES ---
 function ligarCamera() {
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
         .then(stream => {
@@ -192,7 +184,7 @@ function ligarCamera() {
         })
         .catch(() => {
             statusDiv.className = 'alert alert-danger';
-            statusDiv.innerHTML = 'Permita o acesso à câmara no seu navegador.';
+            statusDiv.innerHTML = 'Permita o acesso à câmera.';
         });
 }
 
@@ -203,7 +195,7 @@ function liberarBotoes() {
     if (temRetornoAlmoco && !temSaida) document.getElementById('btnSaida').disabled = false;
 }
 
-// --- 4. CLIQUE PARA FOTO ---
+// --- 4. TIRA A FOTO ---
 function tirarFoto(tipoInterno, nomeAmigavel) {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -219,39 +211,35 @@ function tirarFoto(tipoInterno, nomeAmigavel) {
     document.getElementById('confirmationSection').style.display = 'block';
 }
 
-// --- 5. VERIFICAÇÃO FINAL (ANTI-CRACHÁ E MATCH FACIAL) ---
+// --- 5. VALIDA FOTO VS CRACHÁ ---
 async function confirmarPonto() {
     const btnConfirmar = document.getElementById('btnConfirmar');
     const btnCancelar = document.getElementById('btnCancelar');
-    btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A analisar...';
+    btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A analisar rosto...';
     btnConfirmar.disabled = true; btnCancelar.disabled = true;
 
     const detection = await faceapi.detectSingleFace(document.getElementById('photoPreview'), new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
 
     if (!detection) {
-        alert("Nenhum rosto detetado na foto! Garanta uma boa iluminação.");
+        alert("Nenhum rosto detectado na foto!");
         resetarBotoes(btnConfirmar, btnCancelar); return;
     }
 
-    // TRAVA ANTI-CRACHÁ (Rosto tem de ocupar mais de 15% do vídeo)
+    // Trava do Crachá (Rosto >= 15%)
     const box = detection.detection.box;
-    const imgWidth = photoPreview.width || video.videoWidth;
-    const imgHeight = photoPreview.height || video.videoHeight;
-    const proporcaoRosto = ((box.width * box.height) / (imgWidth * imgHeight)) * 100;
-    
+    const proporcaoRosto = ((box.width * box.height) / (video.videoWidth * video.videoHeight)) * 100;
     if (proporcaoRosto < 15) {
-        alert(`FRAUDE DETETADA!\nO rosto está demasiado pequeno (${proporcaoRosto.toFixed(1)}%).\nNão utilize fotos impressas! Enquadre o seu rosto no ecrã.`);
+        alert(`FRAUDE DETECTADA!\nO rosto está pequeno demais (${proporcaoRosto.toFixed(1)}%).\nNão use fotos ou crachás. Aproxime seu rosto da câmera!`);
         cancelarFoto(); resetarBotoes(btnConfirmar, btnCancelar); return;
     }
 
-    // VERIFICAÇÃO DE IDENTIDADE
     const distance = faceapi.euclideanDistance(referenceDescriptor, detection.descriptor);
     if (distance < DISTANCE_THRESHOLD) {
         btnConfirmar.innerHTML = '<i class="fas fa-check-double"></i> Aprovado!';
         btnConfirmar.className = 'btn btn-lg btn-success w-100 fw-bold';
         document.getElementById('pontoForm').submit();
     } else {
-        alert("Acesso Negado! O rosto não corresponde ao do funcionário logado.");
+        alert("Acesso Negado! Rosto incompatível com a foto do sistema.");
         cancelarFoto(); resetarBotoes(btnConfirmar, btnCancelar);
     }
 }
@@ -267,7 +255,6 @@ function resetarBotoes(btnC, btnX) {
     btnC.disabled = false; btnX.disabled = false;
 }
 
-// INICIA AUTOMATICAMENTE SOLICITANDO A LOCALIZAÇÃO
 window.onload = validarGeolocalizacao;
 </script>
 {% endblock %}

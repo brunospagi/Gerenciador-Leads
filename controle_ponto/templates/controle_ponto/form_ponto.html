@@ -1,0 +1,45 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 600px;">
+    <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-header bg-primary text-white p-4 border-0 rounded-top-4">
+            <h4 class="mb-0 fw-bold"><i class="fas fa-edit"></i> Corrigir Registo de Ponto</h4>
+            <small>{{ object.funcionario.nome_completo }} | {{ object.data|date:"d/m/Y" }}</small>
+        </div>
+        
+        <div class="card-body p-4 bg-light">
+            <div class="alert alert-warning small">
+                <i class="fas fa-info-circle"></i> As correções manuais substituem os horários originais da biometria.
+            </div>
+
+            <form method="POST">
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Entrada</label>
+                        {{ form.entrada }}
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Saída Almoço</label>
+                        {{ form.saida_almoco }}
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Retorno Almoço</label>
+                        {{ form.retorno_almoco }}
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Saída Final</label>
+                        {{ form.saida }}
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% url 'controle_ponto:relatorio_mensal' %}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</a>
+                    <button type="submit" class="btn btn-success fw-bold"><i class="fas fa-save"></i> Guardar Correção</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

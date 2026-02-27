@@ -1,6 +1,31 @@
 from django.db import models
 from funcionarios.models import Funcionario
 
+class ConfiguracaoPonto(models.Model):
+    """ Tabela de configuração única para as regras do Ponto Eletrônico """
+    ip_permitido = models.CharField(max_length=50, default='*', verbose_name="IP Permitido da Loja", help_text="Coloque o IP Fixo da loja ou deixe '*' para aceitar qualquer IP.")
+    latitude_loja = models.CharField(max_length=50, default='-25.4284', verbose_name="Latitude da Loja (Central)")
+    longitude_loja = models.CharField(max_length=50, default='-49.2733', verbose_name="Longitude da Loja (Central)")
+    raio_permitido = models.IntegerField(default=100, verbose_name="Raio Permitido (em metros)", help_text="Distância máxima que o funcionário pode estar da loja para bater o ponto.")
+
+    class Meta:
+        verbose_name = "Configuração do Ponto"
+        verbose_name_plural = "Configurações do Ponto"
+
+    def save(self, *args, **kwargs):
+        # Garante que só existe 1 linha nesta tabela (ID = 1)
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return "Regras de Segurança de Ponto"
+
+
 class RegistroPonto(models.Model):
     funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE, related_name='pontos')
     data = models.DateField(auto_now_add=True, verbose_name="Data do Ponto")
@@ -23,9 +48,9 @@ class RegistroPonto(models.Model):
     longitude = models.CharField(max_length=50, null=True, blank=True, verbose_name="Longitude")
 
     class Meta:
-        verbose_name = "Registo de Ponto"
-        verbose_name_plural = "Registos de Ponto"
+        verbose_name = "Registro de Ponto"
+        verbose_name_plural = "Registros de Ponto"
         unique_together = ('funcionario', 'data')
 
     def __str__(self):
-        return f"Ponto: {self.funcionario.user.get_full_name()} - {self.data.strftime('%d/%m/%Y')}"
+        return f"Ponto: {self.funcionario.nome_completo} - {self.data.strftime('%d/%m/%Y')}"

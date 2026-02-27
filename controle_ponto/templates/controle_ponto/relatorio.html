@@ -58,6 +58,7 @@
                             <th>Retorno Almoço</th>
                             <th>Saída Final</th>
                             <th>IP Registrado</th>
+                            <th class="d-print-none">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -73,10 +74,19 @@
                             <td><span class="badge bg-info bg-opacity-10 text-info border border-info">{{ p.retorno_almoco|time:"H:i"|default:"--" }}</span></td>
                             <td><span class="badge bg-danger bg-opacity-10 text-danger border border-danger">{{ p.saida|time:"H:i"|default:"--" }}</span></td>
                             <td class="text-muted small">{{ p.ip_registrado|default:"-" }}</td>
+                            
+                            <td class="d-print-none">
+                                <a href="{% url 'controle_ponto:editar_ponto' p.id %}" class="btn btn-sm btn-outline-primary shadow-sm rounded-3" title="Corrigir Horários">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'controle_ponto:excluir_ponto' p.id %}" class="btn btn-sm btn-outline-danger shadow-sm rounded-3 ms-1" title="Excluir Registro">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="py-5 text-muted">Nenhum ponto registrado no período selecionado.</td>
+                            <td colspan="8" class="py-5 text-muted">Nenhum ponto registrado no período selecionado.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
