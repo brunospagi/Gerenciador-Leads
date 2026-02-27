@@ -8,6 +8,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import UpdateView, DeleteView
 from django.urls import reverse_lazy
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
 
 from .models import RegistroPonto, ConfiguracaoPonto
 from funcionarios.models import Funcionario
@@ -190,3 +191,17 @@ class RegistroPontoDeleteView(LoginRequiredMixin, DeleteView):
     def form_valid(self, form):
         messages.warning(self.request, "Registro de ponto excluído permanentemente.")
         return super().form_valid(form)
+@login_required
+def detalhe_ponto(request, pk):
+    # Proteção: Apenas gestores podem ver a auditoria detalhada
+    nivel = getattr(request.user.profile, 'nivel_acesso', '')
+    if not request.user.is_superuser and nivel not in ['ADMIN', 'GERENTE']:
+        messages.error(request, "Acesso Negado: Sem permissão para ver auditoria de ponto.")
+        return redirect('/')
+
+    # Busca o ponto exato pelo ID
+    ponto = get_object_or_404(RegistroPonto, pk=pk)
+
+    return render(request, 'controle_ponto/detalhe_ponto.html', {
+        'ponto': ponto
+    })
