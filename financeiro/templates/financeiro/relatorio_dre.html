@@ -1,96 +1,146 @@
 {% extends 'base_portal.html' %}
 
 {% block content %}
-<div class="container mt-4">
+<div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Relatório de Lucro e Despesas (DRE)</h2>
+        <h2 class="fw-bold text-dark">DRE Analítico e Detalhado</h2>
         <div>
-            <a href="?mes={{ mes_atual }}&ano={{ ano_atual }}&print=1" target="_blank" class="btn btn-primary me-2">
-                🖨️ Imprimir
+            <a href="?mes={{ mes_atual }}&ano={{ ano_atual }}&print=1" target="_blank" class="btn btn-primary me-2 shadow-sm">
+                <i class="fas fa-print me-1"></i> Imprimir
             </a>
-            <a href="{% url 'financeiro:lista_transacoes' %}" class="btn btn-secondary">Voltar</a>
+            <a href="{% url 'financeiro:lista_transacoes' %}" class="btn btn-secondary shadow-sm">Voltar</a>
         </div>
     </div>
 
-    <div class="card mb-4 shadow-sm">
+    <div class="card shadow-sm border-0 mb-4 rounded-4">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-center">
-                <div class="col-auto">
-                    <label class="col-form-label">Mês:</label>
-                </div>
-                <div class="col-auto">
-                    <input type="number" name="mes" class="form-control" value="{{ mes_atual }}" min="1" max="12" required>
-                </div>
-                <div class="col-auto">
-                    <label class="col-form-label">Ano:</label>
-                </div>
-                <div class="col-auto">
-                    <input type="number" name="ano" class="form-control" value="{{ ano_atual }}" required>
-                </div>
-                <div class="col-auto">
-                    <button type="submit" class="btn btn-primary">Filtrar Relatório</button>
-                </div>
+                <div class="col-auto"><label class="col-form-label fw-bold">Mês Referência:</label></div>
+                <div class="col-auto"><input type="number" name="mes" class="form-control" value="{{ mes_atual }}" min="1" max="12" required></div>
+                <div class="col-auto"><label class="col-form-label fw-bold">Ano:</label></div>
+                <div class="col-auto"><input type="number" name="ano" class="form-control" value="{{ ano_atual }}" required></div>
+                <div class="col-auto"><button type="submit" class="btn btn-dark">Filtrar</button></div>
             </form>
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-md-6 mb-4">
-            <div class="card border-success shadow h-100">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0">Receitas (Entradas)</h5>
+    <h4 class="text-success fw-bold border-bottom border-success pb-2"><i class="fas fa-arrow-down"></i> Entradas e Receitas</h4>
+    <div class="row mb-5">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 rounded-4 h-100">
+                <div class="card-header bg-white fw-bold text-success">Vendas de Veículos (Lucro da Loja)</div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0 font-sm">
+                        <thead class="table-light"><tr><th>Data</th><th>Veículo</th><th class="text-end">Lucro</th></tr></thead>
+                        <tbody>
+                            {% for venda in relatorio.vendas_list %}
+                            <tr>
+                                <td>{{ venda.data_venda|date:"d/m/Y" }}</td>
+                                <td>{{ venda.modelo_veiculo }} ({{ venda.placa }})</td>
+                                <td class="text-end text-success">+ R$ {{ venda.lucro_loja }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="text-center text-muted">Nenhuma venda aprovada.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light fw-bold"><tr><td colspan="2">TOTAL VENDAS</td><td class="text-end text-success">R$ {{ relatorio.lucro_vendas|floatformat:2 }}</td></tr></tfoot>
+                    </table>
                 </div>
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Lucro de Vendas da Loja
-                        <span class="fw-bold text-success">R$ {{ relatorio.lucro_vendas|floatformat:2 }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Receitas Extras (Financiamentos, Bônus)
-                        <span class="fw-bold text-success">R$ {{ relatorio.receitas_extras|floatformat:2 }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center bg-light">
-                        <strong>Total de Entradas</strong>
-                        <strong class="text-success">R$ {{ relatorio.total_entradas|floatformat:2 }}</strong>
-                    </li>
-                </ul>
             </div>
         </div>
-
-        <div class="col-md-6 mb-4">
-            <div class="card border-danger shadow h-100">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0">Despesas (Saídas)</h5>
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 rounded-4 h-100">
+                <div class="card-header bg-white fw-bold text-success">Receitas Extras (Bônus, Retornos)</div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0 font-sm">
+                        <thead class="table-light"><tr><th>Data Pgto</th><th>Descrição</th><th class="text-end">Valor</th></tr></thead>
+                        <tbody>
+                            {% for receita in relatorio.receitas_list %}
+                            <tr>
+                                <td>{{ receita.data_pagamento|date:"d/m/Y" }}</td>
+                                <td>{{ receita.descricao }}</td>
+                                <td class="text-end text-success">+ R$ {{ receita.valor }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="text-center text-muted">Nenhuma receita extra.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light fw-bold"><tr><td colspan="2">TOTAL EXTRAS</td><td class="text-end text-success">R$ {{ relatorio.receitas_extras|floatformat:2 }}</td></tr></tfoot>
+                    </table>
                 </div>
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Despesas Operacionais (Fixas/Variáveis/Veículos)
-                        <span class="fw-bold text-danger">R$ {{ relatorio.despesas_loja|floatformat:2 }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Folha: Salários Base
-                        <span class="fw-bold text-danger">R$ {{ relatorio.custo_salario|floatformat:2 }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Folha: Bônus Manuais Lançados
-                        <span class="fw-bold text-danger">R$ {{ relatorio.custo_bonus|floatformat:2 }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center bg-light">
-                        <strong>Total de Saídas</strong>
-                        <strong class="text-danger">R$ {{ relatorio.total_saidas|floatformat:2 }}</strong>
-                    </li>
-                </ul>
             </div>
         </div>
     </div>
 
-    <div class="card shadow {% if relatorio.saldo_liquido >= 0 %}border-success{% else %}border-danger{% endif %} mt-2">
-        <div class="card-body text-center p-4">
-            <h3 class="mb-1">Resultado Líquido do Mês</h3>
-            <h1 class="display-4 fw-bold {% if relatorio.saldo_liquido >= 0 %}text-success{% else %}text-danger{% endif %}">
-                R$ {{ relatorio.saldo_liquido|floatformat:2 }}
-            </h1>
+    <h4 class="text-danger fw-bold border-bottom border-danger pb-2"><i class="fas fa-arrow-up"></i> Saídas e Despesas</h4>
+    <div class="row mb-5">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 rounded-4 h-100">
+                <div class="card-header bg-white fw-bold text-danger">Despesas Operacionais (Contas e Veículos)</div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0 font-sm">
+                        <thead class="table-light"><tr><th>Data Pgto</th><th>Categoria / Descrição</th><th class="text-end">Valor</th></tr></thead>
+                        <tbody>
+                            {% for despesa in relatorio.despesas_list %}
+                            <tr>
+                                <td>{{ despesa.data_pagamento|date:"d/m/Y" }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ despesa.get_categoria_display }}</span><br>
+                                    {{ despesa.descricao }} {% if despesa.placa %}({{ despesa.placa }}){% endif %}
+                                </td>
+                                <td class="text-end text-danger">- R$ {{ despesa.valor }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="text-center text-muted">Nenhuma despesa registada.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light fw-bold"><tr><td colspan="2">TOTAL DESPESAS</td><td class="text-end text-danger">R$ {{ relatorio.despesas_loja|floatformat:2 }}</td></tr></tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 rounded-4 h-100">
+                <div class="card-header bg-white fw-bold text-danger">Folha de Pagamento (RH)</div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0 font-sm">
+                        <thead class="table-light"><tr><th>Funcionário</th><th>Salário Base</th><th class="text-end">Bônus Manuais</th></tr></thead>
+                        <tbody>
+                            {% for folha in relatorio.folhas_list %}
+                            <tr>
+                                <td>{{ folha.funcionario.user.get_full_name|default:folha.funcionario.user.username }}</td>
+                                <td class="text-danger">- R$ {{ folha.salario_base }}</td>
+                                <td class="text-end text-danger">- R$ {{ folha.total_creditos_manuais }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="text-center text-muted">Nenhuma folha gerada.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light fw-bold"><tr><td>TOTAL RH</td><td>R$ {{ relatorio.custo_salario|floatformat:2 }}</td><td class="text-end text-danger">R$ {{ relatorio.custo_bonus|floatformat:2 }}</td></tr></tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow border-0 rounded-4 {% if relatorio.saldo_liquido >= 0 %}bg-success text-white{% else %}bg-danger text-white{% endif %}">
+                <div class="card-body text-center p-5">
+                    <h3 class="mb-3 opacity-75">Resultado Líquido do Mês</h3>
+                    <h1 class="display-3 fw-bold mb-0">R$ {{ relatorio.saldo_liquido|floatformat:2 }}</h1>
+                    <div class="mt-3">
+                        <span class="me-4"><i class="fas fa-plus-circle"></i> Entradas: R$ {{ relatorio.total_entradas|floatformat:2 }}</span>
+                        <span><i class="fas fa-minus-circle"></i> Saídas: R$ {{ relatorio.total_saidas|floatformat:2 }}</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<style>
+    .font-sm { font-size: 0.9rem; }
+    .table-hover tbody tr:hover { background-color: #f8f9fa; }
+</style>
 {% endblock %}
