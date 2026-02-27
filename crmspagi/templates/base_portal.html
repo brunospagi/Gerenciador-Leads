@@ -3,226 +3,200 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Gerenciador de Leads - CRM{% endblock %}</title>
+    <title>CRM Spagi - Painel de Controle</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --sidebar-bg: #0f172a;
+            --sidebar-hover: #1e293b;
+            --primary-color: #3b82f6;
+            --text-color: #334155;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f4f6f9;
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             overflow-x: hidden;
         }
         
-        /* Layout Principal */
-        #wrapper {
-            display: flex;
-            width: 100%;
-            align-items: stretch;
-        }
+        /* Layout Flex */
+        #wrapper { display: flex; width: 100%; min-height: 100vh; }
 
-        /* Menu Lateral (Sidebar) */
+        /* --- SIDEBAR PREMIUM --- */
         #sidebar {
-            min-width: 250px;
-            max-width: 250px;
-            background: #212529; /* Cor Escura */
+            min-width: 260px;
+            max-width: 260px;
+            background: var(--sidebar-bg);
             color: #fff;
-            transition: all 0.3s;
-            min-height: 100vh;
-        }
-        
-        #sidebar.active {
-            margin-left: -250px;
-        }
-
-        #sidebar .sidebar-header {
-            padding: 20px;
-            background: #1a1e21;
-            text-align: center;
-            border-bottom: 1px solid #343a40;
-        }
-
-        #sidebar ul.components {
-            padding: 20px 0;
-        }
-
-        #sidebar ul li a {
-            padding: 12px 20px;
-            font-size: 1.05em;
-            display: block;
-            color: #adb5bd;
-            text-decoration: none;
-            transition: 0.2s;
-        }
-
-        #sidebar ul li a:hover {
-            color: #fff;
-            background: #343a40;
-            border-left: 4px solid #0d6efd;
-        }
-
-        #sidebar ul li a i {
-            margin-right: 10px;
-            width: 20px;
-            text-align: center;
-        }
-
-        /* Conteúdo Principal */
-        #content {
-            width: 100%;
-            min-height: 100vh;
-            transition: all 0.3s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+            z-index: 1000;
         }
 
-        /* Barra Superior (Navbar) */
+        #sidebar.active { margin-left: -260px; }
+
+        .sidebar-brand {
+            padding: 25px 20px;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            background: linear-gradient(90deg, #0f172a, #1e293b);
+        }
+
+        .sidebar-brand i { color: var(--primary-color); }
+
+        .sidebar-menu { padding: 20px 0; flex-grow: 1; }
+
+        .sidebar-menu ul { list-style: none; padding: 0; margin: 0; }
+
+        .sidebar-menu li a {
+            padding: 14px 25px;
+            display: flex;
+            align-items: center;
+            color: #94a3b8;
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: 0.3s;
+            border-left: 4px solid transparent;
+        }
+
+        .sidebar-menu li a:hover, .sidebar-menu li a.active {
+            color: #fff;
+            background: var(--sidebar-hover);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .sidebar-menu li a i {
+            margin-right: 15px;
+            font-size: 1.1rem;
+            width: 25px;
+            text-align: center;
+        }
+
+        .menu-header {
+            padding: 15px 25px 5px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: #475569;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        /* --- CONTEÚDO PRINCIPAL --- */
+        #content-wrapper { width: 100%; display: flex; flex-direction: column; transition: all 0.3s; }
+
+        /* Navbar Superior */
         .top-navbar {
             background: #fff;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            padding: 10px 20px;
+            padding: 15px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 999;
         }
 
-        .main-body {
-            padding: 20px;
-            flex-grow: 1;
+        .btn-toggle {
+            background: none; border: none; font-size: 1.5rem; color: #64748b; cursor: pointer; transition: 0.2s;
         }
+        .btn-toggle:hover { color: var(--primary-color); }
+
+        /* Card do Usuário (Top Navbar) */
+        .user-profile-nav { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 1.2rem; }
+
+        /* Área de Conteúdo */
+        .main-content { padding: 30px; flex-grow: 1; }
+
+        /* Customização de Cards Global */
+        .card { border: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
+        .card-header { background: transparent; border-bottom: 1px solid #f1f5f9; padding: 20px; font-weight: 600; }
 
         /* Responsividade */
         @media (max-width: 768px) {
-            #sidebar {
-                margin-left: -250px;
-            }
-            #sidebar.active {
-                margin-left: 0;
-            }
-            #sidebarCollapse span {
-                display: none;
-            }
+            #sidebar { position: fixed; height: 100vh; margin-left: -260px; }
+            #sidebar.active { margin-left: 0; }
+            .main-content { padding: 15px; }
         }
     </style>
-    {% block extra_head %}{% endblock %}
 </head>
 <body>
 
     <div id="wrapper">
         <nav id="sidebar">
-            <div class="sidebar-header">
-                <h4 class="mb-0 text-white"><i class="fas fa-car-side text-primary"></i> CRM Spagi</h4>
-                <small class="text-muted">Gerenciador de Leads</small>
+            <div class="sidebar-brand">
+                <i class="fas fa-car-side"></i> SPAGI <span style="font-weight: 300;">CRM</span>
             </div>
 
-            <ul class="list-unstyled components">
-                
-                <li class="nav-item">
-                    <a href="/"><i class="fas fa-home"></i> Dashboard</a>
-                </li>
-                
-                <li class="nav-item">
-                    <a href="{% url 'cliente_list' %}"><i class="fas fa-users"></i> Clientes / Leads</a>
-                </li>
-                
-                <li class="nav-item">
-                    <a href="{% url 'venda_produto_list' %}"><i class="fas fa-tags"></i> Vendas Extras</a>
-                </li>
+            <div class="sidebar-menu">
+                <ul>
+                    <li class="menu-header">Menu Principal</li>
+                    <li><a href="/"><i class="fas fa-chart-pie"></i> Dashboard</a></li>
+                    <li><a href="{% url 'cliente_list' %}"><i class="fas fa-users"></i> Clientes e Leads</a></li>
+                    <li><a href="{% url 'venda_produto_list' %}"><i class="fas fa-tags"></i> Vendas e Serviços</a></li>
+                    <li><a href="{% url 'avaliacao_list' %}"><i class="fas fa-clipboard-check"></i> Avaliações</a></li>
+                    <li><a href="{% url 'financiamentos_kanban' %}"><i class="fas fa-hand-holding-usd"></i> Financiamentos</a></li>
+                    <li><a href="{% url 'procuracao_list' %}"><i class="fas fa-file-contract"></i> Documentos</a></li>
 
-                <li class="nav-item">
-                    <a href="{% url 'avaliacao_list' %}"><i class="fas fa-search-dollar"></i> Avaliações</a>
-                </li>
+                    {% if user.profile.nivel_acesso == 'ADMIN' or user.profile.pode_acessar_financeiro %}
+                    <li class="menu-header mt-3">Caixa & Finanças</li>
+                    <li><a href="{% url 'financeiro:lista_transacoes' %}"><i class="fas fa-wallet" style="color:#10b981;"></i> Gestão Financeira</a></li>
+                    {% endif %}
 
-                <li class="nav-item">
-                    <a href="{% url 'financiamentos_kanban' %}"><i class="fas fa-hand-holding-usd"></i> Financiamentos</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="{% url 'procuracao_list' %}"><i class="fas fa-file-signature"></i> Documentos</a>
-                </li>
-
-                {% if user.profile.nivel_acesso == 'ADMIN' or user.profile.pode_acessar_financeiro or user.is_superuser  %}
-                <li class="nav-item">
-                    <a href="{% url 'financeiro:lista_transacoes' %}"><i class="fas fa-wallet text-success"></i> Financeiro (DRE)</a>
-                </li>
-                {% endif %}
-
-                {% if user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
-                <hr style="border-top: 1px solid #495057; margin: 15px 20px;">
-                <p class="text-uppercase text-muted px-4" style="font-size: 0.75rem; letter-spacing: 1px;">Gestão</p>
-
-                <li class="nav-item">
-                    <a href="{% url 'lista_funcionarios' %}"><i class="fas fa-id-badge"></i> Funcionários</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="{% url 'rh_dashboard' %}"><i class="fas fa-file-invoice-dollar"></i> Folha de Pagamento</a>
-                </li>
-
-                <li class="nav-item">
-                    <a href="{% url 'user_list' %}"><i class="fas fa-user-cog"></i> Usuários do Sistema</a>
-                </li>
-                {% endif %}
-
-            </ul>
+                    {% if user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
+                    <li class="menu-header mt-3">Administração</li>
+                    <li><a href="{% url 'lista_funcionarios' %}"><i class="fas fa-id-card"></i> Equipe</a></li>
+                    <li><a href="{% url 'rh_dashboard' %}"><i class="fas fa-file-invoice-dollar"></i> RH / Folha</a></li>
+                    <li><a href="{% url 'user_list' %}"><i class="fas fa-user-shield"></i> Acessos e Perfis</a></li>
+                    {% endif %}
+                </ul>
+            </div>
         </nav>
 
-        <div id="content">
-            <nav class="navbar navbar-expand-lg top-navbar">
-                <div class="container-fluid">
-                    <button type="button" id="sidebarCollapse" class="btn btn-outline-secondary">
-                        <i class="fas fa-bars"></i>
-                    </button>
-
-                    <div class="ms-auto d-flex align-items-center">
-                        <div class="dropdown me-3">
-                            <a class="text-secondary position-relative" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fas fa-bell fs-5"></i>
-                                <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end shadow">
-                                <li><h6 class="dropdown-header">Notificações</h6></li>
-                                <li><a class="dropdown-item" href="#">Sem novas notificações</a></li>
-                            </ul>
+        <div id="content-wrapper">
+            
+            <header class="top-navbar">
+                <button class="btn-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+                
+                <div class="dropdown">
+                    <div class="user-profile-nav" data-bs-toggle="dropdown" aria-expanded="false">
+                        <div class="text-end d-none d-md-block">
+                            <h6 class="mb-0 text-dark fw-bold" style="font-size: 0.9rem;">{{ user.get_full_name|default:user.username }}</h6>
+                            <small class="text-muted">{{ user.profile.get_nivel_acesso_display|default:"Colaborador" }}</small>
                         </div>
-
-                        <div class="dropdown">
-                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <div class="rounded-circle bg-primary text-white d-flex justify-content-center align-items-center me-2" style="width: 35px; height: 35px;">
-                                    {{ user.username|make_list|first|upper }}
-                                </div>
-                                <span>{{ user.get_full_name|default:user.username }}</span>
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end shadow">
-                                <li>
-                                    <span class="dropdown-item-text text-muted small">
-                                        Perfil: {{ user.profile.get_nivel_acesso_display|default:"Padrão" }}
-                                    </span>
-                                </li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="fas fa-user me-2"></i> Meu Perfil</a></li>
-                                <li><a class="dropdown-item" href="{% url 'password_change' %}"><i class="fas fa-key me-2"></i> Alterar Senha</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <form method="post" action="{% url 'logout' %}">
-                                        {% csrf_token %}
-                                        <button type="submit" class="dropdown-item text-danger">
-                                            <i class="fas fa-sign-out-alt me-2"></i> Sair do Sistema
-                                        </button>
-                                    </form>
-                                </li>
-                            </ul>
+                        <div class="user-avatar shadow-sm">
+                            {{ user.username|make_list|first|upper }}
                         </div>
                     </div>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
+                        <li><a class="dropdown-item py-2" href="{% url 'profile' %}"><i class="fas fa-user-circle me-2 text-primary"></i> Meu Perfil</a></li>
+                        <li><a class="dropdown-item py-2" href="{% url 'password_change' %}"><i class="fas fa-lock me-2 text-primary"></i> Alterar Senha</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <form method="post" action="{% url 'logout' %}" class="px-2 pb-1">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-danger w-100"><i class="fas fa-sign-out-alt me-2"></i> Sair</button>
+                            </form>
+                        </li>
+                    </ul>
                 </div>
-            </nav>
+            </header>
 
-            <div class="main-body">
-                
+            <main class="main-content">
                 {% if messages %}
                     {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show border-0 shadow-sm rounded-3" role="alert">
                             {{ message }}
                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
@@ -231,25 +205,29 @@
 
                 {% block content %}
                 {% endblock %}
-                
-            </div>
+            </main>
 
-            <footer class="bg-white text-center py-3 text-muted border-top mt-auto shadow-sm">
-                <small>&copy; {% now "Y" %} CRM Spagi - Gerenciador de Leads. Todos os direitos reservados.</small>
-            </footer>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
     <script>
+        // Lógica de abertura do Sidebar
+        document.getElementById('sidebarToggle').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.toggle('active');
+        });
+
+        // Marcar o menu ativo baseando-se no URL atual
         document.addEventListener("DOMContentLoaded", function() {
-            document.getElementById('sidebarCollapse').addEventListener('click', function() {
-                document.getElementById('sidebar').classList.toggle('active');
+            const currentPath = window.location.pathname;
+            const menuLinks = document.querySelectorAll('.sidebar-menu a');
+            menuLinks.forEach(link => {
+                if (link.getAttribute('href') === currentPath || (currentPath.includes(link.getAttribute('href')) && link.getAttribute('href') !== '/')) {
+                    link.classList.add('active');
+                }
             });
         });
     </script>
-
     {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -2,104 +2,79 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>DRE - {{ mes_atual }}/{{ ano_atual }}</title>
+    <title>DRE Analítico - {{ mes_atual }}/{{ ano_atual }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { 
-            background: white; 
-            font-size: 14pt; 
-            color: #000; 
-            padding: 20px;
-        }
-        .print-area { 
-            max-width: 800px; 
-            margin: 0 auto; 
-        }
-        .table { margin-top: 20px; border-color: #000; }
-        .table th, .table td { border-color: #000; }
-        .header-title { 
-            border-bottom: 2px solid #000; 
-            padding-bottom: 10px; 
-            margin-bottom: 20px; 
-        }
-        .total-box { 
-            border: 2px solid #000; 
-            padding: 15px; 
-            text-align: center; 
-            margin-top: 30px; 
-            background-color: #f8f9fa !important; 
-            -webkit-print-color-adjust: exact; 
-        }
-        
-        /* Oculta os botões na hora de gerar o PDF/Papel */
-        @media print {
-            .no-print { display: none !important; }
-        }
+        body { background: white; font-size: 12pt; color: #000; font-family: sans-serif; }
+        .print-area { max-width: 900px; margin: 0 auto; padding: 20px; }
+        .table { margin-top: 15px; border-color: #000; }
+        .table th, .table td { border-color: #000; padding: 6px 8px; }
+        .header-title { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; text-align: center; }
+        .section-title { background-color: #f1f1f1 !important; -webkit-print-color-adjust: exact; font-weight: bold; }
+        .total-box { border: 2px solid #000; padding: 15px; text-align: center; margin-top: 20px; background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; }
+        @media print { .no-print { display: none !important; } }
     </style>
 </head>
 <body onload="window.print()">
     <div class="print-area">
-        
         <div class="no-print text-end mb-4">
-            <button onclick="window.print()" class="btn btn-primary">Imprimir Agora</button>
+            <button onclick="window.print()" class="btn btn-primary">Imprimir PDF</button>
             <button onclick="window.close()" class="btn btn-secondary">Fechar</button>
         </div>
 
-        <div class="text-center">
-            <h2 class="header-title">Demonstração de Resultados (DRE) - Mês {{ mes_atual }}/{{ ano_atual }}</h2>
-        </div>
+        <h2 class="header-title">Demonstração de Resultados (DRE Analítico) - Mês {{ mes_atual }}/{{ ano_atual }}</h2>
         
-        <table class="table table-bordered">
-            <thead class="table-light" style="-webkit-print-color-adjust: exact; background-color: #e9ecef !important;">
-                <tr><th colspan="2">1. RECEITAS (ENTRADAS)</th></tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Lucro de Vendas de Veículos da Loja</td>
-                    <td class="text-end">R$ {{ relatorio.lucro_vendas|floatformat:2 }}</td>
-                </tr>
-                <tr>
-                    <td>Receitas Extras (Financiamentos, Bônus, etc.)</td>
-                    <td class="text-end">R$ {{ relatorio.receitas_extras|floatformat:2 }}</td>
-                </tr>
-                <tr style="-webkit-print-color-adjust: exact; background-color: #e9ecef !important;" class="fw-bold">
-                    <td>TOTAL DE ENTRADAS</td>
-                    <td class="text-end">R$ {{ relatorio.total_entradas|floatformat:2 }}</td>
-                </tr>
-            </tbody>
+        <table class="table table-bordered table-sm">
+            <tr class="section-title"><td colspan="3">1. RECEITAS DE VENDAS (LUCRO LOJA)</td></tr>
+            {% for venda in relatorio.vendas_list %}
+            <tr>
+                <td width="15%">{{ venda.data_venda|date:"d/m/Y" }}</td>
+                <td width="65%">{{ venda.modelo_veiculo }} ({{ venda.placa }})</td>
+                <td width="20%" class="text-end">R$ {{ venda.lucro_loja }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="fw-bold"><td colspan="2" class="text-end">TOTAL VENDAS:</td><td class="text-end">R$ {{ relatorio.lucro_vendas|floatformat:2 }}</td></tr>
+
+            <tr class="section-title"><td colspan="3">2. RECEITAS EXTRAS (FINANCIAMENTOS, BÔNUS)</td></tr>
+            {% for receita in relatorio.receitas_list %}
+            <tr>
+                <td>{{ receita.data_pagamento|date:"d/m/Y" }}</td>
+                <td>{{ receita.descricao }}</td>
+                <td class="text-end">R$ {{ receita.valor }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="fw-bold"><td colspan="2" class="text-end">TOTAL EXTRAS:</td><td class="text-end">R$ {{ relatorio.receitas_extras|floatformat:2 }}</td></tr>
+            
+            <tr class="section-title fs-5"><td colspan="2" class="text-end">SOMA DAS ENTRADAS:</td><td class="text-end">R$ {{ relatorio.total_entradas|floatformat:2 }}</td></tr>
         </table>
 
-        <table class="table table-bordered mt-4">
-            <thead class="table-light" style="-webkit-print-color-adjust: exact; background-color: #e9ecef !important;">
-                <tr><th colspan="2">2. DESPESAS (SAÍDAS)</th></tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Despesas Operacionais (Contas Fixas, Variáveis, Veículos)</td>
-                    <td class="text-end">R$ {{ relatorio.despesas_loja|floatformat:2 }}</td>
-                </tr>
-                <tr>
-                    <td>Folha de Pagamento: Salários Base</td>
-                    <td class="text-end">R$ {{ relatorio.custo_salario|floatformat:2 }}</td>
-                </tr>
-                <tr>
-                    <td>Folha de Pagamento: Bônus Manuais Lançados</td>
-                    <td class="text-end">R$ {{ relatorio.custo_bonus|floatformat:2 }}</td>
-                </tr>
-                <tr style="-webkit-print-color-adjust: exact; background-color: #e9ecef !important;" class="fw-bold">
-                    <td>TOTAL DE SAÍDAS</td>
-                    <td class="text-end">R$ {{ relatorio.total_saidas|floatformat:2 }}</td>
-                </tr>
-            </tbody>
+        <table class="table table-bordered table-sm mt-4">
+            <tr class="section-title"><td colspan="3">3. DESPESAS OPERACIONAIS</td></tr>
+            {% for despesa in relatorio.despesas_list %}
+            <tr>
+                <td width="15%">{{ despesa.data_pagamento|date:"d/m/Y" }}</td>
+                <td width="65%">[{{ despesa.get_categoria_display }}] {{ despesa.descricao }} {% if despesa.placa %}({{ despesa.placa }}){% endif %}</td>
+                <td width="20%" class="text-end">R$ {{ despesa.valor }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="fw-bold"><td colspan="2" class="text-end">TOTAL OPERACIONAL:</td><td class="text-end">R$ {{ relatorio.despesas_loja|floatformat:2 }}</td></tr>
+
+            <tr class="section-title"><td colspan="3">4. FOLHA DE PAGAMENTO (RH)</td></tr>
+            {% for folha in relatorio.folhas_list %}
+            <tr>
+                <td>{{ folha.funcionario.user.get_full_name|default:folha.funcionario.user.username }}</td>
+                <td>Salário: R$ {{ folha.salario_base }} | Bônus: R$ {{ folha.total_creditos_manuais }}</td>
+                <td class="text-end">R$ {{ folha.salario_base|add:folha.total_creditos_manuais }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="fw-bold"><td colspan="2" class="text-end">TOTAL RH:</td><td class="text-end">R$ {{ relatorio.custo_rh|floatformat:2 }}</td></tr>
+            
+            <tr class="section-title fs-5"><td colspan="2" class="text-end">SOMA DAS SAÍDAS:</td><td class="text-end">R$ {{ relatorio.total_saidas|floatformat:2 }}</td></tr>
         </table>
 
         <div class="total-box">
-            <h4 class="mb-1">RESULTADO LÍQUIDO DO MÊS</h4>
-            <h1 class="mb-0 fw-bold">R$ {{ relatorio.saldo_liquido|floatformat:2 }}</h1>
-        </div>
-        
-        <div class="mt-5 text-center text-muted" style="font-size: 10pt;">
-            Relatório gerado pelo Sistema em {% now "d/m/Y \à\s H:i" %}
+            <h4>RESULTADO LÍQUIDO DO MÊS</h4>
+            <h1>R$ {{ relatorio.saldo_liquido|floatformat:2 }}</h1>
         </div>
     </div>
 </body>

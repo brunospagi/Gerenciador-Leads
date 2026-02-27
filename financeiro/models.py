@@ -83,27 +83,29 @@ class TransacaoFinanceira(models.Model):
 
 
 def gerar_relatorio_DRE_mensal(mes, ano):
-    """Calcula o lucro final abatendo despesas da loja e da folha de pagamento."""
+    """Calcula o lucro final e retorna os detalhes de cada transação."""
     
-    # 1. Receitas de Vendas
-    vendas = VendaProduto.objects.filter(data_venda__month=mes, data_venda__year=ano, status='APROVADO')
+    # 1. Receitas de Vendas (Detalhado)
+    vendas = VendaProduto.objects.filter(data_venda__month=mes, data_venda__year=ano, status='APROVADO').order_by('data_venda')
     lucro_vendas = vendas.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
 
-    # 2. Receitas Extras (Retornos, etc)
-    receitas_extras = TransacaoFinanceira.objects.filter(
+    # 2. Receitas Extras (Detalhado)
+    receitas_list = TransacaoFinanceira.objects.filter(
         tipo='RECEITA', efetivado=True, data_pagamento__month=mes, data_pagamento__year=ano
-    ).aggregate(Sum('valor'))['valor__sum'] or 0
+    ).order_by('data_pagamento')
+    receitas_extras = receitas_list.aggregate(Sum('valor'))['valor__sum'] or 0
 
     total_entradas = lucro_vendas + receitas_extras
 
-    # 3. Despesas da Loja
-    despesas_loja = TransacaoFinanceira.objects.filter(
+    # 3. Despesas da Loja (Detalhado)
+    despesas_list = TransacaoFinanceira.objects.filter(
         tipo='DESPESA', efetivado=True, data_pagamento__month=mes, data_pagamento__year=ano
-    ).aggregate(Sum('valor'))['valor__sum'] or 0
+    ).order_by('data_pagamento')
+    despesas_loja = despesas_list.aggregate(Sum('valor'))['valor__sum'] or 0
 
-    # 4. Despesas de RH
-    folhas = FolhaPagamento.objects.filter(mes=mes, ano=ano)
-    agregado_rh = folhas.aggregate(
+    # 4. Despesas de RH (Detalhado)
+    folhas_list = FolhaPagamento.objects.filter(mes=mes, ano=ano).select_related('funcionario')
+    agregado_rh = folhas_list.aggregate(
         total_base=Sum('salario_base'),
         total_bonus=Sum('total_creditos_manuais')
     )
@@ -115,10 +117,14 @@ def gerar_relatorio_DRE_mensal(mes, ano):
 
     return {
         'mes': mes, 'ano': ano,
+        'vendas_list': vendas,
         'lucro_vendas': lucro_vendas,
+        'receitas_list': receitas_list,
         'receitas_extras': receitas_extras,
         'total_entradas': total_entradas,
+        'despesas_list': despesas_list,
         'despesas_loja': despesas_loja,
+        'folhas_list': folhas_list,
         'custo_salario': custo_salario,
         'custo_bonus': custo_bonus,
         'custo_rh': custo_rh,
