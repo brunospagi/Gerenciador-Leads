@@ -126,164 +126,142 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+
 <script>
-// ================= VARIÁVEIS =================
-const video = document.getElementById('videoElement');
-const canvas = document.getElementById('canvasElement');
-const photoPreview = document.getElementById('photoPreview');
+const video = document.getElementById('video');
+const statusDiv = document.getElementById('status');
 const refImage = document.getElementById('refImage');
-const statusDiv = document.getElementById('ai-status');
 
 let referenceDescriptor = null;
-let piscou = false;
-let olhosFechados = false;
+let blinkValidated = false;
+let blinkState = "open";
+let closedFrames = 0;
 
-const DISTANCE_THRESHOLD = 0.60;
-const EAR_THRESHOLD = 0.20;
+const EAR_THRESHOLD = 0.27;   // 🔥 Ajuste fino
+const MIN_FRAMES_CLOSED = 2;  // Piscada realista
+const FACE_MATCH_THRESHOLD = 0.55;
 
-// ================= AUXILIARES =================
-function distancia(a, b) {
+function distance(a, b) {
     return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function calcularEAR(eye) {
-    const A = distancia(eye[1], eye[5]);
-    const B = distancia(eye[2], eye[4]);
-    const C = distancia(eye[0], eye[3]);
+    const A = distance(eye[1], eye[5]);
+    const B = distance(eye[2], eye[4]);
+    const C = distance(eye[0], eye[3]);
     return (A + B) / (2.0 * C);
 }
 
-// ================= INICIAR IA =================
+function validarPiscada(landmarks) {
+    const leftEAR = calcularEAR(landmarks.getLeftEye());
+    const rightEAR = calcularEAR(landmarks.getRightEye());
+    const ear = (leftEAR + rightEAR) / 2;
+
+    console.log("EAR:", ear.toFixed(3));
+
+    if (ear < EAR_THRESHOLD) {
+        closedFrames++;
+
+        if (closedFrames >= MIN_FRAMES_CLOSED && blinkState === "open") {
+            blinkState = "closed";
+        }
+    } else {
+        if (blinkState === "closed") {
+            blinkValidated = true;
+            blinkState = "open";
+            console.log("✅ PISCADA VALIDADA");
+        }
+        closedFrames = 0;
+    }
+}
+
 async function iniciarIA() {
     const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
 
     await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
         faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
         faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
     ]);
 
-    if (refImage) {
-        await new Promise(resolve => {
-            if (refImage.complete && refImage.naturalWidth !== 0) resolve();
-            else refImage.onload = resolve;
-        });
+    console.log("Modelos carregados");
 
-        const detection = await faceapi
-            .detectSingleFace(refImage, new faceapi.TinyFaceDetectorOptions())
-            .withFaceLandmarks()
-            .withFaceDescriptor();
+    await new Promise((resolve) => {
+        if (refImage.complete) resolve();
+        else refImage.onload = resolve;
+    });
 
-        if (detection) {
-            referenceDescriptor = detection.descriptor;
-        }
-    }
-
-    statusDiv.className = 'alert alert-info shadow-sm';
-    statusDiv.innerHTML = 'Piscar os olhos para validar identidade 👁️';
-
-    ligarCamera();
-    monitorarPiscada();
-}
-
-// ================= PISCADA =================
-async function monitorarPiscada() {
-    setInterval(async () => {
-        const detection = await faceapi
-            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-            .withFaceLandmarks();
-
-        if (!detection) return;
-
-        const landmarks = detection.landmarks;
-        const leftEye = landmarks.getLeftEye();
-        const rightEye = landmarks.getRightEye();
-
-        const earLeft = calcularEAR(leftEye);
-        const earRight = calcularEAR(rightEye);
-        const ear = (earLeft + earRight) / 2;
-
-        if (ear < EAR_THRESHOLD) {
-            olhosFechados = true;
-        }
-
-        if (olhosFechados && ear > EAR_THRESHOLD + 0.05) {
-            piscou = true;
-            statusDiv.className = 'alert alert-success shadow-sm';
-            statusDiv.innerHTML = 'Piscada detectada! Pode registrar o ponto ✅';
-        }
-    }, 300);
-}
-
-// ================= CÂMERA =================
-function ligarCamera() {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-        .then(stream => {
-            video.srcObject = stream;
-            liberarBotoes();
-        })
-        .catch(() => alert("Permita acesso à câmera."));
-}
-
-// ================= LIBERAR BOTÕES =================
-function liberarBotoes() {
-    const temEntrada = {% if ponto.entrada %}true{% else %}false{% endif %};
-    const temSaidaAlmoco = {% if ponto.saida_almoco %}true{% else %}false{% endif %};
-    const temRetornoAlmoco = {% if ponto.retorno_almoco %}true{% else %}false{% endif %};
-    const temSaida = {% if ponto.saida %}true{% else %}false{% endif %};
-
-    if (!temEntrada) btnEntrada.disabled = false;
-    if (temEntrada && !temSaidaAlmoco) btnSaidaAlmoco.disabled = false;
-    if (temSaidaAlmoco && !temRetornoAlmoco) btnRetornoAlmoco.disabled = false;
-    if (temRetornoAlmoco && !temSaida) btnSaida.disabled = false;
-}
-
-// ================= FOTO =================
-function tirarFoto(tipoInterno, nomeAmigavel) {
-    if (!piscou) {
-        alert("Você precisa piscar antes de registrar.");
-        return;
-    }
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-
-    const dataURL = canvas.toDataURL('image/jpeg', 0.8);
-    photoPreview.src = dataURL;
-
-    document.getElementById('fotoBase64Input').value = dataURL;
-    document.getElementById('tipoBatidaInput').value = tipoInterno;
-    document.getElementById('lblTipoBatida').innerText = nomeAmigavel;
-
-    liveCameraSection.style.display = 'none';
-    confirmationSection.style.display = 'block';
-}
-
-// ================= VALIDAÇÃO =================
-async function confirmarPonto() {
     const detection = await faceapi
-        .detectSingleFace(photoPreview, new faceapi.TinyFaceDetectorOptions())
+        .detectSingleFace(refImage)
         .withFaceLandmarks()
         .withFaceDescriptor();
 
     if (!detection) {
-        alert("Nenhum rosto detectado.");
+        statusDiv.innerHTML = "❌ Rosto não encontrado na foto do RH";
         return;
     }
 
-    const distance = faceapi.euclideanDistance(
-        referenceDescriptor,
-        detection.descriptor
-    );
+    referenceDescriptor = detection.descriptor;
 
-    if (distance < DISTANCE_THRESHOLD) {
-        pontoForm.submit();
-    } else {
-        alert("Rosto não corresponde.");
-    }
+    statusDiv.innerHTML = "👁 Piscando para validar presença...";
+    ligarCamera();
 }
 
-iniciarIA();
+async function ligarCamera() {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+
+    video.addEventListener('play', () => {
+        const canvas = faceapi.createCanvasFromMedia(video);
+        document.body.append(canvas);
+
+        const displaySize = {
+            width: video.width,
+            height: video.height
+        };
+
+        faceapi.matchDimensions(canvas, displaySize);
+
+        setInterval(async () => {
+
+            const detection = await faceapi
+                .detectSingleFace(video)
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            if (!detection) {
+                statusDiv.innerHTML = "❌ Nenhum rosto detectado";
+                return;
+            }
+
+            const resized = faceapi.resizeResults(detection, displaySize);
+
+            canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+
+            faceapi.draw.drawDetections(canvas, resized);
+
+            validarPiscada(detection.landmarks);
+
+            const distance = faceapi.euclideanDistance(
+                referenceDescriptor,
+                detection.descriptor
+            );
+
+            console.log("Distância facial:", distance.toFixed(3));
+
+            if (distance < FACE_MATCH_THRESHOLD && blinkValidated) {
+                statusDiv.innerHTML = "✅ Presença confirmada com liveness!";
+                console.log("ACESSO LIBERADO");
+
+                blinkValidated = false; // evita múltiplas validações
+            }
+
+        }, 150);
+
+    });
+}
+
+window.onload = iniciarIA;
 </script>
 {% endblock %}
