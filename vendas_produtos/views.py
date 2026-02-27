@@ -278,7 +278,7 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
             ids_para_processar = list(ids_titulares | ids_ajudantes)
             if None in ids_para_processar: ids_para_processar.remove(None)
         
-        # Adiciona o próprio usuário logado se ele for admin/gerente e não tiver vendas (para aparecer a seção dele com as comissões de gerência)
+        # Adiciona o próprio usuário logado se ele for admin/gerente e não tiver vendas
         if not vendedor_id_filter:
             if self.request.user.id not in ids_para_processar and (self.request.user.is_superuser or getattr(self.request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']):
                 ids_para_processar.append(self.request.user.id)
@@ -300,11 +300,10 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
                 
                 total_geral = soma_titular + soma_ajudante
 
-                # 3. Se for GERENTE/ADMIN, busca as vendas da equipe para pagar a comissão de gerência
-                # Regra: R$ 150 Carro / R$ 80 Moto (Apenas Aprovados e de outros vendedores)
+                # 3. Se for EXCLUSIVAMENTE GERENTE, busca vendas da equipe (ADMIN fica de fora)
                 is_gerente_row = False
                 try:
-                    if vendedor_obj.is_superuser or vendedor_obj.profile.nivel_acesso in ['ADMIN', 'GERENTE']:
+                    if vendedor_obj.profile.nivel_acesso == 'GERENTE':
                         is_gerente_row = True
                 except: pass
 
@@ -315,7 +314,6 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
                     ).exclude(vendedor=vendedor_obj)
                     
                     for v in vendas_equipe:
-                        # Cria uma cópia ou atributo dinâmico para não alterar o objeto original em outras listas
                         v.is_comissao_gerente = True
                         if v.tipo_produto == 'VENDA_VEICULO':
                             v.valor_comissao_gerente = Decimal('150.00')

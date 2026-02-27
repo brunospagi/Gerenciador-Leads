@@ -160,7 +160,7 @@
                                         </small>
                                     {% endif %}
                                     
-                                    {# --- MOSTRA SE É UMA VENDA DA EQUIPE (COMISSÃO GERENTE) --- #}
+                                    {# Mostra tag de Gerência apenas para o Gerente #}
                                     {% if venda.is_comissao_gerente %}
                                         <div class="small text-purple fw-bold mt-1">
                                             <i class="fa fa-users me-1"></i> Venda de: {{ venda.vendedor.first_name|default:venda.vendedor.username }}
@@ -178,7 +178,7 @@
                                 <td class="text-end align-middle pe-3">
                                     <div class="fw-bold">
                                         {% if venda.is_comissao_gerente %}
-                                            {# COMISSÃO DE GERÊNCIA #}
+                                            {# COMISSÃO EXCLUSIVA DE GERENTE #}
                                             <span class="text-purple">R$ {{ venda.valor_comissao_gerente|floatformat:2 }}</span>
                                             <span class="badge bg-purple border border-purple text-white ms-1" style="font-size: 0.6rem;">GERÊNCIA</span>
                                         
