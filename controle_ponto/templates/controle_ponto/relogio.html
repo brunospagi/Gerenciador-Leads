@@ -28,8 +28,11 @@
             </p>
 
             {% if foto_url %}
-            <img id="refImage" src="{{ foto_url }}" style="display:none;">
-            {% endif %}
+            <img id="refImage"
+                src="{{ foto_url }}"
+                crossorigin="anonymous"
+                style="display:none;">            
+                {% endif %}
 
             <!-- ================= CAMERA ================= -->
             <div id="liveCameraSection">
