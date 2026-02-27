@@ -1,0 +1,23 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow border-danger">
+                <div class="card-body text-center">
+                    <h4 class="text-danger mb-4">Apagar Lançamento?</h4>
+                    <p>Tem a certeza que deseja apagar o registo <strong>{{ object.descricao }}</strong> no valor de <strong>R$ {{ object.valor }}</strong>?</p>
+                    <p class="text-muted"><small>Esta ação não pode ser desfeita e irá afetar o saldo dos relatórios mensais.</small></p>
+                    
+                    <form method="post" class="mt-4">
+                        {% csrf_token %}
+                        <a href="{% url 'financeiro:lista_transacoes' %}" class="btn btn-secondary me-2">Cancelar</a>
+                        <button type="submit" class="btn btn-danger">Sim, Apagar Registo</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

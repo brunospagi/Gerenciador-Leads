@@ -1,0 +1,96 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Relatório de Lucro e Despesas (DRE)</h2>
+        <div>
+            <a href="?mes={{ mes_atual }}&ano={{ ano_atual }}&print=1" target="_blank" class="btn btn-primary me-2">
+                🖨️ Imprimir
+            </a>
+            <a href="{% url 'financeiro:lista_transacoes' %}" class="btn btn-secondary">Voltar</a>
+        </div>
+    </div>
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-center">
+                <div class="col-auto">
+                    <label class="col-form-label">Mês:</label>
+                </div>
+                <div class="col-auto">
+                    <input type="number" name="mes" class="form-control" value="{{ mes_atual }}" min="1" max="12" required>
+                </div>
+                <div class="col-auto">
+                    <label class="col-form-label">Ano:</label>
+                </div>
+                <div class="col-auto">
+                    <input type="number" name="ano" class="form-control" value="{{ ano_atual }}" required>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">Filtrar Relatório</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card border-success shadow h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Receitas (Entradas)</h5>
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Lucro de Vendas da Loja
+                        <span class="fw-bold text-success">R$ {{ relatorio.lucro_vendas|floatformat:2 }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Receitas Extras (Financiamentos, Bônus)
+                        <span class="fw-bold text-success">R$ {{ relatorio.receitas_extras|floatformat:2 }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center bg-light">
+                        <strong>Total de Entradas</strong>
+                        <strong class="text-success">R$ {{ relatorio.total_entradas|floatformat:2 }}</strong>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card border-danger shadow h-100">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Despesas (Saídas)</h5>
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Despesas Operacionais (Fixas/Variáveis/Veículos)
+                        <span class="fw-bold text-danger">R$ {{ relatorio.despesas_loja|floatformat:2 }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Folha: Salários Base
+                        <span class="fw-bold text-danger">R$ {{ relatorio.custo_salario|floatformat:2 }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Folha: Bônus Manuais Lançados
+                        <span class="fw-bold text-danger">R$ {{ relatorio.custo_bonus|floatformat:2 }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center bg-light">
+                        <strong>Total de Saídas</strong>
+                        <strong class="text-danger">R$ {{ relatorio.total_saidas|floatformat:2 }}</strong>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow {% if relatorio.saldo_liquido >= 0 %}border-success{% else %}border-danger{% endif %} mt-2">
+        <div class="card-body text-center p-4">
+            <h3 class="mb-1">Resultado Líquido do Mês</h3>
+            <h1 class="display-4 fw-bold {% if relatorio.saldo_liquido >= 0 %}text-success{% else %}text-danger{% endif %}">
+                R$ {{ relatorio.saldo_liquido|floatformat:2 }}
+            </h1>
+        </div>
+    </div>
+</div>
+{% endblock %}

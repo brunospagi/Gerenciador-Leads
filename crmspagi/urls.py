@@ -20,5 +20,5 @@ urlpatterns = [
     path('acessos/', include('credenciais.urls')),
     path('rh/', include('folha_pagamento.urls')),
     path('funcionarios/', include('funcionarios.urls')),
-    
+    path('financeiro/', include('financeiro.urls')),
 ]

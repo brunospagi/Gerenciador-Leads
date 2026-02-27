@@ -27,6 +27,11 @@ class Profile(models.Model):
         default=False,
         verbose_name="Permissão Extra: Pode Distribuir Leads?"
     )
+
+    pode_acessar_financeiro = models.BooleanField(
+        default=False, 
+        verbose_name="Pode acessar o Financeiro? (Ver e Lançar)"
+    )
     
     avatar = models.ImageField(
         upload_to=get_avatar_upload_path,

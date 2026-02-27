@@ -1,0 +1,86 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Gestão Financeira</h2>
+        <div>
+            {% if user.profile.nivel_acesso == 'ADMIN' %}
+            <a href="{% url 'financeiro:relatorio_dre' %}" class="btn btn-info me-2">Ver Relatório DRE</a>
+            {% endif %}
+            
+            <a href="{% url 'financeiro:nova_transacao' %}" class="btn btn-primary">+ Novo Lançamento</a>
+        </div>
+    </div>
+
+    {% if user.profile.nivel_acesso != 'ADMIN' %}
+    <div class="alert alert-info shadow-sm">
+        <i class="fas fa-info-circle"></i> Apenas consegue visualizar as contas e despesas lançadas por si. Contas fixas globais são geridas pela Administração.
+    </div>
+    {% endif %}
+
+    <div class="card shadow">
+        <div class="card-body">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Vencimento</th>
+                        <th>Tipo</th>
+                        <th>Categoria</th>
+                        <th>Descrição</th>
+                        <th>Valor (R$)</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transacao in transacoes %}
+                    <tr>
+                        <td>{{ transacao.data_vencimento|date:"d/m/Y" }}</td>
+                        <td>
+                            {% if transacao.tipo == 'RECEITA' %}
+                                <span class="badge bg-success">Receita</span>
+                            {% else %}
+                                <span class="badge bg-danger">Despesa</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ transacao.get_categoria_display }}</td>
+                        <td>
+                            {{ transacao.descricao }}
+                            
+                            {% if transacao.categoria == 'VEICULO' %}
+                                <br><small class="text-muted">{{ transacao.placa }} - {{ transacao.modelo_veiculo }}</small>
+                            {% endif %}
+                            
+                            {% if user.profile.nivel_acesso == 'ADMIN' and transacao.criado_por %}
+                                <br><small class="text-primary"><i class="fas fa-user"></i> Lançado por: {{ transacao.criado_por.first_name|default:transacao.criado_por.username }}</small>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold">R$ {{ transacao.valor }}</td>
+                        <td>
+                            {% if transacao.efetivado %}
+                                <span class="badge bg-success">Efetivado</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Pendente</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.profile.nivel_acesso == 'ADMIN' %}
+                                <a href="{% url 'financeiro:editar_transacao' transacao.pk %}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
+                                <a href="{% url 'financeiro:apagar_transacao' transacao.pk %}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>
+                            {% else %}
+                                <span class="text-muted"><small>Sem permissão</small></span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">Nenhuma transação registada até ao momento.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

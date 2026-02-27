@@ -1,0 +1,83 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">{% if object %}Editar{% else %}Novo{% endif %} Lançamento Financeiro</h4>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">{{ form.tipo.label_tag }} {{ form.tipo }}</div>
+                    <div class="col-md-6">{{ form.categoria.label_tag }} {{ form.categoria }}</div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-12">{{ form.descricao.label_tag }} {{ form.descricao }}</div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">{{ form.valor.label_tag }} {{ form.valor }}</div>
+                    <div class="col-md-4">{{ form.data_vencimento.label_tag }} {{ form.data_vencimento }}</div>
+                    <div class="col-md-4">{{ form.data_pagamento.label_tag }} {{ form.data_pagamento }}</div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6 form-check ms-3">
+                        {{ form.efetivado }}
+                        <label class="form-check-label" for="{{ form.efetivado.id_for_label }}">Lançamento já foi Efetivado (Pago/Recebido)?</label>
+                    </div>
+                    <div class="col-md-6 form-check">
+                        {{ form.recorrente }}
+                        <label class="form-check-label" for="{{ form.recorrente.id_for_label }}">Conta Fixa Mensal? (Gerar para o próximo mês ao pagar)</label>
+                    </div>
+                </div>
+
+                <div class="row mb-3 bg-light p-3 border rounded" id="div-veiculos" style="display: none;">
+                    <h5>Dados do Veículo</h5>
+                    <div class="col-md-4">{{ form.placa.label_tag }} {{ form.placa }}</div>
+                    <div class="col-md-4">{{ form.modelo_veiculo.label_tag }} {{ form.modelo_veiculo }}</div>
+                    <div class="col-md-4">{{ form.ano.label_tag }} {{ form.ano }}</div>
+                </div>
+
+                {% if form.errors %}
+                    <div class="alert alert-danger">
+                        Por favor, corrija os erros abaixo.
+                        {{ form.errors }}
+                    </div>
+                {% endif %}
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-success">Guardar</button>
+                    <a href="{% url 'financeiro:lista_transacoes' %}" class="btn btn-secondary">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const categoriaSelect = document.getElementById("{{ form.categoria.id_for_label }}");
+        const divVeiculos = document.getElementById("div-veiculos");
+
+        function toggleVeiculos() {
+            if (categoriaSelect.value === "VEICULO") {
+                divVeiculos.style.display = "flex";
+            } else {
+                divVeiculos.style.display = "none";
+                // Limpar campos se não for veículo
+                document.getElementById("{{ form.placa.id_for_label }}").value = "";
+                document.getElementById("{{ form.modelo_veiculo.id_for_label }}").value = "";
+                document.getElementById("{{ form.ano.id_for_label }}").value = "";
+            }
+        }
+
+        categoriaSelect.addEventListener("change", toggleVeiculos);
+        toggleVeiculos(); // Executa no carregamento da página
+    });
+</script>
+{% endblock %}

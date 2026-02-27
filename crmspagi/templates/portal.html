@@ -126,6 +126,34 @@
         </div>
     </div>
 
+    {% if  user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.pode_acessar_financeiro %}
+    <div class="card mb-4 shadow-sm border-success border-top border-3">
+        <div class="section-title border-bottom pb-2 mb-3 mx-3 mt-3 fw-bold text-success">
+            <i class="fa fa-money-bill-wave me-2"></i> Gestão Financeira
+        </div>
+        <div class="system-grid p-3 pt-0">
+            
+            <a href="{% url 'financeiro:lista_transacoes' %}" class="system-item" style="border-left: 4px solid #198754;">
+                <div>
+                    <span class="system-name text-success">Contas e Despesas</span>
+                    <div class="system-desc text-muted">Lançamento e Fluxo</div>
+                </div>
+                <i class="fa fa-wallet system-icon text-success opacity-50"></i>
+            </a>
+
+            {% if user.profile.nivel_acesso == 'ADMIN' %}
+            <a href="{% url 'financeiro:relatorio_dre' %}" class="system-item" style="border-left: 4px solid #0dcaf0;">
+                <div>
+                    <span class="system-name text-info">Relatório DRE</span>
+                    <div class="system-desc text-muted">Balanço e Lucro do Mês</div>
+                </div>
+                <i class="fa fa-chart-pie system-icon text-info opacity-50"></i>
+            </a>
+            {% endif %}
+
+        </div>
+    </div>
+    {% endif %}
     <div class="card mb-4 shadow-sm">
         <div class="section-title border-bottom pb-2 mb-3 mx-3 mt-3 fw-bold text-secondary">
             <i class="fa fa-tools me-2"></i> Ferramentas & Utilitários
@@ -192,9 +220,9 @@
             <a href="{% url 'venda_produto_relatorio' %}" class="system-item">
                 <div>
                     <span class="system-name" style="color:#dc3545">Relatórios Gerais</span>
-                    <div class="system-desc" style="color:#666">Métricas Financeiras</div>
+                    <div class="system-desc" style="color:#666">Métricas de Vendas Extras</div>
                 </div>
-                <i class="fa fa-chart-pie system-icon" style="color:#dc3545"></i>
+                <i class="fa fa-chart-line system-icon" style="color:#dc3545"></i>
             </a>
             {% endif %}
 
