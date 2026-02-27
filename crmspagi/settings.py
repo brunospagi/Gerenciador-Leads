@@ -62,7 +62,8 @@ INSTALLED_APPS = [
     'credenciais',
     'funcionarios',  
     'folha_pagamento',
-    'financeiro',    
+    'financeiro',
+    'controle_ponto',    
 ]
 
 MIDDLEWARE = [

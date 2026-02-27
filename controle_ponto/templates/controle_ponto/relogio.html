@@ -1,0 +1,228 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+
+<div class="container mt-4 mb-5 text-center" style="max-width: 600px;">
+    <h3 class="fw-bold mb-4 text-dark"><i class="fas fa-brain text-primary"></i> Ponto Inteligente c/ IA</h3>
+    
+    <div id="ai-status" class="alert alert-warning shadow-sm">
+        <i class="fas fa-spinner fa-spin"></i> A carregar módulos de Inteligência Artificial...
+    </div>
+
+    {% if not foto_url %}
+    <div class="alert alert-danger shadow-sm">
+        <i class="fas fa-exclamation-triangle"></i> <strong>Acesso Bloqueado:</strong> Você não possui uma foto de biometria cadastrada no RH. Solicite ao gerente para atualizar seu perfil.
+    </div>
+    {% endif %}
+
+    <div class="card shadow-sm rounded-4 border-0" {% if not foto_url %}style="opacity: 0.5; pointer-events: none;"{% endif %}>
+        <div class="card-body p-4">
+            <p class="text-muted small mb-3">IP Identificado: <strong>{{ ip_atual }}</strong></p>
+
+            {% if foto_url %}
+            <img id="refImage" src="{{ foto_url }}" crossorigin="anonymous" style="display: none;">
+            {% endif %}
+
+            <div id="liveCameraSection">
+                <div class="position-relative bg-dark rounded-4 overflow-hidden mb-4 shadow-sm" style="height: 350px; border: 4px solid #f8f9fa;">
+                    <video id="videoElement" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+                    <div class="position-absolute top-50 start-50 translate-middle" style="width: 200px; height: 260px; border: 3px dashed rgba(255,255,255,0.7); border-radius: 50%;"></div>
+                </div>
+                
+                <h5 class="fw-bold text-dark mb-3">Ações de Ponto - {{ ponto.data|date:"d/m/Y" }}</h5>
+                
+                <div class="d-grid gap-2">
+                    <button id="btnEntrada" class="btn btn-lg fw-bold text-white btn-success" onclick="tirarFoto('entrada', 'Entrada')" disabled>
+                        <i class="fas fa-sign-in-alt"></i> Entrada {% if ponto.entrada %}({{ ponto.entrada|time:"H:i" }}){% endif %}
+                    </button>
+                    <button id="btnSaidaAlmoco" class="btn btn-lg fw-bold text-white btn-warning" onclick="tirarFoto('saida_almoco', 'Saída Almoço')" disabled>
+                        <i class="fas fa-utensils"></i> Saída Almoço {% if ponto.saida_almoco %}({{ ponto.saida_almoco|time:"H:i" }}){% endif %}
+                    </button>
+                    <button id="btnRetornoAlmoco" class="btn btn-lg fw-bold text-white btn-info" onclick="tirarFoto('retorno_almoco', 'Retorno Almoço')" disabled>
+                        <i class="fas fa-undo"></i> Retorno Almoço {% if ponto.retorno_almoco %}({{ ponto.retorno_almoco|time:"H:i" }}){% endif %}
+                    </button>
+                    <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger" onclick="tirarFoto('saida', 'Saída Final')" disabled>
+                        <i class="fas fa-sign-out-alt"></i> Saída Final {% if ponto.saida %}({{ ponto.saida|time:"H:i" }}){% endif %}
+                    </button>
+                </div>
+            </div>
+
+            <div id="confirmationSection" style="display: none;">
+                <div class="alert alert-primary mb-3">
+                    <h5 class="fw-bold mb-0">Validação Biométrica em curso...</h5>
+                    <small id="lblTipoBatida" class="fw-bold"></small>
+                </div>
+
+                <div class="rounded-4 overflow-hidden mb-4 shadow" style="height: 350px; border: 4px solid #0d6efd; position: relative;">
+                    <img id="photoPreview" style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);">
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-6">
+                        <button type="button" id="btnCancelar" class="btn btn-lg btn-outline-danger w-100 fw-bold" onclick="cancelarFoto()">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button type="button" id="btnConfirmar" class="btn btn-lg btn-success w-100 fw-bold shadow-sm" onclick="confirmarPonto()">
+                            <i class="fas fa-check"></i> Sim, sou eu!
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <form id="pontoForm" method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="tipo_batida" id="tipoBatidaInput">
+                <input type="hidden" name="foto_base64" id="fotoBase64Input">
+            </form>
+            <canvas id="canvasElement" style="display: none;"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- VARIÁVEIS DO SISTEMA ---
+    const video = document.getElementById('videoElement');
+    const canvas = document.getElementById('canvasElement');
+    const photoPreview = document.getElementById('photoPreview');
+    const refImage = document.getElementById('refImage');
+    const statusDiv = document.getElementById('ai-status');
+
+    let referenceDescriptor = null; // O "molde 3D" do rosto oficial
+
+    // Lógica dos botões (Bloqueia o que já foi batido)
+    const btnE = document.getElementById('btnEntrada');
+    const btnSA = document.getElementById('btnSaidaAlmoco');
+    const btnRA = document.getElementById('btnRetornoAlmoco');
+    const btnS = document.getElementById('btnSaida');
+
+    const temEntrada = {% if ponto.entrada %}true{% else %}false{% endif %};
+    const temSaidaAlmoco = {% if ponto.saida_almoco %}true{% else %}false{% endif %};
+    const temRetornoAlmoco = {% if ponto.retorno_almoco %}true{% else %}false{% endif %};
+    const temSaida = {% if ponto.saida %}true{% else %}false{% endif %};
+
+    // --- 1. INICIALIZAR A INTELIGÊNCIA ARTIFICIAL ---
+    async function iniciarIA() {
+        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+        
+        try {
+            await Promise.all([
+                faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+            ]);
+
+            // Se tiver foto de base, a IA estuda o rosto
+            if (refImage) {
+                statusDiv.innerHTML = '<i class="fas fa-user-shield"></i> A mapear a sua biometria...';
+                const detection = await faceapi.detectSingleFace(refImage).withFaceLandmarks().withFaceDescriptor();
+                
+                if (detection) {
+                    referenceDescriptor = detection.descriptor;
+                    statusDiv.className = 'alert alert-success shadow-sm';
+                    statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> IA Pronta! Biometria ativada e câmara libertada.';
+                    ligarCamera();
+                } else {
+                    statusDiv.className = 'alert alert-danger shadow-sm';
+                    statusDiv.innerHTML = '<i class="fas fa-times-circle"></i> Erro: A foto do seu perfil no RH não é nítida. Peça para trocarem.';
+                }
+            } else {
+                statusDiv.style.display = 'none'; // Erro já tratado no topo
+            }
+        } catch (e) {
+            statusDiv.className = 'alert alert-danger shadow-sm';
+            statusDiv.innerHTML = 'Erro ao ligar a Inteligência Artificial. Verifique a internet.';
+            console.error(e);
+        }
+    }
+
+    // --- 2. LIGAR A CÂMARA E BOTÕES ---
+    function ligarCamera() {
+        if (navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+                .then(stream => {
+                    video.srcObject = stream;
+                    // Liberta os botões corretos
+                    if (!temEntrada) btnE.disabled = false;
+                    if (temEntrada && !temSaidaAlmoco) btnSA.disabled = false;
+                    if (temSaidaAlmoco && !temRetornoAlmoco) btnRA.disabled = false;
+                    if (temRetornoAlmoco && !temSaida) btnS.disabled = false;
+                    
+                    // Colore os botões desativados de cinzento
+                    if(temEntrada) { btnE.className = 'btn btn-lg fw-bold text-white btn-secondary'; btnE.disabled = true; }
+                    if(temSaidaAlmoco) { btnSA.className = 'btn btn-lg fw-bold text-white btn-secondary'; btnSA.disabled = true; }
+                    if(temRetornoAlmoco) { btnRA.className = 'btn btn-lg fw-bold text-white btn-secondary'; btnRA.disabled = true; }
+                    if(temSaida) { btnS.className = 'btn btn-lg fw-bold text-white btn-secondary'; btnS.disabled = true; }
+                })
+                .catch(err => alert("Permita o acesso à câmara para o sistema de ponto funcionar."));
+        }
+    }
+
+    // Chama a função ao carregar a página
+    iniciarIA();
+
+    // --- 3. TIRAR FOTO E ABRIR CONFIRMAÇÃO ---
+    function tirarFoto(tipoInterno, nomeAmigavel) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+        photoPreview.src = dataURL;
+        
+        document.getElementById('fotoBase64Input').value = dataURL;
+        document.getElementById('tipoBatidaInput').value = tipoInterno;
+        document.getElementById('lblTipoBatida').innerText = nomeAmigavel;
+
+        document.getElementById('liveCameraSection').style.display = 'none';
+        document.getElementById('confirmationSection').style.display = 'block';
+    }
+
+    function cancelarFoto() {
+        document.getElementById('fotoBase64Input').value = '';
+        document.getElementById('confirmationSection').style.display = 'none';
+        document.getElementById('liveCameraSection').style.display = 'block';
+    }
+
+    // --- 4. A MÁGICA: VALIDAÇÃO FINAL ANTES DO SUBMIT ---
+    async function confirmarPonto() {
+        const btnConf = document.getElementById('btnConfirmar');
+        btnConf.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> A Analisar Rosto...';
+        btnConf.disabled = true;
+        document.getElementById('btnCancelar').disabled = true;
+
+        // A IA lê a foto que acabou de ser capturada
+        const detection = await faceapi.detectSingleFace(photoPreview).withFaceLandmarks().withFaceDescriptor();
+
+        if (!detection) {
+            alert("Fraude Detetada ou Má Iluminação: Nenhum rosto humano encontrado na imagem!");
+            reiniciarBotoes();
+            return;
+        }
+
+        // Calcula a distância entre os rostos (0 = idêntico, 1 = completamente diferente)
+        const distance = faceapi.euclideanDistance(referenceDescriptor, detection.descriptor);
+        
+        // Se a distância for menor que 0.55, é a mesma pessoa!
+        if (distance < 0.55) {
+            btnConf.innerHTML = '<i class="fas fa-check"></i> Biometria Aprovada!';
+            btnConf.className = 'btn btn-lg btn-success w-100 fw-bold shadow-sm';
+            document.getElementById('pontoForm').submit(); // Manda pro Django
+        } else {
+            alert(`Acesso Negado 🚫\nO rosto não corresponde ao funcionário logado.\n(Margem de erro: ${distance.toFixed(2)})`);
+            reiniciarBotoes();
+            cancelarFoto();
+        }
+    }
+
+    function reiniciarBotoes() {
+        const btnConf = document.getElementById('btnConfirmar');
+        btnConf.innerHTML = '<i class="fas fa-check"></i> Sim, sou eu!';
+        btnConf.disabled = false;
+        document.getElementById('btnCancelar').disabled = false;
+    }
+</script>
+{% endblock %}

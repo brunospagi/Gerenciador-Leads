@@ -21,4 +21,5 @@ urlpatterns = [
     path('rh/', include('folha_pagamento.urls')),
     path('funcionarios/', include('funcionarios.urls')),
     path('financeiro/', include('financeiro.urls')),
+    path('ponto/', include('controle_ponto.urls')),
 ]

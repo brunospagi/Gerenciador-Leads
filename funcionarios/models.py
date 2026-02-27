@@ -35,6 +35,13 @@ class Funcionario(models.Model):
         default=0, 
         verbose_name="Valor Diário VT (Ida+Volta)"
     )
+    
+    foto_biometria = models.ImageField(
+        upload_to='biometria/', 
+        null=True, 
+        blank=True, 
+        verbose_name="Foto Base para Biometria Facial"
+    )
 
     # Dados Bancários
     banco = models.CharField(max_length=100, verbose_name="Nome do Banco")
