@@ -4,49 +4,71 @@
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
 
 <div class="container mt-4 mb-5 text-center" style="max-width: 600px;">
-    <h3 class="fw-bold mb-4 text-dark"><i class="fas fa-camera text-primary"></i> Ponto Eletrônico c/ Biometria</h3>
+    <h3 class="fw-bold mb-4 text-dark">
+        <i class="fas fa-brain text-primary"></i> Ponto Inteligente c/ IA
+    </h3>
     
     <div id="ai-status" class="alert alert-warning shadow-sm">
-        <i class="fas fa-spinner fa-spin"></i> Iniciando sistema...
+        <i class="fas fa-spinner fa-spin"></i> A carregar módulos de Inteligência Artificial...
     </div>
 
     {% if not foto_url %}
     <div class="alert alert-danger shadow-sm">
-        <i class="fas fa-exclamation-triangle"></i> <strong>Erro:</strong> Você não possui foto de biometria cadastrada no seu perfil de funcionário.
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>Acesso Bloqueado:</strong> Você não possui foto cadastrada no RH.
     </div>
     {% endif %}
 
-    <div class="card shadow-sm rounded-4 border-0" id="mainCard" style="display: none;">
+    <div class="card shadow-sm rounded-4 border-0" {% if not foto_url %}style="opacity:0.5;pointer-events:none;"{% endif %}>
         <div class="card-body p-4">
+
             {% if foto_url %}
-            <img id="refImage" src="{{ foto_url }}" crossorigin="anonymous" style="display: none;">
+            <img id="refImage" src="{{ foto_url }}" style="display:none;">
             {% endif %}
 
             <div id="liveCameraSection">
-                <div class="position-relative bg-dark rounded-4 overflow-hidden mb-4 shadow-sm" style="height: 350px; border: 4px solid #f8f9fa;">
-                    <video id="videoElement" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
-                    <div class="position-absolute top-50 start-50 translate-middle" style="width: 200px; height: 260px; border: 3px dashed rgba(255,255,255,0.7); border-radius: 50%;"></div>
+                <div class="position-relative bg-dark rounded-4 overflow-hidden mb-4 shadow-sm" style="height:350px;">
+                    <video id="videoElement" autoplay playsinline 
+                        style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);">
+                    </video>
                 </div>
-                
+
                 <div class="d-grid gap-2">
-                    <button id="btnEntrada" class="btn btn-lg fw-bold text-white btn-success" onclick="tirarFoto('entrada', 'Entrada')" disabled>Entrada</button>
-                    <button id="btnSaidaAlmoco" class="btn btn-lg fw-bold text-white btn-warning" onclick="tirarFoto('saida_almoco', 'Saída Almoço')" disabled>Almoço</button>
-                    <button id="btnRetornoAlmoco" class="btn btn-lg fw-bold text-white btn-info" onclick="tirarFoto('retorno_almoco', 'Retorno Almoço')" disabled>Retorno</button>
-                    <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger" onclick="tirarFoto('saida', 'Saída Final')" disabled>Saída</button>
+                    <button id="btnEntrada" class="btn btn-success btn-lg fw-bold"
+                        onclick="tirarFoto('entrada','Entrada')" disabled>
+                        Entrada
+                    </button>
+
+                    <button id="btnSaida" class="btn btn-danger btn-lg fw-bold"
+                        onclick="tirarFoto('saida','Saída')" disabled>
+                        Saída
+                    </button>
                 </div>
             </div>
 
-            <div id="confirmationSection" style="display: none;">
+            <div id="confirmationSection" style="display:none;">
                 <div class="alert alert-primary mb-3">
-                    <h5 class="fw-bold mb-0">Confirmar Identidade?</h5>
+                    <h5 class="fw-bold mb-0">Validação Biométrica...</h5>
                     <small id="lblTipoBatida" class="fw-bold"></small>
                 </div>
-                <div class="rounded-4 overflow-hidden mb-4 shadow" style="height: 350px; border: 4px solid #0d6efd;">
-                    <img id="photoPreview" style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);">
+
+                <div class="rounded-4 overflow-hidden mb-4 shadow"
+                    style="height:350px;border:4px solid #0d6efd;">
+                    <img id="photoPreview"
+                        style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);">
                 </div>
+
                 <div class="row g-2">
-                    <div class="col-6"><button type="button" class="btn btn-lg btn-outline-danger w-100" onclick="cancelarFoto()">Retirar</button></div>
-                    <div class="col-6"><button type="button" id="btnConfirmar" class="btn btn-lg btn-success w-100" onclick="confirmarPonto()">Sim, sou eu!</button></div>
+                    <div class="col-6">
+                        <button type="button" id="btnCancelar"
+                            class="btn btn-outline-danger w-100"
+                            onclick="cancelarFoto()">Cancelar</button>
+                    </div>
+                    <div class="col-6">
+                        <button type="button" id="btnConfirmar"
+                            class="btn btn-success w-100"
+                            onclick="confirmarPonto()">Confirmar</button>
+                    </div>
                 </div>
             </div>
 
@@ -55,117 +77,147 @@
                 <input type="hidden" name="tipo_batida" id="tipoBatidaInput">
                 <input type="hidden" name="foto_base64" id="fotoBase64Input">
             </form>
-            <canvas id="canvasElement" style="display: none;"></canvas>
+
+            <canvas id="canvasElement" style="display:none;"></canvas>
         </div>
     </div>
 </div>
 
 <script>
-    const video = document.getElementById('videoElement');
-    const statusDiv = document.getElementById('ai-status');
-    const refImage = document.getElementById('refImage');
-    let referenceDescriptor = null;
+const video = document.getElementById('videoElement');
+const canvas = document.getElementById('canvasElement');
+const photoPreview = document.getElementById('photoPreview');
+const refImage = document.getElementById('refImage');
+const statusDiv = document.getElementById('ai-status');
 
-    async function iniciar() {
-        // VERIFICAÇÃO DE SEGURANÇA DO NAVEGADOR
-        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-            statusDiv.className = 'alert alert-danger';
-            statusDiv.innerHTML = '<strong>Erro de Segurança:</strong> A câmara só funciona em endereços <strong>HTTPS</strong> ou <strong>Localhost</strong>.';
+let referenceDescriptor = null;
+
+// ------------------ INICIAR IA ------------------
+
+async function iniciarIA() {
+    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+
+    try {
+        await Promise.all([
+            faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+            faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+            faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+        ]);
+
+        console.log("Modelos carregados.");
+
+        if (!refImage) {
+            ligarCamera();
             return;
         }
 
-        try {
-            statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando IA...';
-            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
-            
-            await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
-            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-
-            if (refImage) {
-                // Pequeno delay para garantir que a imagem carregou
-                await new Promise(r => setTimeout(r, 500)); 
-                const detection = await faceapi.detectSingleFace(refImage).withFaceLandmarks().withFaceDescriptor();
-                
-                if (detection) {
-                    referenceDescriptor = detection.descriptor;
-                    statusDiv.className = 'alert alert-success';
-                    statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Biometria Pronta!';
-                    document.getElementById('mainCard').style.display = 'block';
-                    ligarCamera();
-                } else {
-                    statusDiv.className = 'alert alert-danger';
-                    statusDiv.innerHTML = '<strong>Erro:</strong> Não foi possível identificar um rosto na sua foto de cadastro.';
-                }
+        await new Promise((resolve, reject) => {
+            if (refImage.complete && refImage.naturalWidth !== 0) {
+                resolve();
+            } else {
+                refImage.onload = resolve;
+                refImage.onerror = reject;
             }
-        } catch (e) {
-            statusDiv.className = 'alert alert-danger';
-            statusDiv.innerHTML = 'Erro técnico: ' + e.message;
-        }
-    }
+        });
 
-    function ligarCamera() {
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => {
-                video.srcObject = stream;
-                // Ativar botões baseados no ponto
-                document.getElementById('btnEntrada').disabled = {% if ponto.entrada %}true{% else %}false{% endif %};
-                document.getElementById('btnSaidaAlmoco').disabled = {% if not ponto.entrada or ponto.saida_almoco %}true{% else %}false{% endif %};
-                document.getElementById('btnRetornoAlmoco').disabled = {% if not ponto.saida_almoco or ponto.retorno_almoco %}true{% else %}false{% endif %};
-                document.getElementById('btnSaida').disabled = {% if not ponto.retorno_almoco or ponto.saida %}true{% else %}false{% endif %};
-            })
-            .catch(err => {
-                statusDiv.className = 'alert alert-danger';
-                statusDiv.innerHTML = 'Câmara bloqueada! Verifique as permissões do navegador.';
-            });
-    }
+        const detection = await faceapi
+            .detectSingleFace(refImage)
+            .withFaceLandmarks()
+            .withFaceDescriptor();
 
-    function tirarFoto(tipo, nome) {
-        const canvas = document.getElementById('canvasElement');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        const data = canvas.toDataURL('image/jpeg', 0.8);
-        
-        document.getElementById('photoPreview').src = data;
-        document.getElementById('fotoBase64Input').value = data;
-        document.getElementById('tipoBatidaInput').value = tipo;
-        document.getElementById('lblTipoBatida').innerText = nome;
-        document.getElementById('liveCameraSection').style.display = 'none';
-        document.getElementById('confirmationSection').style.display = 'block';
-    }
+        console.log("Detection:", detection);
 
-    function cancelarFoto() {
-        document.getElementById('confirmationSection').style.display = 'none';
-        document.getElementById('liveCameraSection').style.display = 'block';
-    }
-
-    async function confirmarPonto() {
-        const btn = document.getElementById('btnConfirmar');
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validando...';
-        btn.disabled = true;
-
-        const imgPreview = document.getElementById('photoPreview');
-        const detection = await faceapi.detectSingleFace(imgPreview).withFaceLandmarks().withFaceDescriptor();
-
-        if (!detection) {
-            alert("Rosto não detectado! Fique de frente para a câmara.");
-            btn.innerHTML = 'Sim, sou eu!';
-            btn.disabled = false;
-            return;
-        }
-
-        const distance = faceapi.euclideanDistance(referenceDescriptor, detection.descriptor);
-        if (distance < 0.55) {
-            document.getElementById('pontoForm').submit();
+        if (detection) {
+            referenceDescriptor = detection.descriptor;
+            statusDiv.className = 'alert alert-success shadow-sm';
+            statusDiv.innerHTML = 'IA pronta!';
         } else {
-            alert("Biometria não confere! Acesso negado.");
-            cancelarFoto();
-            btn.innerHTML = 'Sim, sou eu!';
-            btn.disabled = false;
+            statusDiv.className = 'alert alert-danger shadow-sm';
+            statusDiv.innerHTML = 'Rosto não detectado na foto do RH.';
         }
+
+        ligarCamera();
+
+    } catch (err) {
+        console.error("Erro IA:", err);
+        statusDiv.className = 'alert alert-danger';
+        statusDiv.innerHTML = 'Erro ao carregar IA.';
+        ligarCamera();
+    }
+}
+
+// ------------------ CÂMERA ------------------
+
+function ligarCamera() {
+    console.log("Tentando abrir câmera...");
+
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+            video.srcObject = stream;
+            document.getElementById('btnEntrada').disabled = false;
+            document.getElementById('btnSaida').disabled = false;
+        })
+        .catch(err => {
+            console.error("Erro câmera:", err);
+            alert("Permita acesso à câmera.");
+        });
+}
+
+// ------------------ FOTO ------------------
+
+function tirarFoto(tipoInterno, nomeAmigavel) {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+
+    const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+
+    photoPreview.src = dataURL;
+    document.getElementById('fotoBase64Input').value = dataURL;
+    document.getElementById('tipoBatidaInput').value = tipoInterno;
+    document.getElementById('lblTipoBatida').innerText = nomeAmigavel;
+
+    document.getElementById('liveCameraSection').style.display = 'none';
+    document.getElementById('confirmationSection').style.display = 'block';
+}
+
+function cancelarFoto() {
+    document.getElementById('confirmationSection').style.display = 'none';
+    document.getElementById('liveCameraSection').style.display = 'block';
+}
+
+// ------------------ VALIDAÇÃO ------------------
+
+async function confirmarPonto() {
+    if (!referenceDescriptor) {
+        document.getElementById('pontoForm').submit();
+        return;
     }
 
-    window.onload = iniciar;
+    const detection = await faceapi
+        .detectSingleFace(photoPreview)
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+    if (!detection) {
+        alert("Nenhum rosto detectado.");
+        return;
+    }
+
+    const distance = faceapi.euclideanDistance(
+        referenceDescriptor,
+        detection.descriptor
+    );
+
+    if (distance < 0.55) {
+        document.getElementById('pontoForm').submit();
+    } else {
+        alert("Rosto não corresponde.");
+    }
+}
+
+iniciarIA();
 </script>
 {% endblock %}
