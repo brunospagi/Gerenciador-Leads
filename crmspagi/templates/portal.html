@@ -203,12 +203,12 @@
                 <div class="system-icon-wrapper"><i class="fas fa-file-invoice-dollar"></i></div>
             </a>
             {% endif %}
-            
+            {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
             <a href="{% url 'controle_ponto:relatorio_mensal' %}" class="system-item" style="--item-color: #f59e0b; --icon-bg: #fef3c7;">
                 <div><span class="system-name">Auditoria de Ponto</span><span class="system-desc">Folha e Mapas de GPS</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-map-marked-alt"></i></div>
             </a>
-
+            {% endif %}
             <a href="{% if user.profile.nivel_acesso == 'ADMIN' or user.is_superuser %}{% url 'rh_dashboard' %}{% else %}{% url 'lista_funcionarios' %}{% endif %}" class="system-item" style="--item-color: #3b82f6; --icon-bg: #eff6ff;">
                 <div><span class="system-name">Gestão de Equipe</span><span class="system-desc">Cadastro de Colaboradores</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-users"></i></div>

@@ -34,9 +34,10 @@ def relogio_ponto(request):
     if config.ip_permitido != '*' and ip_atual != config.ip_permitido:
         messages.error(request, f"Acesso Negado 🚫 O ponto só pode ser registrado na rede Wi-Fi da Loja! (Seu IP atual: {ip_atual})")
         return redirect('/')
-
-    hoje = timezone.now().date()
-    agora = timezone.now().time()
+    
+    momento_atual = timezone.localtime()
+    hoje = momento_atual.date()
+    agora = momento_atual.time()
     
     ponto, created = RegistroPonto.objects.get_or_create(funcionario=funcionario, data=hoje)
 

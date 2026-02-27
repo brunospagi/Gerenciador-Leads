@@ -146,7 +146,7 @@
                     <li><a href="{% url 'financeiro:lista_transacoes' %}"><i class="fas fa-wallet" style="color:#10b981;"></i> Gestão Financeira</a></li>
                     {% endif %}
 
-                    {% if user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' or user.is_superuser %}
+                    {% if user.profile.nivel_acesso == 'ADMIN' or user.is_superuser %}
                     <li class="menu-header mt-3">Administração</li>
                     <li><a href="{% url 'admin_dashboard' %}"><i class="fas fa-chart-line text-warning"></i> Dashboard Executivo</a></li>
                     <li><a href="{% url 'controle_ponto:relatorio_mensal' %}"><i class="fas fa-calendar-check"></i> Espelho de Ponto</a></li>
