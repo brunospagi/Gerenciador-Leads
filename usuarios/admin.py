@@ -4,12 +4,12 @@ from .models import Profile, UserLoginActivity
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
     # Mostra se pode distribuir na listagem
-    list_display = ('user', 'nivel_acesso', 'pode_distribuir_leads') 
+    list_display = ('user', 'nivel_acesso', 'pode_distribuir_leads','pode_acessar_financeiro') 
     
     # Permite marcar a caixinha sem abrir o perfil (agilidade)
-    list_editable = ('pode_distribuir_leads',) 
+    list_editable = ('pode_distribuir_leads', 'pode_acessar_financeiro') 
     
-    list_filter = ('nivel_acesso', 'pode_distribuir_leads')
+    list_filter = ('nivel_acesso', 'pode_distribuir_leads', 'pode_acessar_financeiro')
     search_fields = ('user__username', 'user__first_name', 'user__email')
 
 @admin.register(UserLoginActivity)
