@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 
+from crmspagi.storage_backends import PublicMediaStorage
+
 class Funcionario(models.Model):
     TIPO_CONTA_CHOICES = [
         ('CORRENTE', 'Conta Corrente'),
@@ -35,14 +37,14 @@ class Funcionario(models.Model):
         default=0, 
         verbose_name="Valor Diário VT (Ida+Volta)"
     )
-    
+
     foto_biometria = models.ImageField(
         upload_to='biometria/', 
+        storage=PublicMediaStorage(), 
         null=True, 
         blank=True, 
         verbose_name="Foto Base para Biometria Facial"
     )
-
     # Dados Bancários
     banco = models.CharField(max_length=100, verbose_name="Nome do Banco")
     agencia = models.CharField(max_length=20, verbose_name="Agência")
