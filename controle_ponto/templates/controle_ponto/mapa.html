@@ -1,0 +1,88 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-dark"><i class="fas fa-map-marked-alt text-danger"></i> Mapa de Auditoria de Ponto</h3>
+        <a href="{% url 'controle_ponto:relatorio_mensal' %}" class="btn btn-outline-primary shadow-sm"><i class="fas fa-list"></i> Ver Espelho em Tabela</a>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4 rounded-4">
+        <div class="card-body">
+            <form method="GET" class="d-flex align-items-end gap-3">
+                <div>
+                    <label class="form-label fw-bold text-muted small">Data do Ponto:</label>
+                    <input type="date" name="data" class="form-control" value="{{ data_filtro }}" required>
+                </div>
+                <button type="submit" class="btn btn-dark"><i class="fas fa-search"></i> Filtrar Mapa</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow rounded-4 border-0 overflow-hidden">
+        <div id="mapa_pontos" style="height: 600px; width: 100%; z-index: 1;"></div>
+    </div>
+</div>
+
+<script>
+    // Configuração inicial do Mapa (Centralizado de forma genérica no Brasil)
+    var map = L.map('mapa_pontos').setView([-15.7801, -47.9292], 4); 
+
+    // Adiciona o visual do mapa (OpenStreetMap)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Carrega os dados JSON gerados pelo Django
+    var pontos = {{ pontos_json|safe }};
+    var markers = [];
+
+    // Ícone personalizado para os pinos
+    var iconePonto = L.icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
+
+    if (pontos.length > 0) {
+        // Percorre todos os funcionários que bateram ponto
+        pontos.forEach(function(p) {
+            var latLng = [p.lat, p.lng];
+            
+            // Constrói o balão de informações (Popup)
+            var fotoHtml = p.foto ? `<img src="${p.foto}" style="width:50px; height:50px; border-radius:50%; object-fit:cover; margin-bottom:10px;">` : '';
+            var popupContent = `
+                <div class="text-center" style="min-width: 150px;">
+                    ${fotoHtml}
+                    <h6 class="fw-bold mb-0">${p.nome}</h6>
+                    <small class="text-muted d-block mb-2">${p.cargo}</small>
+                    <hr class="my-1">
+                    <div class="text-start small">
+                        <strong>Entrada:</strong> ${p.entrada}<br>
+                        <strong>Saída Final:</strong> ${p.saida}<br>
+                        <strong class="text-info">IP:</strong> ${p.ip}
+                    </div>
+                </div>
+            `;
+
+            var marker = L.marker(latLng, {icon: iconePonto})
+                .addTo(map)
+                .bindPopup(popupContent);
+            
+            markers.push(marker);
+        });
+
+        // Agrupa os marcadores e dá zoom automático para a região da loja
+        var group = new L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.1));
+    } else {
+        alert("Nenhum ponto registrado com localização nesta data.");
+    }
+</script>
+{% endblock %}

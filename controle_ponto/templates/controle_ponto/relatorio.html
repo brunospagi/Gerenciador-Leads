@@ -1,0 +1,97 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-dark"><i class="fas fa-calendar-check text-primary"></i> Espelho de Ponto Mensal</h3>
+        <div>
+            <a href="{% url 'controle_ponto:mapa_pontos' %}" class="btn btn-danger shadow-sm me-2"><i class="fas fa-map-marker-alt"></i> Ver no Mapa</a>
+            <button onclick="window.print()" class="btn btn-secondary shadow-sm"><i class="fas fa-print"></i> Imprimir</button>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4 rounded-4 d-print-none">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small text-muted">Funcionário:</label>
+                    <select name="funcionario" class="form-select">
+                        <option value="">Todos os Colaboradores</option>
+                        {% for f in funcionarios %}
+                        <option value="{{ f.id }}" {% if funcionario_selecionado == f.id %}selected{% endif %}>{{ f.nome_completo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small text-muted">Mês:</label>
+                    <select name="mes" class="form-select">
+                        {% for m in meses %}
+                        <option value="{{ m }}" {% if mes_atual == m %}selected{% endif %}>{{ m|stringformat:"02d" }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold small text-muted">Ano:</label>
+                    <select name="ano" class="form-select">
+                        {% for a in anos %}
+                        <option value="{{ a }}" {% if ano_atual == a %}selected{% endif %}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Filtrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow rounded-4 border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped mb-0 text-center align-middle" style="font-size: 0.9rem;">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="text-start ps-4">Data</th>
+                            <th class="text-start">Colaborador</th>
+                            <th>Entrada</th>
+                            <th>Saída Almoço</th>
+                            <th>Retorno Almoço</th>
+                            <th>Saída Final</th>
+                            <th>IP Registrado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in pontos %}
+                        <tr>
+                            <td class="text-start ps-4 fw-bold">{{ p.data|date:"d/m/Y (D)" }}</td>
+                            <td class="text-start">
+                                <span class="fw-bold">{{ p.funcionario.nome_completo }}</span><br>
+                                <small class="text-muted">{{ p.funcionario.cargo }}</small>
+                            </td>
+                            <td><span class="badge bg-success bg-opacity-10 text-success border border-success">{{ p.entrada|time:"H:i"|default:"--" }}</span></td>
+                            <td><span class="badge bg-warning bg-opacity-10 text-warning border border-warning">{{ p.saida_almoco|time:"H:i"|default:"--" }}</span></td>
+                            <td><span class="badge bg-info bg-opacity-10 text-info border border-info">{{ p.retorno_almoco|time:"H:i"|default:"--" }}</span></td>
+                            <td><span class="badge bg-danger bg-opacity-10 text-danger border border-danger">{{ p.saida|time:"H:i"|default:"--" }}</span></td>
+                            <td class="text-muted small">{{ p.ip_registrado|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="py-5 text-muted">Nenhum ponto registrado no período selecionado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @media print {
+        .d-print-none, header, nav { display: none !important; }
+        body { background: white; }
+        .card { box-shadow: none !important; border: 1px solid #ccc !important; }
+        .table-dark { background-color: #f8f9fa !important; color: black !important; -webkit-print-color-adjust: exact; }
+    }
+</style>
+{% endblock %}

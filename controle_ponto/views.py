@@ -4,9 +4,13 @@ from django.utils import timezone
 from django.contrib.auth.decorators import login_required
 from .models import RegistroPonto
 from funcionarios.models import Funcionario
+import json
+from django.db.models import Q
+from datetime import datetime
 
-# === CONFIGURAÇÃO DO IP PERMITIDO ===
-IP_PERMITIDO_LOJA = '187.19.123.45' 
+# === CONFIGURAÇÃO DO IP DA LOJA ===
+# Se quiser desativar temporariamente para testes, deixe '*'
+IP_PERMITIDO_LOJA = '*' 
 
 def obter_ip_cliente(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -16,38 +20,40 @@ def obter_ip_cliente(request):
 
 @login_required
 def relogio_ponto(request):
-    # --- CORREÇÃO AQUI: Busca direta e segura ---
-    # Em vez de request.user.funcionario, usamos o .filter() que nunca dá erro de atributo.
-    funcionario = Funcionario.objects.filter(user=request.user).first()
+    # Procura a ficha de funcionário do utilizador logado com segurança
+    funcionario = getattr(request.user, 'dados_funcionais', None)
     
     if not funcionario:
-        messages.error(request, "Acesso Negado: O seu utilizador não está associado a uma ficha de Funcionário no RH.")
-        return redirect('/') # Volta para a home/dashboard
+        messages.error(request, "Acesso Negado: O seu utilizador não possui ficha no RH.")
+        return redirect('/')
 
     ip_atual = obter_ip_cliente(request)
+    
+    # --- TRAVA DE IP ---
+    if IP_PERMITIDO_LOJA != '*' and ip_atual != IP_PERMITIDO_LOJA:
+        messages.error(request, f"Acesso Negado 🚫 O ponto só pode ser registado na rede Wi-Fi da Loja! (Seu IP: {ip_atual})")
+        return redirect('/')
+
     hoje = timezone.now().date()
     agora = timezone.now().time()
     
-    # --- BLOQUEIO POR IP (Descomente quando for para produção) ---
-    # if IP_PERMITIDO_LOJA != '*' and ip_atual != IP_PERMITIDO_LOJA:
-    #     messages.error(request, f"Ponto bloqueado! Você precisa estar no Wi-Fi da loja para registrar o ponto. (Seu IP: {ip_atual})")
-    #     return redirect('/')
-
     ponto, created = RegistroPonto.objects.get_or_create(funcionario=funcionario, data=hoje)
 
     if request.method == 'POST':
         tipo_batida = request.POST.get('tipo_batida')
         foto_base64 = request.POST.get('foto_base64')
+        lat = request.POST.get('latitude')
+        lng = request.POST.get('longitude')
         
         if not foto_base64:
-            messages.error(request, "Falha ao receber a foto. Tente novamente.")
+            messages.error(request, "Falha ao receber a foto.")
             return redirect('controle_ponto:relogio')
 
+        # Grava os horários e a foto enviada
         if tipo_batida == 'entrada' and not ponto.entrada:
             ponto.entrada = agora
             ponto.foto_entrada = foto_base64
-            ponto.ip_registrado = ip_atual
-            messages.success(request, f"Entrada registrada: {agora.strftime('%H:%M')}")
+            messages.success(request, f"Entrada registada: {agora.strftime('%H:%M')}")
             
         elif tipo_batida == 'saida_almoco' and not ponto.saida_almoco:
             ponto.saida_almoco = agora
@@ -63,12 +69,21 @@ def relogio_ponto(request):
             ponto.saida = agora
             ponto.foto_saida = foto_base64
             messages.success(request, f"Fim de expediente: {agora.strftime('%H:%M')}. Bom descanso!")
+            
         else:
-            messages.warning(request, "Batida inválida ou já registrada.")
+            messages.warning(request, "Batida inválida.")
+            return redirect('controle_ponto:relogio')
 
+        # Grava a auditoria de rede e GPS
+        ponto.ip_registrado = ip_atual
+        if lat and lng:
+            ponto.latitude = lat
+            ponto.longitude = lng
+        
         ponto.save()
         return redirect('controle_ponto:relogio')
-    # Pegamos a URL da foto de cadastro do funcionário para a IA usar como base
+
+    # A URL da imagem guardada no S3 para servir de base à Inteligência Artificial
     foto_url = funcionario.foto_biometria.url if funcionario.foto_biometria else None
 
     return render(request, 'controle_ponto/relogio.html', {
@@ -76,3 +91,77 @@ def relogio_ponto(request):
         'ip_atual': ip_atual,
         'foto_url': foto_url,
     })
+
+@login_required
+def mapa_pontos(request):
+    # Proteção de Acesso: Apenas Admin ou Gerente
+    nivel = getattr(request.user.profile, 'nivel_acesso', '')
+    if not request.user.is_superuser and nivel not in ['ADMIN', 'GERENTE']:
+        messages.error(request, "Acesso negado ao mapa de auditoria.")
+        return redirect('dashboard')
+
+    # Filtro de Data (Padrão: Hoje)
+    data_str = request.GET.get('data')
+    if data_str:
+        data_filtro = datetime.strptime(data_str, '%Y-%m-%d').date()
+    else:
+        data_filtro = timezone.now().date()
+
+    # Busca apenas pontos do dia selecionado que tenham Latitude preenchida
+    pontos = RegistroPonto.objects.filter(data=data_filtro).exclude(latitude__isnull=True).exclude(latitude__exact='')
+
+    # Prepara os dados para o JavaScript (Leaflet)
+    pontos_json = []
+    for p in pontos:
+        try:
+            foto_perfil = p.funcionario.foto_biometria.url if p.funcionario.foto_biometria else None
+            pontos_json.append({
+                'nome': p.funcionario.nome_completo,
+                'cargo': p.funcionario.cargo,
+                'lat': float(p.latitude),
+                'lng': float(p.longitude),
+                'entrada': p.entrada.strftime('%H:%M') if p.entrada else '--:--',
+                'saida': p.saida.strftime('%H:%M') if p.saida else '--:--',
+                'ip': p.ip_registrado,
+                'foto': foto_perfil
+            })
+        except ValueError:
+            pass # Ignora se a latitude/longitude estiver corrompida
+
+    context = {
+        'data_filtro': data_filtro.strftime('%Y-%m-%d'),
+        'pontos_json': json.dumps(pontos_json),
+    }
+    return render(request, 'controle_ponto/mapa.html', context)
+
+@login_required
+def relatorio_mensal(request):
+    # Proteção de Acesso
+    nivel = getattr(request.user.profile, 'nivel_acesso', '')
+    if not request.user.is_superuser and nivel not in ['ADMIN', 'GERENTE']:
+        messages.error(request, "Acesso negado ao espelho de ponto.")
+        return redirect('dashboard')
+
+    hoje = timezone.now().date()
+    mes = int(request.GET.get('mes', hoje.month))
+    ano = int(request.GET.get('ano', hoje.year))
+    funcionario_id = request.GET.get('funcionario')
+
+    # Busca registros do mês/ano
+    pontos = RegistroPonto.objects.filter(data__month=mes, data__year=ano).select_related('funcionario').order_by('data', 'funcionario__user__first_name')
+
+    if funcionario_id:
+        pontos = pontos.filter(funcionario_id=funcionario_id)
+
+    funcionarios_list = Funcionario.objects.filter(ativo=True).order_by('user__first_name')
+
+    context = {
+        'pontos': pontos,
+        'mes_atual': mes,
+        'ano_atual': ano,
+        'funcionario_selecionado': int(funcionario_id) if funcionario_id else '',
+        'funcionarios': funcionarios_list,
+        'meses': range(1, 13),
+        'anos': range(hoje.year - 2, hoje.year + 2),
+    }
+    return render(request, 'controle_ponto/relatorio.html', context)

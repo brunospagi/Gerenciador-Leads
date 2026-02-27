@@ -1,0 +1,122 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark mb-0"><i class="fas fa-chart-line text-primary me-2"></i> Dashboard Executivo</h2>
+            <p class="text-muted small">Resumo de Performance - Mês {{ mes_atual }}/{{ ano_atual }}</p>
+        </div>
+        <div>
+            <a href="{% url 'financeiro:relatorio_dre' %}" class="btn btn-dark shadow-sm"><i class="fas fa-file-invoice-dollar me-2"></i> Ver DRE Completo</a>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-5">
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-success text-white shadow rounded-4 border-0 h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-uppercase fw-bold opacity-75 mb-1" style="font-size: 0.8rem;">Lucro Bruto (Vendas)</p>
+                            <h3 class="fw-bold mb-0">R$ {{ lucro_bruto_vendas|floatformat:2 }}</h3>
+                            <small class="opacity-75">{{ qtd_vendas }} veículos vendidos</small>
+                        </div>
+                        <div class="fs-1 opacity-50"><i class="fas fa-car-side"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-danger text-white shadow rounded-4 border-0 h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-uppercase fw-bold opacity-75 mb-1" style="font-size: 0.8rem;">Despesas Pagas</p>
+                            <h3 class="fw-bold mb-0">R$ {{ total_despesas|floatformat:2 }}</h3>
+                            <small class="opacity-75">Custos fixos e operacionais</small>
+                        </div>
+                        <div class="fs-1 opacity-50"><i class="fas fa-arrow-down"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card shadow rounded-4 border-0 h-100 {% if saldo_parcial >= 0 %}bg-primary{% else %}bg-warning text-dark{% endif %} text-white">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-uppercase fw-bold opacity-75 mb-1" style="font-size: 0.8rem;">Saldo Parcial do Mês</p>
+                            <h3 class="fw-bold mb-0">R$ {{ saldo_parcial|floatformat:2 }}</h3>
+                            <small class="opacity-75">Lucro Vendas - Despesas</small>
+                        </div>
+                        <div class="fs-1 opacity-50"><i class="fas fa-wallet"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-info text-white shadow rounded-4 border-0 h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-uppercase fw-bold opacity-75 mb-1" style="font-size: 0.8rem;">Presença (Hoje)</p>
+                            <h3 class="fw-bold mb-0">{{ pontos_hoje }} <span class="fs-6 fw-normal">colaboradores</span></h3>
+                            <small class="opacity-75">Bateram ponto de entrada</small>
+                        </div>
+                        <div class="fs-1 opacity-50"><i class="fas fa-users"></i></div>
+                    </div>
+                    <a href="{% url 'controle_ponto:mapa_pontos' %}" class="text-white text-decoration-none small fw-bold mt-2 d-inline-block"><i class="fas fa-map-marker-alt"></i> Ver Mapa de Ponto &rarr;</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+            <h5 class="fw-bold text-dark"><i class="fas fa-tags text-primary me-2"></i> Últimas Vendas Aprovadas</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light text-secondary small text-uppercase">
+                        <tr>
+                            <th>Data</th>
+                            <th>Veículo</th>
+                            <th>Vendedor</th>
+                            <th>Cliente</th>
+                            <th class="text-end">Valor Venda</th>
+                            <th class="text-end">Lucro Loja</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for venda in ultimas_vendas %}
+                        <tr>
+                            <td class="fw-bold text-muted">{{ venda.data_venda|date:"d/m/Y" }}</td>
+                            <td>
+                                <strong>{{ venda.modelo_veiculo|default:venda.get_tipo_produto_display }}</strong>
+                                {% if venda.placa %}<br><small class="text-muted">{{ venda.placa }}</small>{% endif %}
+                            </td>
+                            <td><i class="fas fa-user-tie text-primary me-1"></i> {{ venda.vendedor.first_name }}</td>
+                            <td>{{ venda.cliente_nome|truncatechars:20 }}</td>
+                            <td class="text-end fw-bold">R$ {{ venda.valor_venda|floatformat:2 }}</td>
+                            <td class="text-end fw-bold text-success">+ R$ {{ venda.lucro_loja|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">Nenhuma venda aprovada até o momento.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-end mt-2">
+                <a href="{% url 'venda_produto_list' %}" class="btn btn-sm btn-outline-primary">Ver todas as vendas</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

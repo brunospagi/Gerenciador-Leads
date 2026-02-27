@@ -17,11 +17,14 @@ class RegistroPonto(models.Model):
     saida = models.TimeField(null=True, blank=True, verbose_name="Saída")
     foto_saida = models.TextField(null=True, blank=True, verbose_name="Foto Saída")
     
+    # Dados de Segurança e Localização
     ip_registrado = models.GenericIPAddressField(null=True, blank=True, verbose_name="IP da Máquina")
+    latitude = models.CharField(max_length=50, null=True, blank=True, verbose_name="Latitude")
+    longitude = models.CharField(max_length=50, null=True, blank=True, verbose_name="Longitude")
 
     class Meta:
-        verbose_name = "Registro de Ponto"
-        verbose_name_plural = "Registros de Ponto"
+        verbose_name = "Registo de Ponto"
+        verbose_name_plural = "Registos de Ponto"
         unique_together = ('funcionario', 'data')
 
     def __str__(self):

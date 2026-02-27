@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('painel-admin/', views.admin_dashboard, name='admin_dashboard'),
     path('contas/', include('django.contrib.auth.urls')),
     path('', login_required(TemplateView.as_view(template_name='portal.html')), name='portal'),    path('', include('leadge.urls')),
     path('clientes/', include('clientes.urls')), 

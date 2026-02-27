@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 
+# Importa o seu storage configurado para o MinIO S3
 from crmspagi.storage_backends import PublicMediaStorage
 
 class Funcionario(models.Model):
@@ -13,6 +14,15 @@ class Funcionario(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='dados_funcionais', verbose_name="Usuário do Sistema")
     
+    # === CAMPO NOVO: FOTO BIOMETRIA (Upload direto para o S3) ===
+    foto_biometria = models.ImageField(
+        upload_to='biometria/', 
+        storage=PublicMediaStorage(), 
+        null=True, 
+        blank=True, 
+        verbose_name="Foto Base para Biometria Facial"
+    )
+
     # Dados Pessoais
     cpf = models.CharField(max_length=14, unique=True, verbose_name="CPF")
     rg = models.CharField(max_length=20, blank=True, null=True, verbose_name="RG")
@@ -29,7 +39,7 @@ class Funcionario(models.Model):
     salario_base = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Salário Base (R$)", validators=[MinValueValidator(0)])
     ativo = models.BooleanField(default=True, verbose_name="Colaborador Ativo?")
 
-    # === NOVOS CAMPOS VT ===
+    # === CAMPOS VT ===
     opta_vt = models.BooleanField(default=False, verbose_name="Opta por Vale Transporte?")
     valor_diario_vt = models.DecimalField(
         max_digits=5, 
@@ -38,13 +48,6 @@ class Funcionario(models.Model):
         verbose_name="Valor Diário VT (Ida+Volta)"
     )
 
-    foto_biometria = models.ImageField(
-        upload_to='biometria/', 
-        storage=PublicMediaStorage(), 
-        null=True, 
-        blank=True, 
-        verbose_name="Foto Base para Biometria Facial"
-    )
     # Dados Bancários
     banco = models.CharField(max_length=100, verbose_name="Nome do Banco")
     agencia = models.CharField(max_length=20, verbose_name="Agência")
@@ -54,7 +57,6 @@ class Funcionario(models.Model):
 
     @property
     def nome_completo(self):
-        """Retorna Nome Completo. Se vazio, retorna o Username (Login)."""
         full_name = self.user.get_full_name()
         if full_name:
             return full_name
