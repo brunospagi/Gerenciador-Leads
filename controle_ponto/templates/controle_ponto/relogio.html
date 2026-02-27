@@ -9,43 +9,79 @@
     </h3>
     
     <div id="ai-status" class="alert alert-warning shadow-sm">
-        <i class="fas fa-spinner fa-spin"></i> A carregar módulos de Inteligência Artificial...
+        <i class="fas fa-spinner fa-spin"></i> A carregar IA...
     </div>
 
     {% if not foto_url %}
     <div class="alert alert-danger shadow-sm">
         <i class="fas fa-exclamation-triangle"></i>
-        <strong>Acesso Bloqueado:</strong> Você não possui foto cadastrada no RH.
+        <strong>Acesso Bloqueado:</strong> Você não possui foto cadastrada.
     </div>
     {% endif %}
 
-    <div class="card shadow-sm rounded-4 border-0" {% if not foto_url %}style="opacity:0.5;pointer-events:none;"{% endif %}>
+    <div class="card shadow-sm rounded-4 border-0"
+         {% if not foto_url %}style="opacity:0.5;pointer-events:none;"{% endif %}>
         <div class="card-body p-4">
+
+            <p class="text-muted small mb-3">
+                IP Identificado: <strong>{{ ip_atual }}</strong>
+            </p>
 
             {% if foto_url %}
             <img id="refImage" src="{{ foto_url }}" style="display:none;">
             {% endif %}
 
+            <!-- ================= CAMERA ================= -->
             <div id="liveCameraSection">
-                <div class="position-relative bg-dark rounded-4 overflow-hidden mb-4 shadow-sm" style="height:350px;">
-                    <video id="videoElement" autoplay playsinline 
-                        style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);">
+                <div class="position-relative bg-dark rounded-4 overflow-hidden mb-4 shadow-sm"
+                     style="height: 350px; border: 4px solid #f8f9fa;">
+                    
+                    <video id="videoElement" autoplay playsinline
+                           style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);">
                     </video>
-                </div>
 
+                    <div class="position-absolute top-50 start-50 translate-middle"
+                         style="width:200px;height:260px;border:3px dashed rgba(255,255,255,0.7);
+                                border-radius:50%;">
+                    </div>
+                </div>
+                
+                <h5 class="fw-bold text-dark mb-3">
+                    Ações de Ponto - {{ ponto.data|date:"d/m/Y" }}
+                </h5>
+                
                 <div class="d-grid gap-2">
-                    <button id="btnEntrada" class="btn btn-success btn-lg fw-bold"
+                    <button id="btnEntrada"
+                        class="btn btn-lg fw-bold text-white btn-success"
                         onclick="tirarFoto('entrada','Entrada')" disabled>
-                        Entrada
+                        <i class="fas fa-sign-in-alt"></i>
+                        Entrada {% if ponto.entrada %}({{ ponto.entrada|time:"H:i" }}){% endif %}
                     </button>
 
-                    <button id="btnSaida" class="btn btn-danger btn-lg fw-bold"
-                        onclick="tirarFoto('saida','Saída')" disabled>
-                        Saída
+                    <button id="btnSaidaAlmoco"
+                        class="btn btn-lg fw-bold text-white btn-warning"
+                        onclick="tirarFoto('saida_almoco','Saída Almoço')" disabled>
+                        <i class="fas fa-utensils"></i>
+                        Saída Almoço {% if ponto.saida_almoco %}({{ ponto.saida_almoco|time:"H:i" }}){% endif %}
+                    </button>
+
+                    <button id="btnRetornoAlmoco"
+                        class="btn btn-lg fw-bold text-white btn-info"
+                        onclick="tirarFoto('retorno_almoco','Retorno Almoço')" disabled>
+                        <i class="fas fa-undo"></i>
+                        Retorno Almoço {% if ponto.retorno_almoco %}({{ ponto.retorno_almoco|time:"H:i" }}){% endif %}
+                    </button>
+
+                    <button id="btnSaida"
+                        class="btn btn-lg fw-bold text-white btn-danger"
+                        onclick="tirarFoto('saida','Saída Final')" disabled>
+                        <i class="fas fa-sign-out-alt"></i>
+                        Saída Final {% if ponto.saida %}({{ ponto.saida|time:"H:i" }}){% endif %}
                     </button>
                 </div>
             </div>
 
+            <!-- ================= CONFIRMAÇÃO ================= -->
             <div id="confirmationSection" style="display:none;">
                 <div class="alert alert-primary mb-3">
                     <h5 class="fw-bold mb-0">Validação Biométrica...</h5>
@@ -53,21 +89,25 @@
                 </div>
 
                 <div class="rounded-4 overflow-hidden mb-4 shadow"
-                    style="height:350px;border:4px solid #0d6efd;">
+                     style="height:350px;border:4px solid #0d6efd;">
                     <img id="photoPreview"
-                        style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);">
+                         style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);">
                 </div>
 
                 <div class="row g-2">
                     <div class="col-6">
                         <button type="button" id="btnCancelar"
-                            class="btn btn-outline-danger w-100"
-                            onclick="cancelarFoto()">Cancelar</button>
+                            class="btn btn-lg btn-outline-danger w-100 fw-bold"
+                            onclick="cancelarFoto()">
+                            Cancelar
+                        </button>
                     </div>
                     <div class="col-6">
                         <button type="button" id="btnConfirmar"
-                            class="btn btn-success w-100"
-                            onclick="confirmarPonto()">Confirmar</button>
+                            class="btn btn-lg btn-success w-100 fw-bold"
+                            onclick="confirmarPonto()">
+                            Sim, sou eu!
+                        </button>
                     </div>
                 </div>
             </div>
@@ -84,6 +124,7 @@
 </div>
 
 <script>
+// ================= VARIÁVEIS =================
 const video = document.getElementById('videoElement');
 const canvas = document.getElementById('canvasElement');
 const photoPreview = document.getElementById('photoPreview');
@@ -91,113 +132,135 @@ const refImage = document.getElementById('refImage');
 const statusDiv = document.getElementById('ai-status');
 
 let referenceDescriptor = null;
+let piscou = false;
+let olhosFechados = false;
 
-// ------------------ INICIAR IA ------------------
+const DISTANCE_THRESHOLD = 0.60;
+const EAR_THRESHOLD = 0.20;
 
+// ================= AUXILIARES =================
+function distancia(a, b) {
+    return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function calcularEAR(eye) {
+    const A = distancia(eye[1], eye[5]);
+    const B = distancia(eye[2], eye[4]);
+    const C = distancia(eye[0], eye[3]);
+    return (A + B) / (2.0 * C);
+}
+
+// ================= INICIAR IA =================
 async function iniciarIA() {
     const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
 
-    try {
-        await Promise.all([
-            faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-            faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-            faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-        ]);
+    await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+    ]);
 
-        console.log("Modelos carregados.");
-
-        if (!refImage) {
-            ligarCamera();
-            return;
-        }
-
-        await new Promise((resolve, reject) => {
-            if (refImage.complete && refImage.naturalWidth !== 0) {
-                resolve();
-            } else {
-                refImage.onload = resolve;
-                refImage.onerror = reject;
-            }
+    if (refImage) {
+        await new Promise(resolve => {
+            if (refImage.complete && refImage.naturalWidth !== 0) resolve();
+            else refImage.onload = resolve;
         });
 
         const detection = await faceapi
-            .detectSingleFace(refImage)
+            .detectSingleFace(refImage, new faceapi.TinyFaceDetectorOptions())
             .withFaceLandmarks()
             .withFaceDescriptor();
 
-        console.log("Detection:", detection);
-
         if (detection) {
             referenceDescriptor = detection.descriptor;
-            statusDiv.className = 'alert alert-success shadow-sm';
-            statusDiv.innerHTML = 'IA pronta!';
-        } else {
-            statusDiv.className = 'alert alert-danger shadow-sm';
-            statusDiv.innerHTML = 'Rosto não detectado na foto do RH.';
+        }
+    }
+
+    statusDiv.className = 'alert alert-info shadow-sm';
+    statusDiv.innerHTML = 'Piscar os olhos para validar identidade 👁️';
+
+    ligarCamera();
+    monitorarPiscada();
+}
+
+// ================= PISCADA =================
+async function monitorarPiscada() {
+    setInterval(async () => {
+        const detection = await faceapi
+            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks();
+
+        if (!detection) return;
+
+        const landmarks = detection.landmarks;
+        const leftEye = landmarks.getLeftEye();
+        const rightEye = landmarks.getRightEye();
+
+        const earLeft = calcularEAR(leftEye);
+        const earRight = calcularEAR(rightEye);
+        const ear = (earLeft + earRight) / 2;
+
+        if (ear < EAR_THRESHOLD) {
+            olhosFechados = true;
         }
 
-        ligarCamera();
-
-    } catch (err) {
-        console.error("Erro IA:", err);
-        statusDiv.className = 'alert alert-danger';
-        statusDiv.innerHTML = 'Erro ao carregar IA.';
-        ligarCamera();
-    }
+        if (olhosFechados && ear > EAR_THRESHOLD + 0.05) {
+            piscou = true;
+            statusDiv.className = 'alert alert-success shadow-sm';
+            statusDiv.innerHTML = 'Piscada detectada! Pode registrar o ponto ✅';
+        }
+    }, 300);
 }
 
-// ------------------ CÂMERA ------------------
-
+// ================= CÂMERA =================
 function ligarCamera() {
-    console.log("Tentando abrir câmera...");
-
-    navigator.mediaDevices.getUserMedia({ video: true })
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
         .then(stream => {
             video.srcObject = stream;
-            document.getElementById('btnEntrada').disabled = false;
-            document.getElementById('btnSaida').disabled = false;
+            liberarBotoes();
         })
-        .catch(err => {
-            console.error("Erro câmera:", err);
-            alert("Permita acesso à câmera.");
-        });
+        .catch(() => alert("Permita acesso à câmera."));
 }
 
-// ------------------ FOTO ------------------
+// ================= LIBERAR BOTÕES =================
+function liberarBotoes() {
+    const temEntrada = {% if ponto.entrada %}true{% else %}false{% endif %};
+    const temSaidaAlmoco = {% if ponto.saida_almoco %}true{% else %}false{% endif %};
+    const temRetornoAlmoco = {% if ponto.retorno_almoco %}true{% else %}false{% endif %};
+    const temSaida = {% if ponto.saida %}true{% else %}false{% endif %};
 
+    if (!temEntrada) btnEntrada.disabled = false;
+    if (temEntrada && !temSaidaAlmoco) btnSaidaAlmoco.disabled = false;
+    if (temSaidaAlmoco && !temRetornoAlmoco) btnRetornoAlmoco.disabled = false;
+    if (temRetornoAlmoco && !temSaida) btnSaida.disabled = false;
+}
+
+// ================= FOTO =================
 function tirarFoto(tipoInterno, nomeAmigavel) {
+    if (!piscou) {
+        alert("Você precisa piscar antes de registrar.");
+        return;
+    }
+
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
+    canvas.getContext('2d').drawImage(video, 0, 0);
 
     const dataURL = canvas.toDataURL('image/jpeg', 0.8);
-
     photoPreview.src = dataURL;
+
     document.getElementById('fotoBase64Input').value = dataURL;
     document.getElementById('tipoBatidaInput').value = tipoInterno;
     document.getElementById('lblTipoBatida').innerText = nomeAmigavel;
 
-    document.getElementById('liveCameraSection').style.display = 'none';
-    document.getElementById('confirmationSection').style.display = 'block';
+    liveCameraSection.style.display = 'none';
+    confirmationSection.style.display = 'block';
 }
 
-function cancelarFoto() {
-    document.getElementById('confirmationSection').style.display = 'none';
-    document.getElementById('liveCameraSection').style.display = 'block';
-}
-
-// ------------------ VALIDAÇÃO ------------------
-
+// ================= VALIDAÇÃO =================
 async function confirmarPonto() {
-    if (!referenceDescriptor) {
-        document.getElementById('pontoForm').submit();
-        return;
-    }
-
     const detection = await faceapi
-        .detectSingleFace(photoPreview)
+        .detectSingleFace(photoPreview, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
         .withFaceDescriptor();
 
@@ -211,8 +274,8 @@ async function confirmarPonto() {
         detection.descriptor
     );
 
-    if (distance < 0.55) {
-        document.getElementById('pontoForm').submit();
+    if (distance < DISTANCE_THRESHOLD) {
+        pontoForm.submit();
     } else {
         alert("Rosto não corresponde.");
     }
