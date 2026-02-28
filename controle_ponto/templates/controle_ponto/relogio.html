@@ -13,6 +13,7 @@
     <h3 class="fw-bold mb-4 text-dark">
         <i class="fas fa-map-marker-alt text-danger"></i> Ponto Seguro (GPS + IA)
     </h3>
+    <div id="relogio-tempo-real" class="text-primary fw-bold mb-4 fs-5"></div>
     
     <div id="ai-status" class="alert alert-warning shadow-sm">
         <i class="fas fa-spinner fa-spin"></i> Solicitando localização GPS...
@@ -52,9 +53,9 @@
                     <button id="btnRetornoAlmoco" class="btn btn-lg fw-bold text-white btn-info" onclick="tirarFoto('retorno_almoco','Retorno Almoço')" disabled>
                         Retorno Almoço {% if ponto.retorno_almoco %}({{ ponto.retorno_almoco|time:"H:i" }}){% endif %}
                     </button>
-                    <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger" onclick="tirarFoto('saida','Saída Final')" disabled>
+                   <!-- <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger" onclick="tirarFoto('saida','Saída Final')" disabled>
                         Saída Final {% if ponto.saida %}({{ ponto.saida|time:"H:i" }}){% endif %}
-                    </button>
+                    </button> -->
                 </div>
             </div>
 
@@ -255,6 +256,19 @@ function resetarBotoes(btnC, btnX) {
     btnC.innerHTML = 'Sim, sou eu!';
     btnC.disabled = false; btnX.disabled = false;
 }
+
+// --- RELÓGIO EM TEMPO REAL ---
+function atualizarRelogio() {
+    const agora = new Date();
+    const data = agora.toLocaleDateString('pt-BR');
+    const hora = agora.toLocaleTimeString('pt-BR');
+    
+    document.getElementById('relogio-tempo-real').innerHTML = `<i class="fas fa-clock"></i> ${data} - ${hora}`;
+}
+
+// Inicia o relógio
+setInterval(atualizarRelogio, 1000);
+atualizarRelogio();
 
 window.onload = validarGeolocalizacao;
 </script>
