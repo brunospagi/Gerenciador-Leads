@@ -1,4 +1,7 @@
 import json
+from django.conf import settings
+import requests
+import threading
 from datetime import datetime
 from django.shortcuts import render, redirect
 from django.contrib import messages
@@ -51,21 +54,27 @@ def relogio_ponto(request):
             messages.error(request, "Falha ao receber a foto. Tente novamente.")
             return redirect('controle_ponto:relogio')
 
+        evento_registrado = None
+
         if tipo_batida == 'entrada' and not ponto.entrada:
             ponto.entrada = agora
             ponto.foto_entrada = foto_base64
+            evento_registrado = "Entrada"
             messages.success(request, f"Entrada registrada com sucesso às {agora.strftime('%H:%M')}")
         elif tipo_batida == 'saida_almoco' and not ponto.saida_almoco:
             ponto.saida_almoco = agora
             ponto.foto_saida_almoco = foto_base64
+            evento_registrado = "Saída Almoço"
             messages.success(request, f"Saída para almoço às {agora.strftime('%H:%M')}")
         elif tipo_batida == 'retorno_almoco' and not ponto.retorno_almoco:
             ponto.retorno_almoco = agora
             ponto.foto_retorno_almoco = foto_base64
+            evento_registrado = "Retorno Almoço"
             messages.success(request, f"Retorno do almoço às {agora.strftime('%H:%M')}")
         elif tipo_batida == 'saida' and not ponto.saida:
             ponto.saida = agora
             ponto.foto_saida = foto_base64
+            evento_registrado = "Saída Final"
             messages.success(request, f"Fim de expediente às {agora.strftime('%H:%M')}. Bom descanso!")
         else:
             messages.warning(request, "Batida inválida ou já registrada.")
@@ -77,6 +86,40 @@ def relogio_ponto(request):
             ponto.longitude = lng
         
         ponto.save()
+
+        # ========================================================
+        # INÍCIO DO ENVIO DO WEBHOOK EM SEGUNDO PLANO
+        # ========================================================
+        def disparar_webhook(dados_webhook):
+            try:
+                # Busca a URL diretamente do settings.py (que leu do .env)
+                url_webhook = getattr(settings, 'WEBHOOK_PONTO_URL', None)
+                
+                # Se a URL não estiver configurada no .env, ele simplesmente cancela o envio sem dar erro
+                if not url_webhook:
+                    print("Webhook URL não configurada no .env")
+                    return
+
+                requests.post(url_webhook, json=dados_webhook, timeout=5)
+            except Exception as e:
+                print(f"Falha ao enviar webhook do ponto: {e}")
+
+        payload = {
+            "evento": "novo_ponto",
+            "funcionario_id": funcionario.id,
+            "funcionario_nome": getattr(funcionario, 'nome_completo', str(funcionario)),
+            "tipo_batida": evento_registrado,
+            "data": hoje.strftime('%Y-%m-%d'),
+            "hora": agora.strftime('%H:%M:%S'),
+            "ip_registrado": ip_atual,
+            "latitude": lat,
+            "longitude": lng
+        }
+
+        # Roda a função de forma paralela para não atrasar a resposta da tela
+        threading.Thread(target=disparar_webhook, args=(payload,)).start()
+        # ========================================================
+
         return redirect('controle_ponto:relogio')
 
     foto_url = funcionario.foto_biometria.url if funcionario.foto_biometria else None
@@ -157,7 +200,7 @@ def relatorio_mensal(request):
     return render(request, 'controle_ponto/relatorio.html', context)
 
 # ==========================================
-# VIEWS DE ADMINISTRAÇÃO (EDTAR E EXCLUIR)
+# VIEWS DE ADMINISTRAÇÃO (EDITAR E EXCLUIR)
 # ==========================================
 
 class RegistroPontoUpdateView(LoginRequiredMixin, UpdateView):
@@ -192,6 +235,7 @@ class RegistroPontoDeleteView(LoginRequiredMixin, DeleteView):
     def form_valid(self, form):
         messages.warning(self.request, "Registro de ponto excluído permanentemente.")
         return super().form_valid(form)
+
 @login_required
 def detalhe_ponto(request, pk):
     # Proteção: Apenas gestores podem ver a auditoria detalhada

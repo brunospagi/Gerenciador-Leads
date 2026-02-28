@@ -8,6 +8,9 @@ load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Configurações do Webhook do Ponto (Lida do .ENV)
+WEBHOOK_PONTO_URL = os.getenv('WEBHOOK_PONTO_URL')
+
 # --- CONFIGURAÇÕES DE PRODUÇÃO (LIDAS DO .ENV) ---
 # A SECRET_KEY é lida do ambiente. Use uma chave forte em produção!
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-default-key-for-dev')
