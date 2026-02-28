@@ -7,7 +7,7 @@ import calendar
 from datetime import datetime, date
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta
-
+from django.views.decorators.http import require_POST
 from .models import FolhaPagamento, Desconto, ParcelaDesconto, Credito, ParcelaCredito
 from funcionarios.models import Funcionario
 from vendas_produtos.models import VendaProduto
@@ -278,3 +278,20 @@ def detalhe_folha(request, pk):
         'total_vencimentos': total_vencimentos,
         'total_descontos': folha.total_descontos,
     })
+
+@login_required
+@user_passes_test(is_admin_financeiro)
+@require_POST
+def fechar_folha(request, pk):
+    # Busca a folha específica
+    folha = get_object_or_404(FolhaPagamento, pk=pk)
+    
+    if folha.fechada:
+        messages.warning(request, "Esta folha já encontra-se fechada.")
+    else:
+        # Chama a função que você já criou no models.py
+        folha.fechar()
+        messages.success(request, f"Folha de {folha.funcionario.user.first_name} ({folha.mes}/{folha.ano}) fechada com sucesso! Os valores foram travados.")
+        
+    # Redireciona de volta para a tela de detalhes da folha
+    return redirect('detalhe_folha', pk=folha.pk)

@@ -9,10 +9,23 @@
     <div class="d-flex justify-content-between align-items-center mb-4 no-print">
         <a href="{% url 'rh_dashboard' %}" class="btn btn-outline-secondary">
             <i class="fa fa-arrow-left me-2"></i> Voltar
-        </a>
+        </a>        
+        {% if not folha.fechada and request.user.profile.nivel_acesso == 'ADMIN' %}
         <button onclick="window.print()" class="btn btn-primary shadow-sm">
             <i class="fa fa-print me-2"></i> Imprimir Holerite
         </button>
+    <form method="POST" action="{% url 'fechar_folha' folha.pk %}" style="display: inline-block;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger fw-bold" 
+                onclick="return confirm('ATENÇÃO!\n\nTem certeza que deseja fechar esta folha?\n\nAo confirmar, nenhuma nova comissão ou desconto entrará nela, e os valores serão travados de forma definitiva.')">
+            <i class="fas fa-lock me-1"></i> Fechar Folha Definitivamente
+        </button>
+    </form>
+{% elif folha.fechada %}
+    <div class="badge bg-warning text-dark p-2 mt-2" style="font-size: 0.9rem;">
+        <i class="fas fa-lock me-1"></i> Folha Fechada e Travada
+    </div>
+{% endif %}
     </div>
 
     <div class="holerite-container bg-white border shadow-sm mx-auto p-4" style="max-width: 850px; min-height: 600px;">
