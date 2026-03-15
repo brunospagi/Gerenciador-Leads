@@ -132,26 +132,55 @@
                 <i class="fas fa-car-side"></i> SPAGI <span style="font-weight: 300;">CRM</span>
             </div>
 
-            <div class="sidebar-menu">
+                        <div class="sidebar-menu">
                 <ul>
                     <li class="menu-header">Menu Principal</li>
                     <li><a href="/"><i class="fas fa-home"></i> Portal Inicial</a></li>
+
+                    {% if module_access.clientes %}
                     <li><a href="{% url 'cliente_list' %}"><i class="fas fa-users"></i> Clientes e Leads</a></li>
-                    <li><a href="{% url 'venda_produto_list' %}"><i class="fas fa-tags"></i> Vendas e Serviços</a></li>
-                    <li><a href="{% url 'controle_ponto:relogio' %}"><i class="fas fa-fingerprint text-info"></i> Bater Ponto</a></li>
-                    <li><a href="{% url 'financiamentos_kanban' %}"><i class="fas fa-hand-holding-usd"></i> Financiamentos</a></li>
-                    
-                    {% if user.profile.nivel_acesso == 'ADMIN' or user.profile.pode_acessar_financeiro %}
-                    <li class="menu-header mt-3">Caixa & Finanças</li>
-                    <li><a href="{% url 'financeiro:lista_transacoes' %}"><i class="fas fa-wallet" style="color:#10b981;"></i> Gestão Financeira</a></li>
                     {% endif %}
 
-                    {% if user.profile.nivel_acesso == 'ADMIN' or user.is_superuser %}
-                    <li class="menu-header mt-3">Administração</li>
+                    {% if module_access.vendas %}
+                    <li><a href="{% url 'venda_produto_list' %}"><i class="fas fa-tags"></i> Vendas e Servicos</a></li>
+                    {% endif %}
+
+                    {% if module_access.ponto %}
+                    <li><a href="{% url 'controle_ponto:relogio' %}"><i class="fas fa-fingerprint text-info"></i> Bater Ponto</a></li>
+                    {% endif %}
+
+                    {% if module_access.financiamentos %}
+                    <li><a href="{% url 'financiamentos_kanban' %}"><i class="fas fa-hand-holding-usd"></i> Financiamentos</a></li>
+                    {% endif %}
+
+                    {% if module_access.distribuicao %}
+                    <li><a href="{% url 'painel-distribuicao' %}"><i class="fas fa-random"></i> Distribuicao de Leads</a></li>
+                    {% endif %}
+
+                    {% if module_access.financeiro %}
+                    <li class="menu-header mt-3">Caixa e Financas</li>
+                    <li><a href="{% url 'financeiro:lista_transacoes' %}"><i class="fas fa-wallet" style="color:#10b981;"></i> Gestao Financeira</a></li>
+                    {% endif %}
+
+                    {% if module_access.relatorios and user.is_superuser or module_access.relatorios and user.profile.nivel_acesso == 'ADMIN' or module_access.relatorios and user.profile.nivel_acesso == 'GERENTE' or module_access.rh or module_access.usuarios_admin %}
+                    <li class="menu-header mt-3">Administracao</li>
+                    {% endif %}
+
+                    {% if module_access.relatorios and user.is_superuser or module_access.relatorios and user.profile.nivel_acesso == 'ADMIN' or module_access.relatorios and user.profile.nivel_acesso == 'GERENTE' %}
                     <li><a href="{% url 'admin_dashboard' %}"><i class="fas fa-chart-line text-warning"></i> Dashboard Executivo</a></li>
                     <li><a href="{% url 'controle_ponto:relatorio_mensal' %}"><i class="fas fa-calendar-check"></i> Espelho de Ponto</a></li>
+                    {% endif %}
+
+                    {% if module_access.rh %}
                     <li><a href="{% url 'lista_funcionarios' %}"><i class="fas fa-id-card"></i> Equipe (RH)</a></li>
+                    {% endif %}
+
+                    {% if module_access.usuarios_admin and user.is_superuser or module_access.usuarios_admin and user.profile.nivel_acesso == 'ADMIN' %}
                     <li><a href="{% url 'user_list' %}"><i class="fas fa-user-shield"></i> Acessos e Perfis</a></li>
+                    {% endif %}
+
+                    {% if user.is_superuser %}
+                    <li><a href="{% url 'user_module_permissions' %}"><i class="fas fa-shield-alt"></i> Permissoes por Modulo</a></li>
                     {% endif %}
                 </ul>
             </div>

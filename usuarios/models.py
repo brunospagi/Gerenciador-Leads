@@ -50,11 +50,33 @@ class Profile(models.Model):
             return self.avatar.url
         return 'https://cdn.quasar.dev/img/boy-avatar.png'
 
+
+class ModulePermission(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='module_permissions')
+
+    modulo_clientes = models.BooleanField(default=True)
+    modulo_vendas = models.BooleanField(default=True)
+    modulo_financiamentos = models.BooleanField(default=True)
+    modulo_ponto = models.BooleanField(default=True)
+    modulo_avaliacoes = models.BooleanField(default=True)
+
+    modulo_financeiro = models.BooleanField(default=False)
+    modulo_distribuicao = models.BooleanField(default=False)
+    modulo_rh = models.BooleanField(default=False)
+    modulo_documentos = models.BooleanField(default=False)
+    modulo_autorizacoes = models.BooleanField(default=False)
+    modulo_relatorios = models.BooleanField(default=False)
+    modulo_admin_usuarios = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Permissoes de modulos: {self.user.username}"
+
 # --- SINAIS (Mantidos iguais) ---
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         Profile.objects.create(user=instance)
+        ModulePermission.objects.create(user=instance)
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
@@ -62,6 +84,10 @@ def save_user_profile(sender, instance, **kwargs):
         instance.profile.save()
     except ObjectDoesNotExist:
         Profile.objects.create(user=instance)
+    try:
+        instance.module_permissions.save()
+    except ObjectDoesNotExist:
+        ModulePermission.objects.create(user=instance)
 
 class UserLoginActivity(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='login_activities')

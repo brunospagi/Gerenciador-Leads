@@ -98,13 +98,23 @@ class RelatorioDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, Templat
         # --- Lógica de Filtros (Dia e Mês) ---
         # Filtro Diário
         data_diario_str = self.request.GET.get('data_diario')
-        data_filtro = datetime.strptime(data_diario_str, '%Y-%m-%d').date() if data_diario_str else hoje
+        if data_diario_str:
+            try:
+                data_filtro = datetime.strptime(data_diario_str, '%Y-%m-%d').date()
+            except ValueError:
+                data_filtro = hoje
+        else:
+            data_filtro = hoje
 
         # Filtro Mensal
         mes_mensal_str = self.request.GET.get('mes_mensal')
         if mes_mensal_str:
-            dt_mes = datetime.strptime(mes_mensal_str, '%Y-%m')
-            mes_ref, ano_ref = dt_mes.month, dt_mes.year
+            try:
+                dt_mes = datetime.strptime(mes_mensal_str, '%Y-%m')
+                mes_ref, ano_ref = dt_mes.month, dt_mes.year
+            except ValueError:
+                mes_ref, ano_ref = hoje.month, hoje.year
+                mes_mensal_str = hoje.strftime('%Y-%m')
         else:
             mes_ref, ano_ref = hoje.month, hoje.year
             mes_mensal_str = hoje.strftime('%Y-%m')

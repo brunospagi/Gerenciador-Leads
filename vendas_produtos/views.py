@@ -6,6 +6,8 @@ from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Sum, Q
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from datetime import datetime
 from decimal import Decimal
 import calendar
@@ -236,10 +238,16 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         vendedor_id_filter = self.request.GET.get('vendedor')
 
         hoje = timezone.now().date()
-        data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje.replace(day=1)
-        if data_fim_str: 
-            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
-        else: 
+        try:
+            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else hoje.replace(day=1)
+        except (TypeError, ValueError):
+            data_inicio = hoje.replace(day=1)
+        if data_fim_str:
+            try:
+                data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+            except (TypeError, ValueError):
+                data_fim = data_inicio.replace(day=calendar.monthrange(data_inicio.year, data_inicio.month)[1])
+        else:
             data_fim = data_inicio.replace(day=calendar.monthrange(data_inicio.year, data_inicio.month)[1])
 
         context['periodo_inicio_str'] = data_inicio.strftime('%Y-%m-%d')
@@ -341,6 +349,8 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         context['periodo_fim'] = data_fim
         return context
 
+@login_required
+@require_POST
 def aprovar_venda_produto(request, pk):
     is_gestor = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
     if not is_gestor:
@@ -380,6 +390,8 @@ def aprovar_venda_produto(request, pk):
         messages.success(request, "Venda APROVADA.")
     return redirect('venda_produto_list')
 
+@login_required
+@require_POST
 def rejeitar_venda_produto(request, pk):
     is_gestor = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
     if not is_gestor:
@@ -396,6 +408,8 @@ def rejeitar_venda_produto(request, pk):
         messages.warning(request, "Venda REJEITADA.")
     return redirect('venda_produto_list')
 
+@login_required
+@require_POST
 def toggle_fechamento_mes(request):
     if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
         messages.error(request, "Permissão negada.")

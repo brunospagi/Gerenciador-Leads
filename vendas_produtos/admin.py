@@ -15,8 +15,8 @@ class ParametrosComissaoAdmin(admin.ModelAdmin):
 
 @admin.register(VendaProduto)
 class VendaProdutoAdmin(admin.ModelAdmin):
-    list_display = ('tipo_produto', 'modelo_veiculo', 'placa', 'vendedor', 'data_venda', 'status', 'comissao_vendedor')
-    list_filter = ('tipo_produto', 'status', 'data_venda')
+    list_display = ('tipo_produto', 'origem_cliente', 'modelo_veiculo', 'placa', 'vendedor', 'data_venda', 'status', 'comissao_vendedor')
+    list_filter = ('tipo_produto', 'origem_cliente', 'status', 'data_venda')
     search_fields = ('placa', 'modelo_veiculo', 'cliente_nome')
 
 @admin.register(FechamentoMensal)

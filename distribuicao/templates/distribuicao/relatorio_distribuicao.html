@@ -6,7 +6,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4 no-print">
         <h2 class="text-primary"><i class="fa fa-chart-line me-2"></i>Relatório de Distribuição de Leads</h2>
         <div>
-            <button onclick="window.print()" class="btn btn-dark">
+            <button onclick="printRelatorio()" class="btn btn-dark">
                 <i class="fa fa-print me-2"></i>Imprimir / PDF
             </button>
             <a href="{% url 'portal' %}" class="btn btn-outline-secondary ms-2">Voltar ao Portal</a>
@@ -213,30 +213,138 @@
             </div>
         </div>
     </div>
+
+    <section class="print-document">
+        <header class="print-header">
+            <h1>Relatorio de Distribuicao de Leads</h1>
+            <p class="print-tab tab-diario">Periodo: Diario - {{ data_hoje|date:"d/m/Y" }}</p>
+            <p class="print-tab tab-semanal">Periodo: Semanal</p>
+            <p class="print-tab tab-mensal">Periodo: Mensal - {{ mes_atual_str }}</p>
+            <p>Emitido em: {% now "d/m/Y H:i" %}</p>
+        </header>
+
+        <div class="print-tab tab-diario">
+            <h3>Resumo do Dia</h3>
+            <p class="print-kpi">Total {{ total_hoje }} | Manha {{ total_manha }} | Tarde {{ total_tarde }}</p>
+            <table class="print-table">
+                <thead>
+                    <tr><th>Hora</th><th>Cliente</th><th>Telefone</th><th>Veiculo</th><th>Canal</th><th>Vendedor</th></tr>
+                </thead>
+                <tbody>
+                    {% for lead in leads_manha %}
+                    <tr>
+                        <td>{{ lead.data_primeiro_contato|date:"H:i" }}</td>
+                        <td>{{ lead.nome_cliente }}</td>
+                        <td>{{ lead.whatsapp }}</td>
+                        <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                        <td>{{ lead.fonte_cliente|default:"Nao informado" }}</td>
+                        <td>{{ lead.vendedor.get_full_name|default:lead.vendedor.username }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6">Sem leads na manha.</td></tr>
+                    {% endfor %}
+                    {% for lead in leads_tarde %}
+                    <tr>
+                        <td>{{ lead.data_primeiro_contato|date:"H:i" }}</td>
+                        <td>{{ lead.nome_cliente }}</td>
+                        <td>{{ lead.whatsapp }}</td>
+                        <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                        <td>{{ lead.fonte_cliente|default:"Nao informado" }}</td>
+                        <td>{{ lead.vendedor.get_full_name|default:lead.vendedor.username }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6">Sem leads na tarde.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="print-tab tab-semanal">
+            <h3>Resumo Semanal</h3>
+            <p class="print-kpi">Total {{ total_semana }}</p>
+            <table class="print-table">
+                <thead>
+                    <tr><th>Data / Hora</th><th>Cliente</th><th>Telefone</th><th>Veiculo</th><th>Canal</th><th>Vendedor</th></tr>
+                </thead>
+                <tbody>
+                    {% for lead in leads_semana %}
+                    <tr>
+                        <td>{{ lead.data_primeiro_contato|date:"d/m/Y H:i" }}</td>
+                        <td>{{ lead.nome_cliente }}</td>
+                        <td>{{ lead.whatsapp }}</td>
+                        <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                        <td>{{ lead.fonte_cliente|default:"Nao informado" }}</td>
+                        <td>{{ lead.vendedor.get_full_name|default:lead.vendedor.username }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6">Sem dados nesta semana.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="print-tab tab-mensal">
+            <h3>Resumo Mensal</h3>
+            <p class="print-kpi">Total {{ total_mes }} | Mes {{ mes_atual_str }}</p>
+            <table class="print-table">
+                <thead>
+                    <tr><th>Data</th><th>Cliente</th><th>Telefone</th><th>Veiculo</th><th>Status</th><th>Vendedor</th></tr>
+                </thead>
+                <tbody>
+                    {% for lead in leads_mes %}
+                    <tr>
+                        <td>{{ lead.data_primeiro_contato|date:"d/m/Y" }}</td>
+                        <td>{{ lead.nome_cliente }}</td>
+                        <td>{{ lead.whatsapp }}</td>
+                        <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                        <td>{{ lead.get_status_negociacao_display }}</td>
+                        <td>{{ lead.vendedor.get_full_name|default:lead.vendedor.username }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6">Sem dados neste mes.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
 </div>
 
 <style>
-    /* Estilização para Impressão */
+    .print-document { display: none; }
+    .print-tab { display: none; }
+    .print-header { border-bottom: 2px solid #111827; margin-bottom: 10px; padding-bottom: 6px; }
+    .print-header h1 { margin: 0 0 4px; font-size: 20px; }
+    .print-header p { margin: 0; font-size: 12px; color: #4b5563; }
+    .print-kpi { font-size: 12px; font-weight: 600; margin: 0 0 8px; }
+    .print-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .print-table th, .print-table td { border: 1px solid #d1d5db; padding: 6px; text-align: left; }
+    .print-table th { background: #f3f4f6; }
+
     @media print {
         @page { size: landscape; margin: 1cm; }
         body { background: white; -webkit-print-color-adjust: exact; }
-        
-        /* Esconde elementos de navegação */
-        .no-print, .navbar, .sidebar, footer, .nav-tabs { display: none !important; }
-        
-        /* Ajusta o card para ocupar a página */
-        .card { border: none !important; box-shadow: none !important; }
-        .card-header { background-color: #f8f9fa !important; color: black !important; border-bottom: 2px solid #000; }
-        
-        /* Garante que a aba ativa seja impressa */
-        .tab-pane { display: block !important; opacity: 1 !important; }
-        .tab-pane:not(.active) { display: none !important; }
-        
-        /* Tabela compacta */
-        .table { width: 100% !important; border-collapse: collapse !important; }
-        .table th, .table td { border: 1px solid #ddd !important; padding: 6px !important; font-size: 12px; }
-        
-        .badge { border: 1px solid #000; color: #000 !important; background: none !important; }
+        .no-print, .navbar, .sidebar, footer, .nav-tabs, #relatorioTabContent { display: none !important; }
+        .print-document { display: block !important; }
+        body[data-print-tab="diario"] .print-document .tab-diario { display: block !important; }
+        body[data-print-tab="semanal"] .print-document .tab-semanal { display: block !important; }
+        body[data-print-tab="mensal"] .print-document .tab-mensal { display: block !important; }
+        .container-fluid { margin: 0 !important; padding: 0 !important; }
     }
 </style>
+<script>
+    function getActiveTabId() {
+        const activePane = document.querySelector('#relatorioTabContent .tab-pane.active');
+        return activePane ? activePane.id : 'diario';
+    }
+
+    function printRelatorio() {
+        document.body.setAttribute('data-print-tab', getActiveTabId());
+        window.print();
+    }
+
+    window.addEventListener('beforeprint', function () {
+        document.body.setAttribute('data-print-tab', getActiveTabId());
+    });
+</script>
 {% endblock %}
+

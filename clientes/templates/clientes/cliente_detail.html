@@ -65,7 +65,7 @@
                     <button onclick="window.print()" class="btn btn-info btn-sm"><i class="bi bi-printer-fill me-1"></i> Imprimir</button>
                     
                     {# --- NOVO BOTÃO DE REDISTRIBUIÇÃO --- #}
-                    {% if user.is_superuser or user.profile.nivel_acesso in 'ADMIN,GERENTE,DISTRIBUIDOR' %}
+                    {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' or user.profile.nivel_acesso == 'DISTRIBUIDOR' %}
                     <a href="{% url 'redistribuir-lead' cliente.pk %}" class="btn btn-outline-warning btn-sm text-white" title="Passar para outro vendedor (Rodízio)">
                         <i class="bi bi-arrow-repeat me-1"></i> Redistribuir
                     </a>

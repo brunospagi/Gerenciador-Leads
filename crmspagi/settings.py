@@ -16,7 +16,7 @@ WEBHOOK_PONTO_URL = os.getenv('WEBHOOK_PONTO_URL')
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-default-key-for-dev')
 
 # DEBUG é False em produção por padrão. Mude para 'True' no .env apenas para desenvolvimento.
-DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
+DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'False'
 
 # Lê os hosts permitidos de uma variável de ambiente (separados por vírgula)
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
@@ -77,6 +77,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'usuarios.middleware.ModulePermissionMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -132,6 +133,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'notificacoes.context_processors.unread_notifications_context',
                 'core.context_processors.banner_context',
+                'usuarios.context_processors.module_access_context',
             ],
         },
     },
@@ -144,7 +146,7 @@ LOGOUT_REDIRECT_URL = '/contas/login/'
 LOGIN_URL = '/contas/login/'
 
 
-
+'''
 # --- Database (LIDO DO .ENV) ---
 DATABASES = {
     "default": {
@@ -164,7 +166,6 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-'''
 # --- Autenticação personalizada com OIDC ---
 
 AUTHENTICATION_BACKENDS = [

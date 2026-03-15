@@ -89,9 +89,20 @@ class VendaProduto(models.Model):
     ]
 
     STATUS_CHOICES = [
-        ('PENDENTE', 'Pendente de Conferência'),
+        ('PENDENTE', 'Pendente de Conferencia'),
         ('APROVADO', 'Aprovado pelo Gerente'),
         ('REJEITADO', 'Rejeitado'),
+    ]
+
+    ORIGEM_CLIENTE_CHOICES = [
+        ('INDICACAO', 'Indicacao'),
+        ('INSTAGRAM', 'Instagram'),
+        ('FACEBOOK', 'Facebook'),
+        ('OLX', 'OLX'),
+        ('SITE', 'Site'),
+        ('LOJA', 'Passagem na Loja'),
+        ('WHATSAPP', 'WhatsApp'),
+        ('OUTRO', 'Outro'),
     ]
 
     vendedor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='vendas_produtos')
@@ -108,6 +119,12 @@ class VendaProduto(models.Model):
     comissao_ajudante = models.DecimalField(max_digits=10, decimal_places=2, default=0, editable=False)
 
     cliente_nome = models.CharField(max_length=150, verbose_name="Nome do Cliente")
+    origem_cliente = models.CharField(
+        max_length=20,
+        choices=ORIGEM_CLIENTE_CHOICES,
+        default='OUTRO',
+        verbose_name="Origem do Cliente"
+    )
     placa = models.CharField(max_length=10)
     modelo_veiculo = models.CharField(max_length=100, blank=True, null=True, verbose_name="Modelo")
     cor = models.CharField(max_length=50, blank=True, null=True, verbose_name="Cor")

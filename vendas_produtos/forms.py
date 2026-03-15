@@ -62,7 +62,7 @@ class VendaProdutoForm(forms.ModelForm):
         model = VendaProduto
         # Incluímos 'vendedor' na lista de campos possíveis
         fields = [
-            'vendedor', 'tipo_produto', 'com_desconto', 'cliente_nome', 
+            'vendedor', 'tipo_produto', 'com_desconto', 'cliente_nome', 'origem_cliente',
             'modelo_veiculo', 'placa', 'cor', 'ano',
             'custo_base', 
             'valor_venda', 
@@ -78,6 +78,7 @@ class VendaProdutoForm(forms.ModelForm):
             
             'data_venda': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control'}),
             'cliente_nome': forms.TextInput(attrs={'class': 'form-control'}),
+            'origem_cliente': forms.Select(attrs={'class': 'form-select'}),
             'modelo_veiculo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Onix LTZ 1.4'}),
             'placa': forms.TextInput(attrs={'style': 'text-transform:uppercase', 'class': 'form-control'}),
             'cor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Prata'}),

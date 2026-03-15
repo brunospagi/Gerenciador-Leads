@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import PasswordChangeForm, SetPasswordForm
 from django.contrib.auth.models import User
-from .models import Profile
+from .models import Profile, ModulePermission
 
 class CustomPasswordChangeForm(PasswordChangeForm):
     # ... (código existente sem alterações)
@@ -95,3 +95,41 @@ class UserUpdateFormByAdmin(forms.ModelForm):
         
         user.profile.save()
         return user
+
+
+class ModulePermissionForm(forms.ModelForm):
+    class Meta:
+        model = ModulePermission
+        fields = [
+            'modulo_clientes',
+            'modulo_vendas',
+            'modulo_financiamentos',
+            'modulo_ponto',
+            'modulo_avaliacoes',
+            'modulo_financeiro',
+            'modulo_distribuicao',
+            'modulo_rh',
+            'modulo_documentos',
+            'modulo_autorizacoes',
+            'modulo_relatorios',
+            'modulo_admin_usuarios',
+        ]
+        labels = {
+            'modulo_clientes': 'Clientes e Leads',
+            'modulo_vendas': 'Vendas e Servicos',
+            'modulo_financiamentos': 'Financiamentos',
+            'modulo_ponto': 'Controle de Ponto',
+            'modulo_avaliacoes': 'Avaliacoes',
+            'modulo_financeiro': 'Financeiro',
+            'modulo_distribuicao': 'Distribuicao de Leads',
+            'modulo_rh': 'RH e Funcionarios',
+            'modulo_documentos': 'Documentos',
+            'modulo_autorizacoes': 'Autorizacoes',
+            'modulo_relatorios': 'Relatorios Gerenciais',
+            'modulo_admin_usuarios': 'Acessos e Perfis',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs['class'] = 'form-check-input'

@@ -5,17 +5,28 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 
 from .models import TransacaoFinanceira, gerar_relatorio_DRE_mensal
 from .forms import TransacaoFinanceiraForm
+from usuarios.permissions import has_module_access
 
 class AcessoFinanceiroMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
+        if self.request.user.is_superuser:
+            return True
         profile = getattr(self.request.user, 'profile', None)
-        if not profile: return False
-        return profile.nivel_acesso == 'ADMIN' or profile.pode_acessar_financeiro
+        if not profile:
+            return False
+        return (
+            profile.nivel_acesso == 'ADMIN'
+            or profile.pode_acessar_financeiro
+            or has_module_access(self.request.user, 'financeiro')
+        )
 
 class AcessoAdminMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
+        if self.request.user.is_superuser:
+            return True
         profile = getattr(self.request.user, 'profile', None)
-        if not profile: return False
+        if not profile:
+            return False
         return profile.nivel_acesso == 'ADMIN'
 
 class TransacaoListView(AcessoFinanceiroMixin, ListView):

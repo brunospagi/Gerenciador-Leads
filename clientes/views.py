@@ -17,6 +17,8 @@ from django.contrib.auth.models import User
 from collections import defaultdict
 from django.contrib import messages 
 
+CLOSED_STATUSES = [Cliente.StatusNegociacao.FINALIZADO, Cliente.StatusNegociacao.VENDIDO]
+
 
 class CalendarioView(LoginRequiredMixin, TemplateView):
     template_name = 'clientes/calendario.html'
@@ -94,7 +96,7 @@ class ClienteListView(LoginRequiredMixin, ListView):
         base_queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
         context['clientes_atrasados_count'] = base_queryset.filter(
             data_proximo_contato__lte=timezone.now()
-        ).exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO).count()
+        ).exclude(status_negociacao__in=CLOSED_STATUSES).count()
         return context
 
 
@@ -173,7 +175,7 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
                 existing_client = Cliente.objects.filter(
                     whatsapp=whatsapp
                 ).exclude(
-                    status_negociacao=Cliente.StatusNegociacao.FINALIZADO
+                    status_negociacao__in=CLOSED_STATUSES
                 ).select_related('vendedor').first() 
 
                 if existing_client:
@@ -279,7 +281,7 @@ class ClienteAtrasadoListView(LoginRequiredMixin, ListView):
         queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
         queryset = queryset.filter(data_proximo_contato__lte=timezone.now())
         queryset = queryset.order_by('data_proximo_contato')
-        return queryset.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
+        return queryset.exclude(status_negociacao__in=CLOSED_STATUSES)
 
 class ClienteFinalizadoListView(LoginRequiredMixin, ListView):
     model = Cliente
@@ -310,15 +312,19 @@ def relatorio_dashboard(request):
     end_date_str = request.GET.get('end_date')
 
     if start_date_str and end_date_str:
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            end_date = timezone.now().date()
+            start_date = end_date - timedelta(days=30)
     else:
         end_date = timezone.now().date()
         start_date = end_date - timedelta(days=30)
 
     clientes_todos = Cliente.objects.filter(data_primeiro_contato__date__range=[start_date, end_date])
     total_clientes = clientes_todos.count()
-    clientes_ativos = clientes_todos.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
+    clientes_ativos = clientes_todos.exclude(status_negociacao__in=CLOSED_STATUSES)
     
     clientes_concluidos = clientes_todos.filter(status_negociacao=Cliente.StatusNegociacao.VENDIDO)
 
@@ -386,15 +392,19 @@ def exportar_relatorio_pdf(request):
     end_date_str = request.GET.get('end_date')
 
     if start_date_str and end_date_str:
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            end_date = timezone.now().date()
+            start_date = end_date - timedelta(days=30)
     else:
         end_date = timezone.now().date()
         start_date = end_date - timedelta(days=30)
 
     clientes_todos = Cliente.objects.filter(data_primeiro_contato__date__range=[start_date, end_date])
     total_clientes = clientes_todos.count()
-    clientes_ativos = clientes_todos.exclude(status_negociacao=Cliente.StatusNegociacao.FINALIZADO)
+    clientes_ativos = clientes_todos.exclude(status_negociacao__in=CLOSED_STATUSES)
     
     clientes_concluidos = clientes_todos.filter(status_negociacao=Cliente.StatusNegociacao.VENDIDO)
 
@@ -474,7 +484,7 @@ def relatorio_atrasados_por_vendedor(request):
     clientes_atrasados_qs = Cliente.objects.filter(
         data_proximo_contato__lte=timezone.now()
     ).exclude(
-        status_negociacao=Cliente.StatusNegociacao.FINALIZADO
+        status_negociacao__in=CLOSED_STATUSES
     ).select_related('vendedor').order_by('vendedor__username', 'data_proximo_contato')
 
     vendedor_ids = Cliente.objects.values_list('vendedor_id', flat=True).distinct()
@@ -515,7 +525,7 @@ def exportar_relatorio_atrasados_pdf(request):
     clientes_atrasados_qs = Cliente.objects.filter(
         data_proximo_contato__lte=timezone.now()
     ).exclude(
-        status_negociacao=Cliente.StatusNegociacao.FINALIZADO
+        status_negociacao__in=CLOSED_STATUSES
     ).select_related('vendedor').order_by('vendedor__username', 'data_proximo_contato')
 
     selected_vendedores_ids_str = request.GET.getlist('vendedores')

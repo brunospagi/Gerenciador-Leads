@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     admin_dashboard_view, profile_view, CustomPasswordChangeView,
     UserListView, UserCreateView, UserUpdateView, UserDeleteView,
-    UserPasswordChangeView
+    UserPasswordChangeView, ModulePermissionListView, ModulePermissionUpdateView
 )
 
 urlpatterns = [
@@ -14,4 +14,6 @@ urlpatterns = [
     path('usuarios/<int:pk>/editar/', UserUpdateView.as_view(), name='user_update'),
     path('usuarios/<int:pk>/excluir/', UserDeleteView.as_view(), name='user_delete'),
     path('usuarios/<int:pk>/alterar-senha/', UserPasswordChangeView.as_view(), name='user_password_change'),
+    path('usuarios/permissoes/', ModulePermissionListView.as_view(), name='user_module_permissions'),
+    path('usuarios/<int:pk>/permissoes/', ModulePermissionUpdateView.as_view(), name='user_module_permissions_update'),
 ]

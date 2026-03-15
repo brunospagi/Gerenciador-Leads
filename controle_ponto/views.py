@@ -140,7 +140,10 @@ def mapa_pontos(request):
 
     data_str = request.GET.get('data')
     if data_str:
-        data_filtro = datetime.strptime(data_str, '%Y-%m-%d').date()
+        try:
+            data_filtro = datetime.strptime(data_str, '%Y-%m-%d').date()
+        except ValueError:
+            data_filtro = timezone.now().date()
     else:
         data_filtro = timezone.now().date()
 

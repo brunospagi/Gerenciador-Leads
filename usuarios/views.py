@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import UserPassesTestMixin, LoginRequiredMixin
 from django.contrib.auth.views import PasswordChangeView
@@ -8,10 +8,10 @@ from django.contrib import messages
 # --- ProfileAvatarForm ADICIONADO ---
 from .forms import (
     CustomPasswordChangeForm, UserCreationFormByAdmin, 
-    UserUpdateFormByAdmin, AdminSetPasswordForm, ProfileAvatarForm
+    UserUpdateFormByAdmin, AdminSetPasswordForm, ProfileAvatarForm, ModulePermissionForm
 )
 from django.contrib.auth.models import User
-from .models import Profile, UserLoginActivity
+from .models import Profile, UserLoginActivity, ModulePermission
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count
 from django.db.models.functions import TruncDate
@@ -108,6 +108,45 @@ class UserPasswordChangeView(AdminRequiredMixin, FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['target_user'] = User.objects.get(pk=self.kwargs['pk'])
+        return context
+
+
+class ModulePermissionListView(AdminRequiredMixin, ListView):
+    model = User
+    template_name = 'usuarios/module_permissions_list.html'
+    context_object_name = 'usuarios'
+
+    def get_queryset(self):
+        return User.objects.select_related('profile').order_by('username')
+
+
+class ModulePermissionUpdateView(AdminRequiredMixin, UpdateView):
+    model = ModulePermission
+    form_class = ModulePermissionForm
+    template_name = 'usuarios/module_permissions_form.html'
+
+    def get_object(self, queryset=None):
+        target_user = get_object_or_404(User, pk=self.kwargs['pk'])
+        obj, _ = ModulePermission.objects.get_or_create(user=target_user)
+        return obj
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+
+        profile = self.object.user.profile
+        profile.pode_acessar_financeiro = form.cleaned_data.get('modulo_financeiro', False)
+        profile.pode_distribuir_leads = form.cleaned_data.get('modulo_distribuicao', False)
+        profile.save(update_fields=['pode_acessar_financeiro', 'pode_distribuir_leads'])
+
+        messages.success(self.request, f"Permissoes por modulo atualizadas para {self.object.user.username}.")
+        return response
+
+    def get_success_url(self):
+        return reverse_lazy('user_module_permissions')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['target_user'] = self.object.user
         return context
 
 

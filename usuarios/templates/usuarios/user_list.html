@@ -2,8 +2,11 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="mb-0"><i class="bi bi-people-fill me-2"></i>Gerenciar Usuários</h1>
-    <a href="{% url 'user_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Adicionar Usuário</a>
+    <h1 class="mb-0"><i class="bi bi-people-fill me-2"></i>Gerenciar Usuarios</h1>
+    <div class="d-flex gap-2">
+        <a href="{% url 'user_module_permissions' %}" class="btn btn-outline-dark"><i class="bi bi-shield-lock me-1"></i>Permissoes por Modulo</a>
+        <a href="{% url 'user_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i>Adicionar Usuario</a>
+    </div>
 </div>
 
 <div class="card shadow-sm">
@@ -12,12 +15,12 @@
             <table class="table table-hover align-middle">
                 <thead class="table-dark">
                     <tr>
-                        <th>Usuário</th>
+                        <th>Usuario</th>
                         <th>Nome Completo</th>
                         <th>Email</th>
-                        <th>Nível de Acesso</th>
+                        <th>Nivel de Acesso</th>
                         <th>Status</th>
-                        <th class="text-center">Ações</th>
+                        <th class="text-center">Acoes</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -52,7 +55,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center">Nenhum usuário cadastrado.</td>
+                        <td colspan="7" class="text-center">Nenhum usuario cadastrado.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
