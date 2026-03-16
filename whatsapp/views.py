@@ -1,6 +1,7 @@
 import json
 import mimetypes
 import os
+import re
 import uuid
 
 from django.contrib import messages
@@ -36,9 +37,17 @@ from .services import (
 )
 
 
+def _visible_text(value: str) -> str:
+    text = str(value or '')
+    text = re.sub(r'[\u200b\u200c\u200d\ufeff\u200e\u200f]', '', text)
+    return text.strip()
+
+
 def _is_noise_status_message(message: WhatsAppMessage) -> bool:
-    content = (message.conteudo or '').strip()
+    content = _visible_text(message.conteudo or '')
     has_media = bool((message.media_url or '').strip())
+    if not content and not has_media and message.direcao != WhatsAppMessage.Direction.SISTEMA:
+        return True
     if content or has_media:
         return False
     if message.direcao != WhatsAppMessage.Direction.ENVIADA:
@@ -110,7 +119,12 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                 conversa_ativa.nao_lidas = 0
                 conversa_ativa.save(update_fields=['nao_lidas'])
             raw_mensagens = list(conversa_ativa.mensagens.all().order_by('criado_em')[:500])
-            filtered = [m for m in raw_mensagens if not _is_noise_status_message(m)]
+            filtered = []
+            for m in raw_mensagens:
+                if _is_noise_status_message(m):
+                    continue
+                m.conteudo = _visible_text(m.conteudo or '')
+                filtered.append(m)
             mensagens = filtered[-300:]
 
         instance = get_active_instance()
@@ -137,8 +151,12 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         return redirect('whatsapp:inbox')
 
     def _start_conversation(self, request):
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
         form = WhatsAppStartConversationForm(request.POST)
         if not form.is_valid():
+            if is_ajax:
+                errors = [str(e) for errs in form.errors.values() for e in errs]
+                return JsonResponse({'ok': False, 'error': errors[0] if errors else 'Dados invalidos.'}, status=400)
             context = self.get_context_data()
             context['start_form'] = form
             context['open_new_chat'] = True
@@ -146,6 +164,8 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
 
         numero = ensure_br_country_code(form.cleaned_data['numero'])
         if not numero:
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': 'Informe um numero valido no formato DDD + telefone.'}, status=400)
             form.add_error('numero', 'Informe um numero valido no formato DDD + telefone.')
             context = self.get_context_data()
             context['start_form'] = form
@@ -168,6 +188,8 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         if primeira_mensagem:
             instance = conversa.instance or get_active_instance()
             if not instance:
+                if is_ajax:
+                    return JsonResponse({'ok': True, 'conversation_id': conversa.pk, 'warning': 'Conversa criada, mas sem instancia ativa para envio da primeira mensagem.'})
                 messages.warning(request, 'Conversa criada, mas sem instancia ativa para envio da primeira mensagem.')
                 return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
@@ -202,6 +224,15 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                 mensagem.status = WhatsAppMessage.Status.FALHA
                 mensagem.payload = {'erro': str(exc)}
                 mensagem.save(update_fields=['status', 'payload'])
+                if is_ajax:
+                    return JsonResponse(
+                        {
+                            'ok': False,
+                            'error': f'Conversa criada, mas falhou no envio da primeira mensagem: {exc}',
+                            'conversation_id': conversa.pk,
+                        },
+                        status=400,
+                    )
                 form.add_error(None, f'Conversa criada, mas falhou no envio da primeira mensagem: {exc}')
                 context = self.get_context_data()
                 context['start_form'] = form
@@ -211,29 +242,40 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                 context['conversas'] = WhatsAppConversation.objects.order_by('-ultima_mensagem_em')[:200]
                 return self.render_to_response(context)
 
+        if is_ajax:
+            return JsonResponse({'ok': True, 'conversation_id': conversa.pk})
         return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
     def _send_message(self, request):
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
         form = WhatsAppSendMessageForm(request.POST, request.FILES)
         conversa_id = request.POST.get('conversa_id')
         if not conversa_id:
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': 'Conversa invalida.'}, status=400)
             messages.error(request, 'Conversa invalida.')
             return redirect('whatsapp:inbox')
 
         if not form.is_valid():
             first_error = next(iter(form.errors.values()))[0] if form.errors else 'Mensagem invalida.'
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': str(first_error)}, status=400)
             messages.error(request, str(first_error))
             return redirect('whatsapp:inbox')
 
         conversa = get_object_or_404(WhatsAppConversation, pk=conversa_id)
         instance = conversa.instance or get_active_instance()
         if not instance:
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': 'Nenhuma instancia ativa configurada para envio via Evolution API.'}, status=400)
             messages.error(request, 'Nenhuma instancia ativa configurada para envio via Evolution API.')
             return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
         texto = (form.cleaned_data.get('mensagem') or '').strip()
         arquivo = form.cleaned_data.get('arquivo')
         if not texto and not arquivo:
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': 'Informe uma mensagem ou selecione um arquivo para enviar.'}, status=400)
             messages.error(request, 'Informe uma mensagem ou selecione um arquivo para enviar.')
             return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
@@ -295,6 +337,8 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             conversa.ultima_mensagem = preview[:500]
             conversa.ultima_mensagem_em = nova_mensagem.criado_em
             conversa.save()
+            if is_ajax:
+                return JsonResponse({'ok': True, 'conversation_id': conversa.pk, 'message_id': nova_mensagem.pk})
             if arquivo:
                 messages.success(request, 'Arquivo/midia enviado com sucesso.')
             else:
@@ -308,6 +352,8 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                     default_storage.delete(media_storage_path)
                 except Exception:
                     pass
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': f'Falha ao enviar mensagem: {exc}'}, status=400)
             messages.error(request, f'Falha ao enviar mensagem: {exc}')
 
         return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
@@ -357,6 +403,8 @@ def mark_read(request, pk):
     conversa = get_object_or_404(WhatsAppConversation, pk=pk)
     conversa.nao_lidas = 0
     conversa.save(update_fields=['nao_lidas'])
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'ok': True, 'conversation_id': conversa.pk})
     return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
 
@@ -608,6 +656,7 @@ def conversations_feed(request):
             'id': c.pk,
             'nome': c.nome_exibicao,
             'wa_id': c.wa_id,
+            'wa_id_display': c.wa_id_display,
             'wa_id_alt': c.wa_id_alt or '',
             'avatar_url': c.avatar_url or '',
             'etiquetas': c.etiquetas or [],
@@ -632,7 +681,7 @@ def conversation_messages_feed(request, pk):
         {
             'id': m.pk,
             'direcao': m.direcao,
-            'conteudo': m.conteudo or '',
+            'conteudo': _visible_text(m.conteudo or ''),
             'media_url': m.media_url or '',
             'media_kind': m.media_kind or '',
             'status_code': m.status,

@@ -55,7 +55,7 @@
     .right-container .header .img-text h4 span { font-size: .78rem; color: #64748b; font-weight: 400; }
     .chat-container { position: relative; width: 100%; height: calc(100% - 122px); padding: 24px; overflow-y: auto; z-index: 2; }
     .message-box { position: relative; display: flex; width: 100%; margin: 5px 0; }
-    .message-bubble { position: relative; max-width: 70%; padding: 8px 12px 6px; margin: 0; border-radius: 10px; font-size: .9rem; background: #dcf8c6; color: #111827; }
+    .message-bubble { position: relative; max-width: 70%; padding: 8px 12px 6px; margin: 0; border-radius: 10px; font-size: .9rem; background: #dcf8c6; color: #111827; overflow: visible; }
     .message-text { word-break: break-word; white-space: pre-wrap; line-height: 1.35; }
     .message-meta { margin-top: 4px; display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: .75rem; color: rgba(17, 24, 39, .65); }
     .message-status-icon { font-size: .74rem; line-height: 1; }
@@ -114,23 +114,50 @@
         font-size: .8rem; line-height: 1; padding: 4px 7px; cursor: pointer;
     }
     .reaction-btn:hover { background: #f1f5f9; }
+    .emoji-picker-panel {
+        position: fixed;
+        display: none;
+        z-index: 9999;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        box-shadow: 0 10px 24px rgba(0,0,0,.2);
+        padding: 6px;
+        gap: 4px;
+    }
+    .emoji-picker-panel.show { display: flex; }
+    .emoji-picker-panel button {
+        border: 0;
+        background: transparent;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        font-size: 18px;
+        line-height: 1;
+    }
+    .emoji-picker-panel button:hover { background: #f3f4f6; }
     .message-menu-trigger {
         position: absolute;
-        top: 6px;
-        right: 6px;
-        width: 24px;
-        height: 24px;
+        top: 4px;
+        right: -24px;
+        width: 22px;
+        height: 22px;
         border-radius: 50%;
         color: #4b5563;
-        background: rgba(255, 255, 255, 0.82);
+        background: rgba(255, 255, 255, 0.92);
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: 15px;
+        font-size: 13px;
         line-height: 1;
         border: 1px solid #e5e7eb;
         opacity: 0;
         transition: opacity .15s ease;
+        z-index: 6;
+    }
+    .my-message .message-menu-trigger {
+        right: auto;
+        left: -24px;
     }
     .message-bubble:hover .message-menu-trigger,
     .message-menu-trigger.force-show {
@@ -138,8 +165,8 @@
     }
     .message-menu {
         position: absolute;
-        top: 34px;
-        right: 6px;
+        top: 28px;
+        right: -6px;
         min-width: 175px;
         background: #fff;
         border-radius: 8px;
@@ -148,6 +175,10 @@
         z-index: 8;
         padding: 4px 0;
         display: none;
+    }
+    .my-message .message-menu {
+        right: auto;
+        left: -6px;
     }
     .message-menu.open { display: block; }
     .message-menu button {
@@ -259,7 +290,7 @@
                     <li>
                         <a href="#" id="btnOpenNewChat" title="Nova conversa"><i class="fa-solid fa-comment-dots"></i></a>
                         <div class="top-new-chat-card" id="newChatCard">
-                            <form method="post">
+                            <form method="post" id="startConversationForm">
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="start_conversation">
                                 {% if start_form.non_field_errors %}
@@ -361,7 +392,7 @@
                         {% endif %}
                     </div>
                     <div class="contact-meta">
-                        <h4 id="active-contact-name">{{ conversa_ativa.nome_exibicao }}<br><span id="active-contact-jid">{{ conversa_ativa.wa_id }}</span></h4>
+                        <h4 id="active-contact-name">{{ conversa_ativa.nome_exibicao }}<br><span id="active-contact-jid">{{ conversa_ativa.wa_id_display }}</span></h4>
                     </div>
                     <div class="label-row" id="active-contact-labels">
                         {% if conversa_ativa.etiquetas %}
@@ -374,13 +405,13 @@
                 <ul class="nav-icons">
                     <li><i class="fa-solid fa-magnifying-glass"></i></li>
                     <li>
-                        <form method="post" action="{% url 'whatsapp:mark_read' conversa_ativa.pk %}">
+                        <form method="post" action="{% url 'whatsapp:mark_read' conversa_ativa.pk %}" id="markReadForm">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-sm btn-light border">Marcar lida</button>
                         </form>
                     </li>
                     <li>
-                        <form method="post" action="{% url 'whatsapp:delete_conversation' conversa_ativa.pk %}" onsubmit="return confirm('Deseja realmente deletar esta conversa? Esta acao nao pode ser desfeita.');">
+                        <form method="post" action="{% url 'whatsapp:delete_conversation' conversa_ativa.pk %}" id="deleteConversationForm">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-sm btn-outline-danger">Deletar conversa</button>
                         </form>
@@ -391,13 +422,13 @@
             <div class="chat-container" id="message-list">
                 {% for mensagem in mensagens %}
                 <div class="message-box {% if mensagem.direcao == 'OUT' %}my-message{% elif mensagem.direcao == 'SYSTEM' %}system-message{% else %}friend-message{% endif %}">
-                    <div class="message-bubble {% if mensagem.media_url %}has-media{% endif %} {% if mensagem.media_url and not mensagem.conteudo %}media-only{% endif %}">
+                    <div class="message-bubble {% if mensagem.media_url %}has-media{% endif %} {% if mensagem.media_url and not mensagem.conteudo and mensagem.media_kind != 'audio' and mensagem.media_kind != 'document' %}media-only{% endif %}">
                         <button type="button" class="message-menu-trigger" onclick="toggleMessageMenu(event, {{ mensagem.pk }})">&#8942;</button>
                         <div class="message-menu" id="msg-menu-{{ mensagem.pk }}">
                             <button type="button" onclick="messageAction('forward', {{ mensagem.pk }}, '')">Encaminhar</button>
                             <button type="button" onclick="messageAction('download', {{ mensagem.pk }}, '{{ mensagem.media_url|default:''|escapejs }}')" {% if not mensagem.media_url %}disabled{% endif %}>Download</button>
                             <button type="button" onclick="messageAction('reply', {{ mensagem.pk }}, '{{ mensagem.conteudo|default:''|escapejs }}')">Responder</button>
-                            <button type="button" onclick="messageAction('react', {{ mensagem.pk }}, '')">Reagir</button>
+                            <button type="button" onclick="messageAction('react', {{ mensagem.pk }}, '', this)">Reagir</button>
                         </div>
                         {% if mensagem.media_url %}
                             {% if mensagem.media_kind == 'audio' %}
@@ -410,7 +441,7 @@
                             <span class="bubble-media"><a href="{{ mensagem.media_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a></span>
                             {% endif %}
                         {% endif %}
-                        {% if mensagem.conteudo %}
+                        {% if mensagem.conteudo and mensagem.conteudo != '[DOCUMENT]' and mensagem.conteudo != '[ARQUIVO]' %}
                         <div class="message-text">{{ mensagem.conteudo|linebreaksbr }}</div>
                         {% endif %}
                         <div class="message-meta">
@@ -440,7 +471,7 @@
                 {% endfor %}
             </div>
 
-            <form method="post" enctype="multipart/form-data" class="chatbox-input">
+            <form method="post" enctype="multipart/form-data" class="chatbox-input" id="sendMessageForm">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="send_message">
                 <input type="hidden" name="conversa_id" value="{{ conversa_ativa.pk }}">
@@ -490,6 +521,8 @@
         const activeAvatarEl = document.getElementById('active-contact-avatar');
         const activeLabelsEl = document.getElementById('active-contact-labels');
         const defaultAvatar = 'https://cdn.quasar.dev/img/avatar4.jpg';
+        const AUTO_SCROLL_THRESHOLD = 90;
+        let firstMessagesRender = true;
 
         function esc(str) {
             return (str || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -502,6 +535,9 @@
             if (kind === 'video') return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${mediaUrl}"></video></span>`;
             if (kind === 'image') return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia"></span>`;
             const url = mediaUrl.toLowerCase();
+            if (url.startsWith('data:image/')) return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia"></span>`;
+            if (url.startsWith('data:video/')) return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${mediaUrl}"></video></span>`;
+            if (url.startsWith('data:audio/')) return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
             if (url.includes('.mp3') || url.includes('.ogg') || url.includes('.wav') || url.includes('.opus') || url.includes('.m4a') || url.includes('.aac')) return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
             if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')) return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${mediaUrl}"></video></span>`;
             if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.gif') || url.includes('.webp')) return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia"></span>`;
@@ -539,14 +575,14 @@
                     <button type="button" onclick="messageAction('forward', ${message.id}, '')">Encaminhar</button>
                     <button type="button" onclick="messageAction('download', ${message.id}, '${encMedia}')" ${noMedia}>Download</button>
                     <button type="button" onclick="messageAction('reply', ${message.id}, '${encText}')">Responder</button>
-                    <button type="button" onclick="messageAction('react', ${message.id}, '')">Reagir</button>
+                    <button type="button" onclick="messageAction('react', ${message.id}, '', this)">Reagir</button>
                 </div>`;
         }
 
         function updateHeaderByConversation(c) {
             if (!c) return;
             if (activeNameEl) {
-                activeNameEl.innerHTML = `${esc(c.nome || c.wa_id || 'Contato')}<br><span id="active-contact-jid">${esc(c.wa_id || '')}</span>`;
+                activeNameEl.innerHTML = `${esc(c.nome || c.wa_id_display || c.wa_id || 'Contato')}<br><span id="active-contact-jid">${esc(c.wa_id_display || c.wa_id || '')}</span>`;
             }
             if (activeAvatarEl) {
                 activeAvatarEl.src = c.avatar_url || defaultAvatar;
@@ -574,18 +610,35 @@
 
         function renderMessages(mensagens) {
             if (!messagesEl) return;
-            messagesEl.innerHTML = (mensagens || []).map((m) => {
+            const distanceFromBottom = messagesEl.scrollHeight - (messagesEl.scrollTop + messagesEl.clientHeight);
+            const shouldStickToBottom = firstMessagesRender || distanceFromBottom <= AUTO_SCROLL_THRESHOLD;
+            const sanitizeText = (value) => String(value || '').replace(/[\u200B-\u200D\uFEFF\u200E\u200F]/g, '').trim();
+            const safeMessages = (mensagens || []).filter((m) => {
+                const hasText = !!sanitizeText(m && m.conteudo);
+                const hasMedia = !!(m && m.media_url && String(m.media_url).trim());
+                return hasText || hasMedia || m.direcao === 'SYSTEM';
+            });
+            messagesEl.innerHTML = safeMessages.map((m) => {
                 const side = m.direcao === 'OUT' ? 'my-message' : (m.direcao === 'SYSTEM' ? 'system-message' : 'friend-message');
-                const textHtml = esc(m.conteudo).replaceAll('\n', '<br>');
+                const kind = String(m.media_kind || '').toLowerCase();
+                let cleanedText = sanitizeText(m.conteudo);
+                if ((kind === 'document') && (cleanedText === '[DOCUMENT]' || cleanedText === '[ARQUIVO]')) {
+                    cleanedText = '';
+                }
+                const textHtml = esc(cleanedText).replaceAll('\n', '<br>');
                 const reactionRow = reactionMarkup(m.id);
                 const timeText = esc((m.criado_em || '').split(' ')[1] || m.criado_em || '');
                 const messageText = textHtml ? `<div class="message-text">${textHtml}</div>` : '';
                 const hasMedia = !!m.media_url;
-                const mediaOnly = hasMedia && !m.conteudo;
+                const isVisualMedia = kind === 'image' || kind === 'video';
+                const mediaOnly = hasMedia && !cleanedText && isVisualMedia;
                 const bubbleClass = `message-bubble${hasMedia ? ' has-media' : ''}${mediaOnly ? ' media-only' : ''}`;
                 return `<div class="message-box ${side}"><div class="${bubbleClass}">${menuMarkup(m)}${mediaMarkup(m.media_url, m.media_kind)}${messageText}<div class="message-meta"><span class="message-time">${timeText}</span>${statusIconMarkup(m)}</div>${reactionRow}</div></div>`;
             }).join('');
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+            if (shouldStickToBottom) {
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+            firstMessagesRender = false;
         }
 
         function closeAllMessageMenus(exceptMessageId = null) {
@@ -610,14 +663,7 @@
             }
         };
 
-        function toggleReactionRow(messageId) {
-            const row = document.getElementById(`reaction-row-${messageId}`);
-            if (!row) return;
-            row.classList.toggle('reaction-hidden');
-            row.classList.toggle('is-open');
-        }
-
-        window.messageAction = function (action, messageId, payload) {
+        window.messageAction = function (action, messageId, payload, sourceEl) {
             const decodePayload = (val) => {
                 try {
                     return decodeURIComponent(val || '');
@@ -626,7 +672,7 @@
                 }
             };
             if (action === 'react') {
-                toggleReactionRow(messageId);
+                openEmojiPicker(messageId, sourceEl || null);
             } else if (action === 'download') {
                 const decoded = decodePayload(payload);
                 if (decoded) {
@@ -710,6 +756,41 @@
         const attachMenu = document.getElementById('attachMenu');
         const chatFileInput = document.getElementById('chatFileInput');
         const selectedFileName = document.getElementById('selectedFileName');
+        const sendMessageForm = document.getElementById('sendMessageForm');
+        const markReadForm = document.getElementById('markReadForm');
+        const deleteConversationForm = document.getElementById('deleteConversationForm');
+        const startConversationForm = document.getElementById('startConversationForm');
+        const emojiPickerPanel = document.createElement('div');
+        emojiPickerPanel.className = 'emoji-picker-panel';
+        emojiPickerPanel.id = 'emojiPickerPanel';
+        let emojiPickerMessageId = null;
+        ['👍', '❤️', '😂', '🙏', '😮', '😢', '👏', '🔥'].forEach((emoji) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = emoji;
+            btn.addEventListener('click', () => {
+                if (!emojiPickerMessageId) return;
+                sendReaction(emojiPickerMessageId, emoji);
+                closeEmojiPicker();
+            });
+            emojiPickerPanel.appendChild(btn);
+        });
+        document.body.appendChild(emojiPickerPanel);
+
+        function closeEmojiPicker() {
+            emojiPickerPanel.classList.remove('show');
+            emojiPickerMessageId = null;
+        }
+
+        function openEmojiPicker(messageId, anchorEl) {
+            emojiPickerMessageId = messageId;
+            const rect = anchorEl ? anchorEl.getBoundingClientRect() : { left: window.innerWidth / 2, top: window.innerHeight / 2 };
+            const top = Math.max(12, rect.top - 58);
+            const left = Math.max(12, Math.min(rect.left - 8, window.innerWidth - 320));
+            emojiPickerPanel.style.top = `${top}px`;
+            emojiPickerPanel.style.left = `${left}px`;
+            emojiPickerPanel.classList.add('show');
+        }
 
         function applyBrPhoneMask(value) {
             const digits = (value || '').replace(/\D/g, '').slice(0, 11);
@@ -761,6 +842,82 @@
             });
         }
 
+        async function submitFormAjax(formEl) {
+            const resp = await fetch(formEl.action || window.location.pathname + window.location.search, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: new FormData(formEl)
+            });
+            const data = await resp.json().catch(() => ({ ok: false, error: 'Resposta invalida do servidor.' }));
+            if (!resp.ok || !data.ok) {
+                throw new Error(data.error || 'Falha na requisicao.');
+            }
+            return data;
+        }
+
+        if (sendMessageForm) {
+            sendMessageForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                try {
+                    await submitFormAjax(sendMessageForm);
+                    const textInput = sendMessageForm.querySelector('input[name="mensagem"]');
+                    if (textInput) textInput.value = '';
+                    if (chatFileInput) chatFileInput.value = '';
+                    if (selectedFileName) selectedFileName.textContent = '';
+                    closeAttachMenu();
+                    pollMessages();
+                    pollConversations();
+                } catch (err) {
+                    alert(err.message || 'Erro ao enviar mensagem.');
+                }
+            });
+        }
+
+        if (markReadForm) {
+            markReadForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                try {
+                    await submitFormAjax(markReadForm);
+                    pollConversations();
+                } catch (err) {
+                    alert(err.message || 'Erro ao marcar conversa como lida.');
+                }
+            });
+        }
+
+        if (startConversationForm) {
+            startConversationForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                try {
+                    const data = await submitFormAjax(startConversationForm);
+                    const targetConversationId = data.conversation_id;
+                    if (targetConversationId) {
+                        const baseUrl = "{% url 'whatsapp:inbox' %}";
+                        window.location.href = `${baseUrl}?c=${targetConversationId}`;
+                        return;
+                    }
+                    pollConversations();
+                    if (newChatCard) newChatCard.classList.remove('show');
+                } catch (err) {
+                    alert(err.message || 'Erro ao iniciar conversa.');
+                }
+            });
+        }
+
+        if (deleteConversationForm) {
+            deleteConversationForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const ok = window.confirm('Deseja realmente deletar esta conversa? Esta acao nao pode ser desfeita.');
+                if (!ok) return;
+                try {
+                    await submitFormAjax(deleteConversationForm);
+                    window.location.href = "{% url 'whatsapp:inbox' %}";
+                } catch (err) {
+                    alert(err.message || 'Erro ao deletar conversa.');
+                }
+            });
+        }
+
         window.openAttachment = function (kind) {
             if (!chatFileInput) return;
             chatFileInput.removeAttribute('capture');
@@ -791,6 +948,9 @@
             if (!e.target.closest('.attach-box')) {
                 closeAttachMenu();
             }
+            if (!e.target.closest('#emojiPickerPanel')) {
+                closeEmojiPicker();
+            }
         });
 
         {% if open_new_chat %}
@@ -802,8 +962,8 @@
 
         pollConversations();
         pollMessages();
-        setInterval(pollConversations, 7000);
-        setInterval(pollMessages, 5000);
+        setInterval(pollConversations, 5000);
+        setInterval(pollMessages, 2500);
     })();
 </script>
 {% endblock %}

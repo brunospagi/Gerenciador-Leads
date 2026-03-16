@@ -17,6 +17,13 @@ from .models import WhatsAppConversation, WhatsAppInstance, WhatsAppMessage
 logger = logging.getLogger(__name__)
 
 
+def sanitize_text_content(value: str) -> str:
+    text = str(value or '')
+    # Remove caracteres invisiveis que podem gerar bolhas "vazias"
+    text = re.sub(r'[\u200b\u200c\u200d\ufeff\u200e\u200f]', '', text)
+    return text.strip()
+
+
 def normalize_wa_id(raw_value: str) -> str:
     value = (raw_value or '').strip()
     if not value:
@@ -235,15 +242,15 @@ def parse_message_text(payload: dict[str, Any]) -> str:
         return str(message)
 
     if message.get('conversation'):
-        return message.get('conversation')
+        return sanitize_text_content(message.get('conversation'))
     if message.get('extendedTextMessage', {}).get('text'):
-        return message['extendedTextMessage']['text']
+        return sanitize_text_content(message['extendedTextMessage']['text'])
     if message.get('imageMessage', {}).get('caption'):
-        return message['imageMessage']['caption']
+        return sanitize_text_content(message['imageMessage']['caption'])
     if message.get('videoMessage', {}).get('caption'):
-        return message['videoMessage']['caption']
+        return sanitize_text_content(message['videoMessage']['caption'])
 
-    return data.get('text') or data.get('body') or ''
+    return sanitize_text_content(data.get('text') or data.get('body') or '')
 
 
 def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
@@ -267,7 +274,56 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
                 or media_obj.get('mediaUrl')
                 or ''
             )
-            return media_url, media_kind
+            if media_url:
+                return str(media_url), media_kind
+
+            mime = (
+                media_obj.get('mimetype')
+                or media_obj.get('mimeType')
+                or data.get('mimetype')
+                or data.get('mimeType')
+                or payload.get('mimetype')
+                or payload.get('mimeType')
+                or ''
+            )
+            base64_data = (
+                media_obj.get('base64')
+                or data.get('base64')
+                or payload.get('base64')
+                or ''
+            )
+            if base64_data and isinstance(base64_data, str):
+                mime_val = str(mime or 'application/octet-stream')
+                return f'data:{mime_val};base64,{base64_data}', media_kind
+
+    # Fallback: algumas versoes enviam URL fora de message.{image,video,...}
+    generic_url = (
+        data.get('mediaUrl')
+        or data.get('url')
+        or data.get('media')
+        or data.get('fileUrl')
+        or payload.get('mediaUrl')
+        or payload.get('url')
+        or payload.get('media')
+        or ''
+    )
+    if generic_url:
+        mime = str(
+            data.get('mimetype')
+            or data.get('mimeType')
+            or payload.get('mimetype')
+            or payload.get('mimeType')
+            or ''
+        ).lower()
+        msg_type = str(data.get('messageType') or payload.get('messageType') or '').lower()
+        if mime.startswith('image/') or 'image' in msg_type:
+            return str(generic_url), 'image'
+        if mime.startswith('video/') or 'video' in msg_type:
+            return str(generic_url), 'video'
+        if mime.startswith('audio/') or 'audio' in msg_type or 'ptt' in msg_type:
+            return str(generic_url), 'audio'
+        return str(generic_url), 'document'
+
     return '', ''
 
 
@@ -751,21 +807,22 @@ def process_labels_update(payload: dict[str, Any]) -> bool:
 
 def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance | None = None) -> None:
     event_name = str(payload.get('event') or '').upper()
-    if event_name in {'LABELS_ASSOCIATION', 'LABELS_EDIT', 'CONTACTS_UPDATE'}:
+    event_name_norm = re.sub(r'[^A-Z0-9]+', '_', event_name).strip('_')
+    if event_name_norm in {'LABELS_ASSOCIATION', 'LABELS_EDIT', 'CONTACTS_UPDATE'}:
         if process_labels_update(payload):
             logger.info('Webhook de etiquetas processado.')
             return
-    if event_name in {'CONNECTION_UPDATE', 'CONNECTION.STATE', 'INSTANCE_CONNECTION_UPDATE'}:
+    if event_name_norm in {'CONNECTION_UPDATE', 'CONNECTION_STATE', 'INSTANCE_CONNECTION_UPDATE'}:
         if process_connection_update(payload, instance):
             logger.info('Webhook de conexao processado: %s', instance.instance_name if instance else '-')
             return
 
-    if event_name in {'QRCODE_UPDATED', 'QRCODE_UPDATE'}:
+    if event_name_norm in {'QRCODE_UPDATED', 'QRCODE_UPDATE'}:
         if process_qrcode_update(payload, instance):
             logger.info('Webhook de QR code processado: %s', instance.instance_name if instance else '-')
             return
 
-    if event_name in {'MESSAGES_UPDATE', 'MESSAGE_UPDATE', 'MESSAGE_STATUS', 'SEND_MESSAGE'}:
+    if event_name_norm in {'MESSAGES_UPDATE', 'MESSAGE_UPDATE', 'MESSAGE_STATUS', 'SEND_MESSAGE'}:
         if process_status_update(payload):
             logger.info('Webhook de status processado para mensagem existente.')
         # Eventos de status nao devem criar conversa/mensagem nova
@@ -804,8 +861,18 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
         etiquetas.append('Facebook Ads')
     texto = parse_message_text(payload)
     media_url, media_kind = parse_message_media(payload)
-    if not texto and media_kind:
-        texto = f'[{media_kind.upper()}]'
+    raw_message = data.get('message') if isinstance(data.get('message'), dict) else {}
+    if not texto and not media_url:
+        # Evita criar bolha vazia (apenas horario) quando webhook nao traz conteudo real.
+        if isinstance(raw_message, dict) and raw_message:
+            unsupported_type = next(iter(raw_message.keys()), '')
+            if unsupported_type:
+                texto = '[Mensagem nao suportada]'
+        if not texto:
+            return
+    if not texto and media_kind in {'image', 'video', 'audio'}:
+        label = {'image': 'IMAGEM', 'video': 'VIDEO', 'audio': 'AUDIO'}.get(media_kind, media_kind.upper())
+        texto = f'[{label}]'
     ts = parse_message_timestamp(payload)
     ext_id = (
         key_data.get('id')

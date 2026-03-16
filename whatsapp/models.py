@@ -55,8 +55,17 @@ class WhatsAppConversation(models.Model):
         return self.nome_exibicao
 
     @property
+    def wa_id_display(self) -> str:
+        raw = (self.wa_id or '').strip()
+        if not raw:
+            return ''
+        local = raw.split('@', 1)[0]
+        digits = ''.join(ch for ch in local if ch.isdigit())
+        return digits or local
+
+    @property
     def nome_exibicao(self):
-        return self.nome_contato or self.wa_id
+        return self.nome_contato or self.wa_id_display
 
 
 class WhatsAppMessage(models.Model):
@@ -135,6 +144,12 @@ class WhatsAppMessage(models.Model):
                 return 'image'
 
         url = (self.media_url or '').lower()
+        if url.startswith('data:image/'):
+            return 'image'
+        if url.startswith('data:video/'):
+            return 'video'
+        if url.startswith('data:audio/'):
+            return 'audio'
         guessed, _ = mimetypes.guess_type(url)
         guessed = (guessed or '').lower()
         if guessed.startswith('audio/'):
