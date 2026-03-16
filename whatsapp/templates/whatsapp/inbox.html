@@ -53,9 +53,9 @@
                 <button class="btn btn-success w-100 btn-sm"><i class="fas fa-plus"></i> Nova conversa</button>
             </form>
         </div>
-        <div class="conversation-list">
+        <div class="conversation-list" id="conversation-list" data-active-id="{% if conversa_ativa %}{{ conversa_ativa.pk }}{% endif %}">
             {% for conversa in conversas %}
-            <a class="conversation-item {% if conversa_ativa and conversa.pk == conversa_ativa.pk %}active{% endif %}" href="{% url 'whatsapp:inbox' %}?c={{ conversa.pk }}">
+            <a class="conversation-item {% if conversa_ativa and conversa.pk == conversa_ativa.pk %}active{% endif %}" href="{% url 'whatsapp:inbox' %}?c={{ conversa.pk }}" data-conversation-id="{{ conversa.pk }}">
                 <div class="d-flex justify-content-between align-items-center">
                     <strong>{{ conversa.nome_exibicao }}</strong>
                     <small class="muted-small">{{ conversa.ultima_mensagem_em|date:"d/m H:i" }}</small>
@@ -85,7 +85,7 @@
                 <button class="btn btn-outline-secondary btn-sm">Marcar como lida</button>
             </form>
         </div>
-        <div class="msg-area">
+        <div class="msg-area" id="message-list">
             {% for mensagem in mensagens %}
             <div class="msg-row {% if mensagem.direcao == 'OUT' %}out{% else %}in{% endif %}">
                 <div class="bubble {% if mensagem.direcao == 'OUT' %}out{% else %}in{% endif %}">
@@ -136,4 +136,92 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if conversa_ativa %}
+<script>
+    (function () {
+        const activeConversationId = '{{ conversa_ativa.pk }}';
+        const conversationsEndpoint = "{% url 'whatsapp:conversations_feed' %}";
+        const messagesEndpoint = "{% url 'whatsapp:conversation_messages_feed' conversa_ativa.pk %}";
+        const listEl = document.getElementById('conversation-list');
+        const messagesEl = document.getElementById('message-list');
+        const currentQuery = "{{ request.GET.q|default:''|escapejs }}";
+
+        function mediaMarkup(mediaUrl) {
+            if (!mediaUrl) return '';
+            const url = mediaUrl.toLowerCase();
+            if (url.includes('.mp3') || url.includes('.ogg') || url.includes('.wav') || url.includes('.opus')) {
+                return `<div class="mb-2"><audio controls style="max-width:100%;"><source src="${mediaUrl}"></audio></div>`;
+            }
+            if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')) {
+                return `<div class="mb-2"><video controls style="max-width:100%; border-radius:8px;"><source src="${mediaUrl}"></video></div>`;
+            }
+            if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.gif') || url.includes('.webp')) {
+                return `<div class="mb-2"><img src="${mediaUrl}" alt="midia" style="max-width:100%; border-radius:8px;"></div>`;
+            }
+            return `<div class="mb-2"><a href="${mediaUrl}" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="fas fa-paperclip"></i> Abrir arquivo</a></div>`;
+        }
+
+        function renderMessages(mensagens) {
+            messagesEl.innerHTML = mensagens.map((m) => {
+                const directionClass = m.direcao === 'OUT' ? 'out' : 'in';
+                const textHtml = (m.conteudo || '').replaceAll('\n', '<br>');
+                return `
+                    <div class="msg-row ${directionClass}">
+                        <div class="bubble ${directionClass}">
+                            ${mediaMarkup(m.media_url)}
+                            <div>${textHtml}</div>
+                            <div class="muted-small mt-1">${m.criado_em} | ${m.status}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function renderConversations(conversas) {
+            const baseUrl = "{% url 'whatsapp:inbox' %}";
+            listEl.innerHTML = conversas.map((c) => {
+                const activeClass = String(c.id) === String(activeConversationId) ? 'active' : '';
+                const unreadBadge = c.nao_lidas ? `<span class="badge rounded-pill text-bg-danger">${c.nao_lidas}</span>` : '';
+                return `
+                    <a class="conversation-item ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>${c.nome}</strong>
+                            <small class="muted-small">${c.ultima_mensagem_em}</small>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="muted-small">${(c.ultima_mensagem || '').slice(0, 55)}</span>
+                            ${unreadBadge}
+                        </div>
+                    </a>
+                `;
+            }).join('');
+        }
+
+        async function pollFeeds() {
+            try {
+                const convResp = await fetch(`${conversationsEndpoint}?q=${encodeURIComponent(currentQuery)}`);
+                if (convResp.ok) {
+                    const convData = await convResp.json();
+                    if (convData.ok) renderConversations(convData.conversas || []);
+                }
+            } catch (e) {}
+
+            try {
+                const msgResp = await fetch(messagesEndpoint);
+                if (msgResp.ok) {
+                    const msgData = await msgResp.json();
+                    if (msgData.ok) renderMessages(msgData.mensagens || []);
+                }
+            } catch (e) {}
+        }
+
+        pollFeeds();
+        setInterval(pollFeeds, 6000);
+    })();
+</script>
+{% endif %}
 {% endblock %}

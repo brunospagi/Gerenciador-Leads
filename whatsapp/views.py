@@ -450,3 +450,50 @@ def _sync_instance_runtime(instance: WhatsAppInstance, try_connect: bool, number
         }
     except Exception as exc:
         return {'ok': False, 'error': str(exc)}
+
+
+@login_required
+def conversations_feed(request):
+    if not has_module_access(request.user, 'whatsapp'):
+        return JsonResponse({'ok': False, 'error': 'Sem permissao'}, status=403)
+
+    query = (request.GET.get('q') or '').strip()
+    conversas = WhatsAppConversation.objects.all()
+    if query:
+        conversas = conversas.filter(Q(nome_contato__icontains=query) | Q(wa_id__icontains=query))
+    conversas = conversas.order_by('-ultima_mensagem_em')[:200]
+
+    data = [
+        {
+            'id': c.pk,
+            'nome': c.nome_exibicao,
+            'wa_id': c.wa_id,
+            'ultima_mensagem': c.ultima_mensagem or '',
+            'ultima_mensagem_em': c.ultima_mensagem_em.strftime('%d/%m %H:%M') if c.ultima_mensagem_em else '',
+            'nao_lidas': c.nao_lidas or 0,
+        }
+        for c in conversas
+    ]
+    return JsonResponse({'ok': True, 'conversas': data})
+
+
+@login_required
+def conversation_messages_feed(request, pk):
+    if not has_module_access(request.user, 'whatsapp'):
+        return JsonResponse({'ok': False, 'error': 'Sem permissao'}, status=403)
+
+    conversa = get_object_or_404(WhatsAppConversation, pk=pk)
+    mensagens = conversa.mensagens.all().order_by('criado_em')[:300]
+
+    data = [
+        {
+            'id': m.pk,
+            'direcao': m.direcao,
+            'conteudo': m.conteudo or '',
+            'media_url': m.media_url or '',
+            'status': m.get_status_display(),
+            'criado_em': m.criado_em.strftime('%d/%m/%Y %H:%M') if m.criado_em else '',
+        }
+        for m in mensagens
+    ]
+    return JsonResponse({'ok': True, 'mensagens': data})
