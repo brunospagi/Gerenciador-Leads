@@ -768,6 +768,18 @@ def process_qrcode_update(payload: dict[str, Any], instance: WhatsAppInstance | 
 
 def process_labels_update(payload: dict[str, Any]) -> bool:
     data = payload.get('data', payload) if isinstance(payload, dict) else {}
+    if isinstance(data, list):
+        updated_any = False
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            nested_payload = dict(payload)
+            nested_payload['data'] = item
+            if process_labels_update(nested_payload):
+                updated_any = True
+        return updated_any
+    if not isinstance(data, dict):
+        return False
     key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
     jid_candidates = extract_jid_candidates(payload, data if isinstance(data, dict) else {}, key_data)
     if not jid_candidates:
