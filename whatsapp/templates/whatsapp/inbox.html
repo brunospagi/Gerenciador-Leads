@@ -853,20 +853,30 @@
         }
 
         async function submitFormAjax(formEl) {
-            const resp = await fetch(formEl.action || window.location.pathname + window.location.search, {
+            const actionAttr = (formEl.getAttribute('action') || '').trim();
+            const endpoint = actionAttr || (window.location.pathname + window.location.search);
+            const body = new FormData(formEl);
+            if (!body.get('ajax')) body.append('ajax', '1');
+            const resp = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCsrfToken(),
                     'Accept': 'application/json'
                 },
-                body: new FormData(formEl)
+                body
             });
             const contentType = (resp.headers.get('content-type') || '').toLowerCase();
             if (!contentType.includes('application/json')) {
+                if (resp.redirected || /\/login/i.test(resp.url || '')) {
+                    throw new Error('Sessao expirada. Faca login novamente e tente de novo.');
+                }
                 if (resp.status === 403) {
                     throw new Error('Sessao expirada ou sem permissao. Atualize a pagina e tente novamente.');
                 }
-                throw new Error('Resposta invalida do servidor.');
+                const rawText = await resp.text().catch(() => '');
+                const snippet = (rawText || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+                throw new Error(`Resposta invalida do servidor (HTTP ${resp.status}). ${snippet ? 'Detalhe: ' + snippet : ''}`);
             }
             const data = await resp.json().catch(() => ({ ok: false, error: 'Resposta invalida do servidor.' }));
             if (!resp.ok || !data.ok) {
