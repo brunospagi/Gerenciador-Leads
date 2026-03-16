@@ -291,21 +291,11 @@ class WhatsAppInstanceConfigView(WhatsAppInstanceAdminMixin, TemplateView):
         if not instance:
             return redirect('whatsapp:instance_config')
 
-        try:
-            client = EvolutionAPIClient(instance)
-            response = client.connection_state()
-            state = (
-                response.get('instance', {}).get('state')
-                or response.get('state')
-                or response.get('status')
-                or 'desconhecido'
-            )
-            instance.status_conexao = str(state).lower()
-            instance.ultima_resposta = response
-            instance.save(update_fields=['status_conexao', 'ultima_resposta', 'atualizado_em'])
-            messages.success(request, f'Status atualizado: {instance.status_conexao}.')
-        except Exception as exc:
-            messages.error(request, f'Erro ao consultar status: {exc}')
+        result = _sync_instance_runtime(instance=instance, try_connect=False)
+        if result.get('ok'):
+            messages.success(request, f"Status atualizado: {result.get('status')}.")
+        else:
+            messages.error(request, f"Erro ao consultar status: {result.get('error')}")
 
         return redirect(f"{reverse('whatsapp:instance_config')}?instance={instance.pk}")
 
@@ -320,3 +310,55 @@ class WhatsAppInstanceConfigView(WhatsAppInstanceAdminMixin, TemplateView):
             messages.error(request, 'Instancia nao encontrada.')
             return None
         return instance
+
+
+@login_required
+def instance_runtime_status(request, pk):
+    if not (request.user.is_superuser or has_module_access(request.user, 'usuarios_admin')):
+        return JsonResponse({'ok': False, 'error': 'Sem permissao'}, status=403)
+
+    instance = get_object_or_404(WhatsAppInstance, pk=pk)
+    try_connect = request.GET.get('try_connect', '1') == '1'
+    number = request.GET.get('number', '')
+    result = _sync_instance_runtime(instance=instance, try_connect=try_connect, number=number)
+    return JsonResponse(result)
+
+
+def _sync_instance_runtime(instance: WhatsAppInstance, try_connect: bool, number: str = '') -> dict:
+    try:
+        client = EvolutionAPIClient(instance)
+        response_state = client.connection_state()
+        state = (
+            response_state.get('instance', {}).get('state')
+            or response_state.get('state')
+            or response_state.get('status')
+            or 'desconhecido'
+        )
+        state = str(state).lower()
+
+        qr = instance.qr_code_base64 or ''
+        response_connect = {}
+
+        if try_connect and state not in {'open', 'connected'}:
+            response_connect = client.connect_instance(number=number)
+            new_qr = extract_qr_base64(response_connect)
+            if new_qr:
+                qr = new_qr
+                instance.qr_code_base64 = new_qr
+
+        instance.status_conexao = state
+        instance.ultima_resposta = {
+            'connectionState': response_state,
+            'connect': response_connect,
+        }
+        instance.save(update_fields=['status_conexao', 'ultima_resposta', 'qr_code_base64', 'atualizado_em'])
+
+        return {
+            'ok': True,
+            'status': state,
+            'connected': state in {'open', 'connected'},
+            'has_qr': bool(qr),
+            'qr': qr,
+        }
+    except Exception as exc:
+        return {'ok': False, 'error': str(exc)}

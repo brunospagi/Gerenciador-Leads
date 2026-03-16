@@ -1,12 +1,19 @@
 from django.urls import path
 
-from .views import WhatsAppInboxView, WhatsAppInstanceConfigView, WhatsAppWebhookView, mark_read
+from .views import (
+    WhatsAppInboxView,
+    WhatsAppInstanceConfigView,
+    WhatsAppWebhookView,
+    instance_runtime_status,
+    mark_read,
+)
 
 app_name = 'whatsapp'
 
 urlpatterns = [
     path('', WhatsAppInboxView.as_view(), name='inbox'),
     path('instancia/', WhatsAppInstanceConfigView.as_view(), name='instance_config'),
+    path('instancia/<int:pk>/status/', instance_runtime_status, name='instance_runtime_status'),
     path('conversa/<int:pk>/marcar-lida/', mark_read, name='mark_read'),
     path('webhook/', WhatsAppWebhookView.as_view(), name='webhook'),
 ]

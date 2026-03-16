@@ -94,19 +94,19 @@
                 </div>
 
                 <div class="alert alert-light border">
-                    <strong>Status atual:</strong> {{ selected_instance.status_conexao|default:"desconhecido" }}
+                    <strong>Status atual:</strong> <span id="wa-status-text">{{ selected_instance.status_conexao|default:"desconhecido" }}</span>
                 </div>
 
-                {% if selected_instance.qr_code_base64 %}
-                    {% if 'data:image' in selected_instance.qr_code_base64 %}
-                        <img src="{{ selected_instance.qr_code_base64 }}" alt="QR Code WhatsApp" class="img-fluid border rounded p-2" style="max-width: 360px;">
+                <div id="wa-qr-wrap" {% if not selected_instance.qr_code_base64 %}style="display:none;"{% endif %}>
+                    {% if selected_instance.qr_code_base64 %}
+                    <img id="wa-qr-img" src="{% if 'data:image' in selected_instance.qr_code_base64 %}{{ selected_instance.qr_code_base64 }}{% else %}data:image/png;base64,{{ selected_instance.qr_code_base64 }}{% endif %}" alt="QR Code WhatsApp" class="img-fluid border rounded p-2" style="max-width: 360px;">
                     {% else %}
-                        <img src="data:image/png;base64,{{ selected_instance.qr_code_base64 }}" alt="QR Code WhatsApp" class="img-fluid border rounded p-2" style="max-width: 360px;">
+                    <img id="wa-qr-img" src="" alt="QR Code WhatsApp" class="img-fluid border rounded p-2" style="max-width: 360px;">
                     {% endif %}
                     <p class="text-muted mt-2 mb-0">Abra o WhatsApp no celular, toque em Dispositivos conectados e escaneie o QR.</p>
-                {% else %}
-                    <p class="text-muted mb-0">Ainda sem QR Code. Clique em "Criar na Evolution + Gerar QR" ou "Atualizar QR".</p>
-                {% endif %}
+                </div>
+                <p id="wa-qr-hint" class="text-muted mb-0" {% if selected_instance.qr_code_base64 %}style="display:none;"{% endif %}>Ainda sem QR Code. Clique em "Criar na Evolution + Gerar QR" ou "Atualizar QR".</p>
+                <p id="wa-connected-msg" class="text-success fw-semibold mb-0" style="display:none;">Instancia conectada. QR Code nao e mais necessario.</p>
                 {% else %}
                 <p class="text-muted mb-0">Salve uma instancia para habilitar a conexao por QR Code.</p>
                 {% endif %}
@@ -114,4 +114,63 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if selected_instance %}
+<script>
+    (function () {
+        const statusEl = document.getElementById('wa-status-text');
+        const qrWrap = document.getElementById('wa-qr-wrap');
+        const qrImg = document.getElementById('wa-qr-img');
+        const qrHint = document.getElementById('wa-qr-hint');
+        const connectedMsg = document.getElementById('wa-connected-msg');
+        const endpoint = "{% url 'whatsapp:instance_runtime_status' selected_instance.pk %}";
+        let isRunning = true;
+
+        function setQrImage(qrValue) {
+            if (!qrValue) return;
+            if (qrValue.startsWith('data:image')) {
+                qrImg.src = qrValue;
+            } else {
+                qrImg.src = 'data:image/png;base64,' + qrValue;
+            }
+        }
+
+        async function tick() {
+            if (!isRunning) return;
+            try {
+                const response = await fetch(endpoint + '?try_connect=1', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!response.ok) return;
+                const data = await response.json();
+                if (!data.ok) return;
+
+                statusEl.textContent = data.status || 'desconhecido';
+                if (data.connected) {
+                    connectedMsg.style.display = 'block';
+                    qrWrap.style.display = 'none';
+                    qrHint.style.display = 'none';
+                    isRunning = false;
+                    return;
+                }
+
+                connectedMsg.style.display = 'none';
+                if (data.has_qr && data.qr) {
+                    setQrImage(data.qr);
+                    qrWrap.style.display = 'block';
+                    qrHint.style.display = 'none';
+                } else {
+                    qrWrap.style.display = 'none';
+                    qrHint.style.display = 'block';
+                }
+            } catch (e) {
+                // Falha de rede temporaria; tenta novamente no proximo ciclo.
+            }
+        }
+
+        tick();
+        setInterval(tick, 8000);
+    })();
+</script>
+{% endif %}
 {% endblock %}
