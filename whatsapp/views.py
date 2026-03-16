@@ -360,6 +360,22 @@ def mark_read(request, pk):
     return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
 
+@login_required
+def delete_conversation(request, pk):
+    if request.method != 'POST':
+        return HttpResponseForbidden('Metodo nao permitido.')
+    if not has_module_access(request.user, 'whatsapp'):
+        return HttpResponseForbidden('Sem permissao.')
+
+    conversa = get_object_or_404(WhatsAppConversation, pk=pk)
+    conversa.delete()
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'ok': True})
+    messages.success(request, 'Conversa deletada com sucesso.')
+    return redirect('whatsapp:inbox')
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class WhatsAppWebhookView(View):
     def post(self, request, *args, **kwargs):
@@ -618,6 +634,8 @@ def conversation_messages_feed(request, pk):
             'direcao': m.direcao,
             'conteudo': m.conteudo or '',
             'media_url': m.media_url or '',
+            'media_kind': m.media_kind or '',
+            'status_code': m.status,
             'status': m.get_status_display(),
             'criado_em': m.criado_em.strftime('%d/%m/%Y %H:%M') if m.criado_em else '',
             'can_react': True,

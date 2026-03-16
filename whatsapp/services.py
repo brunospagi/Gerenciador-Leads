@@ -94,6 +94,74 @@ def extract_jid_candidates(payload: dict[str, Any], data: dict[str, Any], key_da
     return result
 
 
+def _extract_self_jids(payload: dict[str, Any], data: dict[str, Any], instance: WhatsAppInstance | None) -> set[str]:
+    candidates: list[str] = []
+
+    source_dicts = [payload, data]
+    instance_data = data.get('instance') if isinstance(data.get('instance'), dict) else {}
+    if instance_data:
+        source_dicts.append(instance_data)
+
+    for source in source_dicts:
+        if not isinstance(source, dict):
+            continue
+        for key in (
+            'me',
+            'myJid',
+            'myid',
+            'owner',
+            'ownerJid',
+            'jid',
+            'wid',
+            'number',
+        ):
+            value = source.get(key)
+            if isinstance(value, str) and value.strip():
+                candidates.append(value.strip())
+            elif isinstance(value, dict):
+                for nested_key in ('id', 'jid', 'wid', 'number', 'user'):
+                    nested_value = value.get(nested_key)
+                    if isinstance(nested_value, str) and nested_value.strip():
+                        candidates.append(nested_value.strip())
+
+    normalized: set[str] = set()
+    for value in candidates:
+        jid = normalize_wa_id(value)
+        if jid:
+            normalized.add(jid)
+            if '@' in jid:
+                base = jid.split('@', 1)[0]
+                if base:
+                    normalized.add(f'{base}@s.whatsapp.net')
+    return normalized
+
+
+def _choose_conversation_jid(
+    *,
+    jid_candidates: list[str],
+    from_me: bool,
+    self_jids: set[str],
+) -> tuple[str, str, str]:
+    filtered = [jid for jid in jid_candidates if jid and jid not in self_jids]
+    base = filtered if filtered else jid_candidates
+
+    real_jid = next((jid for jid in base if is_real_number_jid(jid)), '')
+    lid_jid = next((jid for jid in base if is_lid_jid(jid)), '')
+    wa_id = real_jid or lid_jid or (base[0] if base else '')
+
+    # Para mensagens enviadas pelo proprio aparelho, sempre prioriza o destinatario (nao-eu)
+    if from_me and filtered:
+        real_filtered = next((jid for jid in filtered if is_real_number_jid(jid)), '')
+        lid_filtered = next((jid for jid in filtered if is_lid_jid(jid)), '')
+        wa_id = real_filtered or lid_filtered or filtered[0]
+        if real_filtered:
+            real_jid = real_filtered
+        if lid_filtered:
+            lid_jid = lid_filtered
+
+    return wa_id, real_jid, lid_jid
+
+
 def normalize_labels(raw_labels: Any) -> list[str]:
     labels: list[str] = []
     if isinstance(raw_labels, list):
@@ -646,14 +714,22 @@ def process_labels_update(payload: dict[str, Any]) -> bool:
     jid_candidates = extract_jid_candidates(payload, data if isinstance(data, dict) else {}, key_data)
     if not jid_candidates:
         return False
+    self_jids = _extract_self_jids(payload, data if isinstance(data, dict) else {}, instance=None)
+    from_me = bool(
+        key_data.get('fromMe')
+        or data.get('fromMe')
+        or payload.get('fromMe')
+    )
 
     labels = extract_labels(payload, data if isinstance(data, dict) else {})
     if not labels:
         return False
 
-    real_jid = next((jid for jid in jid_candidates if is_real_number_jid(jid)), '')
-    lid_jid = next((jid for jid in jid_candidates if is_lid_jid(jid)), '')
-    wa_id = real_jid or lid_jid or jid_candidates[0]
+    wa_id, real_jid, lid_jid = _choose_conversation_jid(
+        jid_candidates=jid_candidates,
+        from_me=from_me,
+        self_jids=self_jids,
+    )
 
     conversation = None
     if real_jid:
@@ -701,20 +777,26 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
 
     key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
     jid_candidates = extract_jid_candidates(payload, data, key_data)
-    real_jid = next((jid for jid in jid_candidates if is_real_number_jid(jid)), '')
-    lid_jid = next((jid for jid in jid_candidates if is_lid_jid(jid)), '')
-    wa_id = real_jid or lid_jid or (jid_candidates[0] if jid_candidates else '')
-    if not wa_id:
-        return
 
     from_me = bool(
         key_data.get('fromMe')
         or data.get('fromMe')
         or payload.get('fromMe')
     )
+    self_jids = _extract_self_jids(payload, data, instance=instance)
+    wa_id, real_jid, lid_jid = _choose_conversation_jid(
+        jid_candidates=jid_candidates,
+        from_me=from_me,
+        self_jids=self_jids,
+    )
+    if not wa_id:
+        return
     direction = WhatsAppMessage.Direction.ENVIADA if from_me else WhatsAppMessage.Direction.RECEBIDA
 
     contato = resolve_contact_name(payload, data)
+    if from_me:
+        # Evita sobrescrever contato com o proprio nome em mensagens enviadas do celular.
+        contato = ''
     avatar_url = resolve_avatar_url(payload, data)
     etiquetas = extract_labels(payload, data)
     is_facebook_ads, ads_metadata = detect_facebook_ads_origin(payload, data)

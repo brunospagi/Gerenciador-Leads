@@ -1,3 +1,5 @@
+import mimetypes
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -98,3 +100,54 @@ class WhatsAppMessage(models.Model):
 
     def __str__(self):
         return f'{self.conversa.nome_exibicao} - {self.get_direcao_display()}'
+
+    @property
+    def media_kind(self) -> str:
+        if not (self.media_url or '').strip():
+            return ''
+
+        payload = self.payload or {}
+        data = payload.get('data', {}) if isinstance(payload, dict) else {}
+        message = data.get('message', {}) if isinstance(data, dict) else {}
+        if isinstance(message, dict):
+            if isinstance(message.get('audioMessage'), dict):
+                return 'audio'
+            if isinstance(message.get('videoMessage'), dict):
+                return 'video'
+            if isinstance(message.get('imageMessage'), dict):
+                return 'image'
+            if isinstance(message.get('documentMessage'), dict):
+                return 'document'
+
+        mime_candidates = []
+        for source in (payload, data):
+            if isinstance(source, dict):
+                for key in ('mimetype', 'mimeType', 'mediaType'):
+                    value = source.get(key)
+                    if isinstance(value, str) and value.strip():
+                        mime_candidates.append(value.strip().lower())
+        for mime in mime_candidates:
+            if mime.startswith('audio/'):
+                return 'audio'
+            if mime.startswith('video/'):
+                return 'video'
+            if mime.startswith('image/'):
+                return 'image'
+
+        url = (self.media_url or '').lower()
+        guessed, _ = mimetypes.guess_type(url)
+        guessed = (guessed or '').lower()
+        if guessed.startswith('audio/'):
+            return 'audio'
+        if guessed.startswith('video/'):
+            return 'video'
+        if guessed.startswith('image/'):
+            return 'image'
+
+        if any(ext in url for ext in ('.mp3', '.ogg', '.wav', '.opus', '.m4a', '.aac')):
+            return 'audio'
+        if any(ext in url for ext in ('.mp4', '.webm', '.mov', '.avi')):
+            return 'video'
+        if any(ext in url for ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp')):
+            return 'image'
+        return 'document'

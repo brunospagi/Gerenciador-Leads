@@ -55,17 +55,57 @@
     .right-container .header .img-text h4 span { font-size: .78rem; color: #64748b; font-weight: 400; }
     .chat-container { position: relative; width: 100%; height: calc(100% - 122px); padding: 24px; overflow-y: auto; z-index: 2; }
     .message-box { position: relative; display: flex; width: 100%; margin: 5px 0; }
-    .message-box p { position: relative; max-width: 70%; padding: 10px 12px; margin: 0; border-radius: 10px; font-size: .9rem; background: #dcf8c6; }
-    .message-box p span { display: block; margin-top: 5px; font-size: .75rem; opacity: .6; text-align: right; }
+    .message-bubble { position: relative; max-width: 70%; padding: 8px 12px 6px; margin: 0; border-radius: 10px; font-size: .9rem; background: #dcf8c6; color: #111827; }
+    .message-text { word-break: break-word; white-space: pre-wrap; line-height: 1.35; }
+    .message-meta { margin-top: 4px; display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: .75rem; color: rgba(17, 24, 39, .65); }
+    .message-status-icon { font-size: .74rem; line-height: 1; }
+    .message-status-icon.read { color: #53bdeb; }
     .my-message { justify-content: flex-end; }
     .friend-message { justify-content: flex-start; }
-    .friend-message p { background: #fff; }
+    .friend-message .message-bubble { background: #fff; }
     .system-message { justify-content: center; }
-    .system-message p { background: #fff3cd; color: #7a5d00; border: 1px solid #ffe08a; max-width: 86%; }
-    .message-box.my-message p::before { content: ''; position: absolute; top: 0; right: -12px; width: 18px; height: 18px; background: linear-gradient(135deg, #dcf8c6 0%, #dcf8c6 50%, transparent 50%, transparent); }
-    .message-box.friend-message p::before { content: ''; position: absolute; top: 0; left: -12px; width: 18px; height: 18px; background: linear-gradient(225deg, #fff 0%, #fff 50%, transparent 50%, transparent); }
+    .system-message .message-bubble { background: #fff3cd; color: #7a5d00; border: 1px solid #ffe08a; max-width: 86%; }
+    .message-box.my-message .message-bubble::before { content: ''; position: absolute; top: 0; right: -12px; width: 18px; height: 18px; background: linear-gradient(135deg, #dcf8c6 0%, #dcf8c6 50%, transparent 50%, transparent); }
+    .message-box.friend-message .message-bubble::before { content: ''; position: absolute; top: 0; left: -12px; width: 18px; height: 18px; background: linear-gradient(225deg, #fff 0%, #fff 50%, transparent 50%, transparent); }
     .bubble-media { margin-bottom: 8px; }
     .bubble-media img, .bubble-media video, .bubble-media audio { max-width: 100%; border-radius: 8px; }
+    .bubble-media audio { width: 100%; min-width: 230px; }
+    .bubble-media.media-image,
+    .bubble-media.media-video {
+        display: block;
+        width: min(380px, 70vw);
+        border-radius: 10px;
+        overflow: hidden;
+        background: #f8fafc;
+    }
+    .bubble-media.media-image img,
+    .bubble-media.media-video video {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 10px;
+    }
+    .message-bubble.media-only {
+        padding: 6px;
+        background: transparent;
+        box-shadow: none;
+    }
+    .message-bubble.media-only .bubble-media {
+        margin-bottom: 0;
+    }
+    .message-bubble.media-only .message-meta {
+        position: absolute;
+        right: 12px;
+        bottom: 10px;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.45);
+        color: #f8fafc;
+    }
+    .message-box.my-message .message-bubble.media-only::before,
+    .message-box.friend-message .message-bubble.media-only::before {
+        content: none;
+    }
     .reaction-row { margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
     .reaction-row.reaction-hidden { display: none; }
     .reaction-row.is-open { display: flex; }
@@ -92,7 +132,7 @@
         opacity: 0;
         transition: opacity .15s ease;
     }
-    .message-box p:hover .message-menu-trigger,
+    .message-bubble:hover .message-menu-trigger,
     .message-menu-trigger.force-show {
         opacity: 1;
     }
@@ -339,13 +379,19 @@
                             <button type="submit" class="btn btn-sm btn-light border">Marcar lida</button>
                         </form>
                     </li>
+                    <li>
+                        <form method="post" action="{% url 'whatsapp:delete_conversation' conversa_ativa.pk %}" onsubmit="return confirm('Deseja realmente deletar esta conversa? Esta acao nao pode ser desfeita.');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Deletar conversa</button>
+                        </form>
+                    </li>
                 </ul>
             </div>
 
             <div class="chat-container" id="message-list">
                 {% for mensagem in mensagens %}
                 <div class="message-box {% if mensagem.direcao == 'OUT' %}my-message{% elif mensagem.direcao == 'SYSTEM' %}system-message{% else %}friend-message{% endif %}">
-                    <p>
+                    <div class="message-bubble {% if mensagem.media_url %}has-media{% endif %} {% if mensagem.media_url and not mensagem.conteudo %}media-only{% endif %}">
                         <button type="button" class="message-menu-trigger" onclick="toggleMessageMenu(event, {{ mensagem.pk }})">&#8942;</button>
                         <div class="message-menu" id="msg-menu-{{ mensagem.pk }}">
                             <button type="button" onclick="messageAction('forward', {{ mensagem.pk }}, '')">Encaminhar</button>
@@ -354,29 +400,40 @@
                             <button type="button" onclick="messageAction('react', {{ mensagem.pk }}, '')">Reagir</button>
                         </div>
                         {% if mensagem.media_url %}
-                        <span class="bubble-media">
-                            {% with media_url=mensagem.media_url|lower %}
-                            {% if '.mp3' in media_url or '.ogg' in media_url or '.wav' in media_url or '.opus' in media_url %}
-                            <audio controls><source src="{{ mensagem.media_url }}"></audio>
-                            {% elif '.mp4' in media_url or '.webm' in media_url or '.mov' in media_url %}
-                            <video controls><source src="{{ mensagem.media_url }}"></video>
-                            {% elif '.jpg' in media_url or '.jpeg' in media_url or '.png' in media_url or '.gif' in media_url or '.webp' in media_url %}
-                            <img src="{{ mensagem.media_url }}" alt="midia">
+                            {% if mensagem.media_kind == 'audio' %}
+                            <span class="bubble-media"><audio controls><source src="{{ mensagem.media_url }}"></audio></span>
+                            {% elif mensagem.media_kind == 'video' %}
+                            <span class="bubble-media media-video"><video controls preload="metadata"><source src="{{ mensagem.media_url }}"></video></span>
+                            {% elif mensagem.media_kind == 'image' %}
+                            <span class="bubble-media media-image"><img src="{{ mensagem.media_url }}" alt="midia"></span>
                             {% else %}
-                            <a href="{{ mensagem.media_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a>
+                            <span class="bubble-media"><a href="{{ mensagem.media_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a></span>
                             {% endif %}
-                            {% endwith %}
-                        </span>
                         {% endif %}
-                        {{ mensagem.conteudo|linebreaksbr }}
-                        <span>{{ mensagem.criado_em|date:"H:i" }} | {{ mensagem.get_status_display }}</span>
+                        {% if mensagem.conteudo %}
+                        <div class="message-text">{{ mensagem.conteudo|linebreaksbr }}</div>
+                        {% endif %}
+                        <div class="message-meta">
+                            <span class="message-time">{{ mensagem.criado_em|date:"H:i" }}</span>
+                            {% if mensagem.direcao == 'OUT' %}
+                                {% if mensagem.status == 'read' %}
+                                <span class="message-status-icon read" title="{{ mensagem.get_status_display }}"><i class="fa-solid fa-check-double"></i></span>
+                                {% elif mensagem.status == 'delivered' %}
+                                <span class="message-status-icon" title="{{ mensagem.get_status_display }}"><i class="fa-solid fa-check-double"></i></span>
+                                {% elif mensagem.status == 'failed' %}
+                                <span class="message-status-icon text-danger" title="{{ mensagem.get_status_display }}"><i class="fa-solid fa-triangle-exclamation"></i></span>
+                                {% else %}
+                                <span class="message-status-icon" title="{{ mensagem.get_status_display }}"><i class="fa-solid fa-check"></i></span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
                         <div class="reaction-row reaction-hidden" id="reaction-row-{{ mensagem.pk }}">
                             <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '\uD83D\uDC4D')">&#128077;</button>
                             <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '\u2764\uFE0F')">&#10084;&#65039;</button>
                             <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '\uD83D\uDE02')">&#128514;</button>
                             <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '\uD83D\uDE4F')">&#128591;</button>
                         </div>
-                    </p>
+                    </div>
                 </div>
                 {% empty %}
                 <div class="text-muted">Sem mensagens.</div>
@@ -438,17 +495,37 @@
             return (str || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
         }
 
-        function mediaMarkup(mediaUrl) {
+        function mediaMarkup(mediaUrl, mediaKind) {
             if (!mediaUrl) return '';
+            const kind = (mediaKind || '').toLowerCase();
+            if (kind === 'audio') return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
+            if (kind === 'video') return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${mediaUrl}"></video></span>`;
+            if (kind === 'image') return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia"></span>`;
             const url = mediaUrl.toLowerCase();
-            if (url.includes('.mp3') || url.includes('.ogg') || url.includes('.wav') || url.includes('.opus')) return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
-            if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')) return `<span class="bubble-media"><video controls><source src="${mediaUrl}"></video></span>`;
-            if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.gif') || url.includes('.webp')) return `<span class="bubble-media"><img src="${mediaUrl}" alt="midia"></span>`;
+            if (url.includes('.mp3') || url.includes('.ogg') || url.includes('.wav') || url.includes('.opus') || url.includes('.m4a') || url.includes('.aac')) return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
+            if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')) return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${mediaUrl}"></video></span>`;
+            if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.gif') || url.includes('.webp')) return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia"></span>`;
             return `<span class="bubble-media"><a href="${mediaUrl}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a></span>`;
         }
 
         function reactionMarkup(messageId) {
             return `<div class="reaction-row reaction-hidden" id="reaction-row-${messageId}"><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDC4D')">&#128077;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\u2764\\uFE0F')">&#10084;&#65039;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDE02')">&#128514;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDE4F')">&#128591;</button></div>`;
+        }
+
+        function statusIconMarkup(message) {
+            if (!message || message.direcao !== 'OUT') return '';
+            const statusCode = (message.status_code || '').toLowerCase();
+            const statusText = esc(message.status || '');
+            if (statusCode === 'read') {
+                return `<span class="message-status-icon read" title="${statusText}"><i class="fa-solid fa-check-double"></i></span>`;
+            }
+            if (statusCode === 'delivered') {
+                return `<span class="message-status-icon" title="${statusText}"><i class="fa-solid fa-check-double"></i></span>`;
+            }
+            if (statusCode === 'failed') {
+                return `<span class="message-status-icon text-danger" title="${statusText}"><i class="fa-solid fa-triangle-exclamation"></i></span>`;
+            }
+            return `<span class="message-status-icon" title="${statusText}"><i class="fa-solid fa-check"></i></span>`;
         }
 
         function menuMarkup(message) {
@@ -501,7 +578,12 @@
                 const side = m.direcao === 'OUT' ? 'my-message' : (m.direcao === 'SYSTEM' ? 'system-message' : 'friend-message');
                 const textHtml = esc(m.conteudo).replaceAll('\n', '<br>');
                 const reactionRow = reactionMarkup(m.id);
-                return `<div class="message-box ${side}"><p>${menuMarkup(m)}${mediaMarkup(m.media_url)}${textHtml}<span>${esc(m.criado_em.split(' ')[1] || m.criado_em)} | ${esc(m.status)}</span>${reactionRow}</p></div>`;
+                const timeText = esc((m.criado_em || '').split(' ')[1] || m.criado_em || '');
+                const messageText = textHtml ? `<div class="message-text">${textHtml}</div>` : '';
+                const hasMedia = !!m.media_url;
+                const mediaOnly = hasMedia && !m.conteudo;
+                const bubbleClass = `message-bubble${hasMedia ? ' has-media' : ''}${mediaOnly ? ' media-only' : ''}`;
+                return `<div class="message-box ${side}"><div class="${bubbleClass}">${menuMarkup(m)}${mediaMarkup(m.media_url, m.media_kind)}${messageText}<div class="message-meta"><span class="message-time">${timeText}</span>${statusIconMarkup(m)}</div>${reactionRow}</div></div>`;
             }).join('');
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
