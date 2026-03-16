@@ -19,6 +19,7 @@ def module_access_context(request):
         'autorizacoes': has_module_access(user, 'autorizacoes'),
         'relatorios': has_module_access(user, 'relatorios'),
         'usuarios_admin': has_module_access(user, 'usuarios_admin'),
+        'credenciais': has_module_access(user, 'credenciais'),
         'whatsapp': has_module_access(user, 'whatsapp'),
     }
     return {'module_access': module_access}

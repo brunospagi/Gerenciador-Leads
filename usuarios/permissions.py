@@ -16,6 +16,7 @@ MODULE_FIELD_MAP = {
     'autorizacoes': 'modulo_autorizacoes',
     'relatorios': 'modulo_relatorios',
     'usuarios_admin': 'modulo_admin_usuarios',
+    'credenciais': 'modulo_credenciais',
     'whatsapp': 'modulo_whatsapp',
 }
 
@@ -42,6 +43,8 @@ def _legacy_default_access(user, module_key):
     if module_key == 'relatorios':
         return nivel in {'ADMIN', 'GERENTE'}
     if module_key == 'usuarios_admin':
+        return nivel == 'ADMIN'
+    if module_key == 'credenciais':
         return nivel == 'ADMIN'
     if module_key in {'documentos', 'autorizacoes'}:
         return True

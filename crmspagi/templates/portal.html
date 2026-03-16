@@ -142,11 +142,11 @@
     </div>
     {% endif %}
 
-    {% if module_access.vendas or module_access.financiamentos or module_access.documentos or module_access.autorizacoes or module_access.clientes or module_access.avaliacoes or module_access.usuarios_admin or module_access.whatsapp %}
+    {% if module_access.vendas or module_access.financiamentos or module_access.documentos or module_access.autorizacoes or module_access.clientes or module_access.avaliacoes or module_access.usuarios_admin or module_access.credenciais or module_access.whatsapp %}
     <div class="mb-5">
         <h4 class="section-title-dashboard"><i class="fas fa-tools text-secondary"></i> Ferramentas e Utilitarios</h4>
         <div class="system-grid">
-            {% if module_access.usuarios_admin %}
+            {% if module_access.credenciais %}
             <a href="{% url 'credencial_list' %}" class="system-item" style="--item-color: #ec4899; --icon-bg: #fce7f3;">
                 <div><span class="system-name">Senhas / Acessos</span><span class="system-desc">Bancos e portais</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-key"></i></div>

@@ -183,6 +183,10 @@
                     <li><a href="{% url 'user_list' %}"><i class="fas fa-user-shield"></i> Acessos e Perfis</a></li>
                     {% endif %}
 
+                    {% if module_access.credenciais %}
+                    <li><a href="{% url 'credencial_list' %}"><i class="fas fa-key"></i> Senhas e Credenciais</a></li>
+                    {% endif %}
+
                     {% if user.is_superuser %}
                     <li><a href="{% url 'user_module_permissions' %}"><i class="fas fa-shield-alt"></i> Permissoes por Modulo</a></li>
                     {% endif %}

@@ -19,10 +19,27 @@ logger = logging.getLogger(__name__)
 
 def normalize_wa_id(raw_value: str) -> str:
     value = (raw_value or '').strip()
-    if '@' in value:
-        return value
     if not value:
         return value
+
+    # Normaliza sufixos comuns da Evolution/WhatsApp para evitar duplicidade de conversa
+    value = value.lower()
+    value = value.replace('@c.us', '@s.whatsapp.net')
+
+    if '@' in value:
+        local, domain = value.split('@', 1)
+        # Remove sufixo de dispositivo/session (ex.: 5511999999999:16@s.whatsapp.net)
+        local = local.split(':', 1)[0]
+        local_digits = re.sub(r'\D', '', local)
+        if domain in {'s.whatsapp.net', 'lid', 'g.us', 'broadcast'}:
+            if domain == 's.whatsapp.net' and local_digits:
+                return f'{local_digits}@s.whatsapp.net'
+            if domain == 'lid' and local:
+                return f'{local}@lid'
+            return f'{local}@{domain}'
+        # Mantem dominio desconhecido, mas com local sanitizado
+        return f'{local_digits or local}@{domain}'
+
     digits = re.sub(r'\D', '', value)
     return f'{digits}@s.whatsapp.net' if digits else value
 
@@ -675,7 +692,8 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
     if event_name in {'MESSAGES_UPDATE', 'MESSAGE_UPDATE', 'MESSAGE_STATUS', 'SEND_MESSAGE'}:
         if process_status_update(payload):
             logger.info('Webhook de status processado para mensagem existente.')
-            return
+        # Eventos de status nao devem criar conversa/mensagem nova
+        return
 
     data = payload.get('data', payload)
     if not isinstance(data, dict):

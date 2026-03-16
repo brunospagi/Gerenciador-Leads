@@ -113,6 +113,7 @@ class ModulePermissionForm(forms.ModelForm):
             'modulo_autorizacoes',
             'modulo_relatorios',
             'modulo_admin_usuarios',
+            'modulo_credenciais',
             'modulo_whatsapp',
         ]
         labels = {
@@ -128,6 +129,7 @@ class ModulePermissionForm(forms.ModelForm):
             'modulo_autorizacoes': 'Autorizacoes',
             'modulo_relatorios': 'Relatorios Gerenciais',
             'modulo_admin_usuarios': 'Acessos e Perfis',
+            'modulo_credenciais': 'Credenciais e Senhas',
             'modulo_whatsapp': 'WhatsApp e Conversas',
         }
 

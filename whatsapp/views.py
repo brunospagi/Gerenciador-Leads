@@ -36,6 +36,29 @@ from .services import (
 )
 
 
+def _is_noise_status_message(message: WhatsAppMessage) -> bool:
+    content = (message.conteudo or '').strip()
+    has_media = bool((message.media_url or '').strip())
+    if content or has_media:
+        return False
+    if message.direcao != WhatsAppMessage.Direction.ENVIADA:
+        return False
+    if message.status not in {
+        WhatsAppMessage.Status.ENVIADA,
+        WhatsAppMessage.Status.ENTREGUE,
+        WhatsAppMessage.Status.LIDA,
+    }:
+        return False
+    payload = message.payload or {}
+    if isinstance(payload, dict):
+        if payload.get('status_update'):
+            return True
+        event = str(payload.get('event') or '').upper()
+        if event in {'SEND_MESSAGE', 'MESSAGE_STATUS', 'MESSAGES_UPDATE', 'MESSAGE_UPDATE'}:
+            return True
+    return True
+
+
 def can_manage_whatsapp_instance(user) -> bool:
     if not getattr(user, 'is_authenticated', False):
         return False
@@ -86,7 +109,9 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             if conversa_ativa.nao_lidas:
                 conversa_ativa.nao_lidas = 0
                 conversa_ativa.save(update_fields=['nao_lidas'])
-            mensagens = conversa_ativa.mensagens.all().order_by('criado_em')[:300]
+            raw_mensagens = list(conversa_ativa.mensagens.all().order_by('criado_em')[:500])
+            filtered = [m for m in raw_mensagens if not _is_noise_status_message(m)]
+            mensagens = filtered[-300:]
 
         instance = get_active_instance()
 
@@ -598,6 +623,7 @@ def conversation_messages_feed(request, pk):
             'can_react': True,
         }
         for m in mensagens
+        if not _is_noise_status_message(m)
     ]
     return JsonResponse({'ok': True, 'mensagens': data})
 

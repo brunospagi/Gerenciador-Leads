@@ -20,6 +20,7 @@ class ModulePermissionMiddleware:
         ('/rh/', 'rh'),
         ('/funcionarios/', 'rh'),
         ('/usuarios/', 'usuarios_admin'),
+        ('/acessos/', 'credenciais'),
         ('/administracao/dashboard/', 'relatorios'),
         ('/painel-admin/', 'relatorios'),
         ('/whatsapp/', 'whatsapp'),

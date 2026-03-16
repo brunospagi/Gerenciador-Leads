@@ -30,6 +30,7 @@ class ModulePermissionAdmin(admin.ModelAdmin):
         'modulo_rh',
         'modulo_relatorios',
         'modulo_admin_usuarios',
+        'modulo_credenciais',
     )
-    list_filter = ('modulo_financeiro', 'modulo_distribuicao', 'modulo_rh', 'modulo_relatorios')
+    list_filter = ('modulo_financeiro', 'modulo_distribuicao', 'modulo_rh', 'modulo_relatorios', 'modulo_credenciais')
     search_fields = ('user__username', 'user__email', 'user__first_name')
