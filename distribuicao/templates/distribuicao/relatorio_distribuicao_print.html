@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatorio de Distribuicao de Leads</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; color: #111827; }
+        .toolbar { text-align: right; margin-bottom: 12px; }
+        .toolbar button { padding: 8px 12px; border: 1px solid #d1d5db; background: #111827; color: #fff; border-radius: 6px; cursor: pointer; }
+        .header { border-bottom: 2px solid #111827; margin-bottom: 14px; padding-bottom: 8px; }
+        .header h1 { margin: 0 0 4px; font-size: 22px; }
+        .header p { margin: 0; font-size: 13px; color: #4b5563; }
+        .kpi { margin: 8px 0 12px; font-size: 13px; font-weight: 700; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th, td { border: 1px solid #d1d5db; padding: 6px; text-align: left; vertical-align: top; }
+        th { background: #f3f4f6; }
+        .section { margin-bottom: 18px; }
+        h3 { margin: 0 0 8px; font-size: 16px; }
+        @media print {
+            @page { size: landscape; margin: 1cm; }
+            .toolbar { display: none !important; }
+            body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body onload="window.print()">
+    <div class="toolbar">
+        <button onclick="window.print()">Imprimir</button>
+    </div>
+
+    <div class="header">
+        <h1>Relatorio de Distribuicao de Leads</h1>
+        {% if active_tab == 'diario' %}
+        <p>Periodo: Diario - {{ data_hoje|date:"d/m/Y" }}</p>
+        {% elif active_tab == 'mensal' %}
+        <p>Periodo: Mensal - {{ mes_atual_str }}</p>
+        {% else %}
+        <p>Periodo: Semanal</p>
+        {% endif %}
+        <p>Emitido em: {% now "d/m/Y H:i" %}</p>
+    </div>
+
+    {% if active_tab == 'diario' %}
+    <div class="section">
+        <h3>Resumo Diario</h3>
+        <p class="kpi">Total: {{ total_hoje }} | Manha: {{ total_manha }} | Tarde: {{ total_tarde }}</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Hora</th><th>Cliente</th><th>Telefone</th><th>Veiculo</th><th>Canal</th><th>Vendedor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lead in leads_manha %}
+                <tr>
+                    <td>{{ lead.data_primeiro_contato|date:"H:i" }}</td>
+                    <td>{{ lead.nome_cliente }}</td>
+                    <td>{{ lead.whatsapp }}</td>
+                    <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                    <td>{{ lead.fonte_cliente|default:"Nao informado" }}</td>
+                    <td>{{ lead.vendedor.get_full_name|default:lead.vendedor.username }}</td>
+                </tr>
+                {% endfor %}
+                {% for lead in leads_tarde %}
+                <tr>
+                    <td>{{ lead.data_primeiro_contato|date:"H:i" }}</td>
+                    <td>{{ lead.nome_cliente }}</td>
+                    <td>{{ lead.whatsapp }}</td>
+                    <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                    <td>{{ lead.fonte_cliente|default:"Nao informado" }}</td>
+                    <td>{{ lead.vendedor.get_full_name|default:lead.vendedor.username }}</td>
+                </tr>
+                {% endfor %}
+                {% if not leads_manha and not leads_tarde %}
+                <tr><td colspan="6">Sem leads no dia selecionado.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    {% elif active_tab == 'mensal' %}
+    <div class="section">
+        <h3>Resumo Mensal</h3>
+        <p class="kpi">Total: {{ total_mes }} | Mes: {{ mes_atual_str }}</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th><th>Cliente</th><th>Telefone</th><th>Veiculo</th><th>Status</th><th>Vendedor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lead in leads_mes %}
+                <tr>
+                    <td>{{ lead.data_primeiro_contato|date:"d/m/Y" }}</td>
+                    <td>{{ lead.nome_cliente }}</td>
+                    <td>{{ lead.whatsapp }}</td>
+                    <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                    <td>{{ lead.get_status_negociacao_display }}</td>
+                    <td>{{ lead.vendedor.get_full_name|default:lead.vendedor.username }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6">Sem dados neste mes.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="section">
+        <h3>Resumo Semanal</h3>
+        <p class="kpi">Total: {{ total_semana }}</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Data / Hora</th><th>Cliente</th><th>Telefone</th><th>Veiculo</th><th>Canal</th><th>Vendedor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lead in leads_semana %}
+                <tr>
+                    <td>{{ lead.data_primeiro_contato|date:"d/m/Y H:i" }}</td>
+                    <td>{{ lead.nome_cliente }}</td>
+                    <td>{{ lead.whatsapp }}</td>
+                    <td>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</td>
+                    <td>{{ lead.fonte_cliente|default:"Nao informado" }}</td>
+                    <td>{{ lead.vendedor.get_full_name|default:lead.vendedor.username }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6">Sem dados nesta semana.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</body>
+</html>

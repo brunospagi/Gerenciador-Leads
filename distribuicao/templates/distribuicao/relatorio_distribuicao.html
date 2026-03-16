@@ -338,8 +338,23 @@
     }
 
     function printRelatorio() {
-        document.body.setAttribute('data-print-tab', getActiveTabId());
-        window.print();
+        const tab = getActiveTabId();
+        const url = new URL(window.location.href);
+        url.searchParams.set('print', '1');
+        url.searchParams.set('tab', tab);
+        if (tab === 'diario') {
+            const dataDiario = document.getElementById('data_diario');
+            if (dataDiario && dataDiario.value) {
+                url.searchParams.set('data_diario', dataDiario.value);
+            }
+        }
+        if (tab === 'mensal') {
+            const mesMensal = document.getElementById('mes_mensal');
+            if (mesMensal && mesMensal.value) {
+                url.searchParams.set('mes_mensal', mesMensal.value);
+            }
+        }
+        window.open(url.toString(), '_blank');
     }
 
     window.addEventListener('beforeprint', function () {

@@ -80,6 +80,11 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
 class RelatorioDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     template_name = 'distribuicao/relatorio_distribuicao.html'
 
+    def get_template_names(self):
+        if self.request.GET.get('print') == '1':
+            return ['distribuicao/relatorio_distribuicao_print.html']
+        return [self.template_name]
+
     def test_func(self):
         user_profile = getattr(self.request.user, 'profile', None)
         if self.request.user.is_superuser: return True
