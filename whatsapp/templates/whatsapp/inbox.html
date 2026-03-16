@@ -2,226 +2,357 @@
 
 {% block content %}
 <style>
-    .whatsapp-shell { display: grid; grid-template-columns: 350px 1fr; gap: 16px; min-height: 75vh; }
-    .wa-panel { background: #fff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; }
-    .wa-header { padding: 14px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
-    .conversation-list { max-height: 65vh; overflow-y: auto; }
-    .conversation-item { display: block; padding: 12px 14px; border-bottom: 1px solid #f1f5f9; text-decoration: none; color: #0f172a; }
-    .conversation-item:hover { background: #f8fafc; }
-    .conversation-item.active { background: #ecfeff; border-left: 4px solid #14b8a6; padding-left: 10px; }
-    .msg-area { max-height: 55vh; overflow-y: auto; padding: 16px; background: #f8fafc; }
-    .msg-row { margin-bottom: 10px; display: flex; }
-    .msg-row.in { justify-content: flex-start; }
-    .msg-row.out { justify-content: flex-end; }
-    .bubble { max-width: 78%; padding: 10px 12px; border-radius: 12px; font-size: .92rem; }
-    .bubble.in { background: #fff; border: 1px solid #e2e8f0; }
-    .bubble.out { background: #dcfce7; border: 1px solid #bbf7d0; }
-    .muted-small { color: #64748b; font-size: .78rem; }
-    @media (max-width: 992px) { .whatsapp-shell { grid-template-columns: 1fr; } .conversation-list { max-height: 45vh; } }
+    .wa-clone-wrap { position: relative; min-height: calc(100vh - 140px); }
+    .background-green { position: absolute; top: 0; left: 0; width: 100%; height: 18%; background-color: #009688; border-radius: 12px; }
+    .main-container {
+        position: relative; width: 100%; height: calc(100vh - 190px); min-height: 620px; background: #fff; display: flex;
+        box-shadow: 0 1px 1px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.25);
+    }
+    .left-container { position: relative; width: 33%; min-width: 320px; height: 100%; background: #fff; border-right: 1px solid #ddd; }
+    .right-container { position: relative; width: 67%; height: 100%; background: #e5ddd5; }
+    .right-container::before {
+        content: ''; position: absolute; inset: 0;
+        background: url(https://web.whatsapp.com/img/bg-chat-tile-light_a4be8e7e7195b6b733d9110b408f075d.png); opacity: .4;
+    }
+    .header { position: relative; display: flex; align-items: center; justify-content: space-between; width: 100%; height: 60px; background: #ededed; padding: 0 15px; z-index: 2; }
+    .user-img { position: relative; width: 40px; height: 40px; overflow: hidden; border-radius: 50%; background: #d1d5db; }
+    .dp { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .nav-icons { display: flex; align-items: center; gap: 18px; margin: 0; padding: 0; }
+    .nav-icons li { list-style: none; color: #54656f; font-size: 1.1rem; }
+    .nav-icons a { color: inherit; text-decoration: none; }
+    .notif-box {
+        position: relative; display: flex; width: 100%; min-height: 70px; background: #76daff; align-items: center;
+        padding: 10px 15px; border-bottom: 1px solid rgba(0,0,0,.06);
+    }
+    .notif-box i { background: #fff; padding: 10px; border-radius: 50%; color: #76daff; margin-right: 12px; }
+    .notif-text p { margin: 0; font-size: .9rem; font-weight: 600; color: #1f2937; }
+    .notif-text small { color: #334155; }
+    .search-container { width: 100%; min-height: 50px; background: #f6f6f6; display: flex; align-items: center; padding: 8px 10px; gap: 8px; border-bottom: 1px solid #e9edef; }
+    .search-container form { width: 100%; }
+    .search-container .input { position: relative; width: 100%; }
+    .search-container .input input {
+        width: 100%; outline: none; border: none; background: #fff; padding: 8px 10px 8px 38px;
+        border-radius: 8px; font-size: .85rem;
+    }
+    .search-container .input i { position: absolute; left: 14px; top: 11px; color: #94a3b8; font-size: .8rem; }
+    .chat-list { position: relative; height: calc(100% - 180px); overflow-y: auto; }
+    .chat-list .chat-box {
+        position: relative; width: 100%; display: flex; align-items: center; cursor: pointer;
+        padding: 12px 15px; border-bottom: 1px solid #f1f5f9; text-decoration: none;
+    }
+    .chat-list .chat-box .img-box { position: relative; width: 50px; height: 50px; overflow: hidden; border-radius: 50%; background: #d1d5db; flex-shrink: 0; }
+    .chat-list .chat-box .chat-details { width: 100%; margin-left: 12px; }
+    .chat-list .chat-box .chat-details .text-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+    .chat-list .chat-box .chat-details .text-head h4 { margin: 0; font-size: 1rem; font-weight: 600; color: #111827; }
+    .chat-list .chat-box .chat-details .text-head .time { margin: 0; font-size: .75rem; color: #94a3b8; }
+    .chat-list .chat-box .chat-details .text-message { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .chat-list .chat-box .chat-details .text-message p { margin: 0; color: #6b7280; font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+    .chat-list .chat-box .chat-details .text-message b {
+        background: #06e744; color: #fff; min-width: 20px; height: 20px; border-radius: 50%;
+        font-size: .75rem; font-weight: 500; display: flex; justify-content: center; align-items: center;
+    }
+    .chat-list .active { background: #ebebeb; }
+    .chat-list .chat-box:hover { background: #f5f5f5; }
+    .chat-list .chat-box .chat-details .text-head .unread { color: #06e744; }
+    .right-container .header .img-text { display: flex; align-items: center; gap: 12px; }
+    .right-container .header .img-text h4 { margin: 0; font-weight: 500; line-height: 1.2em; font-size: .95rem; }
+    .right-container .header .img-text h4 span { font-size: .78rem; color: #64748b; font-weight: 400; }
+    .chat-container {
+        position: relative; width: 100%; height: calc(100% - 122px); padding: 24px; overflow-y: auto; z-index: 2;
+    }
+    .message-box { position: relative; display: flex; width: 100%; margin: 5px 0; }
+    .message-box p {
+        position: relative; max-width: 70%; padding: 10px 12px; margin: 0;
+        border-radius: 10px; font-size: .9rem; background: #dcf8c6;
+    }
+    .message-box p span { display: block; margin-top: 5px; font-size: .75rem; opacity: .6; text-align: right; }
+    .my-message { justify-content: flex-end; }
+    .friend-message { justify-content: flex-start; }
+    .friend-message p { background: #fff; }
+    .message-box.my-message p::before {
+        content: ''; position: absolute; top: 0; right: -12px; width: 18px; height: 18px;
+        background: linear-gradient(135deg, #dcf8c6 0%, #dcf8c6 50%, transparent 50%, transparent);
+    }
+    .message-box.friend-message p::before {
+        content: ''; position: absolute; top: 0; left: -12px; width: 18px; height: 18px;
+        background: linear-gradient(225deg, #fff 0%, #fff 50%, transparent 50%, transparent);
+    }
+    .bubble-media { margin-bottom: 8px; }
+    .bubble-media img, .bubble-media video, .bubble-media audio { max-width: 100%; border-radius: 8px; }
+    .chatbox-input {
+        position: relative; width: 100%; min-height: 62px; background: #f0f0f0; display: flex; align-items: center;
+        gap: 10px; padding: 8px 12px; z-index: 2;
+    }
+    .chatbox-input .icon-btn { color: #54656f; font-size: 1.3rem; line-height: 1; }
+    .chatbox-input .composer { display: flex; width: 100%; gap: 8px; align-items: center; }
+    .chatbox-input input[type="text"] {
+        width: 100%; border-radius: 8px; font-size: .95rem; border: none; outline: none; padding: 10px 12px;
+    }
+    .chatbox-input input[type="file"] {
+        width: 210px; border-radius: 8px; font-size: .75rem; border: 1px solid #d1d5db; background: #fff; padding: 6px;
+    }
+    .chatbox-input .send-btn { border: none; background: #009688; color: #fff; border-radius: 8px; padding: 10px 14px; font-weight: 600; }
+    .empty-chat {
+        position: relative; z-index: 2; height: calc(100% - 122px); display: flex; align-items: center; justify-content: center; color: #475569;
+    }
+    @media (max-width: 1100px) {
+        .main-container { flex-direction: column; height: auto; min-height: 720px; }
+        .left-container, .right-container { width: 100%; min-width: 100%; height: 50%; }
+        .chat-list { height: 300px; }
+        .chatbox-input { flex-wrap: wrap; }
+        .chatbox-input input[type="file"] { width: 100%; }
+    }
 </style>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-        <h3 class="mb-1"><i class="fab fa-whatsapp text-success"></i> Central WhatsApp</h3>
-        <p class="text-muted mb-0">Atendimento em tempo real dentro do CRM.</p>
-    </div>
-    <div class="d-flex align-items-center gap-2">
-        {% if user.is_superuser or module_access.usuarios_admin %}
-            <a href="{% url 'whatsapp:instance_config' %}" class="btn btn-outline-primary btn-sm">
-                <i class="fas fa-plug"></i> Configurar Instancia
-            </a>
-        {% endif %}
-        {% if evolution_instance %}
-            <span class="badge text-bg-success">Instancia: {{ evolution_instance.instance_name }}</span>
-        {% else %}
-            <span class="badge text-bg-danger">Sem instancia ativa</span>
-        {% endif %}
-    </div>
-</div>
+<div class="wa-clone-wrap">
+    <div class="background-green"></div>
 
-<div class="whatsapp-shell">
-    <div class="wa-panel">
-        <div class="wa-header">
-            <form method="get" class="mb-2">
-                <input type="text" name="q" value="{{ request.GET.q }}" class="form-control" placeholder="Buscar contato ou numero...">
-            </form>
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="start_conversation">
-                <div class="mb-2">{{ start_form.numero }}</div>
-                <div class="mb-2">{{ start_form.nome_contato }}</div>
-                <button class="btn btn-success w-100 btn-sm"><i class="fas fa-plus"></i> Nova conversa</button>
-            </form>
-        </div>
-        <div class="conversation-list" id="conversation-list" data-active-id="{% if conversa_ativa %}{{ conversa_ativa.pk }}{% endif %}">
-            {% for conversa in conversas %}
-            <a class="conversation-item {% if conversa_ativa and conversa.pk == conversa_ativa.pk %}active{% endif %}" href="{% url 'whatsapp:inbox' %}?c={{ conversa.pk }}" data-conversation-id="{{ conversa.pk }}">
-                <div class="d-flex justify-content-between align-items-center">
-                    <strong>{{ conversa.nome_exibicao }}</strong>
-                    <small class="muted-small">{{ conversa.ultima_mensagem_em|date:"d/m H:i" }}</small>
-                </div>
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="muted-small">{{ conversa.ultima_mensagem|truncatechars:55 }}</span>
-                    {% if conversa.nao_lidas %}
-                    <span class="badge rounded-pill text-bg-danger">{{ conversa.nao_lidas }}</span>
+    <div class="main-container">
+        <div class="left-container">
+            <div class="header">
+                <div class="user-img">
+                    {% if user.profile.avatar %}
+                    <img class="dp" src="{{ user.profile.get_avatar_url }}" alt="Usuario">
+                    {% else %}
+                    <img class="dp" src="https://cdn.quasar.dev/img/boy-avatar.png" alt="Usuario">
                     {% endif %}
                 </div>
-            </a>
-            {% empty %}
-            <div class="p-3 text-muted">Nenhuma conversa encontrada.</div>
-            {% endfor %}
-        </div>
-    </div>
-
-    <div class="wa-panel d-flex flex-column">
-        {% if conversa_ativa %}
-        <div class="wa-header d-flex justify-content-between align-items-center">
-            <div>
-                <h5 class="mb-0">{{ conversa_ativa.nome_exibicao }}</h5>
-                <small class="text-muted">{{ conversa_ativa.wa_id }}</small>
-            </div>
-            <form method="post" action="{% url 'whatsapp:mark_read' conversa_ativa.pk %}">
-                {% csrf_token %}
-                <button class="btn btn-outline-secondary btn-sm">Marcar como lida</button>
-            </form>
-        </div>
-        <div class="msg-area" id="message-list">
-            {% for mensagem in mensagens %}
-            <div class="msg-row {% if mensagem.direcao == 'OUT' %}out{% else %}in{% endif %}">
-                <div class="bubble {% if mensagem.direcao == 'OUT' %}out{% else %}in{% endif %}">
-                    {% if mensagem.media_url %}
-                    <div class="mb-2">
-                        {% with media_url=mensagem.media_url|lower %}
-                        {% if '.mp3' in media_url or '.ogg' in media_url or '.wav' in media_url or '.opus' in media_url %}
-                        <audio controls style="max-width:100%;">
-                            <source src="{{ mensagem.media_url }}">
-                        </audio>
-                        {% elif '.mp4' in media_url or '.webm' in media_url or '.mov' in media_url %}
-                        <video controls style="max-width:100%; border-radius:8px;">
-                            <source src="{{ mensagem.media_url }}">
-                        </video>
-                        {% elif '.jpg' in media_url or '.jpeg' in media_url or '.png' in media_url or '.gif' in media_url or '.webp' in media_url %}
-                        <img src="{{ mensagem.media_url }}" alt="midia" style="max-width:100%; border-radius:8px;">
+                <ul class="nav-icons">
+                    <li><i class="fa-solid fa-users"></i></li>
+                    <li><i class="fa-solid fa-message"></i></li>
+                    <li>
+                        {% if user.is_superuser or module_access.usuarios_admin %}
+                        <a href="{% url 'whatsapp:instance_config' %}" title="Configurar instancia"><i class="fa-solid fa-gear"></i></a>
                         {% else %}
-                        <a href="{{ mensagem.media_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
-                            <i class="fas fa-paperclip"></i> Abrir arquivo
-                        </a>
+                        <i class="fa-solid fa-ellipsis-vertical"></i>
                         {% endif %}
-                        {% endwith %}
-                    </div>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="notif-box">
+                <i class="fa-solid fa-bell-slash"></i>
+                <div class="notif-text">
+                    <p>Instancia WhatsApp</p>
+                    {% if evolution_instance %}
+                    <small>{{ evolution_instance.instance_name }} | {{ evolution_instance.status_conexao|default:"desconhecido" }}</small>
+                    {% else %}
+                    <small>Nenhuma instancia ativa</small>
                     {% endif %}
-                    <div>{{ mensagem.conteudo|linebreaksbr }}</div>
-                    <div class="muted-small mt-1">{{ mensagem.criado_em|date:"d/m/Y H:i" }} | {{ mensagem.get_status_display }}</div>
                 </div>
             </div>
-            {% empty %}
-            <p class="text-muted">Sem mensagens nesta conversa.</p>
-            {% endfor %}
+
+            <div class="search-container">
+                <form method="get">
+                    {% if conversa_ativa %}<input type="hidden" name="c" value="{{ conversa_ativa.pk }}">{% endif %}
+                    <div class="input">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Search or start new chat">
+                    </div>
+                </form>
+                <i class="fa-sharp fa-solid fa-bars-filter"></i>
+            </div>
+
+            <div class="chat-list" id="conversation-list">
+                {% for conversa in conversas %}
+                <a class="chat-box {% if conversa_ativa and conversa.pk == conversa_ativa.pk %}active{% endif %}" href="{% url 'whatsapp:inbox' %}?c={{ conversa.pk }}" data-conversation-id="{{ conversa.pk }}">
+                    <div class="img-box">
+                        {% if conversa.avatar_url %}
+                        <img class="dp" src="{{ conversa.avatar_url }}" alt="Contato">
+                        {% else %}
+                        <img class="dp" src="https://cdn.quasar.dev/img/avatar4.jpg" alt="Contato">
+                        {% endif %}
+                    </div>
+                    <div class="chat-details">
+                        <div class="text-head">
+                            <h4>{{ conversa.nome_exibicao }}</h4>
+                            <p class="time {% if conversa.nao_lidas %}unread{% endif %}">{{ conversa.ultima_mensagem_em|date:"d/m H:i" }}</p>
+                        </div>
+                        <div class="text-message">
+                            <p>{{ conversa.ultima_mensagem|default:"-"|truncatechars:42 }}</p>
+                            {% if conversa.nao_lidas %}<b>{{ conversa.nao_lidas }}</b>{% endif %}
+                        </div>
+                    </div>
+                </a>
+                {% empty %}
+                <div class="p-3 text-muted">Nenhuma conversa encontrada.</div>
+                {% endfor %}
+            </div>
         </div>
-        <div class="p-3 border-top">
-            <form method="post" enctype="multipart/form-data">
+
+        <div class="right-container">
+            {% if conversa_ativa %}
+            <div class="header">
+                <div class="img-text">
+                    <div class="user-img">
+                        {% if conversa_ativa.avatar_url %}
+                        <img class="dp" src="{{ conversa_ativa.avatar_url }}" alt="Contato">
+                        {% else %}
+                        <img class="dp" src="https://cdn.quasar.dev/img/avatar4.jpg" alt="Contato">
+                        {% endif %}
+                    </div>
+                    <h4>{{ conversa_ativa.nome_exibicao }}<br><span>{{ conversa_ativa.wa_id }}</span></h4>
+                </div>
+                <ul class="nav-icons">
+                    <li><i class="fa-solid fa-magnifying-glass"></i></li>
+                    <li>
+                        <form method="post" action="{% url 'whatsapp:mark_read' conversa_ativa.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-light border">Marcar lida</button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="chat-container" id="message-list">
+                {% for mensagem in mensagens %}
+                <div class="message-box {% if mensagem.direcao == 'OUT' %}my-message{% else %}friend-message{% endif %}">
+                    <p>
+                        {% if mensagem.media_url %}
+                        <span class="bubble-media">
+                            {% with media_url=mensagem.media_url|lower %}
+                            {% if '.mp3' in media_url or '.ogg' in media_url or '.wav' in media_url or '.opus' in media_url %}
+                            <audio controls><source src="{{ mensagem.media_url }}"></audio>
+                            {% elif '.mp4' in media_url or '.webm' in media_url or '.mov' in media_url %}
+                            <video controls><source src="{{ mensagem.media_url }}"></video>
+                            {% elif '.jpg' in media_url or '.jpeg' in media_url or '.png' in media_url or '.gif' in media_url or '.webp' in media_url %}
+                            <img src="{{ mensagem.media_url }}" alt="midia">
+                            {% else %}
+                            <a href="{{ mensagem.media_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a>
+                            {% endif %}
+                            {% endwith %}
+                        </span>
+                        {% endif %}
+                        {{ mensagem.conteudo|linebreaksbr }}
+                        <span>{{ mensagem.criado_em|date:"H:i" }} | {{ mensagem.get_status_display }}</span>
+                    </p>
+                </div>
+                {% empty %}
+                <div class="text-muted">Sem mensagens.</div>
+                {% endfor %}
+            </div>
+
+            <form method="post" enctype="multipart/form-data" class="chatbox-input">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="send_message">
                 <input type="hidden" name="conversa_id" value="{{ conversa_ativa.pk }}">
-                <div class="mb-2">{{ send_form.mensagem }}</div>
-                <div class="mb-2">{{ send_form.arquivo }}</div>
-                <button class="btn btn-success"><i class="fas fa-paper-plane"></i> Enviar</button>
+                <i class="fa-regular fa-face-grin icon-btn"></i>
+                <div class="composer">
+                    <input type="text" name="mensagem" placeholder="Type a message">
+                    <input type="file" name="arquivo" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar">
+                </div>
+                <button class="send-btn" type="submit">Enviar</button>
+                <i class="fa-solid fa-microphone icon-btn"></i>
             </form>
+            {% else %}
+            <div class="empty-chat">
+                <div class="text-center">
+                    <h4 class="mb-2">Selecione uma conversa</h4>
+                    <p class="mb-0">Escolha um contato na coluna esquerda para começar.</p>
+                </div>
+            </div>
+            {% endif %}
         </div>
-        {% else %}
-        <div class="p-4 text-center text-muted">
-            <i class="fab fa-whatsapp fa-3x mb-3 text-success"></i>
-            <p class="mb-0">Selecione uma conversa na coluna ao lado para iniciar o atendimento.</p>
-        </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-{% if conversa_ativa %}
 <script>
     (function () {
-        const activeConversationId = '{{ conversa_ativa.pk }}';
         const conversationsEndpoint = "{% url 'whatsapp:conversations_feed' %}";
-        const messagesEndpoint = "{% url 'whatsapp:conversation_messages_feed' conversa_ativa.pk %}";
+        const activeConversationId = "{% if conversa_ativa %}{{ conversa_ativa.pk }}{% endif %}";
+        const messagesEndpoint = activeConversationId ? "{% url 'whatsapp:conversation_messages_feed' 0 %}".replace('/0/', `/${activeConversationId}/`) : '';
         const listEl = document.getElementById('conversation-list');
         const messagesEl = document.getElementById('message-list');
         const currentQuery = "{{ request.GET.q|default:''|escapejs }}";
+
+        function esc(str) {
+            return (str || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+        }
 
         function mediaMarkup(mediaUrl) {
             if (!mediaUrl) return '';
             const url = mediaUrl.toLowerCase();
             if (url.includes('.mp3') || url.includes('.ogg') || url.includes('.wav') || url.includes('.opus')) {
-                return `<div class="mb-2"><audio controls style="max-width:100%;"><source src="${mediaUrl}"></audio></div>`;
+                return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
             }
             if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')) {
-                return `<div class="mb-2"><video controls style="max-width:100%; border-radius:8px;"><source src="${mediaUrl}"></video></div>`;
+                return `<span class="bubble-media"><video controls><source src="${mediaUrl}"></video></span>`;
             }
             if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.gif') || url.includes('.webp')) {
-                return `<div class="mb-2"><img src="${mediaUrl}" alt="midia" style="max-width:100%; border-radius:8px;"></div>`;
+                return `<span class="bubble-media"><img src="${mediaUrl}" alt="midia"></span>`;
             }
-            return `<div class="mb-2"><a href="${mediaUrl}" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="fas fa-paperclip"></i> Abrir arquivo</a></div>`;
-        }
-
-        function renderMessages(mensagens) {
-            messagesEl.innerHTML = mensagens.map((m) => {
-                const directionClass = m.direcao === 'OUT' ? 'out' : 'in';
-                const textHtml = (m.conteudo || '').replaceAll('\n', '<br>');
-                return `
-                    <div class="msg-row ${directionClass}">
-                        <div class="bubble ${directionClass}">
-                            ${mediaMarkup(m.media_url)}
-                            <div>${textHtml}</div>
-                            <div class="muted-small mt-1">${m.criado_em} | ${m.status}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+            return `<span class="bubble-media"><a href="${mediaUrl}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a></span>`;
         }
 
         function renderConversations(conversas) {
+            if (!listEl) return;
             const baseUrl = "{% url 'whatsapp:inbox' %}";
-            listEl.innerHTML = conversas.map((c) => {
+            listEl.innerHTML = (conversas || []).map((c) => {
                 const activeClass = String(c.id) === String(activeConversationId) ? 'active' : '';
-                const unreadBadge = c.nao_lidas ? `<span class="badge rounded-pill text-bg-danger">${c.nao_lidas}</span>` : '';
+                const unreadClass = c.nao_lidas ? 'unread' : '';
+                const unreadBadge = c.nao_lidas ? `<b>${c.nao_lidas}</b>` : '';
+                const avatar = c.avatar_url ? c.avatar_url : 'https://cdn.quasar.dev/img/avatar4.jpg';
                 return `
-                    <a class="conversation-item ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <strong>${c.nome}</strong>
-                            <small class="muted-small">${c.ultima_mensagem_em}</small>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="muted-small">${(c.ultima_mensagem || '').slice(0, 55)}</span>
-                            ${unreadBadge}
+                    <a class="chat-box ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}">
+                        <div class="img-box"><img class="dp" src="${avatar}" alt="Contato"></div>
+                        <div class="chat-details">
+                            <div class="text-head">
+                                <h4>${esc(c.nome)}</h4>
+                                <p class="time ${unreadClass}">${esc(c.ultima_mensagem_em)}</p>
+                            </div>
+                            <div class="text-message">
+                                <p>${esc((c.ultima_mensagem || '').slice(0, 42))}</p>
+                                ${unreadBadge}
+                            </div>
                         </div>
                     </a>
                 `;
             }).join('');
         }
 
-        async function pollFeeds() {
-            try {
-                const convResp = await fetch(`${conversationsEndpoint}?q=${encodeURIComponent(currentQuery)}`);
-                if (convResp.ok) {
-                    const convData = await convResp.json();
-                    if (convData.ok) renderConversations(convData.conversas || []);
-                }
-            } catch (e) {}
+        function renderMessages(mensagens) {
+            if (!messagesEl) return;
+            messagesEl.innerHTML = (mensagens || []).map((m) => {
+                const side = m.direcao === 'OUT' ? 'my-message' : 'friend-message';
+                const textHtml = esc(m.conteudo).replaceAll('\n', '<br>');
+                return `
+                    <div class="message-box ${side}">
+                        <p>
+                            ${mediaMarkup(m.media_url)}
+                            ${textHtml}
+                            <span>${esc(m.criado_em.split(' ')[1] || m.criado_em)} | ${esc(m.status)}</span>
+                        </p>
+                    </div>
+                `;
+            }).join('');
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
 
+        async function pollConversations() {
             try {
-                const msgResp = await fetch(messagesEndpoint);
-                if (msgResp.ok) {
-                    const msgData = await msgResp.json();
-                    if (msgData.ok) renderMessages(msgData.mensagens || []);
-                }
+                const resp = await fetch(`${conversationsEndpoint}?q=${encodeURIComponent(currentQuery)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (data.ok) renderConversations(data.conversas || []);
             } catch (e) {}
         }
 
-        pollFeeds();
-        setInterval(pollFeeds, 6000);
+        async function pollMessages() {
+            if (!messagesEndpoint) return;
+            try {
+                const resp = await fetch(messagesEndpoint, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (data.ok) renderMessages(data.mensagens || []);
+            } catch (e) {}
+        }
+
+        pollConversations();
+        pollMessages();
+        setInterval(pollConversations, 7000);
+        setInterval(pollMessages, 5000);
     })();
 </script>
-{% endif %}
 {% endblock %}

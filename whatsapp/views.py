@@ -487,6 +487,8 @@ def conversations_feed(request):
             'id': c.pk,
             'nome': c.nome_exibicao,
             'wa_id': c.wa_id,
+            'wa_id_alt': c.wa_id_alt or '',
+            'avatar_url': c.avatar_url or '',
             'ultima_mensagem': c.ultima_mensagem or '',
             'ultima_mensagem_em': c.ultima_mensagem_em.strftime('%d/%m %H:%M') if c.ultima_mensagem_em else '',
             'nao_lidas': c.nao_lidas or 0,

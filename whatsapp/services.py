@@ -26,8 +26,54 @@ def normalize_wa_id(raw_value: str) -> str:
     return f'{digits}@s.whatsapp.net' if digits else value
 
 
+def is_lid_jid(jid: str) -> bool:
+    return (jid or '').strip().lower().endswith('@lid')
+
+
+def is_real_number_jid(jid: str) -> bool:
+    candidate = (jid or '').strip().lower()
+    return bool(re.match(r'^\d+@s\.whatsapp\.net$', candidate))
+
+
 def normalize_number(raw_value: str) -> str:
     return re.sub(r'\D', '', raw_value or '')
+
+
+def resolve_avatar_url(payload: dict[str, Any], data: dict[str, Any]) -> str:
+    candidates = [
+        data.get('profilePicUrl'),
+        data.get('profilePictureUrl'),
+        data.get('picture'),
+        data.get('avatarUrl'),
+        payload.get('profilePicUrl'),
+        payload.get('profilePictureUrl'),
+        payload.get('avatarUrl'),
+    ]
+    for value in candidates:
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ''
+
+
+def extract_jid_candidates(payload: dict[str, Any], data: dict[str, Any], key_data: dict[str, Any]) -> list[str]:
+    candidates = [
+        key_data.get('remoteJid'),
+        key_data.get('participant'),
+        data.get('remoteJid'),
+        data.get('from'),
+        data.get('sender'),
+        data.get('participant'),
+        payload.get('remoteJid'),
+        payload.get('from'),
+        payload.get('sender'),
+    ]
+    result = []
+    for value in candidates:
+        if isinstance(value, str) and value.strip():
+            normalized = normalize_wa_id(value.strip())
+            if normalized and normalized not in result:
+                result.append(normalized)
+    return result
 
 
 def parse_message_text(payload: dict[str, Any]) -> str:
@@ -390,13 +436,10 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
         return
 
     key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
-    remote_jid = (
-        key_data.get('remoteJid')
-        or data.get('remoteJid')
-        or data.get('from')
-        or data.get('sender')
-    )
-    wa_id = normalize_wa_id(remote_jid)
+    jid_candidates = extract_jid_candidates(payload, data, key_data)
+    real_jid = next((jid for jid in jid_candidates if is_real_number_jid(jid)), '')
+    lid_jid = next((jid for jid in jid_candidates if is_lid_jid(jid)), '')
+    wa_id = real_jid or lid_jid or (jid_candidates[0] if jid_candidates else '')
     if not wa_id:
         return
 
@@ -408,6 +451,7 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
     direction = WhatsAppMessage.Direction.ENVIADA if from_me else WhatsAppMessage.Direction.RECEBIDA
 
     contato = resolve_contact_name(payload, data)
+    avatar_url = resolve_avatar_url(payload, data)
     texto = parse_message_text(payload)
     media_url, media_kind = parse_message_media(payload)
     if not texto and media_kind:
@@ -419,22 +463,43 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
         or payload.get('id')
     )
 
-    conversation, _ = WhatsAppConversation.objects.get_or_create(
-        wa_id=wa_id,
-        defaults={
-            'instance': instance if instance and instance.pk else None,
-            'nome_contato': contato,
-            'e_grupo': wa_id.endswith('@g.us'),
-            'ultima_mensagem': texto,
-            'ultima_mensagem_em': ts,
-            'metadata': payload,
-        },
-    )
+    conversation = None
+    if real_jid:
+        conversation = WhatsAppConversation.objects.filter(wa_id=real_jid).first()
+    if not conversation and lid_jid:
+        conversation = WhatsAppConversation.objects.filter(wa_id_alt=lid_jid).first()
+    if not conversation and lid_jid:
+        conversation = WhatsAppConversation.objects.filter(wa_id=lid_jid).first()
+
+    if not conversation:
+        conversation = WhatsAppConversation.objects.create(
+            wa_id=wa_id,
+            wa_id_alt=lid_jid if (lid_jid and lid_jid != wa_id) else '',
+            instance=instance if instance and instance.pk else None,
+            nome_contato=contato,
+            avatar_url=avatar_url,
+            e_grupo=wa_id.endswith('@g.us'),
+            ultima_mensagem=texto,
+            ultima_mensagem_em=ts,
+            metadata=payload,
+        )
+    else:
+        if real_jid and conversation.wa_id != real_jid:
+            collision = WhatsAppConversation.objects.filter(wa_id=real_jid).exclude(pk=conversation.pk).exists()
+            if not collision:
+                old_wa_id = conversation.wa_id
+                conversation.wa_id = real_jid
+                if is_lid_jid(old_wa_id) and not conversation.wa_id_alt:
+                    conversation.wa_id_alt = old_wa_id
+        if lid_jid and not conversation.wa_id_alt and lid_jid != conversation.wa_id:
+            conversation.wa_id_alt = lid_jid
 
     if instance and instance.pk and not conversation.instance:
         conversation.instance = instance
     if contato and not conversation.nome_contato:
         conversation.nome_contato = contato
+    if avatar_url:
+        conversation.avatar_url = avatar_url
     conversation.ultima_mensagem = texto[:500]
     conversation.ultima_mensagem_em = ts
     conversation.metadata = payload

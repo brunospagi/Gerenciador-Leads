@@ -13,8 +13,8 @@ class WhatsAppInstanceAdmin(admin.ModelAdmin):
 
 @admin.register(WhatsAppConversation)
 class WhatsAppConversationAdmin(admin.ModelAdmin):
-    list_display = ('nome_exibicao', 'wa_id', 'nao_lidas', 'ultima_mensagem_em')
-    search_fields = ('nome_contato', 'wa_id')
+    list_display = ('nome_exibicao', 'wa_id', 'wa_id_alt', 'nao_lidas', 'ultima_mensagem_em')
+    search_fields = ('nome_contato', 'wa_id', 'wa_id_alt')
     list_filter = ('e_grupo',)
 
 
