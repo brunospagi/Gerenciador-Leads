@@ -76,6 +76,72 @@ def extract_jid_candidates(payload: dict[str, Any], data: dict[str, Any], key_da
     return result
 
 
+def normalize_labels(raw_labels: Any) -> list[str]:
+    labels: list[str] = []
+    if isinstance(raw_labels, list):
+        for item in raw_labels:
+            if isinstance(item, str):
+                value = item.strip()
+                if value:
+                    labels.append(value)
+            elif isinstance(item, dict):
+                value = (
+                    item.get('name')
+                    or item.get('label')
+                    or item.get('title')
+                    or item.get('id')
+                )
+                if value:
+                    labels.append(str(value).strip())
+    elif isinstance(raw_labels, dict):
+        value = raw_labels.get('name') or raw_labels.get('label') or raw_labels.get('title') or raw_labels.get('id')
+        if value:
+            labels.append(str(value).strip())
+    elif isinstance(raw_labels, str):
+        value = raw_labels.strip()
+        if value:
+            labels.append(value)
+
+    # Remove duplicadas mantendo ordem
+    unique_labels = []
+    for label in labels:
+        if label and label not in unique_labels:
+            unique_labels.append(label)
+    return unique_labels
+
+
+def extract_labels(payload: dict[str, Any], data: dict[str, Any]) -> list[str]:
+    candidates = [
+        data.get('labels'),
+        data.get('label'),
+        data.get('tag'),
+        data.get('tags'),
+        payload.get('labels'),
+        payload.get('label'),
+        payload.get('tag'),
+        payload.get('tags'),
+    ]
+    for raw in candidates:
+        parsed = normalize_labels(raw)
+        if parsed:
+            return parsed
+
+    # Alguns eventos trazem em estruturas aninhadas
+    contact = data.get('contact')
+    if isinstance(contact, dict):
+        parsed = normalize_labels(contact.get('labels') or contact.get('tags'))
+        if parsed:
+            return parsed
+
+    association = data.get('association')
+    if isinstance(association, dict):
+        parsed = normalize_labels(association.get('labels') or association.get('tags'))
+        if parsed:
+            return parsed
+
+    return []
+
+
 def parse_message_text(payload: dict[str, Any]) -> str:
     data = payload.get('data', payload)
     message = data.get('message', {}) if isinstance(data, dict) else {}
@@ -226,6 +292,9 @@ class EvolutionAPIClient:
             'MESSAGES_UPDATE',
             'SEND_MESSAGE',
             'CONNECTION_UPDATE',
+            'LABELS_ASSOCIATION',
+            'LABELS_EDIT',
+            'CONTACTS_UPDATE',
         ]
         headers = {'Content-Type': 'application/json'}
         if webhook_secret:
@@ -414,8 +483,45 @@ def process_qrcode_update(payload: dict[str, Any], instance: WhatsAppInstance | 
     return True
 
 
+def process_labels_update(payload: dict[str, Any]) -> bool:
+    data = payload.get('data', payload) if isinstance(payload, dict) else {}
+    key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
+    jid_candidates = extract_jid_candidates(payload, data if isinstance(data, dict) else {}, key_data)
+    if not jid_candidates:
+        return False
+
+    labels = extract_labels(payload, data if isinstance(data, dict) else {})
+    if not labels:
+        return False
+
+    real_jid = next((jid for jid in jid_candidates if is_real_number_jid(jid)), '')
+    lid_jid = next((jid for jid in jid_candidates if is_lid_jid(jid)), '')
+    wa_id = real_jid or lid_jid or jid_candidates[0]
+
+    conversation = None
+    if real_jid:
+        conversation = WhatsAppConversation.objects.filter(wa_id=real_jid).first()
+    if not conversation and lid_jid:
+        conversation = WhatsAppConversation.objects.filter(wa_id_alt=lid_jid).first()
+    if not conversation:
+        conversation = WhatsAppConversation.objects.filter(wa_id=wa_id).first()
+    if not conversation:
+        return False
+
+    conversation.etiquetas = labels
+    merged_meta = dict(conversation.metadata or {})
+    merged_meta['labels_update'] = payload
+    conversation.metadata = merged_meta
+    conversation.save(update_fields=['etiquetas', 'metadata', 'atualizado_em'])
+    return True
+
+
 def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance | None = None) -> None:
     event_name = str(payload.get('event') or '').upper()
+    if event_name in {'LABELS_ASSOCIATION', 'LABELS_EDIT', 'CONTACTS_UPDATE'}:
+        if process_labels_update(payload):
+            logger.info('Webhook de etiquetas processado.')
+            return
     if event_name in {'CONNECTION_UPDATE', 'CONNECTION.STATE', 'INSTANCE_CONNECTION_UPDATE'}:
         if process_connection_update(payload, instance):
             logger.info('Webhook de conexao processado: %s', instance.instance_name if instance else '-')
@@ -452,6 +558,7 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
 
     contato = resolve_contact_name(payload, data)
     avatar_url = resolve_avatar_url(payload, data)
+    etiquetas = extract_labels(payload, data)
     texto = parse_message_text(payload)
     media_url, media_kind = parse_message_media(payload)
     if not texto and media_kind:
@@ -478,6 +585,7 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
             instance=instance if instance and instance.pk else None,
             nome_contato=contato,
             avatar_url=avatar_url,
+            etiquetas=etiquetas,
             e_grupo=wa_id.endswith('@g.us'),
             ultima_mensagem=texto,
             ultima_mensagem_em=ts,
@@ -500,6 +608,8 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
         conversation.nome_contato = contato
     if avatar_url:
         conversation.avatar_url = avatar_url
+    if etiquetas:
+        conversation.etiquetas = etiquetas
     conversation.ultima_mensagem = texto[:500]
     conversation.ultima_mensagem_em = ts
     conversation.metadata = payload

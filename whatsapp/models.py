@@ -35,6 +35,7 @@ class WhatsAppConversation(models.Model):
     wa_id_alt = models.CharField(max_length=120, blank=True, db_index=True)
     nome_contato = models.CharField(max_length=180, blank=True)
     avatar_url = models.URLField(blank=True)
+    etiquetas = models.JSONField(default=list, blank=True)
     e_grupo = models.BooleanField(default=False)
     ultima_mensagem = models.TextField(blank=True)
     ultima_mensagem_em = models.DateTimeField(default=timezone.now, db_index=True)

@@ -562,6 +562,7 @@ def conversations_feed(request):
             'wa_id': c.wa_id,
             'wa_id_alt': c.wa_id_alt or '',
             'avatar_url': c.avatar_url or '',
+            'etiquetas': c.etiquetas or [],
             'ultima_mensagem': c.ultima_mensagem or '',
             'ultima_mensagem_em': c.ultima_mensagem_em.strftime('%d/%m %H:%M') if c.ultima_mensagem_em else '',
             'nao_lidas': c.nao_lidas or 0,

@@ -44,6 +44,8 @@
     .chat-list .chat-box .chat-details .text-message { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .chat-list .chat-box .chat-details .text-message p { margin: 0; color: #6b7280; font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
     .chat-list .chat-box .chat-details .text-message b { background: #06e744; color: #fff; min-width: 20px; height: 20px; border-radius: 50%; font-size: .75rem; font-weight: 500; display: flex; justify-content: center; align-items: center; }
+    .label-row { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+    .label-chip { display: inline-block; font-size: .68rem; line-height: 1; padding: 4px 7px; border-radius: 999px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
     .chat-list .active { background: #ebebeb; }
     .chat-list .chat-box:hover { background: #f5f5f5; }
     .chat-list .chat-box .chat-details .text-head .unread { color: #06e744; }
@@ -183,6 +185,13 @@
                             <p>{{ conversa.ultima_mensagem|default:"-"|truncatechars:42 }}</p>
                             {% if conversa.nao_lidas %}<b>{{ conversa.nao_lidas }}</b>{% endif %}
                         </div>
+                        {% if conversa.etiquetas %}
+                        <div class="label-row">
+                            {% for et in conversa.etiquetas|slice:":3" %}
+                            <span class="label-chip">{{ et }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
                     </div>
                 </a>
                 {% empty %}
@@ -203,6 +212,13 @@
                         {% endif %}
                     </div>
                     <h4>{{ conversa_ativa.nome_exibicao }}<br><span>{{ conversa_ativa.wa_id }}</span></h4>
+                    {% if conversa_ativa.etiquetas %}
+                    <div class="label-row">
+                        {% for et in conversa_ativa.etiquetas %}
+                        <span class="label-chip">{{ et }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
                 <ul class="nav-icons">
                     <li><i class="fa-solid fa-magnifying-glass"></i></li>
@@ -299,7 +315,9 @@
                 const unreadClass = c.nao_lidas ? 'unread' : '';
                 const unreadBadge = c.nao_lidas ? `<b>${c.nao_lidas}</b>` : '';
                 const avatar = c.avatar_url ? c.avatar_url : 'https://cdn.quasar.dev/img/avatar4.jpg';
-                return `<a class="chat-box ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}"><div class="img-box"><img class="dp" src="${avatar}" alt="Contato"></div><div class="chat-details"><div class="text-head"><h4>${esc(c.nome)}</h4><p class="time ${unreadClass}">${esc(c.ultima_mensagem_em)}</p></div><div class="text-message"><p>${esc((c.ultima_mensagem || '').slice(0, 42))}</p>${unreadBadge}</div></div></a>`;
+                const tags = (c.etiquetas || []).slice(0, 3).map((t) => `<span class="label-chip">${esc(t)}</span>`).join('');
+                const tagsRow = tags ? `<div class="label-row">${tags}</div>` : '';
+                return `<a class="chat-box ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}"><div class="img-box"><img class="dp" src="${avatar}" alt="Contato"></div><div class="chat-details"><div class="text-head"><h4>${esc(c.nome)}</h4><p class="time ${unreadClass}">${esc(c.ultima_mensagem_em)}</p></div><div class="text-message"><p>${esc((c.ultima_mensagem || '').slice(0, 42))}</p>${unreadBadge}</div>${tagsRow}</div></a>`;
             }).join('');
         }
 
