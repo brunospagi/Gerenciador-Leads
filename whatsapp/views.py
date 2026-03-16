@@ -83,6 +83,9 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         conversa_id = self.request.GET.get('c')
         if conversa_id and conversa_id.isdigit():
             conversa_ativa = get_object_or_404(WhatsAppConversation, pk=conversa_id)
+            if conversa_ativa.nao_lidas:
+                conversa_ativa.nao_lidas = 0
+                conversa_ativa.save(update_fields=['nao_lidas'])
             mensagens = conversa_ativa.mensagens.all().order_by('criado_em')[:300]
 
         instance = get_active_instance()
@@ -592,7 +595,7 @@ def conversation_messages_feed(request, pk):
             'media_url': m.media_url or '',
             'status': m.get_status_display(),
             'criado_em': m.criado_em.strftime('%d/%m/%Y %H:%M') if m.criado_em else '',
-            'can_react': bool(m.external_id),
+            'can_react': True,
         }
         for m in mensagens
     ]
@@ -610,24 +613,57 @@ def react_message(request, pk):
     emoji = (request.POST.get('emoji') or '').strip()
     if not emoji:
         return JsonResponse({'ok': False, 'error': 'Emoji obrigatorio'}, status=400)
-    if not mensagem.external_id:
-        return JsonResponse({'ok': False, 'error': 'Mensagem sem id externo para reagir'}, status=400)
 
     conversa = mensagem.conversa
     instance = conversa.instance or get_active_instance()
     if not instance:
         return JsonResponse({'ok': False, 'error': 'Instancia ativa nao encontrada'}, status=400)
 
-    remote_jid = conversa.wa_id
+    payload = mensagem.payload or {}
+    key_data = {}
+    if isinstance(payload.get('data'), dict) and isinstance(payload.get('data', {}).get('key'), dict):
+        key_data = payload.get('data', {}).get('key', {})
+    elif isinstance(payload.get('key'), dict):
+        key_data = payload.get('key', {})
+
+    remote_jid = (
+        key_data.get('remoteJid')
+        or key_data.get('participant')
+        or conversa.wa_id
+        or conversa.wa_id_alt
+        or ''
+    )
     if '@' not in remote_jid:
         remote_jid = normalize_wa_id(remote_jid)
+    from_me = key_data.get('fromMe')
+    if from_me is None:
+        from_me = (mensagem.direcao == WhatsAppMessage.Direction.ENVIADA)
+
+    message_id = (
+        mensagem.external_id
+        or key_data.get('id')
+        or payload.get('id')
+        or payload.get('messageId')
+    )
+    data_payload = payload.get('data', {}) if isinstance(payload.get('data'), dict) else {}
+    message_id = (
+        message_id
+        or data_payload.get('id')
+        or data_payload.get('messageId')
+        or (data_payload.get('key', {}) or {}).get('id')
+    )
+    message_payload = data_payload.get('message', {}) if isinstance(data_payload.get('message'), dict) else {}
+    if not message_id and isinstance(message_payload.get('key'), dict):
+        message_id = message_payload.get('key', {}).get('id')
+    if not message_id:
+        return JsonResponse({'ok': False, 'error': 'Nao foi possivel identificar o id da mensagem para reagir'}, status=400)
 
     try:
         client = EvolutionAPIClient(instance=instance)
         response = client.send_reaction(
             remote_jid=remote_jid,
-            from_me=(mensagem.direcao == WhatsAppMessage.Direction.ENVIADA),
-            message_id=mensagem.external_id,
+            from_me=bool(from_me),
+            message_id=message_id,
             reaction=emoji,
         )
         merged_payload = dict(mensagem.payload or {})

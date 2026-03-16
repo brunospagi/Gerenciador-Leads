@@ -2,7 +2,7 @@
 
 {% block content %}
 <style>
-    .wa-clone-wrap { position: relative; min-height: calc(100vh - 140px); }
+    .wa-clone-wrap { position: relative; min-height: calc(100vh - 140px); font-family: Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif; }
     .wa-topbar { position: relative; z-index: 3; margin-bottom: 10px; padding: 10px 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; }
     .wa-topbar h3 { margin: 0; font-size: 1rem; font-weight: 700; color: #0f172a; }
     .wa-topbar p { margin: 0; font-size: .8rem; color: #64748b; }
@@ -35,9 +35,9 @@
     .search-container .input input { width: 100%; outline: none; border: none; background: #fff; padding: 8px 10px 8px 38px; border-radius: 8px; font-size: .85rem; }
     .search-container .input i { position: absolute; left: 14px; top: 11px; color: #94a3b8; font-size: .8rem; }
     .chat-list { position: relative; height: calc(100% - 180px); overflow-y: auto; }
-    .chat-list .chat-box { position: relative; width: 100%; display: flex; align-items: center; cursor: pointer; padding: 12px 15px; border-bottom: 1px solid #f1f5f9; text-decoration: none; }
+    .chat-list .chat-box { position: relative; width: 100%; display: grid; grid-template-columns: 50px 1fr; gap: 0 12px; align-items: center; cursor: pointer; padding: 12px 15px; border-bottom: 1px solid #f1f5f9; text-decoration: none; }
     .chat-list .chat-box .img-box { position: relative; width: 50px; height: 50px; overflow: hidden; border-radius: 50%; background: #d1d5db; flex-shrink: 0; }
-    .chat-list .chat-box .chat-details { width: 100%; margin-left: 12px; }
+    .chat-list .chat-box .chat-details { width: 100%; margin-left: 0; min-width: 0; }
     .chat-list .chat-box .chat-details .text-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
     .chat-list .chat-box .chat-details .text-head h4 { margin: 0; font-size: 1rem; font-weight: 600; color: #111827; }
     .chat-list .chat-box .chat-details .text-head .time { margin: 0; font-size: .75rem; color: #94a3b8; }
@@ -49,8 +49,9 @@
     .chat-list .active { background: #ebebeb; }
     .chat-list .chat-box:hover { background: #f5f5f5; }
     .chat-list .chat-box .chat-details .text-head .unread { color: #06e744; }
-    .right-container .header .img-text { display: flex; align-items: center; gap: 12px; }
-    .right-container .header .img-text h4 { margin: 0; font-weight: 500; line-height: 1.2em; font-size: .95rem; }
+    .right-container .header .img-text { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+    .right-container .header .img-text .contact-meta { min-width: 0; }
+    .right-container .header .img-text h4 { margin: 0; font-weight: 500; line-height: 1.2em; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
     .right-container .header .img-text h4 span { font-size: .78rem; color: #64748b; font-weight: 400; }
     .chat-container { position: relative; width: 100%; height: calc(100% - 122px); padding: 24px; overflow-y: auto; z-index: 2; }
     .message-box { position: relative; display: flex; width: 100%; margin: 5px 0; }
@@ -59,29 +60,131 @@
     .my-message { justify-content: flex-end; }
     .friend-message { justify-content: flex-start; }
     .friend-message p { background: #fff; }
+    .system-message { justify-content: center; }
+    .system-message p { background: #fff3cd; color: #7a5d00; border: 1px solid #ffe08a; max-width: 86%; }
     .message-box.my-message p::before { content: ''; position: absolute; top: 0; right: -12px; width: 18px; height: 18px; background: linear-gradient(135deg, #dcf8c6 0%, #dcf8c6 50%, transparent 50%, transparent); }
     .message-box.friend-message p::before { content: ''; position: absolute; top: 0; left: -12px; width: 18px; height: 18px; background: linear-gradient(225deg, #fff 0%, #fff 50%, transparent 50%, transparent); }
     .bubble-media { margin-bottom: 8px; }
     .bubble-media img, .bubble-media video, .bubble-media audio { max-width: 100%; border-radius: 8px; }
-    .reaction-row { margin-top: 6px; display: flex; gap: 4px; }
+    .reaction-row { margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+    .reaction-row.reaction-hidden { display: none; }
+    .reaction-row.is-open { display: flex; }
     .reaction-btn {
         border: 1px solid #cbd5e1; background: #fff; border-radius: 999px;
         font-size: .8rem; line-height: 1; padding: 4px 7px; cursor: pointer;
     }
     .reaction-btn:hover { background: #f1f5f9; }
+    .message-menu-trigger {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        color: #4b5563;
+        background: rgba(255, 255, 255, 0.82);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        line-height: 1;
+        border: 1px solid #e5e7eb;
+        opacity: 0;
+        transition: opacity .15s ease;
+    }
+    .message-box p:hover .message-menu-trigger,
+    .message-menu-trigger.force-show {
+        opacity: 1;
+    }
+    .message-menu {
+        position: absolute;
+        top: 34px;
+        right: 6px;
+        min-width: 175px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 10px 28px rgba(0,0,0,.2);
+        border: 1px solid #e5e7eb;
+        z-index: 8;
+        padding: 4px 0;
+        display: none;
+    }
+    .message-menu.open { display: block; }
+    .message-menu button {
+        width: 100%;
+        text-align: left;
+        padding: 9px 14px;
+        font-size: .95rem;
+        color: #111827;
+        background: transparent;
+        border: 0;
+    }
+    .message-menu button:hover { background: #f3f4f6; }
+    .message-menu button:disabled {
+        color: #9ca3af;
+        cursor: not-allowed;
+    }
     .chatbox-input { position: relative; width: 100%; min-height: 62px; background: #f0f0f0; display: flex; align-items: center; gap: 10px; padding: 8px 12px; z-index: 2; }
     .chatbox-input .icon-btn { color: #54656f; font-size: 1.3rem; line-height: 1; }
     .chatbox-input .composer { display: flex; width: 100%; gap: 8px; align-items: center; }
     .chatbox-input input[type="text"] { width: 100%; border-radius: 8px; font-size: .95rem; border: none; outline: none; padding: 10px 12px; }
     .chatbox-input input[type="file"] { width: 210px; border-radius: 8px; font-size: .75rem; border: 1px solid #d1d5db; background: #fff; padding: 6px; }
     .chatbox-input .send-btn { border: none; background: #009688; color: #fff; border-radius: 8px; padding: 10px 14px; font-weight: 600; }
+    .chatbox-input .attach-box { position: relative; }
+    .chatbox-input .attach-trigger {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 1px solid #d1d5db;
+        background: #fff;
+        color: #4b5563;
+        font-size: 1.1rem;
+        line-height: 1;
+    }
+    .chatbox-input .attach-menu {
+        position: absolute;
+        left: 0;
+        bottom: 44px;
+        width: 265px;
+        background: #fff;
+        border-radius: 10px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 12px 26px rgba(0,0,0,.2);
+        padding: 8px 0;
+        display: none;
+        z-index: 20;
+    }
+    .chatbox-input .attach-menu.show { display: block; }
+    .chatbox-input .attach-menu button {
+        width: 100%;
+        text-align: left;
+        border: 0;
+        background: transparent;
+        padding: 11px 14px;
+        font-size: .95rem;
+        color: #111827;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .chatbox-input .attach-menu button:hover { background: #f3f4f6; }
+    .chatbox-input .selected-file {
+        margin-top: 4px;
+        font-size: .72rem;
+        color: #4b5563;
+        max-width: 240px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .chatbox-input .hidden-file-input { display: none; }
     .empty-chat { position: relative; z-index: 2; height: calc(100% - 122px); display: flex; align-items: center; justify-content: center; color: #475569; }
     @media (max-width: 1100px) {
         .main-container { flex-direction: column; height: auto; min-height: 720px; }
         .left-container, .right-container { width: 100%; min-width: 100%; height: 50%; }
         .chat-list { height: 300px; }
         .chatbox-input { flex-wrap: wrap; }
-        .chatbox-input input[type="file"] { width: 100%; }
+        .chatbox-input .attach-menu { left: -10px; width: 240px; }
         .top-new-chat-card { width: 310px; }
     }
 </style>
@@ -212,19 +315,21 @@
                 <div class="img-text">
                     <div class="user-img">
                         {% if conversa_ativa.avatar_url %}
-                        <img class="dp" src="{{ conversa_ativa.avatar_url }}" alt="Contato">
+                        <img class="dp" id="active-contact-avatar" src="{{ conversa_ativa.avatar_url }}" alt="Contato">
                         {% else %}
-                        <img class="dp" src="https://cdn.quasar.dev/img/avatar4.jpg" alt="Contato">
+                        <img class="dp" id="active-contact-avatar" src="https://cdn.quasar.dev/img/avatar4.jpg" alt="Contato">
                         {% endif %}
                     </div>
-                    <h4>{{ conversa_ativa.nome_exibicao }}<br><span>{{ conversa_ativa.wa_id }}</span></h4>
-                    {% if conversa_ativa.etiquetas %}
-                    <div class="label-row">
+                    <div class="contact-meta">
+                        <h4 id="active-contact-name">{{ conversa_ativa.nome_exibicao }}<br><span id="active-contact-jid">{{ conversa_ativa.wa_id }}</span></h4>
+                    </div>
+                    <div class="label-row" id="active-contact-labels">
+                        {% if conversa_ativa.etiquetas %}
                         {% for et in conversa_ativa.etiquetas %}
                         <span class="label-chip">{{ et }}</span>
                         {% endfor %}
+                        {% endif %}
                     </div>
-                    {% endif %}
                 </div>
                 <ul class="nav-icons">
                     <li><i class="fa-solid fa-magnifying-glass"></i></li>
@@ -239,8 +344,15 @@
 
             <div class="chat-container" id="message-list">
                 {% for mensagem in mensagens %}
-                <div class="message-box {% if mensagem.direcao == 'OUT' %}my-message{% else %}friend-message{% endif %}">
+                <div class="message-box {% if mensagem.direcao == 'OUT' %}my-message{% elif mensagem.direcao == 'SYSTEM' %}system-message{% else %}friend-message{% endif %}">
                     <p>
+                        <button type="button" class="message-menu-trigger" onclick="toggleMessageMenu(event, {{ mensagem.pk }})">&#8942;</button>
+                        <div class="message-menu" id="msg-menu-{{ mensagem.pk }}">
+                            <button type="button" onclick="messageAction('forward', {{ mensagem.pk }}, '')">Encaminhar</button>
+                            <button type="button" onclick="messageAction('download', {{ mensagem.pk }}, '{{ mensagem.media_url|default:''|escapejs }}')" {% if not mensagem.media_url %}disabled{% endif %}>Download</button>
+                            <button type="button" onclick="messageAction('reply', {{ mensagem.pk }}, '{{ mensagem.conteudo|default:''|escapejs }}')">Responder</button>
+                            <button type="button" onclick="messageAction('react', {{ mensagem.pk }}, '')">Reagir</button>
+                        </div>
                         {% if mensagem.media_url %}
                         <span class="bubble-media">
                             {% with media_url=mensagem.media_url|lower %}
@@ -258,14 +370,12 @@
                         {% endif %}
                         {{ mensagem.conteudo|linebreaksbr }}
                         <span>{{ mensagem.criado_em|date:"H:i" }} | {{ mensagem.get_status_display }}</span>
-                        {% if mensagem.external_id %}
-                        <div class="reaction-row">
-                            <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '👍')">👍</button>
-                            <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '❤️')">❤️</button>
-                            <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '😂')">😂</button>
-                            <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '🙏')">🙏</button>
+                        <div class="reaction-row reaction-hidden" id="reaction-row-{{ mensagem.pk }}">
+                            <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '\uD83D\uDC4D')">&#128077;</button>
+                            <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '\u2764\uFE0F')">&#10084;&#65039;</button>
+                            <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '\uD83D\uDE02')">&#128514;</button>
+                            <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '\uD83D\uDE4F')">&#128591;</button>
                         </div>
-                        {% endif %}
                     </p>
                 </div>
                 {% empty %}
@@ -278,9 +388,21 @@
                 <input type="hidden" name="action" value="send_message">
                 <input type="hidden" name="conversa_id" value="{{ conversa_ativa.pk }}">
                 <i class="fa-regular fa-face-grin icon-btn"></i>
+                <div class="attach-box">
+                    <button type="button" class="attach-trigger" id="attachTrigger" title="Anexar">+</button>
+                    <div class="attach-menu" id="attachMenu">
+                        <button type="button" onclick="openAttachment('media')"><i class="fa-regular fa-image text-primary"></i> Fotos e videos</button>
+                        <button type="button" onclick="openAttachment('camera')"><i class="fa-solid fa-camera text-danger"></i> Camera</button>
+                        <button type="button" onclick="openAttachment('document')"><i class="fa-regular fa-file-lines text-info"></i> Documento</button>
+                        <button type="button" onclick="openAttachment('contact')"><i class="fa-regular fa-address-book text-success"></i> Contato</button>
+                        <button type="button" onclick="openAttachment('video_call')"><i class="fa-solid fa-video text-success"></i> Video chamada</button>
+                        <button type="button" onclick="openAttachment('buttons')"><i class="fa-solid fa-ellipsis text-primary"></i> Botoes</button>
+                    </div>
+                    <input type="file" class="hidden-file-input" id="chatFileInput" name="arquivo">
+                    <div class="selected-file" id="selectedFileName"></div>
+                </div>
                 <div class="composer">
                     <input type="text" name="mensagem" placeholder="Digite uma mensagem">
-                    <input type="file" name="arquivo" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar">
                 </div>
                 <button class="send-btn" type="submit">Enviar</button>
                 <i class="fa-solid fa-microphone icon-btn"></i>
@@ -307,6 +429,10 @@
         const listEl = document.getElementById('conversation-list');
         const messagesEl = document.getElementById('message-list');
         const currentQuery = "{{ request.GET.q|default:''|escapejs }}";
+        const activeNameEl = document.getElementById('active-contact-name');
+        const activeAvatarEl = document.getElementById('active-contact-avatar');
+        const activeLabelsEl = document.getElementById('active-contact-labels');
+        const defaultAvatar = 'https://cdn.quasar.dev/img/avatar4.jpg';
 
         function esc(str) {
             return (str || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -321,6 +447,38 @@
             return `<span class="bubble-media"><a href="${mediaUrl}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a></span>`;
         }
 
+        function reactionMarkup(messageId) {
+            return `<div class="reaction-row reaction-hidden" id="reaction-row-${messageId}"><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDC4D')">&#128077;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\u2764\\uFE0F')">&#10084;&#65039;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDE02')">&#128514;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDE4F')">&#128591;</button></div>`;
+        }
+
+        function menuMarkup(message) {
+            const mediaUrl = message.media_url || '';
+            const text = message.conteudo || '';
+            const noMedia = mediaUrl ? '' : 'disabled';
+            const encMedia = encodeURIComponent(mediaUrl);
+            const encText = encodeURIComponent(text);
+            return `<button type="button" class="message-menu-trigger" onclick="toggleMessageMenu(event, ${message.id})">&#8942;</button>
+                <div class="message-menu" id="msg-menu-${message.id}">
+                    <button type="button" onclick="messageAction('forward', ${message.id}, '')">Encaminhar</button>
+                    <button type="button" onclick="messageAction('download', ${message.id}, '${encMedia}')" ${noMedia}>Download</button>
+                    <button type="button" onclick="messageAction('reply', ${message.id}, '${encText}')">Responder</button>
+                    <button type="button" onclick="messageAction('react', ${message.id}, '')">Reagir</button>
+                </div>`;
+        }
+
+        function updateHeaderByConversation(c) {
+            if (!c) return;
+            if (activeNameEl) {
+                activeNameEl.innerHTML = `${esc(c.nome || c.wa_id || 'Contato')}<br><span id="active-contact-jid">${esc(c.wa_id || '')}</span>`;
+            }
+            if (activeAvatarEl) {
+                activeAvatarEl.src = c.avatar_url || defaultAvatar;
+            }
+            if (activeLabelsEl) {
+                activeLabelsEl.innerHTML = (c.etiquetas || []).map((t) => `<span class="label-chip">${esc(t)}</span>`).join('');
+            }
+        }
+
         function renderConversations(conversas) {
             if (!listEl) return;
             const baseUrl = "{% url 'whatsapp:inbox' %}";
@@ -328,30 +486,85 @@
                 const activeClass = String(c.id) === String(activeConversationId) ? 'active' : '';
                 const unreadClass = c.nao_lidas ? 'unread' : '';
                 const unreadBadge = c.nao_lidas ? `<b>${c.nao_lidas}</b>` : '';
-                const avatar = c.avatar_url ? c.avatar_url : 'https://cdn.quasar.dev/img/avatar4.jpg';
+                const avatar = c.avatar_url ? c.avatar_url : defaultAvatar;
                 const tags = (c.etiquetas || []).slice(0, 3).map((t) => `<span class="label-chip">${esc(t)}</span>`).join('');
                 const tagsRow = tags ? `<div class="label-row">${tags}</div>` : '';
                 return `<a class="chat-box ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}"><div class="img-box"><img class="dp" src="${avatar}" alt="Contato"></div><div class="chat-details"><div class="text-head"><h4>${esc(c.nome)}</h4><p class="time ${unreadClass}">${esc(c.ultima_mensagem_em)}</p></div><div class="text-message"><p>${esc((c.ultima_mensagem || '').slice(0, 42))}</p>${unreadBadge}</div>${tagsRow}</div></a>`;
             }).join('');
+            const activeConversation = (conversas || []).find((c) => String(c.id) === String(activeConversationId));
+            updateHeaderByConversation(activeConversation);
         }
 
         function renderMessages(mensagens) {
             if (!messagesEl) return;
             messagesEl.innerHTML = (mensagens || []).map((m) => {
-                const side = m.direcao === 'OUT' ? 'my-message' : 'friend-message';
+                const side = m.direcao === 'OUT' ? 'my-message' : (m.direcao === 'SYSTEM' ? 'system-message' : 'friend-message');
                 const textHtml = esc(m.conteudo).replaceAll('\n', '<br>');
-                const reactionRow = m.can_react
-                    ? `<div class="reaction-row">
-                        <button type="button" class="reaction-btn" onclick="sendReaction(${m.id}, '👍')">👍</button>
-                        <button type="button" class="reaction-btn" onclick="sendReaction(${m.id}, '❤️')">❤️</button>
-                        <button type="button" class="reaction-btn" onclick="sendReaction(${m.id}, '😂')">😂</button>
-                        <button type="button" class="reaction-btn" onclick="sendReaction(${m.id}, '🙏')">🙏</button>
-                       </div>`
-                    : '';
-                return `<div class="message-box ${side}"><p>${mediaMarkup(m.media_url)}${textHtml}<span>${esc(m.criado_em.split(' ')[1] || m.criado_em)} | ${esc(m.status)}</span>${reactionRow}</p></div>`;
+                const reactionRow = reactionMarkup(m.id);
+                return `<div class="message-box ${side}"><p>${menuMarkup(m)}${mediaMarkup(m.media_url)}${textHtml}<span>${esc(m.criado_em.split(' ')[1] || m.criado_em)} | ${esc(m.status)}</span>${reactionRow}</p></div>`;
             }).join('');
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
+
+        function closeAllMessageMenus(exceptMessageId = null) {
+            document.querySelectorAll('.message-menu.open').forEach((menu) => {
+                if (exceptMessageId && menu.id === `msg-menu-${exceptMessageId}`) return;
+                menu.classList.remove('open');
+            });
+            document.querySelectorAll('.message-menu-trigger.force-show').forEach((btn) => btn.classList.remove('force-show'));
+        }
+
+        window.toggleMessageMenu = function (event, messageId) {
+            event.preventDefault();
+            event.stopPropagation();
+            const menu = document.getElementById(`msg-menu-${messageId}`);
+            const trigger = event.currentTarget;
+            if (!menu) return;
+            const willOpen = !menu.classList.contains('open');
+            closeAllMessageMenus();
+            if (willOpen) {
+                menu.classList.add('open');
+                if (trigger) trigger.classList.add('force-show');
+            }
+        };
+
+        function toggleReactionRow(messageId) {
+            const row = document.getElementById(`reaction-row-${messageId}`);
+            if (!row) return;
+            row.classList.toggle('reaction-hidden');
+            row.classList.toggle('is-open');
+        }
+
+        window.messageAction = function (action, messageId, payload) {
+            const decodePayload = (val) => {
+                try {
+                    return decodeURIComponent(val || '');
+                } catch (e) {
+                    return val || '';
+                }
+            };
+            if (action === 'react') {
+                toggleReactionRow(messageId);
+            } else if (action === 'download') {
+                const decoded = decodePayload(payload);
+                if (decoded) {
+                    window.open(decoded, '_blank');
+                } else {
+                    alert('Esta mensagem nao possui arquivo para download.');
+                }
+            } else if (action === 'reply') {
+                const decoded = decodePayload(payload);
+                const input = document.querySelector('.chatbox-input input[name="mensagem"]');
+                if (input) {
+                    const base = (decoded || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+                    input.value = base ? `Respondendo: ${base}\n` : 'Respondendo:\n';
+                    input.focus();
+                }
+            } else if (action === 'forward') {
+                alert('Encaminhar sera habilitado em breve.');
+            }
+            closeAllMessageMenus();
+        };
 
         function getCsrfToken() {
             const name = 'csrftoken=';
@@ -381,9 +594,11 @@
                 const data = await resp.json();
                 if (!data.ok) {
                     alert('Erro ao reagir: ' + (data.error || 'falha'));
+                    return;
                 }
+                pollMessages();
             } catch (e) {
-                alert('Erro ao enviar reação.');
+                alert('Erro ao enviar reacao.');
             }
         };
 
@@ -409,6 +624,10 @@
         const btnOpenNewChat = document.getElementById('btnOpenNewChat');
         const newChatCard = document.getElementById('newChatCard');
         const numeroInput = newChatCard ? newChatCard.querySelector('input[name="numero"]') : null;
+        const attachTrigger = document.getElementById('attachTrigger');
+        const attachMenu = document.getElementById('attachMenu');
+        const chatFileInput = document.getElementById('chatFileInput');
+        const selectedFileName = document.getElementById('selectedFileName');
 
         function applyBrPhoneMask(value) {
             const digits = (value || '').replace(/\D/g, '').slice(0, 11);
@@ -440,6 +659,58 @@
             });
         }
 
+        function closeAttachMenu() {
+            if (attachMenu) attachMenu.classList.remove('show');
+        }
+
+        if (attachTrigger && attachMenu) {
+            attachTrigger.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                attachMenu.classList.toggle('show');
+            });
+        }
+
+        if (chatFileInput) {
+            chatFileInput.addEventListener('change', function () {
+                if (!selectedFileName) return;
+                const file = this.files && this.files[0] ? this.files[0] : null;
+                selectedFileName.textContent = file ? `Arquivo: ${file.name}` : '';
+            });
+        }
+
+        window.openAttachment = function (kind) {
+            if (!chatFileInput) return;
+            chatFileInput.removeAttribute('capture');
+            if (kind === 'media') {
+                chatFileInput.setAttribute('accept', 'image/*,video/*');
+                chatFileInput.click();
+            } else if (kind === 'camera') {
+                chatFileInput.setAttribute('accept', 'image/*,video/*');
+                chatFileInput.setAttribute('capture', 'environment');
+                chatFileInput.click();
+            } else if (kind === 'document') {
+                chatFileInput.setAttribute('accept', '.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar');
+                chatFileInput.click();
+            } else if (kind === 'contact') {
+                alert('Envio de contato sera habilitado em breve.');
+            } else if (kind === 'video_call') {
+                alert('Video chamada nao esta disponivel nesta versao.');
+            } else if (kind === 'buttons') {
+                alert('Envio de botoes sera habilitado em breve.');
+            }
+            closeAttachMenu();
+        };
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.message-menu') && !e.target.closest('.message-menu-trigger')) {
+                closeAllMessageMenus();
+            }
+            if (!e.target.closest('.attach-box')) {
+                closeAttachMenu();
+            }
+        });
+
         {% if open_new_chat %}
         if (newChatCard) {
             newChatCard.classList.add('show');
@@ -454,3 +725,4 @@
     })();
 </script>
 {% endblock %}
+
