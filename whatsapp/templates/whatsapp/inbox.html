@@ -25,7 +25,12 @@
         <h3 class="mb-1"><i class="fab fa-whatsapp text-success"></i> Central WhatsApp</h3>
         <p class="text-muted mb-0">Atendimento em tempo real dentro do CRM.</p>
     </div>
-    <div>
+    <div class="d-flex align-items-center gap-2">
+        {% if user.is_superuser or module_access.usuarios_admin %}
+            <a href="{% url 'whatsapp:instance_config' %}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-plug"></i> Configurar Instancia
+            </a>
+        {% endif %}
         {% if evolution_instance %}
             <span class="badge text-bg-success">Instancia: {{ evolution_instance.instance_name }}</span>
         {% else %}

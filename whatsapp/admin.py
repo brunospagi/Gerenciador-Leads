@@ -8,6 +8,7 @@ class WhatsAppInstanceAdmin(admin.ModelAdmin):
     list_display = ('nome', 'instance_name', 'ativo', 'status_conexao', 'atualizado_em')
     search_fields = ('nome', 'instance_name')
     list_filter = ('ativo',)
+    readonly_fields = ('qr_code_base64', 'ultima_resposta', 'atualizado_em')
 
 
 @admin.register(WhatsAppConversation)

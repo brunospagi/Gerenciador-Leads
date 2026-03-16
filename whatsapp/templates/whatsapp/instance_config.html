@@ -1,0 +1,117 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="mb-1"><i class="fas fa-plug text-primary"></i> Configuracao da Instancia WhatsApp</h3>
+        <p class="text-muted mb-0">Crie a instancia e conecte via QR Code sem sair do CRM.</p>
+    </div>
+    <a href="{% url 'whatsapp:inbox' %}" class="btn btn-outline-secondary">Voltar para Conversas</a>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header">Instancias</div>
+            <div class="card-body">
+                {% if instances %}
+                    <div class="list-group mb-3">
+                        {% for item in instances %}
+                        <a href="{% url 'whatsapp:instance_config' %}?instance={{ item.pk }}" class="list-group-item list-group-item-action {% if selected_instance and selected_instance.pk == item.pk %}active{% endif %}">
+                            <div class="d-flex w-100 justify-content-between">
+                                <strong>{{ item.nome }}</strong>
+                                <small>{{ item.status_conexao|default:"-" }}</small>
+                            </div>
+                            <small>{{ item.instance_name }}</small>
+                        </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">Nenhuma instancia cadastrada.</p>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="save_instance">
+                    {% if selected_instance %}<input type="hidden" name="instance_id" value="{{ selected_instance.pk }}">{% endif %}
+                    <div class="mb-2">
+                        <label class="form-label">Nome</label>
+                        {{ instance_form.nome }}
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Base URL</label>
+                        {{ instance_form.api_base_url }}
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">API Key</label>
+                        {{ instance_form.api_key }}
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Nome da Instancia</label>
+                        {{ instance_form.instance_name }}
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Webhook Secret</label>
+                        {{ instance_form.webhook_secret }}
+                    </div>
+                    <div class="form-check mb-3">
+                        {{ instance_form.ativo }}
+                        <label class="form-check-label">Instancia ativa</label>
+                    </div>
+                    <button class="btn btn-primary w-100">Salvar configuracao</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header">Conexao (QR Code)</div>
+            <div class="card-body">
+                {% if selected_instance %}
+                <div class="d-flex gap-2 mb-3">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="create_remote">
+                        <input type="hidden" name="instance_id" value="{{ selected_instance.pk }}">
+                        <button class="btn btn-success">Criar na Evolution + Gerar QR</button>
+                    </form>
+
+                    <form method="post" class="d-flex gap-2">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="connect_remote">
+                        <input type="hidden" name="instance_id" value="{{ selected_instance.pk }}">
+                        <div style="min-width: 230px;">{{ connect_form.numero }}</div>
+                        <button class="btn btn-outline-success">Atualizar QR</button>
+                    </form>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="refresh_status">
+                        <input type="hidden" name="instance_id" value="{{ selected_instance.pk }}">
+                        <button class="btn btn-outline-primary">Atualizar status</button>
+                    </form>
+                </div>
+
+                <div class="alert alert-light border">
+                    <strong>Status atual:</strong> {{ selected_instance.status_conexao|default:"desconhecido" }}
+                </div>
+
+                {% if selected_instance.qr_code_base64 %}
+                    {% if 'data:image' in selected_instance.qr_code_base64 %}
+                        <img src="{{ selected_instance.qr_code_base64 }}" alt="QR Code WhatsApp" class="img-fluid border rounded p-2" style="max-width: 360px;">
+                    {% else %}
+                        <img src="data:image/png;base64,{{ selected_instance.qr_code_base64 }}" alt="QR Code WhatsApp" class="img-fluid border rounded p-2" style="max-width: 360px;">
+                    {% endif %}
+                    <p class="text-muted mt-2 mb-0">Abra o WhatsApp no celular, toque em Dispositivos conectados e escaneie o QR.</p>
+                {% else %}
+                    <p class="text-muted mb-0">Ainda sem QR Code. Clique em "Criar na Evolution + Gerar QR" ou "Atualizar QR".</p>
+                {% endif %}
+                {% else %}
+                <p class="text-muted mb-0">Salve uma instancia para habilitar a conexao por QR Code.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

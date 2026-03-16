@@ -98,6 +98,26 @@ class EvolutionAPIClient:
         response.raise_for_status()
         return response.json() if response.content else {}
 
+    def create_instance(self, qrcode: bool = True, integration: str = 'WHATSAPP-BAILEYS') -> dict[str, Any]:
+        url = f'{self.base_url}/instance/create'
+        payload = {
+            'instanceName': self.instance.instance_name,
+            'qrcode': qrcode,
+            'integration': integration,
+        }
+        response = requests.post(url, json=payload, headers=self.headers, timeout=30)
+        response.raise_for_status()
+        return response.json() if response.content else {}
+
+    def connect_instance(self, number: str = '') -> dict[str, Any]:
+        url = f'{self.base_url}/instance/connect/{self.instance.instance_name}'
+        params = {}
+        if number:
+            params['number'] = normalize_number(number)
+        response = requests.get(url, params=params, headers=self.headers, timeout=30)
+        response.raise_for_status()
+        return response.json() if response.content else {}
+
     def connection_state(self) -> dict[str, Any]:
         url = f'{self.base_url}/instance/connectionState/{self.instance.instance_name}'
         response = requests.get(url, headers=self.headers, timeout=30)
@@ -122,6 +142,29 @@ def get_active_instance() -> WhatsAppInstance | None:
             ativo=True,
         )
     return None
+
+
+def extract_qr_base64(payload: dict[str, Any]) -> str:
+    if not isinstance(payload, dict):
+        return ''
+
+    direct = payload.get('base64')
+    if isinstance(direct, str) and direct:
+        return direct
+
+    qrcode = payload.get('qrcode')
+    if isinstance(qrcode, dict):
+        qr_val = qrcode.get('base64') or qrcode.get('code')
+        if isinstance(qr_val, str):
+            return qr_val
+
+    data = payload.get('data')
+    if isinstance(data, dict):
+        qr_val = data.get('base64')
+        if isinstance(qr_val, str):
+            return qr_val
+
+    return ''
 
 
 def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance | None = None) -> None:

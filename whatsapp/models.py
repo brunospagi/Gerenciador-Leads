@@ -11,6 +11,8 @@ class WhatsAppInstance(models.Model):
     webhook_secret = models.CharField(max_length=255, blank=True, null=True)
     ativo = models.BooleanField(default=True)
     status_conexao = models.CharField(max_length=50, default='desconhecido')
+    qr_code_base64 = models.TextField(blank=True)
+    ultima_resposta = models.JSONField(default=dict, blank=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
     class Meta:
