@@ -268,6 +268,14 @@ class WhatsAppWebhookView(View):
             return JsonResponse({'ok': False, 'error': 'payload invalido'}, status=400)
 
         instance_name = payload.get('instance') or request.headers.get('X-Evolution-Instance')
+        if not instance_name and isinstance(payload.get('data'), dict):
+            data = payload.get('data', {})
+            raw_instance = data.get('instance')
+            if isinstance(raw_instance, dict):
+                instance_name = raw_instance.get('instanceName') or raw_instance.get('name')
+            elif isinstance(raw_instance, str):
+                instance_name = raw_instance
+
         instance = None
         if instance_name:
             instance = WhatsAppInstance.objects.filter(instance_name=instance_name).first()
@@ -338,13 +346,24 @@ class WhatsAppInstanceConfigView(WhatsAppInstanceAdminMixin, TemplateView):
 
         try:
             client = EvolutionAPIClient(instance)
-            response = client.create_instance(qrcode=True)
-            qr = extract_qr_base64(response)
+            response_create = client.create_instance(qrcode=True)
+            qr = extract_qr_base64(response_create)
             if qr:
                 instance.qr_code_base64 = qr
-            instance.ultima_resposta = response
+
+            webhook_url = request.build_absolute_uri(reverse('whatsapp:webhook'))
+            response_webhook = client.set_webhook(
+                webhook_url=webhook_url,
+                webhook_secret=instance.webhook_secret or '',
+            )
+
+            instance.ultima_resposta = {
+                'create_instance': response_create,
+                'set_webhook': response_webhook,
+                'webhook_url': webhook_url,
+            }
             instance.save(update_fields=['qr_code_base64', 'ultima_resposta', 'atualizado_em'])
-            messages.success(request, 'Instancia criada na Evolution API. Escaneie o QR Code.')
+            messages.success(request, 'Instancia criada e webhook configurado. Escaneie o QR Code.')
         except Exception as exc:
             messages.error(request, f'Erro ao criar instancia na Evolution API: {exc}')
 

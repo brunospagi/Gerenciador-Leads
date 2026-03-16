@@ -167,6 +167,37 @@ class EvolutionAPIClient:
         response.raise_for_status()
         return response.json() if response.content else {}
 
+    def set_webhook(
+        self,
+        webhook_url: str,
+        events: list[str] | None = None,
+        webhook_secret: str = '',
+    ) -> dict[str, Any]:
+        url = f'{self.base_url}/webhook/set/{self.instance.instance_name}'
+        selected_events = events or [
+            'QRCODE_UPDATED',
+            'MESSAGES_UPSERT',
+            'MESSAGES_UPDATE',
+            'SEND_MESSAGE',
+            'CONNECTION_UPDATE',
+        ]
+        headers = {'Content-Type': 'application/json'}
+        if webhook_secret:
+            headers['X-Webhook-Secret'] = webhook_secret
+        payload = {
+            'webhook': {
+                'enabled': True,
+                'url': webhook_url,
+                'headers': headers,
+                'byEvents': True,
+                'base64': True,
+                'events': selected_events,
+            }
+        }
+        response = requests.post(url, json=payload, headers=self.headers, timeout=30)
+        response.raise_for_status()
+        return response.json() if response.content else {}
+
     def connect_instance(self, number: str = '') -> dict[str, Any]:
         url = f'{self.base_url}/instance/connect/{self.instance.instance_name}'
         params = {}
@@ -297,8 +328,58 @@ def process_status_update(payload: dict[str, Any]) -> bool:
     return True
 
 
+def process_connection_update(payload: dict[str, Any], instance: WhatsAppInstance | None) -> bool:
+    if not instance:
+        return False
+    data = payload.get('data', payload) if isinstance(payload, dict) else {}
+    raw_state = (
+        data.get('state')
+        or data.get('connection')
+        or data.get('status')
+        or data.get('instance', {}).get('state')
+        or data.get('instance', {}).get('status')
+        or ''
+    )
+    if not raw_state:
+        return False
+
+    state = str(raw_state).strip().lower()
+    instance.status_conexao = state
+    merged = dict(instance.ultima_resposta or {})
+    merged['connection_update'] = payload
+    instance.ultima_resposta = merged
+    instance.save(update_fields=['status_conexao', 'ultima_resposta', 'atualizado_em'])
+    return True
+
+
+def process_qrcode_update(payload: dict[str, Any], instance: WhatsAppInstance | None) -> bool:
+    if not instance:
+        return False
+
+    qr = extract_qr_base64(payload)
+    if not qr:
+        return False
+
+    instance.qr_code_base64 = qr
+    merged = dict(instance.ultima_resposta or {})
+    merged['qrcode_update'] = payload
+    instance.ultima_resposta = merged
+    instance.save(update_fields=['qr_code_base64', 'ultima_resposta', 'atualizado_em'])
+    return True
+
+
 def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance | None = None) -> None:
     event_name = str(payload.get('event') or '').upper()
+    if event_name in {'CONNECTION_UPDATE', 'CONNECTION.STATE', 'INSTANCE_CONNECTION_UPDATE'}:
+        if process_connection_update(payload, instance):
+            logger.info('Webhook de conexao processado: %s', instance.instance_name if instance else '-')
+            return
+
+    if event_name in {'QRCODE_UPDATED', 'QRCODE_UPDATE'}:
+        if process_qrcode_update(payload, instance):
+            logger.info('Webhook de QR code processado: %s', instance.instance_name if instance else '-')
+            return
+
     if event_name in {'MESSAGES_UPDATE', 'MESSAGE_UPDATE', 'MESSAGE_STATUS', 'SEND_MESSAGE'}:
         if process_status_update(payload):
             logger.info('Webhook de status processado para mensagem existente.')
