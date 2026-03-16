@@ -3,43 +3,39 @@
 {% block content %}
 <style>
     .wa-clone-wrap { position: relative; min-height: calc(100vh - 140px); }
+    .wa-topbar { position: relative; z-index: 3; margin-bottom: 10px; padding: 10px 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; }
+    .wa-topbar h3 { margin: 0; font-size: 1rem; font-weight: 700; color: #0f172a; }
+    .wa-topbar p { margin: 0; font-size: .8rem; color: #64748b; }
     .background-green { position: absolute; top: 0; left: 0; width: 100%; height: 18%; background-color: #009688; border-radius: 12px; }
-    .main-container {
-        position: relative; width: 100%; height: calc(100vh - 190px); min-height: 620px; background: #fff; display: flex;
-        box-shadow: 0 1px 1px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.25);
-    }
+    .main-container { position: relative; width: 100%; height: calc(100vh - 190px); min-height: 620px; background: #fff; display: flex; box-shadow: 0 1px 1px rgba(0,0,0,.2), 0 2px 8px rgba(0,0,0,.25); }
     .left-container { position: relative; width: 33%; min-width: 320px; height: 100%; background: #fff; border-right: 1px solid #ddd; }
     .right-container { position: relative; width: 67%; height: 100%; background: #e5ddd5; }
-    .right-container::before {
-        content: ''; position: absolute; inset: 0;
-        background: url(https://web.whatsapp.com/img/bg-chat-tile-light_a4be8e7e7195b6b733d9110b408f075d.png); opacity: .4;
-    }
+    .right-container::before { content: ''; position: absolute; inset: 0; background: url(https://web.whatsapp.com/img/bg-chat-tile-light_a4be8e7e7195b6b733d9110b408f075d.png); opacity: .4; }
     .header { position: relative; display: flex; align-items: center; justify-content: space-between; width: 100%; height: 60px; background: #ededed; padding: 0 15px; z-index: 2; }
     .user-img { position: relative; width: 40px; height: 40px; overflow: hidden; border-radius: 50%; background: #d1d5db; }
     .dp { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
     .nav-icons { display: flex; align-items: center; gap: 18px; margin: 0; padding: 0; }
-    .nav-icons li { list-style: none; color: #54656f; font-size: 1.1rem; }
+    .nav-icons li { list-style: none; color: #54656f; font-size: 1.1rem; position: relative; }
     .nav-icons a { color: inherit; text-decoration: none; }
-    .notif-box {
-        position: relative; display: flex; width: 100%; min-height: 70px; background: #76daff; align-items: center;
-        padding: 10px 15px; border-bottom: 1px solid rgba(0,0,0,.06);
+    .top-new-chat-card {
+        display: none; position: absolute; top: 40px; right: 0; width: 360px; background: #fff; border: 1px solid #dbe4ea; border-radius: 10px;
+        box-shadow: 0 8px 22px rgba(0,0,0,.18); padding: 10px; z-index: 15;
     }
+    .top-new-chat-card.show { display: block; }
+    .top-new-chat-card .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+    .top-new-chat-card input, .top-new-chat-card textarea { width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 8px; font-size: .82rem; }
+    .top-new-chat-card .btn-open-chat { width: 100%; border: none; background: #009688; color: #fff; border-radius: 8px; padding: 8px; font-size: .82rem; font-weight: 600; }
+    .notif-box { position: relative; display: flex; width: 100%; min-height: 70px; background: #76daff; align-items: center; padding: 10px 15px; border-bottom: 1px solid rgba(0,0,0,.06); }
     .notif-box i { background: #fff; padding: 10px; border-radius: 50%; color: #76daff; margin-right: 12px; }
     .notif-text p { margin: 0; font-size: .9rem; font-weight: 600; color: #1f2937; }
     .notif-text small { color: #334155; }
     .search-container { width: 100%; min-height: 50px; background: #f6f6f6; display: flex; align-items: center; padding: 8px 10px; gap: 8px; border-bottom: 1px solid #e9edef; }
     .search-container form { width: 100%; }
     .search-container .input { position: relative; width: 100%; }
-    .search-container .input input {
-        width: 100%; outline: none; border: none; background: #fff; padding: 8px 10px 8px 38px;
-        border-radius: 8px; font-size: .85rem;
-    }
+    .search-container .input input { width: 100%; outline: none; border: none; background: #fff; padding: 8px 10px 8px 38px; border-radius: 8px; font-size: .85rem; }
     .search-container .input i { position: absolute; left: 14px; top: 11px; color: #94a3b8; font-size: .8rem; }
     .chat-list { position: relative; height: calc(100% - 180px); overflow-y: auto; }
-    .chat-list .chat-box {
-        position: relative; width: 100%; display: flex; align-items: center; cursor: pointer;
-        padding: 12px 15px; border-bottom: 1px solid #f1f5f9; text-decoration: none;
-    }
+    .chat-list .chat-box { position: relative; width: 100%; display: flex; align-items: center; cursor: pointer; padding: 12px 15px; border-bottom: 1px solid #f1f5f9; text-decoration: none; }
     .chat-list .chat-box .img-box { position: relative; width: 50px; height: 50px; overflow: hidden; border-radius: 50%; background: #d1d5db; flex-shrink: 0; }
     .chat-list .chat-box .chat-details { width: 100%; margin-left: 12px; }
     .chat-list .chat-box .chat-details .text-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
@@ -47,64 +43,54 @@
     .chat-list .chat-box .chat-details .text-head .time { margin: 0; font-size: .75rem; color: #94a3b8; }
     .chat-list .chat-box .chat-details .text-message { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .chat-list .chat-box .chat-details .text-message p { margin: 0; color: #6b7280; font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
-    .chat-list .chat-box .chat-details .text-message b {
-        background: #06e744; color: #fff; min-width: 20px; height: 20px; border-radius: 50%;
-        font-size: .75rem; font-weight: 500; display: flex; justify-content: center; align-items: center;
-    }
+    .chat-list .chat-box .chat-details .text-message b { background: #06e744; color: #fff; min-width: 20px; height: 20px; border-radius: 50%; font-size: .75rem; font-weight: 500; display: flex; justify-content: center; align-items: center; }
     .chat-list .active { background: #ebebeb; }
     .chat-list .chat-box:hover { background: #f5f5f5; }
     .chat-list .chat-box .chat-details .text-head .unread { color: #06e744; }
     .right-container .header .img-text { display: flex; align-items: center; gap: 12px; }
     .right-container .header .img-text h4 { margin: 0; font-weight: 500; line-height: 1.2em; font-size: .95rem; }
     .right-container .header .img-text h4 span { font-size: .78rem; color: #64748b; font-weight: 400; }
-    .chat-container {
-        position: relative; width: 100%; height: calc(100% - 122px); padding: 24px; overflow-y: auto; z-index: 2;
-    }
+    .chat-container { position: relative; width: 100%; height: calc(100% - 122px); padding: 24px; overflow-y: auto; z-index: 2; }
     .message-box { position: relative; display: flex; width: 100%; margin: 5px 0; }
-    .message-box p {
-        position: relative; max-width: 70%; padding: 10px 12px; margin: 0;
-        border-radius: 10px; font-size: .9rem; background: #dcf8c6;
-    }
+    .message-box p { position: relative; max-width: 70%; padding: 10px 12px; margin: 0; border-radius: 10px; font-size: .9rem; background: #dcf8c6; }
     .message-box p span { display: block; margin-top: 5px; font-size: .75rem; opacity: .6; text-align: right; }
     .my-message { justify-content: flex-end; }
     .friend-message { justify-content: flex-start; }
     .friend-message p { background: #fff; }
-    .message-box.my-message p::before {
-        content: ''; position: absolute; top: 0; right: -12px; width: 18px; height: 18px;
-        background: linear-gradient(135deg, #dcf8c6 0%, #dcf8c6 50%, transparent 50%, transparent);
-    }
-    .message-box.friend-message p::before {
-        content: ''; position: absolute; top: 0; left: -12px; width: 18px; height: 18px;
-        background: linear-gradient(225deg, #fff 0%, #fff 50%, transparent 50%, transparent);
-    }
+    .message-box.my-message p::before { content: ''; position: absolute; top: 0; right: -12px; width: 18px; height: 18px; background: linear-gradient(135deg, #dcf8c6 0%, #dcf8c6 50%, transparent 50%, transparent); }
+    .message-box.friend-message p::before { content: ''; position: absolute; top: 0; left: -12px; width: 18px; height: 18px; background: linear-gradient(225deg, #fff 0%, #fff 50%, transparent 50%, transparent); }
     .bubble-media { margin-bottom: 8px; }
     .bubble-media img, .bubble-media video, .bubble-media audio { max-width: 100%; border-radius: 8px; }
-    .chatbox-input {
-        position: relative; width: 100%; min-height: 62px; background: #f0f0f0; display: flex; align-items: center;
-        gap: 10px; padding: 8px 12px; z-index: 2;
-    }
+    .chatbox-input { position: relative; width: 100%; min-height: 62px; background: #f0f0f0; display: flex; align-items: center; gap: 10px; padding: 8px 12px; z-index: 2; }
     .chatbox-input .icon-btn { color: #54656f; font-size: 1.3rem; line-height: 1; }
     .chatbox-input .composer { display: flex; width: 100%; gap: 8px; align-items: center; }
-    .chatbox-input input[type="text"] {
-        width: 100%; border-radius: 8px; font-size: .95rem; border: none; outline: none; padding: 10px 12px;
-    }
-    .chatbox-input input[type="file"] {
-        width: 210px; border-radius: 8px; font-size: .75rem; border: 1px solid #d1d5db; background: #fff; padding: 6px;
-    }
+    .chatbox-input input[type="text"] { width: 100%; border-radius: 8px; font-size: .95rem; border: none; outline: none; padding: 10px 12px; }
+    .chatbox-input input[type="file"] { width: 210px; border-radius: 8px; font-size: .75rem; border: 1px solid #d1d5db; background: #fff; padding: 6px; }
     .chatbox-input .send-btn { border: none; background: #009688; color: #fff; border-radius: 8px; padding: 10px 14px; font-weight: 600; }
-    .empty-chat {
-        position: relative; z-index: 2; height: calc(100% - 122px); display: flex; align-items: center; justify-content: center; color: #475569;
-    }
+    .empty-chat { position: relative; z-index: 2; height: calc(100% - 122px); display: flex; align-items: center; justify-content: center; color: #475569; }
     @media (max-width: 1100px) {
         .main-container { flex-direction: column; height: auto; min-height: 720px; }
         .left-container, .right-container { width: 100%; min-width: 100%; height: 50%; }
         .chat-list { height: 300px; }
         .chatbox-input { flex-wrap: wrap; }
         .chatbox-input input[type="file"] { width: 100%; }
+        .top-new-chat-card { width: 310px; }
     }
 </style>
 
 <div class="wa-clone-wrap">
+    <div class="wa-topbar">
+        <div>
+            <h3><i class="fa-brands fa-whatsapp text-success"></i> Central WhatsApp</h3>
+            <p>Atendimento, envio de midias e acompanhamento em tempo real.</p>
+        </div>
+        {% if evolution_instance %}
+        <span class="badge text-bg-success">{{ evolution_instance.instance_name }}</span>
+        {% else %}
+        <span class="badge text-bg-danger">Sem instancia ativa</span>
+        {% endif %}
+    </div>
+
     <div class="background-green"></div>
 
     <div class="main-container">
@@ -119,9 +105,34 @@
                 </div>
                 <ul class="nav-icons">
                     <li><i class="fa-solid fa-users"></i></li>
-                    <li><i class="fa-solid fa-message"></i></li>
                     <li>
-                        {% if user.is_superuser or module_access.usuarios_admin %}
+                        <a href="#" id="btnOpenNewChat" title="Nova conversa"><i class="fa-solid fa-comment-dots"></i></a>
+                        <div class="top-new-chat-card" id="newChatCard">
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="start_conversation">
+                                {% if start_form.non_field_errors %}
+                                <div class="alert alert-danger py-2 mb-2">
+                                    {% for error in start_form.non_field_errors %}{{ error }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                                </div>
+                                {% endif %}
+                                <div class="row-2">
+                                    {{ start_form.numero }}
+                                    {{ start_form.nome_contato }}
+                                </div>
+                                {% if start_form.numero.errors %}
+                                <div class="text-danger small mb-2">{{ start_form.numero.errors|join:", " }}</div>
+                                {% endif %}
+                                <div style="margin-bottom:8px;">{{ start_form.primeira_mensagem }}</div>
+                                {% if start_form.primeira_mensagem.errors %}
+                                <div class="text-danger small mb-2">{{ start_form.primeira_mensagem.errors|join:", " }}</div>
+                                {% endif %}
+                                <button type="submit" class="btn-open-chat"><i class="fa-solid fa-paper-plane"></i> Nova conversa + enviar</button>
+                            </form>
+                        </div>
+                    </li>
+                    <li>
+                        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
                         <a href="{% url 'whatsapp:instance_config' %}" title="Configurar instancia"><i class="fa-solid fa-gear"></i></a>
                         {% else %}
                         <i class="fa-solid fa-ellipsis-vertical"></i>
@@ -147,7 +158,7 @@
                     {% if conversa_ativa %}<input type="hidden" name="c" value="{{ conversa_ativa.pk }}">{% endif %}
                     <div class="input">
                         <i class="fa-solid fa-magnifying-glass"></i>
-                        <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Search or start new chat">
+                        <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Buscar ou iniciar nova conversa">
                     </div>
                 </form>
                 <i class="fa-sharp fa-solid fa-bars-filter"></i>
@@ -238,7 +249,7 @@
                 <input type="hidden" name="conversa_id" value="{{ conversa_ativa.pk }}">
                 <i class="fa-regular fa-face-grin icon-btn"></i>
                 <div class="composer">
-                    <input type="text" name="mensagem" placeholder="Type a message">
+                    <input type="text" name="mensagem" placeholder="Digite uma mensagem">
                     <input type="file" name="arquivo" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar">
                 </div>
                 <button class="send-btn" type="submit">Enviar</button>
@@ -274,15 +285,9 @@
         function mediaMarkup(mediaUrl) {
             if (!mediaUrl) return '';
             const url = mediaUrl.toLowerCase();
-            if (url.includes('.mp3') || url.includes('.ogg') || url.includes('.wav') || url.includes('.opus')) {
-                return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
-            }
-            if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')) {
-                return `<span class="bubble-media"><video controls><source src="${mediaUrl}"></video></span>`;
-            }
-            if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.gif') || url.includes('.webp')) {
-                return `<span class="bubble-media"><img src="${mediaUrl}" alt="midia"></span>`;
-            }
+            if (url.includes('.mp3') || url.includes('.ogg') || url.includes('.wav') || url.includes('.opus')) return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
+            if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')) return `<span class="bubble-media"><video controls><source src="${mediaUrl}"></video></span>`;
+            if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.gif') || url.includes('.webp')) return `<span class="bubble-media"><img src="${mediaUrl}" alt="midia"></span>`;
             return `<span class="bubble-media"><a href="${mediaUrl}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a></span>`;
         }
 
@@ -294,21 +299,7 @@
                 const unreadClass = c.nao_lidas ? 'unread' : '';
                 const unreadBadge = c.nao_lidas ? `<b>${c.nao_lidas}</b>` : '';
                 const avatar = c.avatar_url ? c.avatar_url : 'https://cdn.quasar.dev/img/avatar4.jpg';
-                return `
-                    <a class="chat-box ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}">
-                        <div class="img-box"><img class="dp" src="${avatar}" alt="Contato"></div>
-                        <div class="chat-details">
-                            <div class="text-head">
-                                <h4>${esc(c.nome)}</h4>
-                                <p class="time ${unreadClass}">${esc(c.ultima_mensagem_em)}</p>
-                            </div>
-                            <div class="text-message">
-                                <p>${esc((c.ultima_mensagem || '').slice(0, 42))}</p>
-                                ${unreadBadge}
-                            </div>
-                        </div>
-                    </a>
-                `;
+                return `<a class="chat-box ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}"><div class="img-box"><img class="dp" src="${avatar}" alt="Contato"></div><div class="chat-details"><div class="text-head"><h4>${esc(c.nome)}</h4><p class="time ${unreadClass}">${esc(c.ultima_mensagem_em)}</p></div><div class="text-message"><p>${esc((c.ultima_mensagem || '').slice(0, 42))}</p>${unreadBadge}</div></div></a>`;
             }).join('');
         }
 
@@ -317,15 +308,7 @@
             messagesEl.innerHTML = (mensagens || []).map((m) => {
                 const side = m.direcao === 'OUT' ? 'my-message' : 'friend-message';
                 const textHtml = esc(m.conteudo).replaceAll('\n', '<br>');
-                return `
-                    <div class="message-box ${side}">
-                        <p>
-                            ${mediaMarkup(m.media_url)}
-                            ${textHtml}
-                            <span>${esc(m.criado_em.split(' ')[1] || m.criado_em)} | ${esc(m.status)}</span>
-                        </p>
-                    </div>
-                `;
+                return `<div class="message-box ${side}"><p>${mediaMarkup(m.media_url)}${textHtml}<span>${esc(m.criado_em.split(' ')[1] || m.criado_em)} | ${esc(m.status)}</span></p></div>`;
             }).join('');
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
@@ -348,6 +331,47 @@
                 if (data.ok) renderMessages(data.mensagens || []);
             } catch (e) {}
         }
+
+        const btnOpenNewChat = document.getElementById('btnOpenNewChat');
+        const newChatCard = document.getElementById('newChatCard');
+        const numeroInput = newChatCard ? newChatCard.querySelector('input[name="numero"]') : null;
+
+        function applyBrPhoneMask(value) {
+            const digits = (value || '').replace(/\D/g, '').slice(0, 11);
+            if (!digits) return '';
+            if (digits.length <= 2) return `(${digits}`;
+            if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+            if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+            return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+        }
+
+        if (numeroInput) {
+            numeroInput.addEventListener('input', function () {
+                this.value = applyBrPhoneMask(this.value);
+            });
+        }
+
+        if (btnOpenNewChat && newChatCard) {
+            btnOpenNewChat.addEventListener('click', function (e) {
+                e.preventDefault();
+                newChatCard.classList.toggle('show');
+                if (newChatCard.classList.contains('show') && numeroInput) {
+                    numeroInput.focus();
+                }
+            });
+            document.addEventListener('click', function (e) {
+                if (!newChatCard.contains(e.target) && !btnOpenNewChat.contains(e.target)) {
+                    newChatCard.classList.remove('show');
+                }
+            });
+        }
+
+        {% if open_new_chat %}
+        if (newChatCard) {
+            newChatCard.classList.add('show');
+            if (numeroInput) numeroInput.focus();
+        }
+        {% endif %}
 
         pollConversations();
         pollMessages();

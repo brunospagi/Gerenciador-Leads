@@ -66,11 +66,14 @@ class WhatsAppSendMessageForm(forms.Form):
 class WhatsAppStartConversationForm(forms.Form):
     numero = forms.CharField(
         label='Numero (DDD + telefone)',
+        required=True,
         max_length=20,
         widget=forms.TextInput(
             attrs={
                 'class': 'form-control',
-                'placeholder': 'Ex: 5511999999999',
+                'placeholder': 'DDD + numero (ex: 11999998888)',
+                'inputmode': 'numeric',
+                'required': 'required',
             }
         ),
     )
@@ -81,10 +84,32 @@ class WhatsAppStartConversationForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 'class': 'form-control',
-                'placeholder': 'Opcional',
+                'placeholder': 'Nome do contato',
             }
         ),
     )
+    primeira_mensagem = forms.CharField(
+        label='Primeira mensagem',
+        required=True,
+        max_length=5000,
+        widget=forms.Textarea(
+            attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': 'Digite a primeira mensagem',
+                'required': 'required',
+            }
+        ),
+    )
+
+    def clean_numero(self):
+        numero = self.cleaned_data.get('numero', '')
+        digits = ''.join(ch for ch in numero if ch.isdigit())
+        if digits.startswith('55'):
+            digits = digits[2:]
+        if len(digits) not in {10, 11}:
+            raise forms.ValidationError('Informe DDD + numero valido.')
+        return numero
 
 
 class WhatsAppInstanceForm(forms.ModelForm):

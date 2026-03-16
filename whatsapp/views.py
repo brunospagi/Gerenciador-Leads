@@ -36,6 +36,26 @@ from .services import (
 )
 
 
+def can_manage_whatsapp_instance(user) -> bool:
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    if user.is_superuser:
+        return True
+    profile = getattr(user, 'profile', None)
+    return getattr(profile, 'nivel_acesso', '') == 'ADMIN'
+
+
+def ensure_br_country_code(number: str) -> str:
+    digits = normalize_number(number or '')
+    if not digits:
+        return digits
+    if digits.startswith('55'):
+        return digits
+    if len(digits) in {10, 11}:
+        return f'55{digits}'
+    return digits
+
+
 class WhatsAppAccessMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
         return has_module_access(self.request.user, 'whatsapp')
@@ -43,7 +63,7 @@ class WhatsAppAccessMixin(LoginRequiredMixin, UserPassesTestMixin):
 
 class WhatsAppInstanceAdminMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
-        return self.request.user.is_superuser or has_module_access(self.request.user, 'usuarios_admin')
+        return can_manage_whatsapp_instance(self.request.user)
 
 
 class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
@@ -74,6 +94,7 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                 'mensagens': mensagens,
                 'send_form': WhatsAppSendMessageForm(),
                 'start_form': WhatsAppStartConversationForm(),
+                'open_new_chat': False,
                 'evolution_instance': instance,
             }
         )
@@ -90,13 +111,18 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
     def _start_conversation(self, request):
         form = WhatsAppStartConversationForm(request.POST)
         if not form.is_valid():
-            messages.error(request, 'Numero invalido para iniciar conversa.')
-            return redirect('whatsapp:inbox')
+            context = self.get_context_data()
+            context['start_form'] = form
+            context['open_new_chat'] = True
+            return self.render_to_response(context)
 
-        numero = normalize_number(form.cleaned_data['numero'])
+        numero = ensure_br_country_code(form.cleaned_data['numero'])
         if not numero:
-            messages.error(request, 'Informe um numero valido no formato DDI + DDD + telefone.')
-            return redirect('whatsapp:inbox')
+            form.add_error('numero', 'Informe um numero valido no formato DDD + telefone.')
+            context = self.get_context_data()
+            context['start_form'] = form
+            context['open_new_chat'] = True
+            return self.render_to_response(context)
 
         wa_id = normalize_wa_id(numero)
         conversa, _ = WhatsAppConversation.objects.get_or_create(
@@ -109,6 +135,53 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         if form.cleaned_data.get('nome_contato') and not conversa.nome_contato:
             conversa.nome_contato = form.cleaned_data['nome_contato']
             conversa.save(update_fields=['nome_contato'])
+
+        primeira_mensagem = (form.cleaned_data.get('primeira_mensagem') or '').strip()
+        if primeira_mensagem:
+            instance = conversa.instance or get_active_instance()
+            if not instance:
+                messages.warning(request, 'Conversa criada, mas sem instancia ativa para envio da primeira mensagem.')
+                return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
+
+            mensagem = WhatsAppMessage.objects.create(
+                conversa=conversa,
+                direcao=WhatsAppMessage.Direction.ENVIADA,
+                conteudo=primeira_mensagem,
+                status=WhatsAppMessage.Status.PENDENTE,
+                enviado_por=request.user,
+            )
+            try:
+                client = EvolutionAPIClient(instance=instance)
+                response = client.send_text(number=numero, text=primeira_mensagem)
+                external_id = (
+                    response.get('key', {}).get('id')
+                    or response.get('message', {}).get('key', {}).get('id')
+                    or response.get('id')
+                )
+                if external_id:
+                    mensagem.external_id = external_id
+                mensagem.status = WhatsAppMessage.Status.ENVIADA
+                mensagem.payload = response
+                mensagem.save()
+
+                if instance.pk:
+                    conversa.instance = instance
+                conversa.ultima_mensagem = primeira_mensagem[:500]
+                conversa.ultima_mensagem_em = mensagem.criado_em
+                conversa.save()
+                messages.success(request, 'Conversa criada e primeira mensagem enviada.')
+            except Exception as exc:
+                mensagem.status = WhatsAppMessage.Status.FALHA
+                mensagem.payload = {'erro': str(exc)}
+                mensagem.save(update_fields=['status', 'payload'])
+                form.add_error(None, f'Conversa criada, mas falhou no envio da primeira mensagem: {exc}')
+                context = self.get_context_data()
+                context['start_form'] = form
+                context['open_new_chat'] = True
+                context['conversa_ativa'] = conversa
+                context['mensagens'] = conversa.mensagens.all().order_by('criado_em')[:300]
+                context['conversas'] = WhatsAppConversation.objects.order_by('-ultima_mensagem_em')[:200]
+                return self.render_to_response(context)
 
         return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
@@ -158,7 +231,7 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
 
         try:
             client = EvolutionAPIClient(instance=instance)
-            number = conversa.wa_id.split('@')[0]
+            number = ensure_br_country_code(conversa.wa_id.split('@')[0])
             if arquivo and media_kind == 'audio':
                 response = client.send_whatsapp_audio(number=number, audio_url=media_url)
             elif arquivo:
@@ -421,7 +494,7 @@ class WhatsAppInstanceConfigView(WhatsAppInstanceAdminMixin, TemplateView):
 
 @login_required
 def instance_runtime_status(request, pk):
-    if not (request.user.is_superuser or has_module_access(request.user, 'usuarios_admin')):
+    if not can_manage_whatsapp_instance(request.user):
         return JsonResponse({'ok': False, 'error': 'Sem permissao'}, status=403)
 
     instance = get_object_or_404(WhatsAppInstance, pk=pk)
