@@ -529,6 +529,9 @@
         let lastMessagesSignature = '';
         let pollConversationsRunning = false;
         let pollMessagesRunning = false;
+        let pollingEnabled = true;
+        let messagesRequestSeq = 0;
+        let conversationsRequestSeq = 0;
         let activeMenuMessageId = null;
 
         function esc(str) {
@@ -795,12 +798,15 @@
         };
 
         async function pollConversations() {
+            if (!pollingEnabled) return;
             if (pollConversationsRunning) return;
             pollConversationsRunning = true;
+            const requestSeq = ++conversationsRequestSeq;
             try {
                 const resp = await fetch(`${conversationsEndpoint}?q=${encodeURIComponent(currentQuery)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                 if (!resp.ok) return;
                 const data = await resp.json();
+                if (!pollingEnabled || requestSeq !== conversationsRequestSeq) return;
                 if (data.ok) renderConversations(data.conversas || []);
             } catch (e) {
             } finally {
@@ -809,14 +815,19 @@
         }
 
         async function pollMessages() {
+            if (!pollingEnabled) return;
             const messagesEndpoint = endpointFromTemplate(messagesEndpointTemplate, activeConversationId);
             if (!messagesEndpoint) return;
             if (pollMessagesRunning) return;
             pollMessagesRunning = true;
+            const requestSeq = ++messagesRequestSeq;
+            const conversationSnapshot = String(activeConversationId || '');
             try {
                 const resp = await fetch(messagesEndpoint, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                 if (!resp.ok) return;
                 const data = await resp.json();
+                if (!pollingEnabled || requestSeq !== messagesRequestSeq) return;
+                if (conversationSnapshot !== String(activeConversationId || '')) return;
                 if (data.ok) renderMessages(data.mensagens || []);
             } catch (e) {
             } finally {
@@ -1017,6 +1028,13 @@
 
         async function activateConversation(conversationId, pushState) {
             if (!conversationId) return;
+            // Quando a tela iniciou sem conversa ativa, o painel de mensagens nao existe.
+            // Nesse caso, abre a URL normal para montar o layout completo.
+            if (!messagesEl || !sendMessageForm) {
+                const baseUrl = "{% url 'whatsapp:inbox' %}";
+                window.location.href = `${baseUrl}?c=${conversationId}`;
+                return;
+            }
             setActiveConversationId(conversationId);
             await pollConversations();
             await pollMessages();
@@ -1035,7 +1053,11 @@
                 const link = e.target.closest('.chat-box[data-conversation-id]');
                 if (!link) return;
                 e.preventDefault();
-                await activateConversation(link.dataset.conversationId, true);
+                try {
+                    await activateConversation(link.dataset.conversationId, true);
+                } catch (err) {
+                    window.location.href = link.href;
+                }
             });
         }
 
@@ -1092,6 +1114,17 @@
         if (activeConversationId) {
             setActiveConversationId(activeConversationId);
         }
+
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) {
+                pollingEnabled = false;
+                return;
+            }
+            pollingEnabled = true;
+            pollConversations();
+            pollMessages();
+        });
+
         pollConversations();
         pollMessages();
         setInterval(pollConversations, 2000);
