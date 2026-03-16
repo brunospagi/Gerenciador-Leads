@@ -142,7 +142,7 @@
     </div>
     {% endif %}
 
-    {% if module_access.vendas or module_access.financiamentos or module_access.documentos or module_access.autorizacoes or module_access.clientes or module_access.avaliacoes or module_access.usuarios_admin %}
+    {% if module_access.vendas or module_access.financiamentos or module_access.documentos or module_access.autorizacoes or module_access.clientes or module_access.avaliacoes or module_access.usuarios_admin or module_access.whatsapp %}
     <div class="mb-5">
         <h4 class="section-title-dashboard"><i class="fas fa-tools text-secondary"></i> Ferramentas e Utilitarios</h4>
         <div class="system-grid">
@@ -186,6 +186,12 @@
             <a href="{% url 'gerador_anuncio' %}" class="system-item" style="--item-color: #06b6d4; --icon-bg: #cffafe;">
                 <div><span class="system-name">Gerador IA</span><span class="system-desc">Criar anuncios de venda</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-robot"></i></div>
+            </a>
+            {% endif %}
+            {% if module_access.whatsapp %}
+            <a href="{% url 'whatsapp:inbox' %}" class="system-item" style="--item-color: #22c55e; --icon-bg: #dcfce7;">
+                <div><span class="system-name">Central WhatsApp</span><span class="system-desc">Conversas e atendimento</span></div>
+                <div class="system-icon-wrapper"><i class="fab fa-whatsapp"></i></div>
             </a>
             {% endif %}
             {% if module_access.relatorios and module_access.vendas and user.is_superuser or module_access.relatorios and module_access.vendas and user.profile.nivel_acesso == 'ADMIN' %}

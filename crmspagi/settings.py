@@ -10,6 +10,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Configurações do Webhook do Ponto (Lida do .ENV)
 WEBHOOK_PONTO_URL = os.getenv('WEBHOOK_PONTO_URL')
+EVOLUTION_API_URL = os.getenv('EVOLUTION_API_URL', '')
+EVOLUTION_API_KEY = os.getenv('EVOLUTION_API_KEY', '')
+EVOLUTION_INSTANCE = os.getenv('EVOLUTION_INSTANCE', '')
 
 # --- CONFIGURAÇÕES DE PRODUÇÃO (LIDAS DO .ENV) ---
 # A SECRET_KEY é lida do ambiente. Use uma chave forte em produção!
@@ -67,6 +70,7 @@ INSTALLED_APPS = [
     'folha_pagamento',
     'financeiro',
     'controle_ponto',    
+    'whatsapp',
 ]
 
 MIDDLEWARE = [

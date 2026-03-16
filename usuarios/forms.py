@@ -113,6 +113,7 @@ class ModulePermissionForm(forms.ModelForm):
             'modulo_autorizacoes',
             'modulo_relatorios',
             'modulo_admin_usuarios',
+            'modulo_whatsapp',
         ]
         labels = {
             'modulo_clientes': 'Clientes e Leads',
@@ -127,6 +128,7 @@ class ModulePermissionForm(forms.ModelForm):
             'modulo_autorizacoes': 'Autorizacoes',
             'modulo_relatorios': 'Relatorios Gerenciais',
             'modulo_admin_usuarios': 'Acessos e Perfis',
+            'modulo_whatsapp': 'WhatsApp e Conversas',
         }
 
     def __init__(self, *args, **kwargs):

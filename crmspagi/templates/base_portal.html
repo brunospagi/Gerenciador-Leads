@@ -140,6 +140,10 @@
                     {% if module_access.clientes %}
                     <li><a href="{% url 'cliente_list' %}"><i class="fas fa-users"></i> Clientes e Leads</a></li>
                     {% endif %}
+                    
+                    {% if module_access.whatsapp %}
+                    <li><a href="{% url 'whatsapp:inbox' %}"><i class="fab fa-whatsapp" style="color:#22c55e;"></i> WhatsApp</a></li>
+                    {% endif %}
 
                     {% if module_access.vendas %}
                     <li><a href="{% url 'venda_produto_list' %}"><i class="fas fa-tags"></i> Vendas e Servicos</a></li>

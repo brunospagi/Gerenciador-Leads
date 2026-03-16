@@ -1,0 +1,112 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<style>
+    .whatsapp-shell { display: grid; grid-template-columns: 350px 1fr; gap: 16px; min-height: 75vh; }
+    .wa-panel { background: #fff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; }
+    .wa-header { padding: 14px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    .conversation-list { max-height: 65vh; overflow-y: auto; }
+    .conversation-item { display: block; padding: 12px 14px; border-bottom: 1px solid #f1f5f9; text-decoration: none; color: #0f172a; }
+    .conversation-item:hover { background: #f8fafc; }
+    .conversation-item.active { background: #ecfeff; border-left: 4px solid #14b8a6; padding-left: 10px; }
+    .msg-area { max-height: 55vh; overflow-y: auto; padding: 16px; background: #f8fafc; }
+    .msg-row { margin-bottom: 10px; display: flex; }
+    .msg-row.in { justify-content: flex-start; }
+    .msg-row.out { justify-content: flex-end; }
+    .bubble { max-width: 78%; padding: 10px 12px; border-radius: 12px; font-size: .92rem; }
+    .bubble.in { background: #fff; border: 1px solid #e2e8f0; }
+    .bubble.out { background: #dcfce7; border: 1px solid #bbf7d0; }
+    .muted-small { color: #64748b; font-size: .78rem; }
+    @media (max-width: 992px) { .whatsapp-shell { grid-template-columns: 1fr; } .conversation-list { max-height: 45vh; } }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="mb-1"><i class="fab fa-whatsapp text-success"></i> Central WhatsApp</h3>
+        <p class="text-muted mb-0">Atendimento em tempo real dentro do CRM.</p>
+    </div>
+    <div>
+        {% if evolution_instance %}
+            <span class="badge text-bg-success">Instancia: {{ evolution_instance.instance_name }}</span>
+        {% else %}
+            <span class="badge text-bg-danger">Sem instancia ativa</span>
+        {% endif %}
+    </div>
+</div>
+
+<div class="whatsapp-shell">
+    <div class="wa-panel">
+        <div class="wa-header">
+            <form method="get" class="mb-2">
+                <input type="text" name="q" value="{{ request.GET.q }}" class="form-control" placeholder="Buscar contato ou numero...">
+            </form>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="start_conversation">
+                <div class="mb-2">{{ start_form.numero }}</div>
+                <div class="mb-2">{{ start_form.nome_contato }}</div>
+                <button class="btn btn-success w-100 btn-sm"><i class="fas fa-plus"></i> Nova conversa</button>
+            </form>
+        </div>
+        <div class="conversation-list">
+            {% for conversa in conversas %}
+            <a class="conversation-item {% if conversa_ativa and conversa.pk == conversa_ativa.pk %}active{% endif %}" href="{% url 'whatsapp:inbox' %}?c={{ conversa.pk }}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <strong>{{ conversa.nome_exibicao }}</strong>
+                    <small class="muted-small">{{ conversa.ultima_mensagem_em|date:"d/m H:i" }}</small>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="muted-small">{{ conversa.ultima_mensagem|truncatechars:55 }}</span>
+                    {% if conversa.nao_lidas %}
+                    <span class="badge rounded-pill text-bg-danger">{{ conversa.nao_lidas }}</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% empty %}
+            <div class="p-3 text-muted">Nenhuma conversa encontrada.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="wa-panel d-flex flex-column">
+        {% if conversa_ativa %}
+        <div class="wa-header d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-0">{{ conversa_ativa.nome_exibicao }}</h5>
+                <small class="text-muted">{{ conversa_ativa.wa_id }}</small>
+            </div>
+            <form method="post" action="{% url 'whatsapp:mark_read' conversa_ativa.pk %}">
+                {% csrf_token %}
+                <button class="btn btn-outline-secondary btn-sm">Marcar como lida</button>
+            </form>
+        </div>
+        <div class="msg-area">
+            {% for mensagem in mensagens %}
+            <div class="msg-row {% if mensagem.direcao == 'OUT' %}out{% else %}in{% endif %}">
+                <div class="bubble {% if mensagem.direcao == 'OUT' %}out{% else %}in{% endif %}">
+                    <div>{{ mensagem.conteudo|linebreaksbr }}</div>
+                    <div class="muted-small mt-1">{{ mensagem.criado_em|date:"d/m/Y H:i" }} | {{ mensagem.get_status_display }}</div>
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-muted">Sem mensagens nesta conversa.</p>
+            {% endfor %}
+        </div>
+        <div class="p-3 border-top">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="send_message">
+                <input type="hidden" name="conversa_id" value="{{ conversa_ativa.pk }}">
+                <div class="mb-2">{{ send_form.mensagem }}</div>
+                <button class="btn btn-success"><i class="fas fa-paper-plane"></i> Enviar</button>
+            </form>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted">
+            <i class="fab fa-whatsapp fa-3x mb-3 text-success"></i>
+            <p class="mb-0">Selecione uma conversa na coluna ao lado para iniciar o atendimento.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
