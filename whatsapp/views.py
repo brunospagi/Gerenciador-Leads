@@ -1,9 +1,13 @@
 import json
+import mimetypes
+import os
+import uuid
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Q
+from django.core.files.storage import default_storage
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -108,7 +112,7 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
     def _send_message(self, request):
-        form = WhatsAppSendMessageForm(request.POST)
+        form = WhatsAppSendMessageForm(request.POST, request.FILES)
         conversa_id = request.POST.get('conversa_id')
         if not form.is_valid() or not conversa_id:
             messages.error(request, 'Mensagem invalida.')
@@ -120,18 +124,47 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             messages.error(request, 'Nenhuma instancia ativa configurada para envio via Evolution API.')
             return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
-        texto = form.cleaned_data['mensagem'].strip()
+        texto = (form.cleaned_data.get('mensagem') or '').strip()
+        arquivo = form.cleaned_data.get('arquivo')
+        if not texto and not arquivo:
+            messages.error(request, 'Informe uma mensagem ou selecione um arquivo para enviar.')
+            return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
+
+        media_url = ''
+        media_mimetype = ''
+        media_name = ''
+        media_kind = ''
+        if arquivo:
+            media_url, media_mimetype, media_name = self._save_upload_and_get_url(arquivo)
+            if media_url.startswith('/'):
+                media_url = request.build_absolute_uri(media_url)
+            media_kind = self._resolve_media_kind(media_mimetype, media_name)
+
         nova_mensagem = WhatsAppMessage.objects.create(
             conversa=conversa,
             direcao=WhatsAppMessage.Direction.ENVIADA,
             conteudo=texto,
+            media_url=media_url,
             status=WhatsAppMessage.Status.PENDENTE,
             enviado_por=request.user,
         )
 
         try:
             client = EvolutionAPIClient(instance=instance)
-            response = client.send_text(number=conversa.wa_id.split('@')[0], text=texto)
+            number = conversa.wa_id.split('@')[0]
+            if arquivo and media_kind == 'audio':
+                response = client.send_whatsapp_audio(number=number, audio_url=media_url)
+            elif arquivo:
+                response = client.send_media(
+                    number=number,
+                    media_url=media_url,
+                    mediatype=media_kind,
+                    mimetype=media_mimetype,
+                    caption=texto,
+                    file_name=media_name,
+                )
+            else:
+                response = client.send_text(number=number, text=texto)
             external_id = (
                 response.get('key', {}).get('id')
                 or response.get('message', {}).get('key', {}).get('id')
@@ -145,10 +178,19 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
 
             if instance.pk:
                 conversa.instance = instance
-            conversa.ultima_mensagem = texto[:500]
+            if arquivo and texto:
+                preview = f"[Arquivo] {media_name} - {texto}"
+            elif arquivo:
+                preview = f"[Arquivo] {media_name}"
+            else:
+                preview = texto
+            conversa.ultima_mensagem = preview[:500]
             conversa.ultima_mensagem_em = nova_mensagem.criado_em
             conversa.save()
-            messages.success(request, 'Mensagem enviada com sucesso.')
+            if arquivo:
+                messages.success(request, 'Arquivo/midia enviado com sucesso.')
+            else:
+                messages.success(request, 'Mensagem enviada com sucesso.')
         except Exception as exc:
             nova_mensagem.status = WhatsAppMessage.Status.FALHA
             nova_mensagem.payload = {'erro': str(exc)}
@@ -156,6 +198,35 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             messages.error(request, f'Falha ao enviar mensagem: {exc}')
 
         return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
+
+    @staticmethod
+    def _resolve_media_kind(mimetype: str, file_name: str) -> str:
+        mime = (mimetype or '').lower()
+        if mime.startswith('audio/'):
+            return 'audio'
+        if mime.startswith('image/'):
+            return 'image'
+        if mime.startswith('video/'):
+            return 'video'
+        guessed, _ = mimetypes.guess_type(file_name or '')
+        guessed = (guessed or '').lower()
+        if guessed.startswith('audio/'):
+            return 'audio'
+        if guessed.startswith('image/'):
+            return 'image'
+        if guessed.startswith('video/'):
+            return 'video'
+        return 'document'
+
+    @staticmethod
+    def _save_upload_and_get_url(uploaded_file):
+        ext = os.path.splitext(uploaded_file.name or '')[1]
+        unique_name = f"{uuid.uuid4().hex}{ext}"
+        storage_path = f"whatsapp/uploads/{unique_name}"
+        saved_path = default_storage.save(storage_path, uploaded_file)
+        file_url = default_storage.url(saved_path)
+        mime = uploaded_file.content_type or mimetypes.guess_type(uploaded_file.name or '')[0] or 'application/octet-stream'
+        return file_url, mime, uploaded_file.name or unique_name
 
 
 @login_required

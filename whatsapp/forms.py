@@ -6,14 +6,25 @@ from .models import WhatsAppInstance
 class WhatsAppSendMessageForm(forms.Form):
     mensagem = forms.CharField(
         label='Mensagem',
+        required=False,
         widget=forms.Textarea(
             attrs={
                 'class': 'form-control',
                 'rows': 2,
-                'placeholder': 'Digite a mensagem para o cliente...',
+                'placeholder': 'Digite a mensagem (ou legenda da midia)...',
             }
         ),
         max_length=5000,
+    )
+    arquivo = forms.FileField(
+        required=False,
+        widget=forms.ClearableFileInput(
+            attrs={
+                'class': 'form-control',
+                'accept': 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar',
+            }
+        ),
+        label='Arquivo/midia',
     )
 
 

@@ -89,6 +89,27 @@
             {% for mensagem in mensagens %}
             <div class="msg-row {% if mensagem.direcao == 'OUT' %}out{% else %}in{% endif %}">
                 <div class="bubble {% if mensagem.direcao == 'OUT' %}out{% else %}in{% endif %}">
+                    {% if mensagem.media_url %}
+                    <div class="mb-2">
+                        {% with media_url=mensagem.media_url|lower %}
+                        {% if '.mp3' in media_url or '.ogg' in media_url or '.wav' in media_url or '.opus' in media_url %}
+                        <audio controls style="max-width:100%;">
+                            <source src="{{ mensagem.media_url }}">
+                        </audio>
+                        {% elif '.mp4' in media_url or '.webm' in media_url or '.mov' in media_url %}
+                        <video controls style="max-width:100%; border-radius:8px;">
+                            <source src="{{ mensagem.media_url }}">
+                        </video>
+                        {% elif '.jpg' in media_url or '.jpeg' in media_url or '.png' in media_url or '.gif' in media_url or '.webp' in media_url %}
+                        <img src="{{ mensagem.media_url }}" alt="midia" style="max-width:100%; border-radius:8px;">
+                        {% else %}
+                        <a href="{{ mensagem.media_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-paperclip"></i> Abrir arquivo
+                        </a>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                    {% endif %}
                     <div>{{ mensagem.conteudo|linebreaksbr }}</div>
                     <div class="muted-small mt-1">{{ mensagem.criado_em|date:"d/m/Y H:i" }} | {{ mensagem.get_status_display }}</div>
                 </div>
@@ -98,11 +119,12 @@
             {% endfor %}
         </div>
         <div class="p-3 border-top">
-            <form method="post">
+            <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="send_message">
                 <input type="hidden" name="conversa_id" value="{{ conversa_ativa.pk }}">
                 <div class="mb-2">{{ send_form.mensagem }}</div>
+                <div class="mb-2">{{ send_form.arquivo }}</div>
                 <button class="btn btn-success"><i class="fas fa-paper-plane"></i> Enviar</button>
             </form>
         </div>

@@ -98,6 +98,39 @@ class EvolutionAPIClient:
         response.raise_for_status()
         return response.json() if response.content else {}
 
+    def send_media(
+        self,
+        number: str,
+        media_url: str,
+        mediatype: str,
+        mimetype: str,
+        caption: str = '',
+        file_name: str = '',
+    ) -> dict[str, Any]:
+        url = f'{self.base_url}/message/sendMedia/{self.instance.instance_name}'
+        payload = {
+            'number': normalize_number(number),
+            'mediatype': mediatype,
+            'mimetype': mimetype,
+            'caption': caption or '',
+            'media': media_url,
+        }
+        if file_name:
+            payload['fileName'] = file_name
+        response = requests.post(url, json=payload, headers=self.headers, timeout=60)
+        response.raise_for_status()
+        return response.json() if response.content else {}
+
+    def send_whatsapp_audio(self, number: str, audio_url: str) -> dict[str, Any]:
+        url = f'{self.base_url}/message/sendWhatsAppAudio/{self.instance.instance_name}'
+        payload = {
+            'number': normalize_number(number),
+            'audio': audio_url,
+        }
+        response = requests.post(url, json=payload, headers=self.headers, timeout=60)
+        response.raise_for_status()
+        return response.json() if response.content else {}
+
     def create_instance(self, qrcode: bool = True, integration: str = 'WHATSAPP-BAILEYS') -> dict[str, Any]:
         url = f'{self.base_url}/instance/create'
         payload = {
