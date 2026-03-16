@@ -3,6 +3,7 @@ import mimetypes
 import os
 import re
 import uuid
+from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -12,10 +13,12 @@ from django.core.files.storage import default_storage
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
+from django.utils.dateparse import parse_datetime
 
 from crmspagi.storage_backends import PublicMediaStorage
 from usuarios.permissions import has_module_access
@@ -35,6 +38,15 @@ from .services import (
     normalize_wa_id,
     process_webhook_payload,
 )
+
+
+def _is_ajax_request(request) -> bool:
+    accept = (request.headers.get('Accept') or '').lower()
+    return (
+        request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        or request.POST.get('ajax') == '1'
+        or 'application/json' in accept
+    )
 
 
 def _visible_text(value: str) -> str:
@@ -66,6 +78,31 @@ def _is_noise_status_message(message: WhatsAppMessage) -> bool:
         if event in {'SEND_MESSAGE', 'MESSAGE_STATUS', 'MESSAGES_UPDATE', 'MESSAGE_UPDATE'}:
             return True
     return True
+
+
+def _presence_info(conversation: WhatsAppConversation) -> tuple[str, str]:
+    metadata = conversation.metadata or {}
+    if not isinstance(metadata, dict):
+        return '', ''
+    presence = metadata.get('presence')
+    if not isinstance(presence, dict):
+        return '', ''
+    state = str(presence.get('state') or '').strip().lower()
+    raw_updated_at = str(presence.get('updated_at') or '').strip()
+    if not state or not raw_updated_at:
+        return '', ''
+    updated_at = parse_datetime(raw_updated_at)
+    if not updated_at:
+        return '', ''
+    if timezone.is_naive(updated_at):
+        updated_at = timezone.make_aware(updated_at)
+    if timezone.now() - updated_at > timedelta(seconds=8):
+        return '', ''
+    if state == 'typing':
+        return 'typing', 'digitando...'
+    if state == 'recording':
+        return 'recording', 'gravando audio...'
+    return '', ''
 
 
 def can_manage_whatsapp_instance(user) -> bool:
@@ -112,9 +149,11 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
 
         conversa_ativa = None
         mensagens = WhatsAppMessage.objects.none()
+        active_presence_text = ''
         conversa_id = self.request.GET.get('c')
         if conversa_id and conversa_id.isdigit():
             conversa_ativa = get_object_or_404(WhatsAppConversation, pk=conversa_id)
+            active_presence_text = _presence_info(conversa_ativa)[1]
             if conversa_ativa.nao_lidas:
                 conversa_ativa.nao_lidas = 0
                 conversa_ativa.save(update_fields=['nao_lidas'])
@@ -138,6 +177,7 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                 'start_form': WhatsAppStartConversationForm(),
                 'open_new_chat': False,
                 'evolution_instance': instance,
+                'active_presence_text': active_presence_text,
             }
         )
         return context
@@ -151,7 +191,7 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         return redirect('whatsapp:inbox')
 
     def _start_conversation(self, request):
-        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        is_ajax = _is_ajax_request(request)
         form = WhatsAppStartConversationForm(request.POST)
         if not form.is_valid():
             if is_ajax:
@@ -247,7 +287,7 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
     def _send_message(self, request):
-        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        is_ajax = _is_ajax_request(request)
         form = WhatsAppSendMessageForm(request.POST, request.FILES)
         conversa_id = request.POST.get('conversa_id')
         if not conversa_id:
@@ -403,7 +443,7 @@ def mark_read(request, pk):
     conversa = get_object_or_404(WhatsAppConversation, pk=pk)
     conversa.nao_lidas = 0
     conversa.save(update_fields=['nao_lidas'])
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+    if _is_ajax_request(request):
         return JsonResponse({'ok': True, 'conversation_id': conversa.pk})
     return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
@@ -418,7 +458,7 @@ def delete_conversation(request, pk):
     conversa = get_object_or_404(WhatsAppConversation, pk=pk)
     conversa.delete()
 
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+    if _is_ajax_request(request):
         return JsonResponse({'ok': True})
     messages.success(request, 'Conversa deletada com sucesso.')
     return redirect('whatsapp:inbox')
@@ -554,9 +594,18 @@ class WhatsAppInstanceConfigView(WhatsAppInstanceAdminMixin, TemplateView):
             qr = extract_qr_base64(response)
             if qr:
                 instance.qr_code_base64 = qr
-            instance.ultima_resposta = response
+            webhook_url = request.build_absolute_uri(reverse('whatsapp:webhook'))
+            response_webhook = client.set_webhook(
+                webhook_url=webhook_url,
+                webhook_secret=instance.webhook_secret or '',
+            )
+            instance.ultima_resposta = {
+                'connect': response,
+                'set_webhook': response_webhook,
+                'webhook_url': webhook_url,
+            }
             instance.save(update_fields=['qr_code_base64', 'ultima_resposta', 'atualizado_em'])
-            messages.success(request, 'QR Code atualizado. Escaneie com o WhatsApp.')
+            messages.success(request, 'QR Code atualizado e webhook reaplicado. Escaneie com o WhatsApp.')
         except Exception as exc:
             messages.error(request, f'Erro ao conectar instancia: {exc}')
 
@@ -651,21 +700,25 @@ def conversations_feed(request):
         conversas = conversas.filter(Q(nome_contato__icontains=query) | Q(wa_id__icontains=query))
     conversas = conversas.order_by('-ultima_mensagem_em')[:200]
 
-    data = [
-        {
-            'id': c.pk,
-            'nome': c.nome_exibicao,
-            'wa_id': c.wa_id,
-            'wa_id_display': c.wa_id_display,
-            'wa_id_alt': c.wa_id_alt or '',
-            'avatar_url': c.avatar_url or '',
-            'etiquetas': c.etiquetas or [],
-            'ultima_mensagem': c.ultima_mensagem or '',
-            'ultima_mensagem_em': c.ultima_mensagem_em.strftime('%d/%m %H:%M') if c.ultima_mensagem_em else '',
-            'nao_lidas': c.nao_lidas or 0,
-        }
-        for c in conversas
-    ]
+    data = []
+    for c in conversas:
+        presence_state, presence_text = _presence_info(c)
+        data.append(
+            {
+                'id': c.pk,
+                'nome': c.nome_exibicao,
+                'wa_id': c.wa_id,
+                'wa_id_display': c.wa_id_display,
+                'wa_id_alt': c.wa_id_alt or '',
+                'avatar_url': c.avatar_url or '',
+                'etiquetas': c.etiquetas or [],
+                'ultima_mensagem': c.ultima_mensagem or '',
+                'ultima_mensagem_em': c.ultima_mensagem_em.strftime('%d/%m %H:%M') if c.ultima_mensagem_em else '',
+                'nao_lidas': c.nao_lidas or 0,
+                'presence_state': presence_state,
+                'presence_text': presence_text,
+            }
+        )
     return JsonResponse({'ok': True, 'conversas': data})
 
 

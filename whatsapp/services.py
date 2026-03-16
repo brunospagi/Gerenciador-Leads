@@ -573,6 +573,8 @@ class EvolutionAPIClient:
             'MESSAGES_UPDATE',
             'SEND_MESSAGE',
             'CONNECTION_UPDATE',
+            'PRESENCE_UPDATE',
+            'PRESENCE_UPSERT',
             'LABELS_ASSOCIATION',
             'LABELS_EDIT',
             'CONTACTS_UPDATE',
@@ -805,9 +807,96 @@ def process_labels_update(payload: dict[str, Any]) -> bool:
     return True
 
 
+def _normalize_presence_state(raw_state: Any) -> str:
+    state = str(raw_state or '').strip().lower()
+    if not state:
+        return ''
+    if state in {'composing', 'typing'}:
+        return 'typing'
+    if state in {'recording', 'recordingaudio', 'recording_audio'}:
+        return 'recording'
+    if state in {'paused', 'available', 'unavailable', 'idle', 'stop'}:
+        return ''
+    return ''
+
+
+def process_presence_update(payload: dict[str, Any], instance: WhatsAppInstance | None = None) -> bool:
+    data = payload.get('data', payload) if isinstance(payload, dict) else {}
+    if not isinstance(data, dict):
+        return False
+
+    self_jids = _extract_self_jids(payload, data, instance=instance)
+    updates: list[tuple[str, str]] = []
+
+    presences = data.get('presences')
+    if isinstance(presences, dict):
+        for jid_key, presence_info in presences.items():
+            state = ''
+            if isinstance(presence_info, dict):
+                state = _normalize_presence_state(
+                    presence_info.get('lastKnownPresence')
+                    or presence_info.get('presence')
+                    or presence_info.get('state')
+                    or presence_info.get('status')
+                )
+            else:
+                state = _normalize_presence_state(presence_info)
+            updates.append((normalize_wa_id(str(jid_key or '')), state))
+    elif isinstance(presences, list):
+        for item in presences:
+            if not isinstance(item, dict):
+                continue
+            jid = normalize_wa_id(str(item.get('id') or item.get('jid') or item.get('remoteJid') or ''))
+            state = _normalize_presence_state(
+                item.get('lastKnownPresence') or item.get('presence') or item.get('state') or item.get('status')
+            )
+            updates.append((jid, state))
+
+    if not updates:
+        key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
+        jid_candidates = extract_jid_candidates(payload, data, key_data)
+        state = _normalize_presence_state(
+            data.get('lastKnownPresence')
+            or data.get('presence')
+            or data.get('state')
+            or data.get('status')
+            or payload.get('presence')
+            or payload.get('state')
+        )
+        for jid in jid_candidates:
+            updates.append((jid, state))
+
+    updated = False
+    for jid, state in updates:
+        if not jid or jid in self_jids:
+            continue
+
+        conversation = (
+            WhatsAppConversation.objects.filter(wa_id=jid).first()
+            or WhatsAppConversation.objects.filter(wa_id_alt=jid).first()
+        )
+        if not conversation:
+            continue
+
+        merged_meta = dict(conversation.metadata or {})
+        merged_meta['presence'] = {
+            'state': state,
+            'updated_at': timezone.now().isoformat(),
+        }
+        conversation.metadata = merged_meta
+        conversation.save(update_fields=['metadata', 'atualizado_em'])
+        updated = True
+
+    return updated
+
+
 def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance | None = None) -> None:
     event_name = str(payload.get('event') or '').upper()
     event_name_norm = re.sub(r'[^A-Z0-9]+', '_', event_name).strip('_')
+    if event_name_norm in {'PRESENCE_UPDATE', 'PRESENCE_UPSERT', 'PRESENCE'}:
+        if process_presence_update(payload, instance=instance):
+            logger.info('Webhook de presenca processado.')
+            return
     if event_name_norm in {'LABELS_ASSOCIATION', 'LABELS_EDIT', 'CONTACTS_UPDATE'}:
         if process_labels_update(payload):
             logger.info('Webhook de etiquetas processado.')

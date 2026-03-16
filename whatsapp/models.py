@@ -89,7 +89,7 @@ class WhatsAppMessage(models.Model):
     external_id = models.CharField(max_length=150, blank=True, null=True, unique=True)
     direcao = models.CharField(max_length=10, choices=Direction.choices)
     conteudo = models.TextField(blank=True)
-    media_url = models.URLField(blank=True)
+    media_url = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
     enviado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,

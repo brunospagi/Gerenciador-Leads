@@ -53,6 +53,7 @@
     .right-container .header .img-text .contact-meta { min-width: 0; }
     .right-container .header .img-text h4 { margin: 0; font-weight: 500; line-height: 1.2em; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
     .right-container .header .img-text h4 span { font-size: .78rem; color: #64748b; font-weight: 400; }
+    .active-presence { font-size: .78rem; color: #16a34a; font-weight: 600; min-height: 16px; margin-top: 2px; }
     .chat-container { position: relative; width: 100%; height: calc(100% - 122px); padding: 24px; overflow-y: auto; z-index: 2; }
     .message-box { position: relative; display: flex; width: 100%; margin: 5px 0; }
     .message-bubble { position: relative; max-width: 70%; padding: 8px 12px 6px; margin: 0; border-radius: 10px; font-size: .9rem; background: #dcf8c6; color: #111827; overflow: visible; }
@@ -292,6 +293,7 @@
                         <div class="top-new-chat-card" id="newChatCard">
                             <form method="post" id="startConversationForm">
                                 {% csrf_token %}
+                                <input type="hidden" name="ajax" value="1">
                                 <input type="hidden" name="action" value="start_conversation">
                                 {% if start_form.non_field_errors %}
                                 <div class="alert alert-danger py-2 mb-2">
@@ -393,6 +395,7 @@
                     </div>
                     <div class="contact-meta">
                         <h4 id="active-contact-name">{{ conversa_ativa.nome_exibicao }}<br><span id="active-contact-jid">{{ conversa_ativa.wa_id_display }}</span></h4>
+                        <div id="active-contact-presence" class="active-presence">{{ active_presence_text }}</div>
                     </div>
                     <div class="label-row" id="active-contact-labels">
                         {% if conversa_ativa.etiquetas %}
@@ -407,12 +410,14 @@
                     <li>
                         <form method="post" action="{% url 'whatsapp:mark_read' conversa_ativa.pk %}" id="markReadForm">
                             {% csrf_token %}
+                            <input type="hidden" name="ajax" value="1">
                             <button type="submit" class="btn btn-sm btn-light border">Marcar lida</button>
                         </form>
                     </li>
                     <li>
                         <form method="post" action="{% url 'whatsapp:delete_conversation' conversa_ativa.pk %}" id="deleteConversationForm">
                             {% csrf_token %}
+                            <input type="hidden" name="ajax" value="1">
                             <button type="submit" class="btn btn-sm btn-outline-danger">Deletar conversa</button>
                         </form>
                     </li>
@@ -473,6 +478,7 @@
 
             <form method="post" enctype="multipart/form-data" class="chatbox-input" id="sendMessageForm">
                 {% csrf_token %}
+                <input type="hidden" name="ajax" value="1">
                 <input type="hidden" name="action" value="send_message">
                 <input type="hidden" name="conversa_id" value="{{ conversa_ativa.pk }}">
                 <i class="fa-regular fa-face-grin icon-btn"></i>
@@ -520,6 +526,7 @@
         const activeNameEl = document.getElementById('active-contact-name');
         const activeAvatarEl = document.getElementById('active-contact-avatar');
         const activeLabelsEl = document.getElementById('active-contact-labels');
+        const activePresenceEl = document.getElementById('active-contact-presence');
         const defaultAvatar = 'https://cdn.quasar.dev/img/avatar4.jpg';
         const AUTO_SCROLL_THRESHOLD = 90;
         let firstMessagesRender = true;
@@ -589,6 +596,9 @@
             }
             if (activeLabelsEl) {
                 activeLabelsEl.innerHTML = (c.etiquetas || []).map((t) => `<span class="label-chip">${esc(t)}</span>`).join('');
+            }
+            if (activePresenceEl) {
+                activePresenceEl.textContent = c.presence_text || '';
             }
         }
 
@@ -845,9 +855,19 @@
         async function submitFormAjax(formEl) {
             const resp = await fetch(formEl.action || window.location.pathname + window.location.search, {
                 method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
                 body: new FormData(formEl)
             });
+            const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+            if (!contentType.includes('application/json')) {
+                if (resp.status === 403) {
+                    throw new Error('Sessao expirada ou sem permissao. Atualize a pagina e tente novamente.');
+                }
+                throw new Error('Resposta invalida do servidor.');
+            }
             const data = await resp.json().catch(() => ({ ok: false, error: 'Resposta invalida do servidor.' }));
             if (!resp.ok || !data.ok) {
                 throw new Error(data.error || 'Falha na requisicao.');
@@ -962,7 +982,7 @@
 
         pollConversations();
         pollMessages();
-        setInterval(pollConversations, 5000);
+        setInterval(pollConversations, 2000);
         setInterval(pollMessages, 2500);
     })();
 </script>
