@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -210,6 +211,131 @@ def resolve_contact_name(payload: dict[str, Any], data: dict[str, Any]) -> str:
         or payload.get('senderName')
         or payload.get('contactName')
         or ''
+    )
+
+
+def _find_nested_value(payload: Any, target_keys: set[str]) -> str:
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            normalized_key = str(key or '').strip().lower()
+            if normalized_key in target_keys and value is not None:
+                if isinstance(value, (str, int, float)):
+                    text = str(value).strip()
+                    if text:
+                        return text
+            found = _find_nested_value(value, target_keys)
+            if found:
+                return found
+    elif isinstance(payload, list):
+        for item in payload:
+            found = _find_nested_value(item, target_keys)
+            if found:
+                return found
+    return ''
+
+
+def detect_facebook_ads_origin(payload: dict[str, Any], data: dict[str, Any]) -> tuple[bool, dict[str, str]]:
+    text_blob = ''
+    try:
+        text_blob = json.dumps(payload or {}, ensure_ascii=False).lower()
+    except Exception:
+        text_blob = str(payload or '').lower()
+
+    indicators = [
+        'facebook.com',
+        'm.facebook.com',
+        'fbclid',
+        'utm_source=facebook',
+        '"utm_source":"facebook',
+        'click_to_whatsapp',
+        'ctwa',
+        'lead_ads',
+        'leadads',
+    ]
+    has_indicator = any(marker in text_blob for marker in indicators)
+
+    key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
+    message = data.get('message', {}) if isinstance(data.get('message'), dict) else {}
+    context_info = message.get('extendedTextMessage', {}).get('contextInfo', {}) if isinstance(
+        message.get('extendedTextMessage'), dict
+    ) else {}
+
+    search_space = {
+        'payload': payload,
+        'data': data,
+        'key': key_data,
+        'message': message,
+        'context_info': context_info,
+    }
+    search_keys = {
+        'source',
+        'sourceid',
+        'source_id',
+        'adid',
+        'ad_id',
+        'adsetid',
+        'adset_id',
+        'campaignid',
+        'campaign_id',
+        'fbclid',
+        'utm_source',
+        'utm_campaign',
+        'ref',
+        'externaladreply',
+        'ctwa',
+    }
+
+    source = _find_nested_value(search_space, {'source', 'utm_source'}) or ''
+    fbclid = _find_nested_value(search_space, {'fbclid'}) or ''
+    campaign_id = _find_nested_value(search_space, {'campaignid', 'campaign_id'}) or ''
+    adset_id = _find_nested_value(search_space, {'adsetid', 'adset_id'}) or ''
+    ad_id = _find_nested_value(search_space, {'adid', 'ad_id'}) or ''
+    source_id = _find_nested_value(search_space, {'sourceid', 'source_id'}) or ''
+    ref = _find_nested_value(search_space, {'ref'}) or ''
+    ad_link = _find_nested_value(search_space, {'url', 'link', 'adlink', 'ad_link', 'sourceurl', 'source_url'}) or ''
+
+    metadata = {
+        'source': source,
+        'fbclid': fbclid,
+        'campaign_id': campaign_id,
+        'adset_id': adset_id,
+        'ad_id': ad_id,
+        'source_id': source_id,
+        'ref': ref,
+        'ad_link': ad_link,
+    }
+    metadata = {k: v for k, v in metadata.items() if v}
+
+    lower_source = (source or '').strip().lower()
+    lower_ref = (ref or '').strip().lower()
+    source_looks_facebook = any(
+        token in lower_source for token in ['facebook', 'meta', 'instagram', 'ctwa', 'click_to_whatsapp']
+    ) or any(token in lower_ref for token in ['facebook', 'meta', 'instagram', 'ctwa', 'click_to_whatsapp'])
+    has_fbclid = bool(fbclid)
+    has_ad_ids = bool(campaign_id or adset_id or ad_id or source_id)
+
+    has_metadata_hint = bool(_find_nested_value(search_space, search_keys))
+    matched = has_indicator or has_fbclid or source_looks_facebook or (has_ad_ids and has_metadata_hint)
+    return matched, metadata
+
+
+def _build_ads_system_message(ads_metadata: dict[str, str]) -> str:
+    source = ads_metadata.get('source') or 'Facebook Ads'
+    campaign = ads_metadata.get('campaign_id') or '-'
+    adset = ads_metadata.get('adset_id') or '-'
+    ad_id = ads_metadata.get('ad_id') or '-'
+    fbclid = ads_metadata.get('fbclid') or '-'
+    ref = ads_metadata.get('ref') or '-'
+    ad_link = ads_metadata.get('ad_link') or '-'
+    return (
+        'Lead de anuncio detectado.\n'
+        f'Origem: {source}\n'
+        f'Campanha: {campaign}\n'
+        f'Conjunto: {adset}\n'
+        f'Anuncio: {ad_id}\n'
+        f'fbclid: {fbclid}\n'
+        f'Referencia: {ref}\n'
+        f'Link do anuncio: {ad_link}'
     )
 
 
@@ -573,6 +699,9 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
     contato = resolve_contact_name(payload, data)
     avatar_url = resolve_avatar_url(payload, data)
     etiquetas = extract_labels(payload, data)
+    is_facebook_ads, ads_metadata = detect_facebook_ads_origin(payload, data)
+    if is_facebook_ads and 'facebook ads' not in {str(et).strip().lower() for et in etiquetas}:
+        etiquetas.append('Facebook Ads')
     texto = parse_message_text(payload)
     media_url, media_kind = parse_message_media(payload)
     if not texto and media_kind:
@@ -629,7 +758,32 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
     conversation.metadata = payload
     if direction == WhatsAppMessage.Direction.RECEBIDA:
         conversation.nao_lidas = (conversation.nao_lidas or 0) + 1
+    create_ads_notice = False
+    if is_facebook_ads:
+        merged_meta = dict(conversation.metadata or {})
+        previous_ads_data = (
+            merged_meta.get('facebook_ads', {}).get('data', {})
+            if isinstance(merged_meta.get('facebook_ads'), dict)
+            else {}
+        )
+        if ads_metadata and ads_metadata != previous_ads_data:
+            create_ads_notice = True
+        merged_meta['facebook_ads'] = {
+            'detected': True,
+            'captured_at': timezone.now().isoformat(),
+            'data': ads_metadata,
+        }
+        conversation.metadata = merged_meta
     conversation.save()
+
+    if is_facebook_ads and create_ads_notice:
+        WhatsAppMessage.objects.create(
+            conversa=conversation,
+            direcao=WhatsAppMessage.Direction.SISTEMA,
+            conteudo=_build_ads_system_message(ads_metadata),
+            status=WhatsAppMessage.Status.ENTREGUE,
+            payload={'facebook_ads_notice': ads_metadata},
+        )
 
     defaults = {
         'conversa': conversation,
