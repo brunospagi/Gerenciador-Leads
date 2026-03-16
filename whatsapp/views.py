@@ -16,6 +16,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 
+from crmspagi.storage_backends import PublicMediaStorage
 from usuarios.permissions import has_module_access
 
 from .forms import (
@@ -223,8 +224,13 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         ext = os.path.splitext(uploaded_file.name or '')[1]
         unique_name = f"{uuid.uuid4().hex}{ext}"
         storage_path = f"whatsapp/uploads/{unique_name}"
-        saved_path = default_storage.save(storage_path, uploaded_file)
-        file_url = default_storage.url(saved_path)
+        try:
+            storage = PublicMediaStorage()
+            saved_path = storage.save(storage_path, uploaded_file)
+            file_url = storage.url(saved_path)
+        except Exception:
+            saved_path = default_storage.save(storage_path, uploaded_file)
+            file_url = default_storage.url(saved_path)
         mime = uploaded_file.content_type or mimetypes.guess_type(uploaded_file.name or '')[0] or 'application/octet-stream'
         return file_url, mime, uploaded_file.name or unique_name
 
