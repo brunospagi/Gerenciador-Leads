@@ -21,5 +21,8 @@ urlpatterns = [
     path('instancia/', WhatsAppInstanceConfigView.as_view(), name='instance_config'),
     path('instancia/<int:pk>/status/', instance_runtime_status, name='instance_runtime_status'),
     path('conversa/<int:pk>/marcar-lida/', mark_read, name='mark_read'),
+    path('webhook', WhatsAppWebhookView.as_view(), name='webhook_no_slash'),
     path('webhook/', WhatsAppWebhookView.as_view(), name='webhook'),
+    path('webhook/<slug:event_name>', WhatsAppWebhookView.as_view(), name='webhook_event_no_slash'),
+    path('webhook/<slug:event_name>/', WhatsAppWebhookView.as_view(), name='webhook_event'),
 ]

@@ -340,6 +340,10 @@ class WhatsAppWebhookView(View):
         except json.JSONDecodeError:
             return JsonResponse({'ok': False, 'error': 'payload invalido'}, status=400)
 
+        event_name = (kwargs.get('event_name') or '').strip()
+        if event_name and not payload.get('event'):
+            payload['event'] = event_name.replace('-', '_').upper()
+
         instance_name = payload.get('instance') or request.headers.get('X-Evolution-Instance')
         if not instance_name and isinstance(payload.get('data'), dict):
             data = payload.get('data', {})
