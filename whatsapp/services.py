@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any
 
 import requests
+from django.db.models import F
 from django.conf import settings
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -65,13 +66,29 @@ def normalize_number(raw_value: str) -> str:
 
 
 def resolve_avatar_url(payload: dict[str, Any], data: dict[str, Any]) -> str:
+    contact_data = data.get('contact') if isinstance(data.get('contact'), dict) else {}
+    instance_contact = data.get('instance') if isinstance(data.get('instance'), dict) else {}
     candidates = [
         data.get('profilePicUrl'),
         data.get('profilePictureUrl'),
+        data.get('profilePicture'),
+        data.get('pictureUrl'),
+        data.get('imgUrl'),
         data.get('picture'),
         data.get('avatarUrl'),
+        contact_data.get('profilePicUrl'),
+        contact_data.get('profilePictureUrl'),
+        contact_data.get('profilePicture'),
+        contact_data.get('picture'),
+        contact_data.get('avatarUrl'),
+        contact_data.get('imgUrl'),
+        instance_contact.get('profilePicUrl'),
+        instance_contact.get('profilePictureUrl'),
         payload.get('profilePicUrl'),
         payload.get('profilePictureUrl'),
+        payload.get('profilePicture'),
+        payload.get('pictureUrl'),
+        payload.get('imgUrl'),
         payload.get('avatarUrl'),
     ]
     for value in candidates:
@@ -167,6 +184,44 @@ def _choose_conversation_jid(
             lid_jid = lid_filtered
 
     return wa_id, real_jid, lid_jid
+
+
+def resolve_from_me(
+    payload: dict[str, Any],
+    data: dict[str, Any],
+    key_data: dict[str, Any],
+    self_jids: set[str],
+) -> bool:
+    explicit = bool(
+        key_data.get('fromMe')
+        or data.get('fromMe')
+        or payload.get('fromMe')
+    )
+    if explicit:
+        return True
+
+    candidate_values = [
+        key_data.get('remoteJid'),
+        key_data.get('participant'),
+        key_data.get('sender'),
+        data.get('remoteJid'),
+        data.get('participant'),
+        data.get('sender'),
+        data.get('from'),
+        payload.get('remoteJid'),
+        payload.get('participant'),
+        payload.get('sender'),
+        payload.get('from'),
+    ]
+    normalized_candidates = {
+        normalize_wa_id(str(value))
+        for value in candidate_values
+        if isinstance(value, str) and value.strip()
+    }
+    normalized_candidates.discard('')
+    if normalized_candidates and normalized_candidates.issubset(self_jids):
+        return True
+    return False
 
 
 def normalize_labels(raw_labels: Any) -> list[str]:
@@ -346,11 +401,19 @@ def parse_message_timestamp(payload: dict[str, Any]) -> datetime:
 
 
 def resolve_contact_name(payload: dict[str, Any], data: dict[str, Any]) -> str:
+    contact_data = data.get('contact') if isinstance(data.get('contact'), dict) else {}
     return (
         data.get('pushName')
         or data.get('notifyName')
+        or data.get('name')
+        or data.get('profileName')
+        or contact_data.get('name')
+        or contact_data.get('pushName')
+        or contact_data.get('notifyName')
+        or contact_data.get('shortName')
         or payload.get('senderName')
         or payload.get('contactName')
+        or payload.get('pushName')
         or ''
     )
 
@@ -785,14 +848,12 @@ def process_labels_update(payload: dict[str, Any]) -> bool:
     if not jid_candidates:
         return False
     self_jids = _extract_self_jids(payload, data if isinstance(data, dict) else {}, instance=None)
-    from_me = bool(
-        key_data.get('fromMe')
-        or data.get('fromMe')
-        or payload.get('fromMe')
-    )
+    from_me = resolve_from_me(payload, data, key_data, self_jids)
 
     labels = extract_labels(payload, data if isinstance(data, dict) else {})
-    if not labels:
+    avatar_url = resolve_avatar_url(payload, data if isinstance(data, dict) else {})
+    contact_name = resolve_contact_name(payload, data if isinstance(data, dict) else {}).strip()
+    if not labels and not avatar_url and not contact_name:
         return False
 
     wa_id, real_jid, lid_jid = _choose_conversation_jid(
@@ -811,11 +872,22 @@ def process_labels_update(payload: dict[str, Any]) -> bool:
     if not conversation:
         return False
 
-    conversation.etiquetas = labels
+    update_fields = ['metadata', 'atualizado_em']
+    if labels:
+        conversation.etiquetas = labels
+        update_fields.append('etiquetas')
+    if avatar_url and avatar_url != (conversation.avatar_url or ''):
+        conversation.avatar_url = avatar_url
+        update_fields.append('avatar_url')
+    if contact_name and contact_name != (conversation.nome_contato or ''):
+        conversation.nome_contato = contact_name
+        update_fields.append('nome_contato')
     merged_meta = dict(conversation.metadata or {})
-    merged_meta['labels_update'] = payload
+    event_name_norm = re.sub(r'[^A-Z0-9]+', '_', str(payload.get('event') or '').upper()).strip('_')
+    meta_key = 'contacts_update' if event_name_norm == 'CONTACTS_UPDATE' else 'labels_update'
+    merged_meta[meta_key] = payload
     conversation.metadata = merged_meta
-    conversation.save(update_fields=['etiquetas', 'metadata', 'atualizado_em'])
+    conversation.save(update_fields=update_fields)
     return True
 
 
@@ -936,12 +1008,8 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
     key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
     jid_candidates = extract_jid_candidates(payload, data, key_data)
 
-    from_me = bool(
-        key_data.get('fromMe')
-        or data.get('fromMe')
-        or payload.get('fromMe')
-    )
     self_jids = _extract_self_jids(payload, data, instance=instance)
+    from_me = resolve_from_me(payload, data, key_data, self_jids)
     wa_id, real_jid, lid_jid = _choose_conversation_jid(
         jid_candidates=jid_candidates,
         from_me=from_me,
@@ -1024,8 +1092,6 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
     conversation.ultima_mensagem = texto[:500]
     conversation.ultima_mensagem_em = ts
     conversation.metadata = payload
-    if direction == WhatsAppMessage.Direction.RECEBIDA:
-        conversation.nao_lidas = (conversation.nao_lidas or 0) + 1
     create_ads_notice = False
     if is_facebook_ads:
         merged_meta = dict(conversation.metadata or {})
@@ -1063,9 +1129,14 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
         'recebido_em': ts if direction == WhatsAppMessage.Direction.RECEBIDA else None,
     }
 
+    message_created = False
     if ext_id:
-        WhatsAppMessage.objects.update_or_create(external_id=ext_id, defaults=defaults)
+        _, message_created = WhatsAppMessage.objects.update_or_create(external_id=ext_id, defaults=defaults)
     else:
         WhatsAppMessage.objects.create(**defaults)
+        message_created = True
+
+    if direction == WhatsAppMessage.Direction.RECEBIDA and message_created:
+        WhatsAppConversation.objects.filter(pk=conversation.pk).update(nao_lidas=F('nao_lidas') + 1)
 
     logger.info('Webhook WhatsApp processado: %s', conversation.wa_id)

@@ -35,7 +35,7 @@
     .search-container .input input { width: 100%; outline: none; border: none; background: #fff; padding: 8px 10px 8px 38px; border-radius: 8px; font-size: .85rem; }
     .search-container .input i { position: absolute; left: 14px; top: 11px; color: #94a3b8; font-size: .8rem; }
     .chat-list { position: relative; height: calc(100% - 180px); overflow-y: auto; }
-    .chat-list .chat-box { position: relative; width: 100%; display: grid; grid-template-columns: 50px 1fr; gap: 0 12px; align-items: center; cursor: pointer; padding: 12px 15px; border-bottom: 1px solid #f1f5f9; text-decoration: none; }
+    .chat-list .chat-box { position: relative; width: 100%; display: grid; grid-template-columns: 50px 1fr; gap: 0 12px; align-items: center; cursor: pointer; padding: 12px 15px; border-bottom: 1px solid #f1f5f9; text-decoration: none; transition: background-color .18s ease; }
     .chat-list .chat-box .img-box { position: relative; width: 50px; height: 50px; overflow: hidden; border-radius: 50%; background: #d1d5db; flex-shrink: 0; }
     .chat-list .chat-box .chat-details { width: 100%; margin-left: 0; min-width: 0; }
     .chat-list .chat-box .chat-details .text-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
@@ -139,8 +139,8 @@
     .emoji-picker-panel button:hover { background: #f3f4f6; }
     .message-menu-trigger {
         position: absolute;
-        top: 4px;
-        right: -24px;
+        top: 6px;
+        right: 6px;
         width: 22px;
         height: 22px;
         border-radius: 50%;
@@ -156,18 +156,15 @@
         transition: opacity .15s ease;
         z-index: 6;
     }
-    .my-message .message-menu-trigger {
-        right: auto;
-        left: -24px;
-    }
     .message-bubble:hover .message-menu-trigger,
+    .message-bubble.has-open-menu .message-menu-trigger,
     .message-menu-trigger.force-show {
         opacity: 1;
     }
     .message-menu {
         position: absolute;
-        top: 28px;
-        right: -6px;
+        top: 32px;
+        right: 0;
         min-width: 175px;
         background: #fff;
         border-radius: 8px;
@@ -176,10 +173,6 @@
         z-index: 8;
         padding: 4px 0;
         display: none;
-    }
-    .my-message .message-menu {
-        right: auto;
-        left: -6px;
     }
     .message-menu.open { display: block; }
     .message-menu button {
@@ -355,7 +348,7 @@
                         {% if conversa.avatar_url %}
                         <img class="dp" src="{{ conversa.avatar_url }}" alt="Contato">
                         {% else %}
-                        <img class="dp" src="https://cdn.quasar.dev/img/avatar4.jpg" alt="Contato">
+                        <img class="dp" src="https://ui-avatars.com/api/?name=Contato&background=e2e8f0&color=64748b&size=256&rounded=true" alt="Contato">
                         {% endif %}
                     </div>
                     <div class="chat-details">
@@ -390,7 +383,7 @@
                         {% if conversa_ativa.avatar_url %}
                         <img class="dp" id="active-contact-avatar" src="{{ conversa_ativa.avatar_url }}" alt="Contato">
                         {% else %}
-                        <img class="dp" id="active-contact-avatar" src="https://cdn.quasar.dev/img/avatar4.jpg" alt="Contato">
+                        <img class="dp" id="active-contact-avatar" src="https://ui-avatars.com/api/?name=Contato&background=e2e8f0&color=64748b&size=256&rounded=true" alt="Contato">
                         {% endif %}
                     </div>
                     <div class="contact-meta">
@@ -518,8 +511,10 @@
 <script>
     (function () {
         const conversationsEndpoint = "{% url 'whatsapp:conversations_feed' %}";
-        const activeConversationId = "{% if conversa_ativa %}{{ conversa_ativa.pk }}{% endif %}";
-        const messagesEndpoint = activeConversationId ? "{% url 'whatsapp:conversation_messages_feed' 0 %}".replace('/0/', `/${activeConversationId}/`) : '';
+        let activeConversationId = "{% if conversa_ativa %}{{ conversa_ativa.pk }}{% endif %}";
+        const messagesEndpointTemplate = "{% url 'whatsapp:conversation_messages_feed' 0 %}";
+        const markReadEndpointTemplate = "{% url 'whatsapp:mark_read' 0 %}";
+        const deleteConversationEndpointTemplate = "{% url 'whatsapp:delete_conversation' 0 %}";
         const listEl = document.getElementById('conversation-list');
         const messagesEl = document.getElementById('message-list');
         const currentQuery = "{{ request.GET.q|default:''|escapejs }}";
@@ -527,9 +522,14 @@
         const activeAvatarEl = document.getElementById('active-contact-avatar');
         const activeLabelsEl = document.getElementById('active-contact-labels');
         const activePresenceEl = document.getElementById('active-contact-presence');
-        const defaultAvatar = 'https://cdn.quasar.dev/img/avatar4.jpg';
+        const defaultAvatar = 'https://ui-avatars.com/api/?name=Contato&background=e2e8f0&color=64748b&size=256&rounded=true';
         const AUTO_SCROLL_THRESHOLD = 90;
         let firstMessagesRender = true;
+        let lastConversationsSignature = '';
+        let lastMessagesSignature = '';
+        let pollConversationsRunning = false;
+        let pollMessagesRunning = false;
+        let activeMenuMessageId = null;
 
         function esc(str) {
             return (str || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -602,20 +602,58 @@
             }
         }
 
+        function endpointFromTemplate(template, conversationId) {
+            if (!conversationId) return '';
+            return template.replace('/0/', `/${conversationId}/`);
+        }
+
+        function setActiveConversationId(conversationId) {
+            activeConversationId = String(conversationId || '');
+            document.querySelectorAll('#conversation-list .chat-box').forEach((el) => {
+                el.classList.toggle('active', String(el.dataset.conversationId || '') === activeConversationId);
+            });
+            if (sendMessageForm) {
+                const input = sendMessageForm.querySelector('input[name="conversa_id"]');
+                if (input) input.value = activeConversationId;
+            }
+            if (markReadForm) {
+                markReadForm.setAttribute('action', endpointFromTemplate(markReadEndpointTemplate, activeConversationId));
+            }
+            if (deleteConversationForm) {
+                deleteConversationForm.setAttribute('action', endpointFromTemplate(deleteConversationEndpointTemplate, activeConversationId));
+            }
+        }
+
         function renderConversations(conversas) {
             if (!listEl) return;
+            const signature = JSON.stringify((conversas || []).map((c) => ({
+                id: c.id,
+                nome: c.nome || '',
+                avatar_url: c.avatar_url || '',
+                ultima_mensagem: c.ultima_mensagem || '',
+                ultima_mensagem_em: c.ultima_mensagem_em || '',
+                nao_lidas: Number(c.nao_lidas || 0),
+                presence_text: c.presence_text || '',
+                etiquetas: c.etiquetas || [],
+            })));
+            const activeConversation = (conversas || []).find((c) => String(c.id) === String(activeConversationId));
+            updateHeaderByConversation(activeConversation);
+            if (signature === lastConversationsSignature) return;
+            lastConversationsSignature = signature;
+
+            const previousScrollTop = listEl.scrollTop;
             const baseUrl = "{% url 'whatsapp:inbox' %}";
             listEl.innerHTML = (conversas || []).map((c) => {
                 const activeClass = String(c.id) === String(activeConversationId) ? 'active' : '';
-                const unreadClass = c.nao_lidas ? 'unread' : '';
-                const unreadBadge = c.nao_lidas ? `<b>${c.nao_lidas}</b>` : '';
+                const unreadCount = Number(c.nao_lidas || 0);
+                const unreadClass = unreadCount > 0 ? 'unread' : '';
+                const unreadBadge = unreadCount > 0 ? `<b>${unreadCount}</b>` : '';
                 const avatar = c.avatar_url ? c.avatar_url : defaultAvatar;
                 const tags = (c.etiquetas || []).slice(0, 3).map((t) => `<span class="label-chip">${esc(t)}</span>`).join('');
                 const tagsRow = tags ? `<div class="label-row">${tags}</div>` : '';
                 return `<a class="chat-box ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}"><div class="img-box"><img class="dp" src="${avatar}" alt="Contato"></div><div class="chat-details"><div class="text-head"><h4>${esc(c.nome)}</h4><p class="time ${unreadClass}">${esc(c.ultima_mensagem_em)}</p></div><div class="text-message"><p>${esc((c.ultima_mensagem || '').slice(0, 42))}</p>${unreadBadge}</div>${tagsRow}</div></a>`;
             }).join('');
-            const activeConversation = (conversas || []).find((c) => String(c.id) === String(activeConversationId));
-            updateHeaderByConversation(activeConversation);
+            listEl.scrollTop = previousScrollTop;
         }
 
         function renderMessages(mensagens) {
@@ -628,6 +666,17 @@
                 const hasMedia = !!(m && m.media_url && String(m.media_url).trim());
                 return hasText || hasMedia || m.direcao === 'SYSTEM';
             });
+            const signature = JSON.stringify((safeMessages || []).map((m) => ({
+                id: m.id,
+                d: m.direcao,
+                c: m.conteudo || '',
+                u: m.media_url || '',
+                k: m.media_kind || '',
+                s: m.status_code || '',
+                t: m.criado_em || '',
+            })));
+            if (signature === lastMessagesSignature) return;
+            lastMessagesSignature = signature;
             messagesEl.innerHTML = safeMessages.map((m) => {
                 const side = m.direcao === 'OUT' ? 'my-message' : (m.direcao === 'SYSTEM' ? 'system-message' : 'friend-message');
                 const kind = String(m.media_kind || '').toLowerCase();
@@ -656,7 +705,9 @@
                 if (exceptMessageId && menu.id === `msg-menu-${exceptMessageId}`) return;
                 menu.classList.remove('open');
             });
+            document.querySelectorAll('.message-bubble.has-open-menu').forEach((bubble) => bubble.classList.remove('has-open-menu'));
             document.querySelectorAll('.message-menu-trigger.force-show').forEach((btn) => btn.classList.remove('force-show'));
+            if (!exceptMessageId) activeMenuMessageId = null;
         }
 
         window.toggleMessageMenu = function (event, messageId) {
@@ -664,12 +715,15 @@
             event.stopPropagation();
             const menu = document.getElementById(`msg-menu-${messageId}`);
             const trigger = event.currentTarget;
+            const bubble = trigger ? trigger.closest('.message-bubble') : null;
             if (!menu) return;
             const willOpen = !menu.classList.contains('open');
             closeAllMessageMenus();
             if (willOpen) {
                 menu.classList.add('open');
                 if (trigger) trigger.classList.add('force-show');
+                if (bubble) bubble.classList.add('has-open-menu');
+                activeMenuMessageId = messageId;
             }
         };
 
@@ -741,22 +795,33 @@
         };
 
         async function pollConversations() {
+            if (pollConversationsRunning) return;
+            pollConversationsRunning = true;
             try {
                 const resp = await fetch(`${conversationsEndpoint}?q=${encodeURIComponent(currentQuery)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                 if (!resp.ok) return;
                 const data = await resp.json();
                 if (data.ok) renderConversations(data.conversas || []);
-            } catch (e) {}
+            } catch (e) {
+            } finally {
+                pollConversationsRunning = false;
+            }
         }
 
         async function pollMessages() {
+            const messagesEndpoint = endpointFromTemplate(messagesEndpointTemplate, activeConversationId);
             if (!messagesEndpoint) return;
+            if (pollMessagesRunning) return;
+            pollMessagesRunning = true;
             try {
                 const resp = await fetch(messagesEndpoint, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                 if (!resp.ok) return;
                 const data = await resp.json();
                 if (data.ok) renderMessages(data.mensagens || []);
-            } catch (e) {}
+            } catch (e) {
+            } finally {
+                pollMessagesRunning = false;
+            }
         }
 
         const btnOpenNewChat = document.getElementById('btnOpenNewChat');
@@ -922,8 +987,8 @@
                     const data = await submitFormAjax(startConversationForm);
                     const targetConversationId = data.conversation_id;
                     if (targetConversationId) {
-                        const baseUrl = "{% url 'whatsapp:inbox' %}";
-                        window.location.href = `${baseUrl}?c=${targetConversationId}`;
+                        await activateConversation(targetConversationId, true);
+                        if (newChatCard) newChatCard.classList.remove('show');
                         return;
                     }
                     pollConversations();
@@ -941,12 +1006,46 @@
                 if (!ok) return;
                 try {
                     await submitFormAjax(deleteConversationForm);
-                    window.location.href = "{% url 'whatsapp:inbox' %}";
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('c');
+                    window.location.href = url.toString();
                 } catch (err) {
                     alert(err.message || 'Erro ao deletar conversa.');
                 }
             });
         }
+
+        async function activateConversation(conversationId, pushState) {
+            if (!conversationId) return;
+            setActiveConversationId(conversationId);
+            await pollConversations();
+            await pollMessages();
+            if (markReadForm) {
+                try { await submitFormAjax(markReadForm); } catch (e) {}
+            }
+            if (pushState) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('c', String(conversationId));
+                history.pushState({ c: String(conversationId) }, '', url.toString());
+            }
+        }
+
+        if (listEl) {
+            listEl.addEventListener('click', async function (e) {
+                const link = e.target.closest('.chat-box[data-conversation-id]');
+                if (!link) return;
+                e.preventDefault();
+                await activateConversation(link.dataset.conversationId, true);
+            });
+        }
+
+        window.addEventListener('popstate', async function () {
+            const params = new URLSearchParams(window.location.search);
+            const c = params.get('c');
+            if (c) {
+                await activateConversation(c, false);
+            }
+        });
 
         window.openAttachment = function (kind) {
             if (!chatFileInput) return;
@@ -990,6 +1089,9 @@
         }
         {% endif %}
 
+        if (activeConversationId) {
+            setActiveConversationId(activeConversationId);
+        }
         pollConversations();
         pollMessages();
         setInterval(pollConversations, 2000);
