@@ -63,6 +63,12 @@
     .message-box.friend-message p::before { content: ''; position: absolute; top: 0; left: -12px; width: 18px; height: 18px; background: linear-gradient(225deg, #fff 0%, #fff 50%, transparent 50%, transparent); }
     .bubble-media { margin-bottom: 8px; }
     .bubble-media img, .bubble-media video, .bubble-media audio { max-width: 100%; border-radius: 8px; }
+    .reaction-row { margin-top: 6px; display: flex; gap: 4px; }
+    .reaction-btn {
+        border: 1px solid #cbd5e1; background: #fff; border-radius: 999px;
+        font-size: .8rem; line-height: 1; padding: 4px 7px; cursor: pointer;
+    }
+    .reaction-btn:hover { background: #f1f5f9; }
     .chatbox-input { position: relative; width: 100%; min-height: 62px; background: #f0f0f0; display: flex; align-items: center; gap: 10px; padding: 8px 12px; z-index: 2; }
     .chatbox-input .icon-btn { color: #54656f; font-size: 1.3rem; line-height: 1; }
     .chatbox-input .composer { display: flex; width: 100%; gap: 8px; align-items: center; }
@@ -252,6 +258,14 @@
                         {% endif %}
                         {{ mensagem.conteudo|linebreaksbr }}
                         <span>{{ mensagem.criado_em|date:"H:i" }} | {{ mensagem.get_status_display }}</span>
+                        {% if mensagem.external_id %}
+                        <div class="reaction-row">
+                            <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '👍')">👍</button>
+                            <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '❤️')">❤️</button>
+                            <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '😂')">😂</button>
+                            <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '🙏')">🙏</button>
+                        </div>
+                        {% endif %}
                     </p>
                 </div>
                 {% empty %}
@@ -326,10 +340,52 @@
             messagesEl.innerHTML = (mensagens || []).map((m) => {
                 const side = m.direcao === 'OUT' ? 'my-message' : 'friend-message';
                 const textHtml = esc(m.conteudo).replaceAll('\n', '<br>');
-                return `<div class="message-box ${side}"><p>${mediaMarkup(m.media_url)}${textHtml}<span>${esc(m.criado_em.split(' ')[1] || m.criado_em)} | ${esc(m.status)}</span></p></div>`;
+                const reactionRow = m.can_react
+                    ? `<div class="reaction-row">
+                        <button type="button" class="reaction-btn" onclick="sendReaction(${m.id}, '👍')">👍</button>
+                        <button type="button" class="reaction-btn" onclick="sendReaction(${m.id}, '❤️')">❤️</button>
+                        <button type="button" class="reaction-btn" onclick="sendReaction(${m.id}, '😂')">😂</button>
+                        <button type="button" class="reaction-btn" onclick="sendReaction(${m.id}, '🙏')">🙏</button>
+                       </div>`
+                    : '';
+                return `<div class="message-box ${side}"><p>${mediaMarkup(m.media_url)}${textHtml}<span>${esc(m.criado_em.split(' ')[1] || m.criado_em)} | ${esc(m.status)}</span>${reactionRow}</p></div>`;
             }).join('');
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
+
+        function getCsrfToken() {
+            const name = 'csrftoken=';
+            const parts = document.cookie.split(';');
+            for (let i = 0; i < parts.length; i++) {
+                const c = parts[i].trim();
+                if (c.startsWith(name)) return c.substring(name.length, c.length);
+            }
+            return '';
+        }
+
+        window.sendReaction = async function (messageId, emoji) {
+            try {
+                const urlTemplate = "{% url 'whatsapp:react_message' 0 %}";
+                const endpoint = urlTemplate.replace('/0/', `/${messageId}/`);
+                const formData = new URLSearchParams();
+                formData.append('emoji', emoji);
+                const resp = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': getCsrfToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData.toString()
+                });
+                const data = await resp.json();
+                if (!data.ok) {
+                    alert('Erro ao reagir: ' + (data.error || 'falha'));
+                }
+            } catch (e) {
+                alert('Erro ao enviar reação.');
+            }
+        };
 
         async function pollConversations() {
             try {

@@ -588,7 +588,51 @@ def conversation_messages_feed(request, pk):
             'media_url': m.media_url or '',
             'status': m.get_status_display(),
             'criado_em': m.criado_em.strftime('%d/%m/%Y %H:%M') if m.criado_em else '',
+            'can_react': bool(m.external_id),
         }
         for m in mensagens
     ]
     return JsonResponse({'ok': True, 'mensagens': data})
+
+
+@login_required
+def react_message(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Metodo nao permitido'}, status=405)
+    if not has_module_access(request.user, 'whatsapp'):
+        return JsonResponse({'ok': False, 'error': 'Sem permissao'}, status=403)
+
+    mensagem = get_object_or_404(WhatsAppMessage, pk=pk)
+    emoji = (request.POST.get('emoji') or '').strip()
+    if not emoji:
+        return JsonResponse({'ok': False, 'error': 'Emoji obrigatorio'}, status=400)
+    if not mensagem.external_id:
+        return JsonResponse({'ok': False, 'error': 'Mensagem sem id externo para reagir'}, status=400)
+
+    conversa = mensagem.conversa
+    instance = conversa.instance or get_active_instance()
+    if not instance:
+        return JsonResponse({'ok': False, 'error': 'Instancia ativa nao encontrada'}, status=400)
+
+    remote_jid = conversa.wa_id
+    if '@' not in remote_jid:
+        remote_jid = normalize_wa_id(remote_jid)
+
+    try:
+        client = EvolutionAPIClient(instance=instance)
+        response = client.send_reaction(
+            remote_jid=remote_jid,
+            from_me=(mensagem.direcao == WhatsAppMessage.Direction.ENVIADA),
+            message_id=mensagem.external_id,
+            reaction=emoji,
+        )
+        merged_payload = dict(mensagem.payload or {})
+        merged_payload['reaction_sent'] = {
+            'emoji': emoji,
+            'response': response,
+        }
+        mensagem.payload = merged_payload
+        mensagem.save(update_fields=['payload'])
+        return JsonResponse({'ok': True})
+    except Exception as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=400)

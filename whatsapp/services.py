@@ -268,6 +268,20 @@ class EvolutionAPIClient:
         response.raise_for_status()
         return response.json() if response.content else {}
 
+    def send_reaction(self, remote_jid: str, from_me: bool, message_id: str, reaction: str) -> dict[str, Any]:
+        url = f'{self.base_url}/message/sendReaction/{self.instance.instance_name}'
+        payload = {
+            'key': {
+                'remoteJid': remote_jid,
+                'fromMe': bool(from_me),
+                'id': message_id,
+            },
+            'reaction': reaction,
+        }
+        response = requests.post(url, json=payload, headers=self.headers, timeout=30)
+        response.raise_for_status()
+        return response.json() if response.content else {}
+
     def create_instance(self, qrcode: bool = True, integration: str = 'WHATSAPP-BAILEYS') -> dict[str, Any]:
         url = f'{self.base_url}/instance/create'
         payload = {
