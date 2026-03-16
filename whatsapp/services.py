@@ -48,6 +48,31 @@ def parse_message_text(payload: dict[str, Any]) -> str:
     return data.get('text') or data.get('body') or ''
 
 
+def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
+    data = payload.get('data', payload)
+    message = data.get('message', {}) if isinstance(data, dict) else {}
+    if not isinstance(message, dict):
+        return '', ''
+
+    mapping = [
+        ('imageMessage', 'image'),
+        ('videoMessage', 'video'),
+        ('audioMessage', 'audio'),
+        ('documentMessage', 'document'),
+    ]
+    for field, media_kind in mapping:
+        media_obj = message.get(field)
+        if isinstance(media_obj, dict):
+            media_url = (
+                media_obj.get('url')
+                or media_obj.get('directPath')
+                or media_obj.get('mediaUrl')
+                or ''
+            )
+            return media_url, media_kind
+    return '', ''
+
+
 def parse_message_timestamp(payload: dict[str, Any]) -> datetime:
     data = payload.get('data', payload)
     raw_ts = (
@@ -200,7 +225,85 @@ def extract_qr_base64(payload: dict[str, Any]) -> str:
     return ''
 
 
+def map_delivery_status(payload: dict[str, Any]) -> str:
+    data = payload.get('data', payload) if isinstance(payload, dict) else {}
+
+    raw_status = (
+        data.get('status')
+        or data.get('messageStatus')
+        or data.get('update', {}).get('status')
+        or payload.get('status')
+        or ''
+    )
+    raw_status_str = str(raw_status).strip().lower()
+    status_map = {
+        'sent': WhatsAppMessage.Status.ENVIADA,
+        'server_ack': WhatsAppMessage.Status.ENVIADA,
+        'delivery_ack': WhatsAppMessage.Status.ENTREGUE,
+        'delivered': WhatsAppMessage.Status.ENTREGUE,
+        'read': WhatsAppMessage.Status.LIDA,
+        'played': WhatsAppMessage.Status.LIDA,
+        'failed': WhatsAppMessage.Status.FALHA,
+        'error': WhatsAppMessage.Status.FALHA,
+        'pending': WhatsAppMessage.Status.PENDENTE,
+    }
+    if raw_status_str in status_map:
+        return status_map[raw_status_str]
+
+    ack = data.get('ack')
+    if ack is None:
+        ack = payload.get('ack')
+    try:
+        ack = int(ack)
+    except (TypeError, ValueError):
+        ack = None
+
+    if ack == -1:
+        return WhatsAppMessage.Status.FALHA
+    if ack == 0:
+        return WhatsAppMessage.Status.PENDENTE
+    if ack == 1:
+        return WhatsAppMessage.Status.ENVIADA
+    if ack == 2:
+        return WhatsAppMessage.Status.ENTREGUE
+    if ack in {3, 4}:
+        return WhatsAppMessage.Status.LIDA
+
+    return WhatsAppMessage.Status.ENVIADA
+
+
+def process_status_update(payload: dict[str, Any]) -> bool:
+    data = payload.get('data', payload) if isinstance(payload, dict) else {}
+    key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
+    external_id = (
+        key_data.get('id')
+        or data.get('id')
+        or data.get('messageId')
+        or payload.get('id')
+    )
+    if not external_id:
+        return False
+
+    status = map_delivery_status(payload)
+    message = WhatsAppMessage.objects.filter(external_id=external_id).first()
+    if not message:
+        return False
+
+    merged_payload = dict(message.payload or {})
+    merged_payload['status_update'] = payload
+    message.status = status
+    message.payload = merged_payload
+    message.save(update_fields=['status', 'payload'])
+    return True
+
+
 def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance | None = None) -> None:
+    event_name = str(payload.get('event') or '').upper()
+    if event_name in {'MESSAGES_UPDATE', 'MESSAGE_UPDATE', 'MESSAGE_STATUS', 'SEND_MESSAGE'}:
+        if process_status_update(payload):
+            logger.info('Webhook de status processado para mensagem existente.')
+            return
+
     data = payload.get('data', payload)
     if not isinstance(data, dict):
         return
@@ -225,6 +328,9 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
 
     contato = resolve_contact_name(payload, data)
     texto = parse_message_text(payload)
+    media_url, media_kind = parse_message_media(payload)
+    if not texto and media_kind:
+        texto = f'[{media_kind.upper()}]'
     ts = parse_message_timestamp(payload)
     ext_id = (
         key_data.get('id')
@@ -259,6 +365,7 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
         'conversa': conversation,
         'direcao': direction,
         'conteudo': texto,
+        'media_url': media_url or '',
         'status': WhatsAppMessage.Status.ENTREGUE if from_me else WhatsAppMessage.Status.LIDA,
         'payload': payload,
         'recebido_em': ts if direction == WhatsAppMessage.Direction.RECEBIDA else None,

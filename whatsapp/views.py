@@ -115,8 +115,13 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
     def _send_message(self, request):
         form = WhatsAppSendMessageForm(request.POST, request.FILES)
         conversa_id = request.POST.get('conversa_id')
-        if not form.is_valid() or not conversa_id:
-            messages.error(request, 'Mensagem invalida.')
+        if not conversa_id:
+            messages.error(request, 'Conversa invalida.')
+            return redirect('whatsapp:inbox')
+
+        if not form.is_valid():
+            first_error = next(iter(form.errors.values()))[0] if form.errors else 'Mensagem invalida.'
+            messages.error(request, str(first_error))
             return redirect('whatsapp:inbox')
 
         conversa = get_object_or_404(WhatsAppConversation, pk=conversa_id)
@@ -132,11 +137,12 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
         media_url = ''
+        media_storage_path = ''
         media_mimetype = ''
         media_name = ''
         media_kind = ''
         if arquivo:
-            media_url, media_mimetype, media_name = self._save_upload_and_get_url(arquivo)
+            media_url, media_mimetype, media_name, media_storage_path = self._save_upload_and_get_url(arquivo)
             if media_url.startswith('/'):
                 media_url = request.build_absolute_uri(media_url)
             media_kind = self._resolve_media_kind(media_mimetype, media_name)
@@ -196,6 +202,11 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             nova_mensagem.status = WhatsAppMessage.Status.FALHA
             nova_mensagem.payload = {'erro': str(exc)}
             nova_mensagem.save(update_fields=['status', 'payload'])
+            if media_storage_path:
+                try:
+                    default_storage.delete(media_storage_path)
+                except Exception:
+                    pass
             messages.error(request, f'Falha ao enviar mensagem: {exc}')
 
         return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
@@ -232,7 +243,7 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             saved_path = default_storage.save(storage_path, uploaded_file)
             file_url = default_storage.url(saved_path)
         mime = uploaded_file.content_type or mimetypes.guess_type(uploaded_file.name or '')[0] or 'application/octet-stream'
-        return file_url, mime, uploaded_file.name or unique_name
+        return file_url, mime, uploaded_file.name or unique_name, saved_path
 
 
 @login_required

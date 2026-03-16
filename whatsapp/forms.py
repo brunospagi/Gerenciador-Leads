@@ -1,6 +1,22 @@
 from django import forms
+import mimetypes
 
 from .models import WhatsAppInstance
+
+
+MAX_UPLOAD_SIZE = 20 * 1024 * 1024  # 20 MB
+ALLOWED_MIME_PREFIXES = ('image/', 'video/', 'audio/')
+ALLOWED_MIME_TYPES = {
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain',
+    'application/zip',
+    'application/x-rar-compressed',
+    'application/vnd.rar',
+}
 
 
 class WhatsAppSendMessageForm(forms.Form):
@@ -26,6 +42,25 @@ class WhatsAppSendMessageForm(forms.Form):
         ),
         label='Arquivo/midia',
     )
+
+    def clean_arquivo(self):
+        arquivo = self.cleaned_data.get('arquivo')
+        if not arquivo:
+            return arquivo
+
+        if arquivo.size > MAX_UPLOAD_SIZE:
+            raise forms.ValidationError('Arquivo excede 20MB. Envie um arquivo menor.')
+
+        content_type = (getattr(arquivo, 'content_type', '') or '').lower()
+        if not content_type:
+            guessed, _ = mimetypes.guess_type(arquivo.name or '')
+            content_type = (guessed or '').lower()
+
+        is_allowed = any(content_type.startswith(prefix) for prefix in ALLOWED_MIME_PREFIXES)
+        if not is_allowed and content_type not in ALLOWED_MIME_TYPES:
+            raise forms.ValidationError('Tipo de arquivo nao permitido para envio no WhatsApp.')
+
+        return arquivo
 
 
 class WhatsAppStartConversationForm(forms.Form):
