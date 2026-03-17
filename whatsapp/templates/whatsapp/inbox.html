@@ -177,6 +177,10 @@
                             <button type="button" onclick="messageAction(event, 'download', {{ mensagem.pk }}, '{{ mensagem.media_url|default:''|escapejs }}')" {% if not mensagem.media_url %}disabled{% endif %}>Download</button>
                             <button type="button" onclick="messageAction(event, 'reply', {{ mensagem.pk }}, '{{ mensagem.conteudo|default:''|escapejs }}')">Responder</button>
                             <button type="button" onclick="messageAction(event, 'react', {{ mensagem.pk }}, '', this)">Reagir</button>
+                            {% if mensagem.direcao == 'OUT' %}
+                            <button type="button" onclick="messageAction(event, 'edit', {{ mensagem.pk }}, '{{ mensagem.conteudo|default:''|escapejs }}')">Editar</button>
+                            {% endif %}
+                            <button type="button" class="text-danger" onclick="messageAction(event, 'delete', {{ mensagem.pk }}, '')">Excluir</button>
                         </div>
                         {% if mensagem.media_url %}
                             {% if mensagem.media_kind == 'audio' %}
@@ -195,6 +199,9 @@
                         <div class="message-text">{{ mensagem.conteudo|linebreaksbr }}</div>
                         {% endif %}
                         <div class="message-meta">
+                            {% if mensagem.is_edited %}
+                            <span class="message-edited">editada</span>
+                            {% endif %}
                             <span class="message-time">{{ mensagem.criado_em|date:"H:i" }}</span>
                             {% if mensagem.direcao == 'OUT' %}
                                 {% if mensagem.status == 'read' %}
@@ -313,6 +320,24 @@
         </div>
     </div>
 </div>
+<div class="edit-message-modal" id="editMessageModal" aria-hidden="true">
+    <div class="edit-message-card">
+        <div class="edit-message-header">
+            <button type="button" class="edit-message-close" id="editMessageClose" aria-label="Fechar">&times;</button>
+            <h5>Editar mensagem</h5>
+        </div>
+        <div class="edit-message-body">
+            <div class="edit-message-preview-wrap">
+                <div class="edit-message-preview-bubble" id="editMessagePreviewBubble"></div>
+            </div>
+            <textarea id="editMessageInput" class="edit-message-input" rows="3" placeholder="Edite sua mensagem"></textarea>
+        </div>
+        <div class="edit-message-footer">
+            <button type="button" class="btn btn-light border" id="editMessageCancelBtn">Cancelar</button>
+            <button type="button" class="btn btn-success" id="editMessageSaveBtn">Salvar</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -324,11 +349,13 @@
         forwardMessagesBulkEndpoint: "{% url 'whatsapp:forward_messages_bulk' %}",
         markReadEndpointTemplate: "{% url 'whatsapp:mark_read' 0 %}",
         deleteConversationEndpointTemplate: "{% url 'whatsapp:delete_conversation' 0 %}",
+        editMessageEndpointTemplate: "{% url 'whatsapp:edit_message' 0 %}",
+        deleteMessageEndpointTemplate: "{% url 'whatsapp:delete_message' 0 %}",
         reactMessageEndpointTemplate: "{% url 'whatsapp:react_message' 0 %}",
         inboxBaseUrl: "{% url 'whatsapp:inbox' %}",
         currentQuery: "{{ request.GET.q|default:''|escapejs }}",
         openNewChat: {% if open_new_chat %}true{% else %}false{% endif %}
     };
 </script>
-<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-6"></script>
+<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-8"></script>
 {% endblock %}

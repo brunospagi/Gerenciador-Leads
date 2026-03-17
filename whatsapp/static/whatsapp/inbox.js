@@ -6,6 +6,8 @@
         const forwardMessagesBulkEndpoint = cfg.forwardMessagesBulkEndpoint || '';
         const markReadEndpointTemplate = cfg.markReadEndpointTemplate || '';
         const deleteConversationEndpointTemplate = cfg.deleteConversationEndpointTemplate || '';
+        const editMessageEndpointTemplate = cfg.editMessageEndpointTemplate || '';
+        const deleteMessageEndpointTemplate = cfg.deleteMessageEndpointTemplate || '';
         const listEl = document.getElementById('conversation-list');
         const messagesEl = document.getElementById('message-list');
         let currentQuery = cfg.currentQuery || '';
@@ -29,6 +31,12 @@
         const forwardTargetCount = document.getElementById('forwardTargetCount');
         const forwardTargetCancelBtn = document.getElementById('forwardTargetCancelBtn');
         const forwardTargetSendBtn = document.getElementById('forwardTargetSendBtn');
+        const editMessageModal = document.getElementById('editMessageModal');
+        const editMessageClose = document.getElementById('editMessageClose');
+        const editMessageCancelBtn = document.getElementById('editMessageCancelBtn');
+        const editMessageSaveBtn = document.getElementById('editMessageSaveBtn');
+        const editMessageInput = document.getElementById('editMessageInput');
+        const editMessagePreviewBubble = document.getElementById('editMessagePreviewBubble');
         const forwardSelectionBar = document.getElementById('forwardSelectionBar');
         const forwardSelectionCount = document.getElementById('forwardSelectionCount');
         const forwardCancelBtn = document.getElementById('forwardCancelBtn');
@@ -48,6 +56,7 @@
         const selectedForwardMessageIds = new Set();
         let latestConversationsCache = [];
         const selectedForwardTargets = new Set();
+        let editingMessageId = null;
 
         function esc(str) {
             return (str || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -114,12 +123,17 @@
             const noMedia = mediaUrl ? '' : 'disabled';
             const encMedia = encodeURIComponent(mediaUrl);
             const encText = encodeURIComponent(text);
+            const editBtn = message.direcao === 'OUT'
+                ? `<button type="button" onclick="messageAction(event, 'edit', ${message.id}, '${encText}')">Editar</button>`
+                : '';
             return `<button type="button" class="message-menu-trigger" onclick="toggleMessageMenu(event, ${message.id})">&#8942;</button>
                 <div class="message-menu" id="msg-menu-${message.id}">
                     <button type="button" onclick="messageAction(event, 'forward', ${message.id}, '')">Encaminhar</button>
                     <button type="button" onclick="messageAction(event, 'download', ${message.id}, '${encMedia}')" ${noMedia}>Download</button>
                     <button type="button" onclick="messageAction(event, 'reply', ${message.id}, '${encText}')">Responder</button>
                     <button type="button" onclick="messageAction(event, 'react', ${message.id}, '', this)">Reagir</button>
+                    ${editBtn}
+                    <button type="button" class="text-danger" onclick="messageAction(event, 'delete', ${message.id}, '')">Excluir</button>
                 </div>`;
         }
 
@@ -212,6 +226,7 @@
                 k: m.media_kind || '',
                 s: m.status_code || '',
                 r: m.reaction_emoji || '',
+                e: !!m.is_edited,
                 t: m.criado_em || '',
             })));
             if (signature === lastMessagesSignature) return;
@@ -235,10 +250,11 @@
                 const isVisualMedia = kind === 'image' || kind === 'video' || kind === 'sticker';
                 const mediaOnly = hasMedia && !cleanedText && isVisualMedia;
                 const bubbleClass = `message-bubble${hasMedia ? ' has-media' : ''}${mediaOnly ? ' media-only' : ''}`;
+                const editedBadge = m.is_edited ? '<span class="message-edited">editada</span>' : '';
                 const isSelected = selectedForwardMessageIds.has(Number(m.id));
                 const selectedClass = isSelected ? 'is-selected' : '';
                 const checkClass = isSelected ? 'selected' : '';
-                return `<div class="message-box ${side} ${selectedClass}" data-message-id="${m.id}"><button type="button" class="forward-check ${checkClass}" onclick="toggleForwardMessageSelection(event, ${m.id})"><i class="fa-solid fa-check"></i></button><div class="${bubbleClass}">${menuMarkup(m)}${mediaMarkup(m.media_url, m.media_kind)}${messageText}<div class="message-meta"><span class="message-time">${timeText}</span>${statusIconMarkup(m)}</div>${reactionBadge}${reactionRow}</div></div>`;
+                return `<div class="message-box ${side} ${selectedClass}" data-message-id="${m.id}"><button type="button" class="forward-check ${checkClass}" onclick="toggleForwardMessageSelection(event, ${m.id})"><i class="fa-solid fa-check"></i></button><div class="${bubbleClass}">${menuMarkup(m)}${mediaMarkup(m.media_url, m.media_kind)}${messageText}<div class="message-meta">${editedBadge}<span class="message-time">${timeText}</span>${statusIconMarkup(m)}</div>${reactionBadge}${reactionRow}</div></div>`;
             }).join('');
             updateForwardSelectionUi();
             if (shouldStickToBottom) {
@@ -338,7 +354,7 @@
             }
         };
 
-        window.messageAction = function (eventOrAction, actionOrMessageId, messageIdOrPayload, payloadOrSourceEl, maybeSourceEl) {
+        window.messageAction = async function (eventOrAction, actionOrMessageId, messageIdOrPayload, payloadOrSourceEl, maybeSourceEl) {
             let event = null;
             let action = '';
             let messageId = '';
@@ -390,8 +406,43 @@
                     input.value = base ? `Respondendo: ${base}\n` : 'Respondendo:\n';
                     input.focus();
                 }
+            } else if (action === 'edit') {
+                const decoded = decodePayload(payload);
+                openEditMessageModal(messageId, decoded);
             } else if (action === 'forward') {
                 enterForwardSelectionMode(messageId);
+            } else if (action === 'delete') {
+                const ok = window.confirm('Deseja excluir esta mensagem?');
+                if (!ok) {
+                    closeAllMessageMenus();
+                    return;
+                }
+                try {
+                    const endpoint = deleteMessageEndpointTemplate.replace('/0/', `/${messageId}/`);
+                    const formData = new URLSearchParams();
+                    formData.append('ajax', '1');
+                    const resp = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': getCsrfToken(),
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json',
+                        },
+                        body: formData.toString(),
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok || !data || !data.ok) {
+                        alert((data && data.error) ? data.error : 'Nao foi possivel excluir a mensagem.');
+                    } else {
+                        lastMessagesSignature = '';
+                        lastConversationsSignature = '';
+                        await pollMessages();
+                        await pollConversations();
+                    }
+                } catch (e) {
+                    alert('Erro ao excluir mensagem.');
+                }
             }
             closeAllMessageMenus();
         };
@@ -483,6 +534,29 @@
             updateForwardTargetCount();
             if (forwardTargetSearch) forwardTargetSearch.value = '';
             if (forwardTargetList) forwardTargetList.innerHTML = '';
+        }
+
+        function closeEditMessageModal() {
+            if (!editMessageModal) return;
+            editMessageModal.classList.remove('show');
+            editMessageModal.setAttribute('aria-hidden', 'true');
+            editingMessageId = null;
+            if (editMessageInput) editMessageInput.value = '';
+            if (editMessagePreviewBubble) editMessagePreviewBubble.textContent = '';
+        }
+
+        function openEditMessageModal(messageId, originalText) {
+            if (!editMessageModal) return;
+            editingMessageId = Number(messageId || 0);
+            const text = String(originalText || '');
+            if (editMessageInput) editMessageInput.value = text;
+            if (editMessagePreviewBubble) editMessagePreviewBubble.textContent = text || '(sem texto)';
+            editMessageModal.classList.add('show');
+            editMessageModal.setAttribute('aria-hidden', 'false');
+            if (editMessageInput) {
+                editMessageInput.focus();
+                editMessageInput.setSelectionRange(editMessageInput.value.length, editMessageInput.value.length);
+            }
         }
 
         async function openForwardTargetModal() {
@@ -908,6 +982,56 @@
         if (composeMediaClose) {
             composeMediaClose.addEventListener('click', closeComposeMediaModal);
         }
+        if (editMessageCancelBtn) {
+            editMessageCancelBtn.addEventListener('click', closeEditMessageModal);
+        }
+        if (editMessageClose) {
+            editMessageClose.addEventListener('click', closeEditMessageModal);
+        }
+        if (editMessageInput && editMessagePreviewBubble) {
+            editMessageInput.addEventListener('input', function () {
+                editMessagePreviewBubble.textContent = this.value || '(sem texto)';
+            });
+        }
+        if (editMessageSaveBtn) {
+            editMessageSaveBtn.addEventListener('click', async function () {
+                const id = Number(editingMessageId || 0);
+                const novoTexto = editMessageInput ? String(editMessageInput.value || '').trim() : '';
+                if (!id) return;
+                if (!novoTexto) {
+                    alert('Informe o novo texto da mensagem.');
+                    return;
+                }
+                try {
+                    const endpoint = editMessageEndpointTemplate.replace('/0/', `/${id}/`);
+                    const formData = new URLSearchParams();
+                    formData.append('ajax', '1');
+                    formData.append('mensagem', novoTexto);
+                    const resp = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': getCsrfToken(),
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json',
+                        },
+                        body: formData.toString(),
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok || !data || !data.ok) {
+                        alert((data && data.error) ? data.error : 'Nao foi possivel editar a mensagem.');
+                        return;
+                    }
+                    closeEditMessageModal();
+                    lastMessagesSignature = '';
+                    lastConversationsSignature = '';
+                    await pollMessages();
+                    await pollConversations();
+                } catch (e) {
+                    alert('Erro ao editar mensagem.');
+                }
+            });
+        }
         if (forwardCancelBtn) {
             forwardCancelBtn.addEventListener('click', function () {
                 exitForwardSelectionMode();
@@ -1245,6 +1369,9 @@
             if (forwardTargetModal && e.target === forwardTargetModal) {
                 closeForwardTargetModal();
             }
+            if (editMessageModal && e.target === editMessageModal) {
+                closeEditMessageModal();
+            }
         });
 
         if (imagePreviewClose) {
@@ -1261,6 +1388,10 @@
             }
             if (e.key === 'Escape' && forwardTargetModal && forwardTargetModal.classList.contains('show')) {
                 closeForwardTargetModal();
+                return;
+            }
+            if (e.key === 'Escape' && editMessageModal && editMessageModal.classList.contains('show')) {
+                closeEditMessageModal();
             }
         });
 

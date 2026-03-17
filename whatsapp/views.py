@@ -146,6 +146,17 @@ def _message_reaction_emoji(message: WhatsAppMessage) -> str:
     return ''
 
 
+def _message_is_edited(message: WhatsAppMessage) -> bool:
+    payload = message.payload or {}
+    if not isinstance(payload, dict):
+        return False
+    if isinstance(payload.get('edited_local'), dict):
+        return True
+    if isinstance(payload.get('message_update'), dict):
+        return True
+    return False
+
+
 def can_manage_whatsapp_instance(user) -> bool:
     if not getattr(user, 'is_authenticated', False):
         return False
@@ -164,6 +175,30 @@ def ensure_br_country_code(number: str) -> str:
     if len(digits) in {10, 11}:
         return f'55{digits}'
     return digits
+
+
+def _refresh_conversation_preview(conversa: WhatsAppConversation) -> None:
+    latest = conversa.mensagens.order_by('-criado_em').first()
+    if latest:
+        preview = _visible_text(latest.conteudo or '')
+        if not preview and (latest.media_url or '').strip():
+            kind = (latest.media_kind or '').strip().lower()
+            preview = {
+                'image': '[IMAGEM]',
+                'video': '[VIDEO]',
+                'audio': '[AUDIO]',
+                'sticker': '[FIGURINHA]',
+                'document': '[DOCUMENTO]',
+            }.get(kind, '[ARQUIVO]')
+        conversa.ultima_mensagem = (preview or '')[:500]
+        conversa.ultima_mensagem_em = latest.criado_em or timezone.now()
+    else:
+        conversa.ultima_mensagem = ''
+        conversa.ultima_mensagem_em = timezone.now()
+
+    in_count = conversa.mensagens.filter(direcao=WhatsAppMessage.Direction.RECEBIDA).count()
+    conversa.nao_lidas = min(int(conversa.nao_lidas or 0), int(in_count))
+    conversa.save(update_fields=['ultima_mensagem', 'ultima_mensagem_em', 'nao_lidas', 'atualizado_em'])
 
 
 class WhatsAppAccessMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -206,6 +241,7 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                 m.conteudo = _visible_text(m.conteudo or '')
                 m.media_url = _normalize_public_media_url(m.media_url or '')
                 m.reaction_emoji = _message_reaction_emoji(m)
+                m.is_edited = _message_is_edited(m)
                 filtered.append(m)
             mensagens = filtered[-300:]
 
@@ -518,6 +554,60 @@ def delete_conversation(request, pk):
     return redirect('whatsapp:inbox')
 
 
+@login_required
+def delete_message(request, pk):
+    if request.method != 'POST':
+        return HttpResponseForbidden('Metodo nao permitido.')
+    if not has_module_access(request.user, 'whatsapp'):
+        return HttpResponseForbidden('Sem permissao.')
+
+    mensagem = get_object_or_404(WhatsAppMessage, pk=pk)
+    conversa = mensagem.conversa
+    deleted_id = mensagem.pk
+    mensagem.delete()
+    _refresh_conversation_preview(conversa)
+
+    if _is_ajax_request(request):
+        return JsonResponse({'ok': True, 'message_id': deleted_id, 'conversation_id': conversa.pk})
+    messages.success(request, 'Mensagem deletada com sucesso.')
+    return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
+
+
+@login_required
+def edit_message(request, pk):
+    if request.method != 'POST':
+        return HttpResponseForbidden('Metodo nao permitido.')
+    if not has_module_access(request.user, 'whatsapp'):
+        return HttpResponseForbidden('Sem permissao.')
+
+    mensagem = get_object_or_404(WhatsAppMessage, pk=pk)
+    if mensagem.direcao != WhatsAppMessage.Direction.ENVIADA:
+        return JsonResponse({'ok': False, 'error': 'Apenas mensagens enviadas podem ser editadas.'}, status=400)
+
+    novo_texto = _visible_text(request.POST.get('mensagem') or request.POST.get('texto') or '')
+    if not novo_texto:
+        return JsonResponse({'ok': False, 'error': 'Informe o novo texto da mensagem.'}, status=400)
+
+    texto_antigo = _visible_text(mensagem.conteudo or '')
+    if novo_texto == texto_antigo:
+        return JsonResponse({'ok': True, 'message_id': mensagem.pk, 'conteudo': mensagem.conteudo or '', 'is_edited': _message_is_edited(mensagem)})
+
+    merged_payload = dict(mensagem.payload or {})
+    merged_payload['edited_local'] = {
+        'old_text': texto_antigo,
+        'new_text': novo_texto,
+        'edited_at': timezone.now().isoformat(),
+        'edited_by': getattr(request.user, 'username', ''),
+    }
+    mensagem.conteudo = novo_texto
+    mensagem.payload = merged_payload
+    mensagem.save(update_fields=['conteudo', 'payload'])
+
+    _refresh_conversation_preview(mensagem.conversa)
+
+    return JsonResponse({'ok': True, 'message_id': mensagem.pk, 'conteudo': mensagem.conteudo, 'is_edited': True})
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class WhatsAppWebhookView(View):
     def post(self, request, *args, **kwargs):
@@ -792,6 +882,7 @@ def conversation_messages_feed(request, pk):
             'media_url': _normalize_public_media_url(m.media_url or ''),
             'media_kind': m.media_kind or '',
             'reaction_emoji': _message_reaction_emoji(m),
+            'is_edited': _message_is_edited(m),
             'status_code': m.status,
             'status': m.get_status_display(),
             'criado_em': m.criado_em.strftime('%d/%m/%Y %H:%M') if m.criado_em else '',
