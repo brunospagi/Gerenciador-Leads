@@ -13,6 +13,7 @@
         const messagesEl = document.getElementById('message-list');
         const filterAllChip = document.getElementById('filterAllChip');
         const filterUnreadChip = document.getElementById('filterUnreadChip');
+        const filterUnreadCount = document.getElementById('filterUnreadCount');
         const filterArchivedChip = document.getElementById('filterArchivedChip');
         const filterArchivedCount = document.getElementById('filterArchivedCount');
         let currentQuery = cfg.currentQuery || '';
@@ -123,6 +124,20 @@
             return `<span class="bubble-media media-album">${html}</span>`;
         }
 
+        function linkPreviewMarkup(preview) {
+            const item = preview && typeof preview === 'object' ? preview : {};
+            const url = String(item.url || '').trim();
+            if (!url) return '';
+            const title = esc(String(item.title || '').trim());
+            const description = esc(String(item.description || '').trim());
+            const siteName = esc(String(item.site_name || '').trim() || url);
+            const imageRaw = normalizeMediaUrl(item.image || '');
+            const imageHtml = imageRaw ? `<img src="${imageRaw}" alt="Preview do link">` : '';
+            const titleHtml = title ? `<strong>${title}</strong>` : '';
+            const descHtml = description ? `<p>${description}</p>` : '';
+            return `<a class="link-preview-card" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${imageHtml}<div class="link-preview-body">${titleHtml}${descHtml}<small>${siteName}</small></div></a>`;
+        }
+
         function reactionMarkup(messageId) {
             return `<div class="reaction-row reaction-hidden" id="reaction-row-${messageId}"><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDC4D')">&#128077;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\u2764\\uFE0F')">&#10084;&#65039;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDE02')">&#128514;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDE4F')">&#128591;</button></div>`;
         }
@@ -131,6 +146,14 @@
             const value = String(emoji || '').trim();
             if (!value) return '';
             return `<div class="message-reaction-badge">${esc(value)}</div>`;
+        }
+
+        function replyPreviewMarkup(replyPreview) {
+            const item = replyPreview && typeof replyPreview === 'object' ? replyPreview : {};
+            const author = esc(String(item.author || '').trim());
+            const text = esc(String(item.text || '').trim());
+            if (!text) return '';
+            return `<div class="message-reply-preview"><div class="message-reply-author">${author || 'Contato'}</div><div class="message-reply-text">${text}</div></div>`;
         }
 
         function statusIconMarkup(message) {
@@ -248,12 +271,15 @@
             if (composeInput) composeInput.disabled = !state;
             if (attachTrigger) attachTrigger.disabled = !state;
             if (micRecordBtn) micRecordBtn.disabled = !state;
-            if (sendRecordedAudioBtn) sendRecordedAudioBtn.disabled = !state;
+            if (recordingDeleteBtn) recordingDeleteBtn.disabled = !state;
+            if (recordingPauseBtn) recordingPauseBtn.disabled = !state;
+            if (recordingSendBtn) recordingSendBtn.disabled = !state;
         }
 
         function clearActiveConversationUi() {
             setActiveConversationId('');
             setConversationActionsEnabled(false);
+            if (typeof clearReplyComposer === 'function') clearReplyComposer();
             if (activeNameEl) {
                 activeNameEl.innerHTML = `Selecione uma conversa<br><span id="active-contact-jid">-</span>`;
             }
@@ -302,6 +328,8 @@
             const baseUrl = cfg.inboxBaseUrl || '/whatsapp/';
             const activeItems = (conversas || []).filter((c) => !c.arquivada);
             const archivedItems = (conversas || []).filter((c) => !!c.arquivada);
+            const unreadItems = activeItems.filter((c) => Number(c.nao_lidas || 0) > 0);
+            if (filterUnreadCount) filterUnreadCount.textContent = String(unreadItems.length);
             if (filterArchivedCount) filterArchivedCount.textContent = String(archivedItems.length);
             const renderItem = (c, archived) => {
                 const activeClass = String(c.id) === String(activeConversationId) ? 'active' : '';
@@ -317,7 +345,6 @@
             if (currentConversationFilter === 'archived') {
                 html = archivedItems.map((c) => renderItem(c, true)).join('');
             } else if (currentConversationFilter === 'unread') {
-                const unreadItems = activeItems.filter((c) => Number(c.nao_lidas || 0) > 0);
                 html = unreadItems.map((c) => renderItem(c, false)).join('');
             } else {
                 const activeHtml = activeItems.map((c) => renderItem(c, false)).join('');
@@ -397,6 +424,8 @@
                 g: m.media_group_id || '',
                 s: m.status_code || '',
                 r: m.reaction_emoji || '',
+                lp: m.link_preview || {},
+                rp: m.reply_preview || {},
                 e: !!m.is_edited,
                 t: m.criado_em || '',
             })));
@@ -417,6 +446,8 @@
                 const reactionBadge = reactionBadgeMarkup(m.reaction_emoji);
                 const timeText = esc((m.criado_em || '').split(' ')[1] || m.criado_em || '');
                 const messageText = textHtml ? `<div class="message-text">${textHtml}</div>` : '';
+                const previewHtml = linkPreviewMarkup(m.link_preview);
+                const replyPreviewHtml = replyPreviewMarkup(m.reply_preview);
                 const hasMedia = !!m.media_url;
                 const isVisualMedia = kind === 'image' || kind === 'video' || kind === 'sticker';
                 const mediaOnly = hasMedia && !cleanedText && isVisualMedia;
@@ -426,7 +457,7 @@
                 const selectedClass = isSelected ? 'is-selected' : '';
                 const checkClass = isSelected ? 'selected' : '';
                 const mediaHtml = kind === 'album' ? mediaAlbumMarkup(m.album_items || []) : mediaMarkup(m.media_url, m.media_kind);
-                return `<div class="message-box ${side} ${selectedClass}" data-message-id="${m.id}"><button type="button" class="forward-check ${checkClass}" onclick="toggleForwardMessageSelection(event, ${m.id})"><i class="fa-solid fa-check"></i></button><div class="${bubbleClass}">${menuMarkup(m)}${mediaHtml}${messageText}<div class="message-meta">${editedBadge}<span class="message-time">${timeText}</span>${statusIconMarkup(m)}</div>${reactionBadge}${reactionRow}</div></div>`;
+                return `<div class="message-box ${side} ${selectedClass}" data-message-id="${m.id}"><button type="button" class="forward-check ${checkClass}" onclick="toggleForwardMessageSelection(event, ${m.id})"><i class="fa-solid fa-check"></i></button><div class="${bubbleClass}">${menuMarkup(m)}${replyPreviewHtml}${mediaHtml}${messageText}${previewHtml}<div class="message-meta">${editedBadge}<span class="message-time">${timeText}</span>${statusIconMarkup(m)}</div>${reactionBadge}${reactionRow}</div></div>`;
             }).join('');
             updateForwardSelectionUi();
             if (shouldStickToBottom) {
@@ -574,12 +605,9 @@
                 }
             } else if (action === 'reply') {
                 const decoded = decodePayload(payload);
+                setReplyComposerState(messageId, decoded);
                 const input = document.querySelector('.chatbox-input input[name="mensagem"]');
-                if (input) {
-                    const base = (decoded || '').replace(/\s+/g, ' ').trim().slice(0, 80);
-                    input.value = base ? `Respondendo: ${base}\n` : 'Respondendo:\n';
-                    input.focus();
-                }
+                if (input) input.focus();
             } else if (action === 'edit') {
                 const decoded = decodePayload(payload);
                 openEditMessageModal(messageId, decoded);
@@ -947,6 +975,13 @@
         const chatCameraInput = document.getElementById('chatCameraInput');
         const selectedFileName = document.getElementById('selectedFileName');
         const sendMessageForm = document.getElementById('sendMessageForm');
+        const replyToMessageIdInput = document.getElementById('replyToMessageId');
+        const replyComposer = document.getElementById('replyComposer');
+        const replyComposerAuthor = document.getElementById('replyComposerAuthor');
+        const replyComposerText = document.getElementById('replyComposerText');
+        const replyComposerThumbWrap = document.getElementById('replyComposerThumbWrap');
+        const replyComposerThumb = document.getElementById('replyComposerThumb');
+        const replyComposerCancelBtn = document.getElementById('replyComposerCancelBtn');
         const composeEmojiTrigger = document.getElementById('composeEmojiTrigger');
         const sendMessageSubmitBtn = sendMessageForm ? sendMessageForm.querySelector('button.send-btn[type="submit"]') : null;
         const markReadForm = document.getElementById('markReadForm');
@@ -956,8 +991,11 @@
         const deleteConversationForm = document.getElementById('deleteConversationForm');
         const startConversationForm = document.getElementById('startConversationForm');
         const micRecordBtn = document.getElementById('micRecordBtn');
-        const recordingHint = document.getElementById('recordingHint');
-        const sendRecordedAudioBtn = document.getElementById('sendRecordedAudioBtn');
+        const recordingBar = document.getElementById('recordingBar');
+        const recordingDeleteBtn = document.getElementById('recordingDeleteBtn');
+        const recordingPauseBtn = document.getElementById('recordingPauseBtn');
+        const recordingSendBtn = document.getElementById('recordingSendBtn');
+        const recordingTimeText = document.getElementById('recordingTimeText');
         const emojiPickerPanel = document.createElement('div');
         emojiPickerPanel.className = 'emoji-picker-panel';
         emojiPickerPanel.id = 'emojiPickerPanel';
@@ -969,9 +1007,14 @@
         let mediaRecorder = null;
         let recordingStream = null;
         let recordingChunks = [];
-        let recordingStartedAt = 0;
         let recordingTimer = null;
+        let recordingElapsedMs = 0;
+        let recordingLastTickAt = 0;
         let isRecordingAudio = false;
+        let isRecordingPaused = false;
+        let isRecordedAudioReady = false;
+        let pendingSendRecordedAudio = false;
+        let discardRecordedAudio = false;
         let composeDraftKind = 'media';
         let composeDraftFiles = [];
         let composeDraftPreviewUrls = [];
@@ -1111,6 +1154,70 @@
             composeEmojiPickerPanel.classList.remove('show');
         }
 
+        function clearReplyComposer() {
+            if (replyToMessageIdInput) replyToMessageIdInput.value = '';
+            if (replyComposerAuthor) replyComposerAuthor.textContent = '';
+            if (replyComposerText) replyComposerText.textContent = '';
+            if (replyComposerThumb) replyComposerThumb.src = '';
+            if (replyComposerThumbWrap) replyComposerThumbWrap.classList.remove('show');
+            if (sendMessageForm) sendMessageForm.classList.remove('reply-mode');
+            if (replyComposer) replyComposer.setAttribute('aria-hidden', 'true');
+        }
+
+        function mediaKindLabel(kindRaw) {
+            const kind = String(kindRaw || '').toLowerCase();
+            if (kind === 'image') return '[Foto]';
+            if (kind === 'video') return '[Video]';
+            if (kind === 'audio') return '[Audio]';
+            if (kind === 'sticker') return '[Figurinha]';
+            if (kind === 'document') return '[Documento]';
+            return '[Mensagem]';
+        }
+
+        function setReplyComposerState(messageId, payloadText) {
+            const id = Number(messageId || 0);
+            if (!id || !sendMessageForm) return;
+            const box = document.querySelector(`#message-list .message-box[data-message-id="${id}"]`);
+            const bubble = box ? box.querySelector('.message-bubble') : null;
+            const textNode = bubble ? bubble.querySelector('.message-text') : null;
+            const imageNode = bubble ? bubble.querySelector('.js-chat-image') : null;
+
+            let previewText = String(payloadText || '').trim();
+            if (!previewText && textNode) previewText = String(textNode.textContent || '').trim();
+
+            let mediaKind = '';
+            if (bubble) {
+                if (bubble.querySelector('.media-image')) mediaKind = 'image';
+                else if (bubble.querySelector('.media-video')) mediaKind = 'video';
+                else if (bubble.querySelector('.media-sticker')) mediaKind = 'sticker';
+                else if (bubble.querySelector('audio')) mediaKind = 'audio';
+                else if (bubble.querySelector('.bubble-media a')) mediaKind = 'document';
+            }
+            if (!previewText) previewText = mediaKindLabel(mediaKind);
+
+            const author = (box && box.classList.contains('my-message'))
+                ? 'Voce'
+                : (activeNameEl ? String((activeNameEl.textContent || '').split('\n')[0]).trim() : 'Contato');
+
+            if (replyToMessageIdInput) replyToMessageIdInput.value = String(id);
+            if (replyComposerAuthor) replyComposerAuthor.textContent = author || 'Contato';
+            if (replyComposerText) replyComposerText.textContent = previewText;
+
+            if (replyComposerThumbWrap && replyComposerThumb) {
+                const thumbSrc = imageNode ? normalizeMediaUrl(imageNode.getAttribute('data-full-src') || imageNode.getAttribute('src') || '') : '';
+                if (thumbSrc && (mediaKind === 'image' || mediaKind === 'sticker' || mediaKind === 'video')) {
+                    replyComposerThumb.src = thumbSrc;
+                    replyComposerThumbWrap.classList.add('show');
+                } else {
+                    replyComposerThumb.src = '';
+                    replyComposerThumbWrap.classList.remove('show');
+                }
+            }
+
+            sendMessageForm.classList.add('reply-mode');
+            if (replyComposer) replyComposer.setAttribute('aria-hidden', 'false');
+        }
+
         function openEmojiPicker(messageId, anchorEl) {
             emojiPickerMessageId = messageId;
             const rect = anchorEl ? anchorEl.getBoundingClientRect() : { left: window.innerWidth / 2, top: window.innerHeight / 2 };
@@ -1145,6 +1252,12 @@
                 } else {
                     openComposeEmojiPicker(composeEmojiTrigger);
                 }
+            });
+        }
+        if (replyComposerCancelBtn) {
+            replyComposerCancelBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                clearReplyComposer();
             });
         }
 
@@ -1189,20 +1302,48 @@
                 sendMessageSubmitBtn.disabled = state;
                 sendMessageSubmitBtn.textContent = state ? 'Enviando...' : 'Enviar';
             }
-            if (sendRecordedAudioBtn) sendRecordedAudioBtn.disabled = state;
             if (micRecordBtn) micRecordBtn.disabled = state;
+            if (recordingDeleteBtn) recordingDeleteBtn.disabled = state;
+            if (recordingPauseBtn) recordingPauseBtn.disabled = state;
+            if (recordingSendBtn) recordingSendBtn.disabled = state;
             if (composeInput) composeInput.readOnly = state;
             if (sendMessageForm) sendMessageForm.classList.toggle('is-sending', state);
         }
 
+        function refreshRecordingUi() {
+            if (sendMessageForm) {
+                sendMessageForm.classList.toggle('recording-mode', isRecordingAudio || isRecordedAudioReady);
+            }
+            if (recordingBar) {
+                recordingBar.classList.toggle('show', isRecordingAudio || isRecordedAudioReady);
+                recordingBar.classList.toggle('paused', !!isRecordingPaused);
+                recordingBar.setAttribute('aria-hidden', (!isRecordingAudio && !isRecordedAudioReady) ? 'true' : 'false');
+            }
+            if (recordingPauseBtn) {
+                const icon = recordingPauseBtn.querySelector('i');
+                if (icon) {
+                    icon.className = isRecordingPaused ? 'fa-solid fa-play' : 'fa-solid fa-pause';
+                }
+                recordingPauseBtn.disabled = !isRecordingAudio;
+            }
+            if (recordingSendBtn) {
+                recordingSendBtn.disabled = !isRecordingAudio && !isRecordedAudioReady;
+            }
+        }
         function setAudioReadyState(isReady) {
-            if (!sendRecordedAudioBtn) return;
-            sendRecordedAudioBtn.classList.toggle('show', !!isReady);
+            isRecordedAudioReady = !!isReady;
+            refreshRecordingUi();
         }
 
         function clearAttachmentInputs() {
             if (chatFileInput) chatFileInput.value = '';
             if (chatCameraInput) chatCameraInput.value = '';
+            pendingSendRecordedAudio = false;
+            discardRecordedAudio = false;
+            recordingElapsedMs = 0;
+            recordingLastTickAt = 0;
+            isRecordingPaused = false;
+            if (recordingTimeText) recordingTimeText.textContent = '0:00';
             setAudioReadyState(false);
         }
 
@@ -1211,7 +1352,12 @@
             const dt = new DataTransfer();
             dt.items.add(file);
             chatFileInput.files = dt.files;
-            if (selectedFileName) selectedFileName.textContent = `Arquivo: ${file.name}`;
+            if (selectedFileName) {
+                const lowerName = String(file.name || '').toLowerCase();
+                const isAudioFile = String(file.type || '').toLowerCase().startsWith('audio/')
+                    || ['.ogg', '.opus', '.webm', '.m4a', '.mp3', '.wav', '.aac'].some((ext) => lowerName.endsWith(ext));
+                selectedFileName.textContent = isAudioFile ? '' : `Arquivo: ${file.name}`;
+            }
             const audioReady = options && options.audioReady;
             setAudioReadyState(!!audioReady);
         }
@@ -1282,7 +1428,7 @@
                 const lowerName = (file.name || '').toLowerCase();
                 const isRecordedAudio = lowerName.startsWith('audio_') && (String(file.type || '').startsWith('audio/') || ['.ogg', '.opus', '.webm', '.m4a', '.mp3', '.wav', '.aac'].some((ext) => lowerName.endsWith(ext)));
                 if (isRecordedAudio) {
-                    selectedFileName.textContent = `Arquivo: ${file.name}`;
+                    selectedFileName.textContent = '';
                     setAudioReadyState(true);
                     return;
                 }
@@ -1304,9 +1450,14 @@
 
         function formatRecordingTime(ms) {
             const totalSec = Math.max(0, Math.floor(ms / 1000));
-            const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+            const mm = String(Math.floor(totalSec / 60));
             const ss = String(totalSec % 60).padStart(2, '0');
             return `${mm}:${ss}`;
+        }
+
+        function updateRecordingTimeLabel() {
+            if (!recordingTimeText) return;
+            recordingTimeText.textContent = formatRecordingTime(recordingElapsedMs);
         }
 
         function stopRecordingTimer() {
@@ -1318,10 +1469,9 @@
 
         function resetRecordingUi() {
             if (micRecordBtn) micRecordBtn.classList.remove('recording');
-            if (recordingHint) {
-                recordingHint.style.display = 'none';
-                recordingHint.textContent = 'Gravando 00:00';
-            }
+            isRecordingPaused = false;
+            refreshRecordingUi();
+            updateRecordingTimeLabel();
         }
 
         async function startAudioRecording() {
@@ -1353,7 +1503,7 @@
                 mediaRecorder.onstop = () => {
                     const blobType = (recordingChunks[0] && recordingChunks[0].type) || 'audio/webm';
                     const blob = new Blob(recordingChunks, { type: blobType });
-                    if (blob.size > 0) {
+                    if (!discardRecordedAudio && blob.size > 0) {
                         clearAttachmentInputs();
                         const ext = blobType.includes('ogg') ? 'ogg' : (blobType.includes('mp4') ? 'm4a' : 'webm');
                         const file = new File([blob], `audio_${Date.now()}.${ext}`, { type: blobType });
@@ -1368,18 +1518,32 @@
                     isRecordingAudio = false;
                     stopRecordingTimer();
                     resetRecordingUi();
+                    if (discardRecordedAudio) {
+                        discardRecordedAudio = false;
+                        pendingSendRecordedAudio = false;
+                        clearAttachmentInputs();
+                        return;
+                    }
+                    if (pendingSendRecordedAudio && sendMessageForm) {
+                        pendingSendRecordedAudio = false;
+                        sendMessageForm.requestSubmit();
+                    }
                 };
                 mediaRecorder.start();
                 isRecordingAudio = true;
-                recordingStartedAt = Date.now();
+                isRecordingPaused = false;
+                isRecordedAudioReady = false;
+                recordingElapsedMs = 0;
+                recordingLastTickAt = Date.now();
                 if (micRecordBtn) micRecordBtn.classList.add('recording');
-                if (recordingHint) {
-                    recordingHint.style.display = 'inline';
-                    recordingHint.textContent = 'Gravando 00:00';
-                }
+                refreshRecordingUi();
+                updateRecordingTimeLabel();
                 recordingTimer = setInterval(() => {
-                    if (!recordingHint || !isRecordingAudio) return;
-                    recordingHint.textContent = `Gravando ${formatRecordingTime(Date.now() - recordingStartedAt)}`;
+                    if (!isRecordingAudio || isRecordingPaused) return;
+                    const now = Date.now();
+                    recordingElapsedMs += Math.max(0, now - recordingLastTickAt);
+                    recordingLastTickAt = now;
+                    updateRecordingTimeLabel();
                 }, 250);
             } catch (err) {
                 isRecordingAudio = false;
@@ -1403,25 +1567,58 @@
             resetRecordingUi();
         }
 
-        if (micRecordBtn) {
-            const begin = (e) => {
-                e.preventDefault();
-                startAudioRecording();
-            };
-            const end = (e) => {
-                e.preventDefault();
-                stopAudioRecording();
-            };
-            micRecordBtn.addEventListener('mousedown', begin);
-            micRecordBtn.addEventListener('touchstart', begin, { passive: false });
-            micRecordBtn.addEventListener('mouseup', end);
-            micRecordBtn.addEventListener('mouseleave', end);
-            micRecordBtn.addEventListener('touchend', end);
-            micRecordBtn.addEventListener('touchcancel', end);
+        function toggleRecordingPause() {
+            if (!isRecordingAudio || !mediaRecorder) return;
+            if (mediaRecorder.state === 'recording') {
+                try {
+                    mediaRecorder.pause();
+                    isRecordingPaused = true;
+                } catch (e) {}
+            } else if (mediaRecorder.state === 'paused') {
+                try {
+                    mediaRecorder.resume();
+                    isRecordingPaused = false;
+                    recordingLastTickAt = Date.now();
+                } catch (e) {}
+            }
+            refreshRecordingUi();
         }
-        if (sendRecordedAudioBtn && sendMessageForm) {
-            sendRecordedAudioBtn.addEventListener('click', function () {
+
+        if (micRecordBtn) {
+            micRecordBtn.addEventListener('click', function (e) {
+                e.preventDefault();
                 if (isSendingMessage) return;
+                if (isRecordingAudio || isRecordedAudioReady) return;
+                startAudioRecording();
+            });
+        }
+        if (recordingPauseBtn) {
+            recordingPauseBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                toggleRecordingPause();
+            });
+        }
+        if (recordingDeleteBtn) {
+            recordingDeleteBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (isRecordingAudio) {
+                    discardRecordedAudio = true;
+                    pendingSendRecordedAudio = false;
+                    stopAudioRecording();
+                }
+                clearAttachmentInputs();
+                setAudioReadyState(false);
+            });
+        }
+        if (recordingSendBtn && sendMessageForm) {
+            recordingSendBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (isSendingMessage) return;
+                if (isRecordingAudio) {
+                    pendingSendRecordedAudio = true;
+                    stopAudioRecording();
+                    return;
+                }
                 const hasFile = !!(chatFileInput && chatFileInput.files && chatFileInput.files.length);
                 if (!hasFile) return;
                 sendMessageForm.requestSubmit();
@@ -1447,6 +1644,7 @@
             const endpoint = (sendMessageForm.getAttribute('action') || '').trim() || (window.location.pathname + window.location.search);
             const conversaInput = sendMessageForm.querySelector('input[name="conversa_id"]');
             const conversaId = (conversaInput && conversaInput.value) ? conversaInput.value : String(activeConversationId || '');
+            const replyToId = (replyToMessageIdInput && replyToMessageIdInput.value) ? String(replyToMessageIdInput.value) : '';
             if (!conversaId) throw new Error('Conversa invalida.');
             const caption = composeMediaCaption ? String(composeMediaCaption.value || '').trim() : '';
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1460,6 +1658,7 @@
                         body.append('ajax', '1');
                         body.append('action', 'send_message');
                         body.append('conversa_id', conversaId);
+                        if (replyToId && i === 0) body.append('reply_to_message_id', replyToId);
                         body.append('arquivo', file, file.name || `arquivo_${Date.now()}_${i + 1}`);
                         if (caption && i === 0) body.append('mensagem', caption);
                         const resp = await fetch(endpoint, {
@@ -1504,6 +1703,7 @@
                     await sendComposeDraftFiles();
                     closeComposeMediaModal(true);
                     clearAttachmentInputs();
+                    clearReplyComposer();
                     if (selectedFileName) selectedFileName.textContent = '';
                     await pollMessages();
                     await pollConversations();
@@ -1791,6 +1991,7 @@
                     const textInput = sendMessageForm.querySelector('input[name="mensagem"]');
                     if (textInput) textInput.value = '';
                     clearAttachmentInputs();
+                    clearReplyComposer();
                     if (selectedFileName) selectedFileName.textContent = '';
                     closeAttachMenu();
                     pollMessages();
@@ -1861,6 +2062,7 @@
         async function activateConversation(conversationId, pushState) {
             if (!conversationId) return;
             exitForwardSelectionMode();
+            clearReplyComposer();
             // Quando a tela iniciou sem conversa ativa, o painel de mensagens nao existe.
             // Nesse caso, abre a URL normal para montar o layout completo.
             if (!messagesEl || !sendMessageForm) {
@@ -2026,6 +2228,10 @@
             }
             if (e.key === 'Escape' && forwardSelectionMode) {
                 exitForwardSelectionMode();
+                return;
+            }
+            if (e.key === 'Escape' && sendMessageForm && sendMessageForm.classList.contains('reply-mode')) {
+                clearReplyComposer();
             }
         });
 

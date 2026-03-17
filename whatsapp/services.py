@@ -7,10 +7,14 @@ import base64
 import binascii
 import mimetypes
 import uuid
+import socket
+import ipaddress
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
+from urllib.parse import urlparse
+from html import unescape
 
 import requests
 from django.core.files.base import ContentFile
@@ -24,6 +28,7 @@ from crmspagi.storage_backends import PublicMediaStorage
 from .models import WhatsAppConversation, WhatsAppInstance, WhatsAppMessage
 
 logger = logging.getLogger(__name__)
+URL_REGEX = re.compile(r'https?://[^\s<>"\']+', flags=re.IGNORECASE)
 
 
 def sanitize_text_content(value: str) -> str:
@@ -385,6 +390,204 @@ def parse_message_text(payload: dict[str, Any]) -> str:
     if low.startswith('http://') or low.startswith('https://') or low.startswith('/o1/v/') or low.startswith('/v/'):
         return ''
     return fallback_text
+
+
+def _sanitize_link_url(raw_value: str) -> str:
+    raw = str(raw_value or '').strip()
+    if not raw:
+        return ''
+    cleaned = raw.rstrip(').,;!?\'"')
+    low = cleaned.lower()
+    if not (low.startswith('http://') or low.startswith('https://')):
+        return ''
+    if any(token in low for token in ['mmg.whatsapp.net', 'lookaside.fbsbx.com', 'cdn.whatsapp.net']):
+        return ''
+    return cleaned
+
+
+def _extract_first_http_url(text: str) -> str:
+    raw = str(text or '')
+    if not raw:
+        return ''
+    match = URL_REGEX.search(raw)
+    if not match:
+        return ''
+    return _sanitize_link_url(match.group(0))
+
+
+def _extract_html_meta_content(html: str, key: str, attr: str = 'property') -> str:
+    if not html:
+        return ''
+    pattern = rf'<meta[^>]+{attr}\s*=\s*["\']{re.escape(key)}["\'][^>]*content\s*=\s*["\']([^"\']+)["\']'
+    match = re.search(pattern, html, flags=re.IGNORECASE)
+    if match:
+        return unescape((match.group(1) or '').strip())
+    # Alguns sites invertem a ordem dos atributos
+    pattern_alt = rf'<meta[^>]+content\s*=\s*["\']([^"\']+)["\'][^>]*{attr}\s*=\s*["\']{re.escape(key)}["\']'
+    match_alt = re.search(pattern_alt, html, flags=re.IGNORECASE)
+    if match_alt:
+        return unescape((match_alt.group(1) or '').strip())
+    return ''
+
+
+def _extract_html_title(html: str) -> str:
+    if not html:
+        return ''
+    match = re.search(r'<title[^>]*>(.*?)</title>', html, flags=re.IGNORECASE | re.DOTALL)
+    if not match:
+        return ''
+    text = re.sub(r'\s+', ' ', match.group(1) or '').strip()
+    return unescape(text)
+
+
+def _is_public_http_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    if parsed.scheme not in {'http', 'https'}:
+        return False
+    host = (parsed.hostname or '').strip()
+    if not host:
+        return False
+    blocked_hosts = {'localhost', '127.0.0.1', '::1'}
+    if host.lower() in blocked_hosts:
+        return False
+    try:
+        infos = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == 'https' else 80))
+    except Exception:
+        return False
+    for info in infos:
+        sockaddr = info[4]
+        ip_raw = sockaddr[0] if isinstance(sockaddr, tuple) and sockaddr else ''
+        try:
+            ip = ipaddress.ip_address(ip_raw)
+        except Exception:
+            continue
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
+            return False
+    return True
+
+
+def _fetch_link_metadata(url: str) -> dict[str, str]:
+    safe_url = _sanitize_link_url(url)
+    if not safe_url or not _is_public_http_url(safe_url):
+        return {}
+    headers = {
+        'User-Agent': (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+        ),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    }
+    try:
+        resp = requests.get(safe_url, timeout=4, headers=headers, allow_redirects=True)
+        if not resp.ok:
+            return {}
+        content_type = str(resp.headers.get('Content-Type') or '').lower()
+        if 'text/html' not in content_type and 'application/xhtml+xml' not in content_type:
+            return {}
+        html = resp.text or ''
+    except Exception:
+        return {}
+
+    title = (
+        _extract_html_meta_content(html, 'og:title')
+        or _extract_html_meta_content(html, 'twitter:title', attr='name')
+        or _extract_html_title(html)
+    )
+    description = (
+        _extract_html_meta_content(html, 'og:description')
+        or _extract_html_meta_content(html, 'description', attr='name')
+        or _extract_html_meta_content(html, 'twitter:description', attr='name')
+    )
+    image = (
+        _extract_html_meta_content(html, 'og:image')
+        or _extract_html_meta_content(html, 'twitter:image', attr='name')
+    )
+    site_name = _extract_html_meta_content(html, 'og:site_name') or (urlparse(safe_url).netloc or '')
+
+    metadata = {
+        'url': safe_url,
+        'title': str(title or '').strip()[:180],
+        'description': str(description or '').strip()[:360],
+        'image': str(image or '').strip()[:1200],
+        'site_name': str(site_name or '').strip()[:120],
+    }
+    return {k: v for k, v in metadata.items() if v}
+
+
+def _enrich_link_preview(preview: dict[str, str]) -> dict[str, str]:
+    current = dict(preview or {})
+    url = _sanitize_link_url(current.get('url') or '')
+    if not url:
+        return current
+    needs_enrich = not current.get('title') or not current.get('description') or not current.get('image')
+    if not needs_enrich:
+        return current
+    fetched = _fetch_link_metadata(url)
+    if not fetched:
+        return current
+    merged = {
+        'url': fetched.get('url') or url,
+        'title': current.get('title') or fetched.get('title') or '',
+        'description': current.get('description') or fetched.get('description') or '',
+        'image': current.get('image') or fetched.get('image') or '',
+        'site_name': current.get('site_name') or fetched.get('site_name') or '',
+    }
+    return {k: str(v).strip() for k, v in merged.items() if str(v or '').strip()}
+
+
+def extract_link_preview(payload: dict[str, Any], texto: str = '') -> dict[str, str]:
+    data = payload.get('data', payload) if isinstance(payload, dict) else {}
+    message = data.get('message', {}) if isinstance(data, dict) else {}
+    message = unwrap_message_content(message)
+    if not isinstance(message, dict):
+        message = {}
+
+    ext = message.get('extendedTextMessage') if isinstance(message.get('extendedTextMessage'), dict) else {}
+    context_info = ext.get('contextInfo') if isinstance(ext.get('contextInfo'), dict) else {}
+    external_ad = context_info.get('externalAdReply') if isinstance(context_info.get('externalAdReply'), dict) else {}
+    search_space = {
+        'payload': payload,
+        'data': data,
+        'message': message,
+        'extended': ext,
+        'context_info': context_info,
+        'external_ad_reply': external_ad,
+    }
+
+    def _pick(*keys: str) -> str:
+        normalized = {str(k or '').strip().lower() for k in keys if k}
+        return _find_nested_value(search_space, normalized)
+
+    url = (
+        _sanitize_link_url(_pick('canonicalurl', 'canonical_url'))
+        or _sanitize_link_url(_pick('sourceurl', 'source_url'))
+        or _sanitize_link_url(_pick('matchedtext', 'matched_text'))
+        or _sanitize_link_url(_pick('link', 'url'))
+        or _extract_first_http_url(texto)
+    )
+    if not url:
+        return {}
+
+    title = _pick('title')
+    description = _pick('description', 'body')
+    image = _pick('thumbnailurl', 'thumbnail_url', 'imageurl', 'image_url')
+    site_name = _pick('sitename', 'site_name', 'source')
+
+    if not site_name:
+        site_name = urlparse(url).netloc
+
+    preview = {
+        'url': url[:1200],
+        'title': str(title or '').strip()[:180],
+        'description': str(description or '').strip()[:360],
+        'image': str(image or '').strip()[:1200],
+        'site_name': str(site_name or '').strip()[:120],
+    }
+    compact = {k: v for k, v in preview.items() if v}
+    return _enrich_link_preview(compact)
 
 
 def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
@@ -1116,12 +1319,51 @@ class EvolutionAPIClient:
             'Content-Type': 'application/json',
         }
 
-    def send_text(self, number: str, text: str) -> dict[str, Any]:
+    def _post_with_payload_variants(
+        self,
+        endpoint: str,
+        payload_variants: list[dict[str, Any]],
+        timeout: int = 30,
+    ) -> dict[str, Any]:
+        last_error = None
+        for payload in payload_variants:
+            try:
+                response = requests.post(endpoint, json=payload, headers=self.headers, timeout=timeout)
+                response.raise_for_status()
+                return response.json() if response.content else {}
+            except requests.RequestException as exc:
+                last_error = exc
+                continue
+        if last_error:
+            raise last_error
+        raise RuntimeError('Nao foi possivel enviar requisicao para Evolution API.')
+
+    def send_text(
+        self,
+        number: str,
+        text: str,
+        quoted_key: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         url = f'{self.base_url}/message/sendText/{self.instance.instance_name}'
-        payload = {'number': normalize_number(number), 'text': text}
-        response = requests.post(url, json=payload, headers=self.headers, timeout=30)
-        response.raise_for_status()
-        return response.json() if response.content else {}
+        base_payload = {'number': normalize_number(number), 'text': text}
+        payload_variants = [base_payload]
+        if quoted_key and isinstance(quoted_key, dict):
+            q_remote = str(quoted_key.get('remoteJid') or '').strip()
+            q_id = str(quoted_key.get('id') or '').strip()
+            if q_remote and q_id:
+                normalized_key = {
+                    'remoteJid': q_remote,
+                    'fromMe': bool(quoted_key.get('fromMe')),
+                    'id': q_id,
+                }
+                payload_variants = [
+                    {**base_payload, 'quoted': normalized_key},
+                    {**base_payload, 'quotedMessage': normalized_key},
+                    {**base_payload, 'quotedMessageId': q_id},
+                    {**base_payload, 'options': {'quoted': normalized_key}},
+                    base_payload,
+                ]
+        return self._post_with_payload_variants(url, payload_variants, timeout=30)
 
     def send_media(
         self,
@@ -1131,9 +1373,10 @@ class EvolutionAPIClient:
         mimetype: str,
         caption: str = '',
         file_name: str = '',
+        quoted_key: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         url = f'{self.base_url}/message/sendMedia/{self.instance.instance_name}'
-        payload = {
+        base_payload = {
             'number': normalize_number(number),
             'mediatype': mediatype,
             'mimetype': mimetype,
@@ -1141,20 +1384,55 @@ class EvolutionAPIClient:
             'media': media_url,
         }
         if file_name:
-            payload['fileName'] = file_name
-        response = requests.post(url, json=payload, headers=self.headers, timeout=60)
-        response.raise_for_status()
-        return response.json() if response.content else {}
+            base_payload['fileName'] = file_name
+        payload_variants = [base_payload]
+        if quoted_key and isinstance(quoted_key, dict):
+            q_remote = str(quoted_key.get('remoteJid') or '').strip()
+            q_id = str(quoted_key.get('id') or '').strip()
+            if q_remote and q_id:
+                normalized_key = {
+                    'remoteJid': q_remote,
+                    'fromMe': bool(quoted_key.get('fromMe')),
+                    'id': q_id,
+                }
+                payload_variants = [
+                    {**base_payload, 'quoted': normalized_key},
+                    {**base_payload, 'quotedMessage': normalized_key},
+                    {**base_payload, 'quotedMessageId': q_id},
+                    {**base_payload, 'options': {'quoted': normalized_key}},
+                    base_payload,
+                ]
+        return self._post_with_payload_variants(url, payload_variants, timeout=60)
 
-    def send_whatsapp_audio(self, number: str, audio_url: str) -> dict[str, Any]:
+    def send_whatsapp_audio(
+        self,
+        number: str,
+        audio_url: str,
+        quoted_key: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         url = f'{self.base_url}/message/sendWhatsAppAudio/{self.instance.instance_name}'
-        payload = {
+        base_payload = {
             'number': normalize_number(number),
             'audio': audio_url,
         }
-        response = requests.post(url, json=payload, headers=self.headers, timeout=60)
-        response.raise_for_status()
-        return response.json() if response.content else {}
+        payload_variants = [base_payload]
+        if quoted_key and isinstance(quoted_key, dict):
+            q_remote = str(quoted_key.get('remoteJid') or '').strip()
+            q_id = str(quoted_key.get('id') or '').strip()
+            if q_remote and q_id:
+                normalized_key = {
+                    'remoteJid': q_remote,
+                    'fromMe': bool(quoted_key.get('fromMe')),
+                    'id': q_id,
+                }
+                payload_variants = [
+                    {**base_payload, 'quoted': normalized_key},
+                    {**base_payload, 'quotedMessage': normalized_key},
+                    {**base_payload, 'quotedMessageId': q_id},
+                    {**base_payload, 'options': {'quoted': normalized_key}},
+                    base_payload,
+                ]
+        return self._post_with_payload_variants(url, payload_variants, timeout=60)
 
     def send_reaction(self, remote_jid: str, from_me: bool, message_id: str, reaction: str) -> dict[str, Any]:
         url = f'{self.base_url}/message/sendReaction/{self.instance.instance_name}'
@@ -1859,10 +2137,18 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
             message_obj.conteudo = label
             changed_fields.append('conteudo')
 
-    if not changed_fields:
+    merged_payload = dict(message_obj.payload or {})
+    preview = extract_link_preview(payload, texto or text_before)
+    preview_changed = False
+    if preview:
+        current_preview = merged_payload.get('link_preview')
+        if not isinstance(current_preview, dict) or current_preview != preview:
+            merged_payload['link_preview'] = preview
+            preview_changed = True
+
+    if not changed_fields and not preview_changed:
         return False
 
-    merged_payload = dict(message_obj.payload or {})
     merged_payload['message_update'] = payload
     message_obj.payload = merged_payload
     changed_fields.append('payload')
@@ -2435,6 +2721,13 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
             payload={'facebook_ads_notice': ads_metadata},
         )
 
+    payload_with_preview = payload
+    if direction == WhatsAppMessage.Direction.RECEBIDA:
+        preview = extract_link_preview(payload, texto)
+        if preview:
+            payload_with_preview = dict(payload or {})
+            payload_with_preview['link_preview'] = preview
+
     defaults = {
         'conversa': conversation,
         'direcao': direction,
@@ -2446,7 +2739,7 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
                 map_delivery_status(payload),
             ) if from_me else WhatsAppMessage.Status.LIDA
         ),
-        'payload': payload,
+        'payload': payload_with_preview,
         'recebido_em': ts if direction == WhatsAppMessage.Direction.RECEBIDA else None,
     }
 

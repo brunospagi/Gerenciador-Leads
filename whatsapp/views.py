@@ -187,6 +187,25 @@ def _message_reaction_emoji(message: WhatsAppMessage) -> str:
     return ''
 
 
+def _message_link_preview(message: WhatsAppMessage) -> dict:
+    payload = message.payload or {}
+    if not isinstance(payload, dict):
+        return {}
+    preview = payload.get('link_preview')
+    if not isinstance(preview, dict):
+        return {}
+    url = _visible_text(preview.get('url') or '')
+    if not url:
+        return {}
+    return {
+        'url': url,
+        'title': _visible_text(preview.get('title') or ''),
+        'description': _visible_text(preview.get('description') or ''),
+        'image': _visible_text(preview.get('image') or ''),
+        'site_name': _visible_text(preview.get('site_name') or ''),
+    }
+
+
 def _message_is_edited(message: WhatsAppMessage) -> bool:
     def _has_edit_marker(node) -> bool:
         if isinstance(node, dict):
@@ -256,6 +275,135 @@ def _message_media_group_id(message: WhatsAppMessage) -> str:
     }
     found = _find_string_in_nested_payload(payload, keys)
     return found[:120] if found else ''
+
+
+def _extract_text_from_message_node(node) -> str:
+    if not isinstance(node, dict):
+        return ''
+    if _visible_text(node.get('conversation') or ''):
+        return _visible_text(node.get('conversation') or '')
+    ext = node.get('extendedTextMessage')
+    if isinstance(ext, dict) and _visible_text(ext.get('text') or ''):
+        return _visible_text(ext.get('text') or '')
+    image = node.get('imageMessage')
+    if isinstance(image, dict) and _visible_text(image.get('caption') or ''):
+        return _visible_text(image.get('caption') or '')
+    video = node.get('videoMessage')
+    if isinstance(video, dict) and _visible_text(video.get('caption') or ''):
+        return _visible_text(video.get('caption') or '')
+    return ''
+
+
+def _message_reply_preview(message: WhatsAppMessage) -> dict:
+    payload = message.payload or {}
+    if not isinstance(payload, dict):
+        return {}
+
+    # Resposta local (mensagens enviadas a partir do CRM)
+    local_reply = payload.get('reply_to')
+    if isinstance(local_reply, dict):
+        text_preview = _visible_text(local_reply.get('text_preview') or '')
+        media_kind = _visible_text(local_reply.get('media_kind') or '')
+        if not text_preview and media_kind:
+            text_preview = f'[{media_kind.upper()}]'
+        if text_preview:
+            author = 'Voce'
+            message_pk = str(local_reply.get('message_pk') or '')
+            if message_pk.isdigit():
+                quoted_msg = message.conversa.mensagens.filter(pk=int(message_pk)).first()
+                if quoted_msg and quoted_msg.direcao == WhatsAppMessage.Direction.RECEBIDA:
+                    author = message.conversa.nome_exibicao or 'Contato'
+            return {
+                'author': author,
+                'text': text_preview[:220],
+            }
+
+    # Resposta recebida (contextInfo no payload do webhook)
+    data = payload.get('data') if isinstance(payload.get('data'), dict) else {}
+    message_node = data.get('message') if isinstance(data.get('message'), dict) else {}
+    if not isinstance(message_node, dict):
+        return {}
+
+    candidates = []
+    for key in (
+        'extendedTextMessage',
+        'imageMessage',
+        'videoMessage',
+        'documentMessage',
+        'audioMessage',
+        'stickerMessage',
+    ):
+        part = message_node.get(key)
+        if isinstance(part, dict):
+            candidates.append(part.get('contextInfo'))
+            nested = part.get('messageContextInfo')
+            if isinstance(nested, dict):
+                candidates.append(nested)
+    if isinstance(message_node.get('messageContextInfo'), dict):
+        candidates.append(message_node.get('messageContextInfo'))
+
+    context_info = next((c for c in candidates if isinstance(c, dict)), {})
+    if not context_info:
+        return {}
+
+    stanza_id = _visible_text(context_info.get('stanzaId') or context_info.get('quotedStanzaID') or '')
+    quoted_participant = normalize_wa_id(_visible_text(context_info.get('participant') or context_info.get('quotedParticipant') or ''))
+    quoted_message = context_info.get('quotedMessage') if isinstance(context_info.get('quotedMessage'), dict) else {}
+
+    preview_text = _extract_text_from_message_node(quoted_message)
+    if not preview_text and isinstance(quoted_message, dict):
+        if isinstance(quoted_message.get('imageMessage'), dict):
+            preview_text = '[Foto]'
+        elif isinstance(quoted_message.get('videoMessage'), dict):
+            preview_text = '[Video]'
+        elif isinstance(quoted_message.get('audioMessage'), dict):
+            preview_text = '[Audio]'
+        elif isinstance(quoted_message.get('stickerMessage'), dict):
+            preview_text = '[Figurinha]'
+        elif isinstance(quoted_message.get('documentMessage'), dict):
+            preview_text = '[Documento]'
+
+    if not preview_text and stanza_id:
+        quoted_msg = (
+            message.conversa.mensagens.filter(external_id=stanza_id).first()
+            or message.conversa.mensagens.filter(external_id__iendswith=stanza_id).first()
+        )
+        if quoted_msg:
+            preview_text = _visible_text(quoted_msg.conteudo or '')
+            if not preview_text:
+                mk = (quoted_msg.media_kind or '').strip().lower()
+                if mk == 'image':
+                    preview_text = '[Foto]'
+                elif mk == 'video':
+                    preview_text = '[Video]'
+                elif mk == 'audio':
+                    preview_text = '[Audio]'
+                elif mk == 'sticker':
+                    preview_text = '[Figurinha]'
+                elif mk == 'document':
+                    preview_text = '[Documento]'
+
+    if not preview_text:
+        return {}
+
+    author = 'Contato'
+    quoted_msg_by_id = None
+    if stanza_id:
+        quoted_msg_by_id = (
+            message.conversa.mensagens.filter(external_id=stanza_id).first()
+            or message.conversa.mensagens.filter(external_id__iendswith=stanza_id).first()
+        )
+    if quoted_msg_by_id:
+        author = 'Voce' if quoted_msg_by_id.direcao == WhatsAppMessage.Direction.ENVIADA else (message.conversa.nome_exibicao or 'Contato')
+    elif quoted_participant:
+        conversation_jids = {normalize_wa_id(message.conversa.wa_id or ''), normalize_wa_id(message.conversa.wa_id_alt or '')}
+        if quoted_participant not in conversation_jids:
+            author = 'Voce'
+
+    return {
+        'author': author,
+        'text': preview_text[:220],
+    }
 
 
 def _message_key_data(message: WhatsAppMessage) -> tuple[str, bool, str]:
@@ -396,8 +544,10 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                 m.conteudo = _visible_text(m.conteudo or '')
                 m.media_url = _normalize_public_media_url(m.media_url or '')
                 m.reaction_emoji = _message_reaction_emoji(m)
+                m.link_preview = _message_link_preview(m)
                 m.is_edited = _message_is_edited(m)
                 m.media_group_id = _message_media_group_id(m)
+                m.reply_preview = _message_reply_preview(m)
                 filtered.append(m)
             mensagens = filtered[-300:]
 
@@ -554,6 +704,7 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
 
         texto = (form.cleaned_data.get('mensagem') or '').strip()
         arquivo = form.cleaned_data.get('arquivo')
+        reply_to_message_id_raw = (request.POST.get('reply_to_message_id') or '').strip()
         if not texto and not arquivo:
             if is_ajax:
                 return JsonResponse({'ok': False, 'error': 'Informe uma mensagem ou selecione um arquivo para enviar.'}, status=400)
@@ -565,6 +716,18 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         media_mimetype = ''
         media_name = ''
         media_kind = ''
+        reply_to_message = None
+        quoted_key_payload = None
+        if reply_to_message_id_raw.isdigit():
+            reply_to_message = conversa.mensagens.filter(pk=int(reply_to_message_id_raw)).first()
+            if reply_to_message:
+                q_remote_jid, q_from_me, q_message_id = _message_key_data(reply_to_message)
+                if q_message_id:
+                    quoted_key_payload = {
+                        'remoteJid': q_remote_jid or conversa.wa_id or '',
+                        'fromMe': bool(q_from_me),
+                        'id': q_message_id,
+                    }
         if arquivo:
             media_url, media_mimetype, media_name, media_storage_path = self._save_upload_and_get_url(arquivo)
             if media_url.startswith('//'):
@@ -587,7 +750,11 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             client = EvolutionAPIClient(instance=instance)
             number = ensure_br_country_code(conversa.wa_id.split('@')[0])
             if arquivo and media_kind == 'audio':
-                response = client.send_whatsapp_audio(number=number, audio_url=media_url)
+                response = client.send_whatsapp_audio(
+                    number=number,
+                    audio_url=media_url,
+                    quoted_key=quoted_key_payload,
+                )
             elif arquivo:
                 response = client.send_media(
                     number=number,
@@ -596,9 +763,10 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                     mimetype=media_mimetype,
                     caption=texto,
                     file_name=media_name,
+                    quoted_key=quoted_key_payload,
                 )
             else:
-                response = client.send_text(number=number, text=texto)
+                response = client.send_text(number=number, text=texto, quoted_key=quoted_key_payload)
             external_id = fit_external_id(
                 (
                 response.get('key', {}).get('id')
@@ -610,6 +778,14 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                 nova_mensagem.external_id = external_id
             nova_mensagem.status = WhatsAppMessage.Status.ENVIADA
             merged_payload = dict(response or {})
+            if reply_to_message and quoted_key_payload:
+                merged_payload['reply_to'] = {
+                    'message_pk': reply_to_message.pk,
+                    'external_id': reply_to_message.external_id or '',
+                    'key': quoted_key_payload,
+                    'text_preview': _visible_text(reply_to_message.conteudo or '')[:180],
+                    'media_kind': (reply_to_message.media_kind or '').strip().lower(),
+                }
             if arquivo:
                 merged_payload['mimetype'] = media_mimetype
                 merged_payload['mediaType'] = media_kind
@@ -1167,8 +1343,10 @@ def conversation_messages_feed(request, pk):
             'media_url': _normalize_public_media_url(m.media_url or ''),
             'media_kind': m.media_kind or '',
             'reaction_emoji': _message_reaction_emoji(m),
+            'link_preview': _message_link_preview(m),
             'media_group_id': _message_media_group_id(m),
             'is_edited': _message_is_edited(m),
+            'reply_preview': _message_reply_preview(m),
             'status_code': m.status,
             'status': m.get_status_display(),
             'criado_em': m.criado_em.strftime('%d/%m/%Y %H:%M') if m.criado_em else '',

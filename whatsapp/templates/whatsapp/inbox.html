@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}?v=20260317-20">
+<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}?v=20260317-26">
 <div class="wa-clone-wrap">
     <div class="wa-topbar">
         <div>
@@ -91,8 +91,8 @@
             </div>
             <div class="conversation-filters">
                 <button type="button" class="chip active" id="filterAllChip" data-filter="all">Tudo</button>
-                <button type="button" class="chip" id="filterUnreadChip" data-filter="unread">Não lidas</button>
-                <button type="button" class="chip" id="filterArchivedChip" data-filter="archived">Arquivadas <span id="filterArchivedCount">{{ conversas_arquivadas|length }}</span></button>
+                <button type="button" class="chip" id="filterUnreadChip" data-filter="unread">Não lidas <span class="chip-count" id="filterUnreadCount">0</span></button>
+                <button type="button" class="chip" id="filterArchivedChip" data-filter="archived">Arquivadas <span class="chip-count" id="filterArchivedCount">{{ conversas_arquivadas|length }}</span></button>
             </div>
 
             <div class="chat-list" id="conversation-list">
@@ -228,6 +228,12 @@
                             {% endif %}
                             <button type="button" class="text-danger" onclick="messageAction(event, 'delete', {{ mensagem.pk }}, '')">Excluir</button>
                         </div>
+                        {% if mensagem.reply_preview %}
+                        <div class="message-reply-preview">
+                            <div class="message-reply-author">{{ mensagem.reply_preview.author }}</div>
+                            <div class="message-reply-text">{{ mensagem.reply_preview.text }}</div>
+                        </div>
+                        {% endif %}
                         {% if mensagem.media_url %}
                             {% if mensagem.media_kind == 'audio' %}
                             <span class="bubble-media"><audio controls><source src="{{ mensagem.media_url }}"></audio></span>
@@ -243,6 +249,18 @@
                         {% endif %}
                         {% if mensagem.conteudo and mensagem.conteudo != '[DOCUMENT]' and mensagem.conteudo != '[ARQUIVO]' and mensagem.conteudo != '[DOCUMENTO]' and mensagem.conteudo != '[IMAGEM]' and mensagem.conteudo != '[VIDEO]' and mensagem.conteudo != '[AUDIO]' and mensagem.conteudo != '[FIGURINHA]' %}
                         <div class="message-text">{{ mensagem.conteudo|linebreaksbr }}</div>
+                        {% endif %}
+                        {% if mensagem.link_preview %}
+                        <a class="link-preview-card" href="{{ mensagem.link_preview.url }}" target="_blank" rel="noopener noreferrer">
+                            {% if mensagem.link_preview.image %}
+                            <img src="{{ mensagem.link_preview.image }}" alt="Preview do link">
+                            {% endif %}
+                            <div class="link-preview-body">
+                                {% if mensagem.link_preview.title %}<strong>{{ mensagem.link_preview.title }}</strong>{% endif %}
+                                {% if mensagem.link_preview.description %}<p>{{ mensagem.link_preview.description }}</p>{% endif %}
+                                <small>{{ mensagem.link_preview.site_name|default:mensagem.link_preview.url }}</small>
+                            </div>
+                        </a>
                         {% endif %}
                         <div class="message-meta">
                             {% if mensagem.is_edited %}
@@ -289,6 +307,19 @@
                 <input type="hidden" name="ajax" value="1">
                 <input type="hidden" name="action" value="send_message">
                 <input type="hidden" name="conversa_id" value="{{ conversa_ativa.pk }}">
+                <input type="hidden" name="reply_to_message_id" id="replyToMessageId" value="">
+                <div class="reply-composer" id="replyComposer" aria-hidden="true">
+                    <div class="reply-composer-main">
+                        <div class="reply-composer-author" id="replyComposerAuthor"></div>
+                        <div class="reply-composer-text" id="replyComposerText"></div>
+                    </div>
+                    <div class="reply-composer-thumb" id="replyComposerThumbWrap">
+                        <img id="replyComposerThumb" src="" alt="midia respondida">
+                    </div>
+                    <button type="button" class="reply-composer-close" id="replyComposerCancelBtn" title="Cancelar resposta">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
                 <button type="button" class="icon-btn emoji-compose-btn" id="composeEmojiTrigger" title="Emojis">
                     <i class="fa-regular fa-face-grin"></i>
                 </button>
@@ -309,10 +340,22 @@
                 <div class="composer">
                     <input type="text" name="mensagem" placeholder="Digite uma mensagem">
                 </div>
-                <span class="recording-hint" id="recordingHint" style="display:none;">Gravando 00:00</span>
+                <div class="recording-bar" id="recordingBar" aria-hidden="true">
+                    <button type="button" class="recording-icon-btn trash" id="recordingDeleteBtn" title="Descartar audio">
+                        <i class="fa-regular fa-trash-can"></i>
+                    </button>
+                    <span class="recording-dot"></span>
+                    <span class="recording-time" id="recordingTimeText">0:00</span>
+                    <div class="recording-wave"><span></span></div>
+                    <button type="button" class="recording-icon-btn pause" id="recordingPauseBtn" title="Pausar/continuar">
+                        <i class="fa-solid fa-pause"></i>
+                    </button>
+                    <button type="button" class="recording-send-btn" id="recordingSendBtn" title="Enviar audio">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
                 <button class="send-btn" type="submit">Enviar</button>
-                <button type="button" class="send-audio-btn" id="sendRecordedAudioBtn">Enviar audio</button>
-                <button type="button" class="icon-btn mic-btn" id="micRecordBtn" title="Segure para gravar audio">
+                <button type="button" class="icon-btn mic-btn" id="micRecordBtn" title="Gravar audio">
                     <i class="fa-solid fa-microphone"></i>
                 </button>
             </form>
@@ -415,5 +458,5 @@
         openNewChat: {% if open_new_chat %}true{% else %}false{% endif %}
     };
 </script>
-<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-20"></script>
+<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-26"></script>
 {% endblock %}
