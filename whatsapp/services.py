@@ -300,6 +300,7 @@ def extract_labels(payload: dict[str, Any], data: dict[str, Any]) -> list[str]:
 def parse_message_text(payload: dict[str, Any]) -> str:
     data = payload.get('data', payload)
     message = data.get('message', {}) if isinstance(data, dict) else {}
+    message = unwrap_message_content(message)
     if not isinstance(message, dict):
         return str(message)
 
@@ -311,6 +312,10 @@ def parse_message_text(payload: dict[str, Any]) -> str:
         return sanitize_text_content(message['imageMessage']['caption'])
     if message.get('videoMessage', {}).get('caption'):
         return sanitize_text_content(message['videoMessage']['caption'])
+    if message.get('image', {}).get('caption'):
+        return sanitize_text_content(message['image']['caption'])
+    if message.get('video', {}).get('caption'):
+        return sanitize_text_content(message['video']['caption'])
 
     return sanitize_text_content(data.get('text') or data.get('body') or '')
 
@@ -318,6 +323,7 @@ def parse_message_text(payload: dict[str, Any]) -> str:
 def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
     data = payload.get('data', payload)
     message = data.get('message', {}) if isinstance(data, dict) else {}
+    message = unwrap_message_content(message)
     if not isinstance(message, dict):
         return '', ''
 
@@ -382,6 +388,10 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         ('videoMessage', 'video'),
         ('audioMessage', 'audio'),
         ('documentMessage', 'document'),
+        ('image', 'image'),
+        ('video', 'video'),
+        ('audio', 'audio'),
+        ('document', 'document'),
     ]
     for field, media_kind in mapping:
         media_obj = message.get(field)
@@ -476,6 +486,31 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
             return persisted_url, 'document'
 
     return '', ''
+
+
+def unwrap_message_content(message: Any, depth: int = 0) -> dict[str, Any]:
+    if not isinstance(message, dict):
+        return {}
+    if depth > 6:
+        return message
+
+    wrapper_keys = [
+        'ephemeralMessage',
+        'viewOnceMessage',
+        'viewOnceMessageV2',
+        'viewOnceMessageV2Extension',
+        'documentWithCaptionMessage',
+        'editedMessage',
+        'deviceSentMessage',
+    ]
+    for key in wrapper_keys:
+        wrapper = message.get(key)
+        if isinstance(wrapper, dict):
+            nested = wrapper.get('message')
+            if isinstance(nested, dict):
+                return unwrap_message_content(nested, depth + 1)
+
+    return message
 
 
 def parse_message_timestamp(payload: dict[str, Any]) -> datetime:
@@ -1126,7 +1161,7 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
         etiquetas.append('Facebook Ads')
     texto = parse_message_text(payload)
     media_url, media_kind = parse_message_media(payload)
-    raw_message = data.get('message') if isinstance(data.get('message'), dict) else {}
+    raw_message = unwrap_message_content(data.get('message') if isinstance(data.get('message'), dict) else {})
     if not texto and not media_url:
         # Evita criar bolha vazia (apenas horario) quando webhook nao traz conteudo real.
         if isinstance(raw_message, dict) and raw_message:
