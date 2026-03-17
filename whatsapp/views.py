@@ -851,31 +851,30 @@ def _forward_single_message(mensagem: WhatsAppMessage, numero: str, user):
     if conteudo and conteudo.lower() not in placeholders:
         caption = conteudo
 
-    try:
-        client = EvolutionAPIClient(instance=instance)
-        if media_url:
-            if media_kind == 'audio':
-                response = client.send_whatsapp_audio(number=numero, audio_url=media_url)
-            else:
-                parsed_path = urlparse(media_url).path or ''
-                file_name = os.path.basename(parsed_path) or f'arquivo_{uuid.uuid4().hex}'
-                guessed_mime = mimetypes.guess_type(parsed_path)[0] or ''
-                if not guessed_mime:
-                    guessed_mime = 'image/jpeg' if media_kind == 'image' else (
-                        'video/mp4' if media_kind == 'video' else 'application/octet-stream'
-                    )
-                response = client.send_media(
-                    number=numero,
-                    media_url=media_url,
-                    mediatype=media_kind if media_kind in {'image', 'video', 'document'} else 'document',
-                    mimetype=guessed_mime,
-                    caption=caption,
-                    file_name=file_name,
-                )
+    client = EvolutionAPIClient(instance=instance)
+    if media_url:
+        if media_kind == 'audio':
+            response = client.send_whatsapp_audio(number=numero, audio_url=media_url)
         else:
-            if not conteudo:
-                raise ValueError('Mensagem sem conteudo para encaminhar.')
-            response = client.send_text(number=numero, text=conteudo)
+            parsed_path = urlparse(media_url).path or ''
+            file_name = os.path.basename(parsed_path) or f'arquivo_{uuid.uuid4().hex}'
+            guessed_mime = mimetypes.guess_type(parsed_path)[0] or ''
+            if not guessed_mime:
+                guessed_mime = 'image/jpeg' if media_kind == 'image' else (
+                    'video/mp4' if media_kind == 'video' else 'application/octet-stream'
+                )
+            response = client.send_media(
+                number=numero,
+                media_url=media_url,
+                mediatype=media_kind if media_kind in {'image', 'video', 'document'} else 'document',
+                mimetype=guessed_mime,
+                caption=caption,
+                file_name=file_name,
+            )
+    else:
+        if not conteudo:
+            raise ValueError('Mensagem sem conteudo para encaminhar.')
+        response = client.send_text(number=numero, text=conteudo)
 
     external_id = (
         response.get('key', {}).get('id')
