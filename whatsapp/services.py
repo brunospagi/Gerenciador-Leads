@@ -8,7 +8,7 @@ import binascii
 import mimetypes
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import requests
@@ -367,7 +367,13 @@ def parse_message_text(payload: dict[str, Any]) -> str:
     if message.get('video', {}).get('caption'):
         return sanitize_text_content(message['video']['caption'])
 
-    return sanitize_text_content(data.get('text') or data.get('body') or '')
+    fallback_text = sanitize_text_content(data.get('text') or data.get('body') or '')
+    # Alguns providers mandam apenas a URL da midia em text/body no update.
+    # Evita renderizar isso como texto comum; o parse de midia deve assumir.
+    low = fallback_text.lower()
+    if low.startswith('http://') or low.startswith('https://') or low.startswith('/o1/v/') or low.startswith('/v/'):
+        return ''
+    return fallback_text
 
 
 def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
@@ -470,14 +476,37 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         if not persist_hint:
             return ''
 
-        try:
-            resp = requests.get(normalized, timeout=45)
-            resp.raise_for_status()
-            content = resp.content or b''
-            if not content:
-                return ''
-        except Exception as exc:
-            logger.debug('Falha ao baixar media remota para persistencia: %s', exc)
+        def _download_with_headers(url_value: str) -> requests.Response | None:
+            browser_headers = {
+                'User-Agent': (
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                    'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+                ),
+                'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+                'Referer': 'https://web.whatsapp.com/',
+                'Origin': 'https://web.whatsapp.com',
+            }
+            try:
+                response = requests.get(url_value, timeout=60, headers=browser_headers, allow_redirects=True)
+                if response.ok and (response.content or b''):
+                    return response
+            except Exception:
+                pass
+            try:
+                response = requests.get(url_value, timeout=60, allow_redirects=True)
+                if response.ok and (response.content or b''):
+                    return response
+            except Exception:
+                pass
+            return None
+
+        resp = _download_with_headers(normalized)
+        if not resp:
+            logger.debug('Falha ao baixar media remota para persistencia: url=%s', normalized)
+            return ''
+
+        content = resp.content or b''
+        if not content:
             return ''
 
         content_type = str(resp.headers.get('Content-Type') or '').split(';', 1)[0].strip().lower()
@@ -689,7 +718,12 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
             )
             if media_url and not _is_encrypted_media_ref(media_url):
                 persisted_remote = _persist_media_from_url(media_url, str(mime or 'application/octet-stream'), media_kind)
-                return (persisted_remote or media_url), media_kind
+                if persisted_remote:
+                    return persisted_remote, media_kind
+                if any(token in media_url.lower() for token in ['mmg.whatsapp.net', 'lookaside.fbsbx.com', 'cdn.whatsapp.net']):
+                    media_url = ''
+                if media_url:
+                    return media_url, media_kind
 
             persisted_url = _media_from_base64(str(mime or 'application/octet-stream'), base64_data, media_kind)
             if persisted_url:
@@ -734,7 +768,11 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
             elif mime.startswith('audio/') or 'audio' in msg_type or 'ptt' in msg_type:
                 inferred_kind = 'audio'
             persisted_remote = _persist_media_from_url(generic_url, mime, inferred_kind)
-            final_url = persisted_remote or generic_url
+            final_url = persisted_remote
+            if not final_url and not any(token in generic_url.lower() for token in ['mmg.whatsapp.net', 'lookaside.fbsbx.com', 'cdn.whatsapp.net']):
+                final_url = generic_url
+            if not final_url:
+                return '', inferred_kind
             if 'sticker' in msg_type:
                 return final_url, 'sticker'
             if mime.startswith('image/') or 'image' in msg_type:
@@ -772,7 +810,10 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         candidate_b64 = candidate.get('base64') or ''
         if candidate_url and not _is_encrypted_media_ref(candidate_url):
             persisted_remote = _persist_media_from_url(candidate_url, candidate_mime, candidate_kind)
-            return (persisted_remote or candidate_url), candidate_kind
+            if persisted_remote:
+                return persisted_remote, candidate_kind
+            if not any(token in candidate_url.lower() for token in ['mmg.whatsapp.net', 'lookaside.fbsbx.com', 'cdn.whatsapp.net']):
+                return candidate_url, candidate_kind
         if candidate_b64:
             persisted_url = _media_from_base64(candidate_mime, candidate_b64, candidate_kind)
             if persisted_url:
@@ -785,7 +826,10 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         candidate_b64 = candidate.get('base64') or ''
         if candidate_url and not _is_encrypted_media_ref(candidate_url):
             persisted_remote = _persist_media_from_url(candidate_url, candidate_mime, candidate_kind)
-            return (persisted_remote or candidate_url), candidate_kind
+            if persisted_remote:
+                return persisted_remote, candidate_kind
+            if not any(token in candidate_url.lower() for token in ['mmg.whatsapp.net', 'lookaside.fbsbx.com', 'cdn.whatsapp.net']):
+                return candidate_url, candidate_kind
         if candidate_b64:
             persisted_url = _media_from_base64(candidate_mime, candidate_b64, candidate_kind)
             if persisted_url:
@@ -1417,20 +1461,61 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
         payload.get('id'),
     ]
     external_id_candidates = [str(v).strip() for v in external_id_candidates if v]
-    if not external_id_candidates:
-        return False
 
-    message_obj = resolve_message_by_external_candidates(external_id_candidates)
-    if not message_obj:
-        return False
+    message_obj = resolve_message_by_external_candidates(external_id_candidates) if external_id_candidates else None
 
-    changed_fields: list[str] = []
-    text_before = sanitize_text_content(message_obj.conteudo or '')
     texto = parse_message_text(payload)
     texto = sanitize_text_content(texto)
     media_url, media_kind = parse_message_media(payload)
     raw_message = unwrap_message_content(data.get('message') if isinstance(data.get('message'), dict) else {})
     inferred_kind = infer_message_kind(raw_message, data, payload)
+
+    if not message_obj:
+        # Fallback para updates sem id/correlacao perfeita:
+        # tenta anexar o update na ultima mensagem recebida "placeholder" da conversa.
+        key_remote = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
+        remote_jid = str(
+            key_remote.get('remoteJid')
+            or key_remote.get('participant')
+            or data.get('remoteJid')
+            or data.get('from')
+            or payload.get('remoteJid')
+            or payload.get('from')
+            or ''
+        ).strip()
+        remote_jid = normalize_wa_id(remote_jid) if remote_jid else ''
+        conversation = None
+        if remote_jid:
+            conversation = (
+                WhatsAppConversation.objects.filter(wa_id=remote_jid).first()
+                or WhatsAppConversation.objects.filter(wa_id_alt=remote_jid).first()
+            )
+        if conversation:
+            recent_cut = timezone.now() - timedelta(minutes=20)
+            placeholders = [
+                '',
+                '[IMAGEM]',
+                '[VIDEO]',
+                '[AUDIO]',
+                '[DOCUMENTO]',
+                '[FIGURINHA]',
+                '[Mensagem nao suportada]',
+            ]
+            message_obj = (
+                conversation.mensagens.filter(
+                    direcao=WhatsAppMessage.Direction.RECEBIDA,
+                    criado_em__gte=recent_cut,
+                    media_url='',
+                    conteudo__in=placeholders,
+                )
+                .order_by('-criado_em')
+                .first()
+            )
+        if not message_obj:
+            return False
+
+    changed_fields: list[str] = []
+    text_before = sanitize_text_content(message_obj.conteudo or '')
 
     def _iter_dict_nodes(root: Any):
         stack = [root]

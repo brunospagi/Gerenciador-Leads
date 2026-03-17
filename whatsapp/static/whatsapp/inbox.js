@@ -23,6 +23,9 @@
         const imagePreviewModal = document.getElementById('imagePreviewModal');
         const imagePreviewTarget = document.getElementById('imagePreviewTarget');
         const imagePreviewClose = document.getElementById('imagePreviewClose');
+        const imagePreviewPrev = document.getElementById('imagePreviewPrev');
+        const imagePreviewNext = document.getElementById('imagePreviewNext');
+        const imagePreviewThumbs = document.getElementById('imagePreviewThumbs');
         const composeMediaModal = document.getElementById('composeMediaModal');
         const composeMediaPreview = document.getElementById('composeMediaPreview');
         const composeMediaPreviewWrap = document.getElementById('composeMediaPreviewWrap');
@@ -65,6 +68,8 @@
         let activeMenuMessageId = null;
         let forwardSelectionMode = false;
         const selectedForwardMessageIds = new Set();
+        let imagePreviewItems = [];
+        let imagePreviewIndex = -1;
         let latestConversationsCache = [];
         let currentConversationFilter = 'all';
         const selectedForwardTargets = new Set();
@@ -574,16 +579,58 @@
             closeAllMessageMenus();
         };
 
+        function collectConversationImages() {
+            const nodes = document.querySelectorAll('#message-list .js-chat-image');
+            const urls = [];
+            nodes.forEach((node) => {
+                const raw = node.getAttribute('data-full-src') || node.getAttribute('src') || '';
+                const normalized = normalizeMediaUrl(raw);
+                if (!normalized) return;
+                if (!urls.includes(normalized)) urls.push(normalized);
+            });
+            return urls;
+        }
+
+        function renderImagePreviewFrame() {
+            if (!imagePreviewTarget) return;
+            if (!imagePreviewItems.length || imagePreviewIndex < 0 || imagePreviewIndex >= imagePreviewItems.length) {
+                imagePreviewTarget.src = '';
+                if (imagePreviewThumbs) imagePreviewThumbs.innerHTML = '';
+                return;
+            }
+            imagePreviewTarget.src = imagePreviewItems[imagePreviewIndex];
+            if (imagePreviewThumbs) {
+                imagePreviewThumbs.innerHTML = imagePreviewItems.map((src, idx) => (
+                    `<button type="button" class="preview-thumb${idx === imagePreviewIndex ? ' active' : ''}" data-preview-index="${idx}"><img src="${src}" alt="miniatura"></button>`
+                )).join('');
+            }
+        }
+
+        function moveImagePreview(step) {
+            if (!imagePreviewItems.length) return;
+            const total = imagePreviewItems.length;
+            imagePreviewIndex = (imagePreviewIndex + step + total) % total;
+            renderImagePreviewFrame();
+        }
+
         function closeImagePreview() {
             if (!imagePreviewModal || !imagePreviewTarget) return;
             imagePreviewModal.classList.remove('show');
             imagePreviewModal.setAttribute('aria-hidden', 'true');
             imagePreviewTarget.src = '';
+            imagePreviewItems = [];
+            imagePreviewIndex = -1;
+            if (imagePreviewThumbs) imagePreviewThumbs.innerHTML = '';
         }
 
         function openImagePreview(src) {
             if (!imagePreviewModal || !imagePreviewTarget || !src) return;
-            imagePreviewTarget.src = normalizeMediaUrl(src);
+            const target = normalizeMediaUrl(src);
+            imagePreviewItems = collectConversationImages();
+            if (!imagePreviewItems.includes(target)) imagePreviewItems.push(target);
+            imagePreviewIndex = imagePreviewItems.indexOf(target);
+            if (imagePreviewIndex < 0) imagePreviewIndex = 0;
+            renderImagePreviewFrame();
             imagePreviewModal.classList.add('show');
             imagePreviewModal.setAttribute('aria-hidden', 'false');
         }
@@ -627,7 +674,8 @@
             }
         }
 
-        function closeComposeMediaModal() {
+        function closeComposeMediaModal(forceClose) {
+            if (isSendingComposeMedia && !forceClose) return;
             if (!composeMediaModal) return;
             composeMediaModal.classList.remove('show');
             composeMediaModal.setAttribute('aria-hidden', 'true');
@@ -636,6 +684,21 @@
             if (composeMediaFiles) composeMediaFiles.innerHTML = '';
             if (composeMediaCount) composeMediaCount.textContent = '0 arquivo(s) selecionado(s)';
             if (composeMediaCaption) composeMediaCaption.value = '';
+        }
+
+        function setComposeMediaSendingState(isSending) {
+            const state = !!isSending;
+            isSendingComposeMedia = state;
+            if (composeMediaModal) composeMediaModal.classList.toggle('is-sending', state);
+            if (composeMediaSendBtn) {
+                composeMediaSendBtn.disabled = state;
+                composeMediaSendBtn.textContent = state ? 'Enviando...' : 'Enviar';
+            }
+            if (composeMediaCancelBtn) composeMediaCancelBtn.disabled = state;
+            if (composeMediaClose) composeMediaClose.disabled = state;
+            if (composeMediaAddBtn) composeMediaAddBtn.disabled = state;
+            if (composeMediaAddInput) composeMediaAddInput.disabled = state;
+            if (composeMediaCaption) composeMediaCaption.readOnly = state;
         }
 
         function openComposeMediaModal(files, kind, appendMode) {
@@ -871,6 +934,7 @@
         let composeDraftFiles = [];
         let composeDraftPreviewUrls = [];
         let attachPickerKind = 'media';
+        let isSendingComposeMedia = false;
         let isSendingMessage = false;
         ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F64F}', '\u{1F62E}', '\u{1F622}', '\u{1F44F}', '\u{1F525}'].forEach((emoji) => {
             const btn = document.createElement('button');
@@ -1343,45 +1407,68 @@
             const conversaId = (conversaInput && conversaInput.value) ? conversaInput.value : String(activeConversationId || '');
             if (!conversaId) throw new Error('Conversa invalida.');
             const caption = composeMediaCaption ? String(composeMediaCaption.value || '').trim() : '';
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
             for (let i = 0; i < composeDraftFiles.length; i++) {
                 const file = composeDraftFiles[i];
-                const body = new FormData();
-                body.append('ajax', '1');
-                body.append('action', 'send_message');
-                body.append('conversa_id', conversaId);
-                body.append('arquivo', file, file.name || `arquivo_${Date.now()}_${i + 1}`);
-                if (caption && i === 0) body.append('mensagem', caption);
-                const resp = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRFToken': getCsrfToken(),
-                        'Accept': 'application/json'
-                    },
-                    body
-                });
-                const contentType = (resp.headers.get('content-type') || '').toLowerCase();
-                if (!contentType.includes('application/json')) {
-                    throw new Error('Resposta invalida do servidor.');
+                let lastErr = null;
+                const maxAttempts = 3;
+                for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                    try {
+                        const body = new FormData();
+                        body.append('ajax', '1');
+                        body.append('action', 'send_message');
+                        body.append('conversa_id', conversaId);
+                        body.append('arquivo', file, file.name || `arquivo_${Date.now()}_${i + 1}`);
+                        if (caption && i === 0) body.append('mensagem', caption);
+                        const resp = await fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRFToken': getCsrfToken(),
+                                'Accept': 'application/json'
+                            },
+                            body
+                        });
+                        const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+                        if (!contentType.includes('application/json')) {
+                            throw new Error('Resposta invalida do servidor.');
+                        }
+                        const data = await resp.json().catch(() => ({ ok: false, error: 'Resposta invalida do servidor.' }));
+                        if (!resp.ok || !data.ok) {
+                            throw new Error(data.error || 'Falha ao enviar arquivo.');
+                        }
+                        lastErr = null;
+                        break;
+                    } catch (err) {
+                        lastErr = err;
+                        if (attempt < maxAttempts) {
+                            await sleep(700 * attempt);
+                            continue;
+                        }
+                    }
                 }
-                const data = await resp.json().catch(() => ({ ok: false, error: 'Resposta invalida do servidor.' }));
-                if (!resp.ok || !data.ok) {
-                    throw new Error(data.error || 'Falha ao enviar arquivo.');
+                if (lastErr) {
+                    throw new Error(lastErr.message || `Falha ao enviar arquivo ${i + 1}.`);
                 }
+                if (i < composeDraftFiles.length - 1) await sleep(220);
             }
         }
         if (composeMediaSendBtn) {
             composeMediaSendBtn.addEventListener('click', async function () {
+                if (isSendingComposeMedia) return;
                 if (!composeDraftFiles.length) return;
+                setComposeMediaSendingState(true);
                 try {
                     await sendComposeDraftFiles();
-                    closeComposeMediaModal();
+                    closeComposeMediaModal(true);
                     clearAttachmentInputs();
                     if (selectedFileName) selectedFileName.textContent = '';
                     await pollMessages();
                     await pollConversations();
                 } catch (err) {
                     alert(err.message || 'Falha ao enviar arquivos.');
+                } finally {
+                    setComposeMediaSendingState(false);
                 }
             });
         }
@@ -1829,10 +1916,46 @@
         if (imagePreviewClose) {
             imagePreviewClose.addEventListener('click', closeImagePreview);
         }
+        if (imagePreviewPrev) {
+            imagePreviewPrev.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                moveImagePreview(-1);
+            });
+        }
+        if (imagePreviewNext) {
+            imagePreviewNext.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                moveImagePreview(1);
+            });
+        }
+        if (imagePreviewThumbs) {
+            imagePreviewThumbs.addEventListener('click', function (e) {
+                const btn = e.target.closest('[data-preview-index]');
+                if (!btn) return;
+                const idx = Number(btn.getAttribute('data-preview-index') || '-1');
+                if (Number.isNaN(idx) || idx < 0 || idx >= imagePreviewItems.length) return;
+                imagePreviewIndex = idx;
+                renderImagePreviewFrame();
+            });
+        }
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && imagePreviewModal && imagePreviewModal.classList.contains('show')) {
                 closeImagePreview();
                 return;
+            }
+            if (imagePreviewModal && imagePreviewModal.classList.contains('show')) {
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    moveImagePreview(-1);
+                    return;
+                }
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    moveImagePreview(1);
+                    return;
+                }
             }
             if (e.key === 'Escape' && composeMediaModal && composeMediaModal.classList.contains('show')) {
                 closeComposeMediaModal();

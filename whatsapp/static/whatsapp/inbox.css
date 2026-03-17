@@ -4,8 +4,8 @@
     .wa-topbar p { margin: 0; font-size: .8rem; color: #64748b; }
     .background-green { position: absolute; top: 0; left: 0; width: 100%; height: 18%; background-color: #009688; border-radius: 12px; }
     .main-container { position: relative; width: 100%; height: calc(100vh - 190px); min-height: 620px; background: #fff; display: flex; box-shadow: 0 1px 1px rgba(0,0,0,.2), 0 2px 8px rgba(0,0,0,.25); }
-    .left-container { position: relative; width: 33%; min-width: 320px; height: 100%; background: #fff; border-right: 1px solid #ddd; }
-    .right-container { position: relative; width: 67%; height: 100%; background: #e5ddd5; }
+    .left-container { position: relative; width: 33%; min-width: 320px; height: 100%; background: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; overflow: hidden; }
+    .right-container { position: relative; width: 67%; height: 100%; background: #e5ddd5; display: flex; flex-direction: column; overflow: hidden; }
     .right-container::before { content: ''; position: absolute; inset: 0; background: url(https://web.whatsapp.com/img/bg-chat-tile-light_a4be8e7e7195b6b733d9110b408f075d.png); opacity: .4; }
     .header { position: relative; display: flex; align-items: center; justify-content: space-between; width: 100%; height: 60px; background: #ededed; padding: 0 15px; z-index: 2; }
     .user-img { position: relative; width: 40px; height: 40px; overflow: hidden; border-radius: 50%; background: #d1d5db; }
@@ -58,7 +58,7 @@
         border-color: #86efac;
         color: #166534;
     }
-    .chat-list { position: relative; height: calc(100% - 180px); overflow-y: auto; }
+    .chat-list { position: relative; flex: 1 1 auto; min-height: 0; height: auto; overflow-y: auto; }
     .chat-list .chat-box { position: relative; width: 100%; display: grid; grid-template-columns: 50px 1fr; gap: 0 12px; align-items: center; cursor: pointer; padding: 12px 15px; border-bottom: 1px solid #f1f5f9; text-decoration: none; transition: background-color .18s ease; }
     .chat-list .chat-box .img-box { position: relative; width: 50px; height: 50px; overflow: hidden; border-radius: 50%; background: #d1d5db; flex-shrink: 0; }
     .chat-list .chat-box .chat-details { width: 100%; margin-left: 0; min-width: 0; }
@@ -102,7 +102,7 @@
     .right-container .header .img-text h4 { margin: 0; font-weight: 500; line-height: 1.2em; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
     .right-container .header .img-text h4 span { font-size: .78rem; color: #64748b; font-weight: 400; }
     .active-presence { font-size: .78rem; color: #16a34a; font-weight: 600; min-height: 16px; margin-top: 2px; }
-    .chat-container { position: relative; width: 100%; height: calc(100% - 122px); padding: 24px; overflow-y: auto; z-index: 2; }
+    .chat-container { position: relative; width: 100%; flex: 1 1 auto; min-height: 0; height: auto; padding: 24px; overflow-y: auto; z-index: 2; }
     .message-box { position: relative; display: flex; width: 100%; margin: 5px 0; }
     .message-box .forward-check {
         display: none;
@@ -520,7 +520,7 @@
         left: -9999px;
         top: -9999px;
     }
-    .empty-chat { position: relative; z-index: 2; height: calc(100% - 122px); display: flex; align-items: center; justify-content: center; color: #475569; }
+    .empty-chat { position: relative; z-index: 2; flex: 1 1 auto; min-height: 0; height: auto; display: flex; align-items: center; justify-content: center; color: #475569; }
     .forward-selection-bar {
         display: none;
         position: relative;
@@ -536,21 +536,78 @@
     .forward-selection-bar.show { display: flex; }
     .forward-selection-actions { display: flex; gap: 8px; pointer-events: auto; }
     .forward-selection-actions .btn { cursor: pointer; }
-    .right-container.forward-selection-active .chat-container { height: calc(100% - 164px); }
+    .right-container.forward-selection-active .chat-container { height: auto; }
     .image-preview-modal {
         position: fixed; inset: 0; z-index: 12000; display: none;
         align-items: center; justify-content: center; padding: 22px;
         background: rgba(15, 23, 42, .78);
     }
     .image-preview-modal.show { display: flex; }
-    .image-preview-modal .preview-inner { position: relative; max-width: min(94vw, 1100px); max-height: 90vh; }
+    .image-preview-modal .preview-inner {
+        position: relative;
+        width: min(96vw, 1320px);
+        max-height: 94vh;
+        display: grid;
+        grid-template-rows: 1fr auto;
+        gap: 10px;
+        justify-items: center;
+    }
     .image-preview-modal img {
-        display: block; max-width: 100%; max-height: 90vh; object-fit: contain;
+        display: block; max-width: 100%; max-height: calc(94vh - 120px); object-fit: contain;
         border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,.45);
     }
     .image-preview-modal .preview-close {
         position: absolute; top: -12px; right: -12px; width: 34px; height: 34px;
         border: 0; border-radius: 50%; background: #0f172a; color: #fff; font-size: 20px; line-height: 1;
+    }
+    .image-preview-modal .preview-nav {
+        position: absolute;
+        top: 48%;
+        transform: translateY(-50%);
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        border: 0;
+        background: rgba(15, 23, 42, .78);
+        color: #fff;
+        font-size: 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .image-preview-modal .preview-nav.prev { left: -24px; }
+    .image-preview-modal .preview-nav.next { right: -24px; }
+    .image-preview-modal .preview-thumbs {
+        width: 100%;
+        max-width: min(96vw, 1320px);
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 8px 4px;
+        justify-content: center;
+    }
+    .image-preview-modal .preview-thumb {
+        width: 70px;
+        height: 70px;
+        border-radius: 8px;
+        border: 2px solid transparent;
+        padding: 0;
+        background: transparent;
+        flex: 0 0 auto;
+        overflow: hidden;
+        opacity: .85;
+    }
+    .image-preview-modal .preview-thumb.active {
+        border-color: #22c55e;
+        opacity: 1;
+    }
+    .image-preview-modal .preview-thumb img {
+        width: 100%;
+        height: 100%;
+        max-height: none;
+        object-fit: cover;
+        border-radius: 6px;
+        box-shadow: none;
     }
     .compose-media-modal {
         position: fixed; inset: 0; z-index: 12100; display: none;
@@ -604,6 +661,12 @@
     .compose-media-caption { width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 9px 10px; margin-top: 10px; }
     .compose-media-footer {
         display: flex; justify-content: flex-end; gap: 8px; padding: 12px 14px; border-top: 1px solid #e5e7eb;
+    }
+    .compose-media-modal.is-sending .compose-media-card { cursor: progress; }
+    .compose-media-modal.is-sending .compose-media-close,
+    .compose-media-modal.is-sending .compose-media-add-btn,
+    .compose-media-modal.is-sending .compose-media-caption {
+        opacity: .7;
     }
     .forward-target-modal {
         position: fixed; inset: 0; z-index: 12110; display: none;

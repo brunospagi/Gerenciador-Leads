@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}?v=20260317-16">
+<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}?v=20260317-20">
 <div class="wa-clone-wrap">
     <div class="wa-topbar">
         <div>
@@ -330,7 +330,10 @@
 <div class="image-preview-modal" id="imagePreviewModal" aria-hidden="true">
     <div class="preview-inner">
         <button type="button" class="preview-close" id="imagePreviewClose" aria-label="Fechar">&times;</button>
+        <button type="button" class="preview-nav prev" id="imagePreviewPrev" aria-label="Anterior"><i class="fa-solid fa-chevron-left"></i></button>
+        <button type="button" class="preview-nav next" id="imagePreviewNext" aria-label="Próxima"><i class="fa-solid fa-chevron-right"></i></button>
         <img id="imagePreviewTarget" src="" alt="Visualizacao ampliada">
+        <div class="preview-thumbs" id="imagePreviewThumbs"></div>
     </div>
 </div>
 <div class="compose-media-modal" id="composeMediaModal" aria-hidden="true">
@@ -412,5 +415,5 @@
         openNewChat: {% if open_new_chat %}true{% else %}false{% endif %}
     };
 </script>
-<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-16"></script>
+<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-20"></script>
 {% endblock %}
