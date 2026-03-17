@@ -209,6 +209,15 @@ def can_manage_whatsapp_instance(user) -> bool:
     return getattr(profile, 'nivel_acesso', '') == 'ADMIN'
 
 
+def can_archive_whatsapp_conversation(user) -> bool:
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    if user.is_superuser:
+        return True
+    profile = getattr(user, 'profile', None)
+    return getattr(profile, 'nivel_acesso', '') == 'GERENTE'
+
+
 def ensure_br_country_code(number: str) -> str:
     digits = normalize_number(number or '')
     if not digits:
@@ -265,6 +274,8 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         if query:
             conversas = conversas.filter(Q(nome_contato__icontains=query) | Q(wa_id__icontains=query))
         conversas = conversas.order_by('-ultima_mensagem_em')
+        conversas_ativas = [c for c in conversas if not c.arquivada]
+        conversas_arquivadas = [c for c in conversas if c.arquivada]
 
         conversa_ativa = None
         mensagens = WhatsAppMessage.objects.none()
@@ -293,6 +304,8 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         context.update(
             {
                 'conversas': conversas[:200],
+                'conversas_ativas': conversas_ativas[:200],
+                'conversas_arquivadas': conversas_arquivadas[:200],
                 'conversa_ativa': conversa_ativa,
                 'mensagens': mensagens,
                 'send_form': WhatsAppSendMessageForm(),
@@ -300,6 +313,7 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                 'open_new_chat': False,
                 'evolution_instance': instance,
                 'active_presence_text': active_presence_text,
+                'can_archive_conversation': can_archive_whatsapp_conversation(self.request.user),
             }
         )
         return context
@@ -596,6 +610,39 @@ def delete_conversation(request, pk):
         return JsonResponse({'ok': True})
     messages.success(request, 'Conversa deletada com sucesso.')
     return redirect('whatsapp:inbox')
+
+
+@login_required
+def archive_conversation(request, pk):
+    if request.method != 'POST':
+        return HttpResponseForbidden('Metodo nao permitido.')
+    if not has_module_access(request.user, 'whatsapp'):
+        return HttpResponseForbidden('Sem permissao.')
+    if not can_archive_whatsapp_conversation(request.user):
+        if _is_ajax_request(request):
+            return JsonResponse({'ok': False, 'error': 'Somente gerente pode arquivar conversas.'}, status=403)
+        return HttpResponseForbidden('Somente gerente pode arquivar conversas.')
+
+    conversa = get_object_or_404(WhatsAppConversation, pk=pk)
+    raw_action = (request.POST.get('archive_action') or request.POST.get('action') or '').strip().lower()
+    if raw_action == 'unarchive':
+        conversa.arquivada = False
+    elif raw_action == 'archive':
+        conversa.arquivada = True
+    else:
+        conversa.arquivada = not bool(conversa.arquivada)
+    conversa.save(update_fields=['arquivada', 'atualizado_em'])
+
+    if _is_ajax_request(request):
+        return JsonResponse(
+            {
+                'ok': True,
+                'conversation_id': conversa.pk,
+                'arquivada': bool(conversa.arquivada),
+            }
+        )
+    messages.success(request, 'Conversa arquivada com sucesso.' if conversa.arquivada else 'Conversa desarquivada com sucesso.')
+    return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
 
 @login_required
@@ -928,6 +975,7 @@ def conversations_feed(request):
                 'ultima_mensagem': c.ultima_mensagem or '',
                 'ultima_mensagem_em': c.ultima_mensagem_em.strftime('%d/%m %H:%M') if c.ultima_mensagem_em else '',
                 'nao_lidas': c.nao_lidas or 0,
+                'arquivada': bool(c.arquivada),
                 'presence_state': presence_state,
                 'presence_text': presence_text,
             }
@@ -1012,6 +1060,20 @@ def _forward_single_message(mensagem: WhatsAppMessage, numero: str, user):
         raise ValueError('Instancia ativa nao encontrada')
 
     conteudo = _visible_text(mensagem.conteudo or '')
+    if not conteudo:
+        payload = mensagem.payload or {}
+        if isinstance(payload, dict):
+            data_payload = payload.get('data', {}) if isinstance(payload.get('data'), dict) else {}
+            message_payload = data_payload.get('message', {}) if isinstance(data_payload.get('message'), dict) else {}
+            fallback_text = (
+                data_payload.get('text')
+                or data_payload.get('body')
+                or payload.get('text')
+                or payload.get('body')
+                or message_payload.get('conversation')
+            )
+            if isinstance(fallback_text, str):
+                conteudo = _visible_text(fallback_text)
     media_url = _normalize_public_media_url(mensagem.media_url or '')
     media_kind = (mensagem.media_kind or '').strip().lower()
 
@@ -1134,17 +1196,29 @@ def forward_messages_bulk(request):
     forwarded_count = 0
     last_conversation_id = None
     last_message_id = None
+    errors: list[str] = []
     for msg in mensagens:
         try:
             conversa_destino, forwarded = _forward_single_message(msg, numero, request.user)
             forwarded_count += 1
             last_conversation_id = conversa_destino.pk
             last_message_id = forwarded.pk
-        except Exception:
+        except Exception as exc:
+            errors.append(str(exc))
             continue
 
     if forwarded_count == 0:
-        return JsonResponse({'ok': False, 'error': 'Nao foi possivel encaminhar as mensagens selecionadas.'}, status=400)
+        error_detail = ''
+        if errors:
+            error_detail = errors[0]
+        return JsonResponse(
+            {
+                'ok': False,
+                'error': f'Nao foi possivel encaminhar as mensagens selecionadas.{(" Motivo: " + error_detail) if error_detail else ""}',
+                'errors': errors[:5],
+            },
+            status=400,
+        )
 
     return JsonResponse(
         {
@@ -1152,5 +1226,6 @@ def forward_messages_bulk(request):
             'forwarded_count': forwarded_count,
             'conversation_id': last_conversation_id,
             'message_id': last_message_id,
+            'errors': errors[:5],
         }
     )

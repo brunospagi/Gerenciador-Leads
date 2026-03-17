@@ -401,6 +401,53 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
             return f'https://mmg.whatsapp.net{candidate}'
         return candidate
 
+    def _guess_mime_from_bytes(content: bytes) -> str:
+        data_bytes = bytes(content or b'')
+        if not data_bytes:
+            return ''
+        head = data_bytes[:32]
+        if head.startswith(b'\xff\xd8\xff'):
+            return 'image/jpeg'
+        if head.startswith(b'\x89PNG\r\n\x1a\n'):
+            return 'image/png'
+        if head.startswith(b'GIF87a') or head.startswith(b'GIF89a'):
+            return 'image/gif'
+        if head.startswith(b'RIFF') and b'WEBP' in data_bytes[:16]:
+            return 'image/webp'
+        if head.startswith(b'%PDF'):
+            return 'application/pdf'
+        if head.startswith(b'OggS'):
+            return 'audio/ogg'
+        if head[:4] == b'fLaC':
+            return 'audio/flac'
+        if len(data_bytes) > 12 and data_bytes[4:8] == b'ftyp':
+            # mp4/m4a/mov
+            brand = data_bytes[8:12]
+            if brand in {b'M4A ', b'isom', b'mp42', b'qt  '}:
+                return 'video/mp4'
+        if head.startswith(b'\x1aE\xdf\xa3'):
+            return 'video/webm'
+        if head[:3] == b'ID3' or (len(head) > 2 and (head[0] == 0xFF and (head[1] & 0xE0) == 0xE0)):
+            return 'audio/mpeg'
+        if head.startswith(b'PK\x03\x04'):
+            return 'application/zip'
+        return ''
+
+    def _mime_matches_kind(mime_value: str, media_kind: str) -> bool:
+        mime = str(mime_value or '').lower()
+        kind = str(media_kind or '').lower()
+        if not kind or kind == 'document':
+            return True
+        if kind == 'sticker':
+            return mime.startswith('image/')
+        if kind == 'image':
+            return mime.startswith('image/')
+        if kind == 'video':
+            return mime.startswith('video/')
+        if kind == 'audio':
+            return mime.startswith('audio/')
+        return True
+
     def _persist_media_from_url(media_url: str, mime_value: str, media_kind: str) -> str:
         normalized = _normalize_public_media_url(media_url)
         if not normalized:
@@ -430,7 +477,21 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
             return ''
 
         content_type = str(resp.headers.get('Content-Type') or '').split(';', 1)[0].strip().lower()
-        final_mime = content_type or mime or 'application/octet-stream'
+        if content_type.startswith('text/') or content_type in {'application/json', 'application/xml'}:
+            logger.debug('Conteudo remoto nao e midia valida: content_type=%s url=%s', content_type, normalized)
+            return ''
+
+        detected_mime = _guess_mime_from_bytes(content)
+        final_mime = detected_mime or content_type or mime or 'application/octet-stream'
+        if not _mime_matches_kind(final_mime, kind):
+            logger.debug(
+                'Mime baixado nao confere com tipo esperado: expected_kind=%s final_mime=%s url=%s',
+                kind,
+                final_mime,
+                normalized,
+            )
+            return ''
+
         extension = mimetypes.guess_extension(final_mime) or ''
         if not extension:
             extension = {
@@ -482,7 +543,12 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         except (binascii.Error, ValueError):
             return ''
 
-        extension = mimetypes.guess_extension(mime.split(';', 1)[0].strip().lower() or '') or ''
+        detected_mime = _guess_mime_from_bytes(decoded)
+        final_mime = detected_mime or mime.split(';', 1)[0].strip().lower() or 'application/octet-stream'
+        if not _mime_matches_kind(final_mime, media_kind):
+            return ''
+
+        extension = mimetypes.guess_extension(final_mime) or ''
         if not extension:
             extension = {
                 'image': '.jpg',
@@ -508,7 +574,7 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
                 return default_storage.url(saved_path)
             except Exception as fallback_exc:
                 logger.warning('Falha ao salvar media base64 no storage padrao, usando data URL: %s', fallback_exc)
-                return f'data:{mime};base64,{source_data}'
+                return f'data:{final_mime};base64,{source_data}'
 
     def _infer_kind_by_mime_or_type(raw_mime: str, raw_type: str, fallback: str = 'document') -> str:
         mime = str(raw_mime or '').lower()

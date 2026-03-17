@@ -5,6 +5,7 @@
         const messagesEndpointTemplate = cfg.messagesEndpointTemplate || '';
         const forwardMessagesBulkEndpoint = cfg.forwardMessagesBulkEndpoint || '';
         const markReadEndpointTemplate = cfg.markReadEndpointTemplate || '';
+        const archiveConversationEndpointTemplate = cfg.archiveConversationEndpointTemplate || '';
         const deleteConversationEndpointTemplate = cfg.deleteConversationEndpointTemplate || '';
         const editMessageEndpointTemplate = cfg.editMessageEndpointTemplate || '';
         const deleteMessageEndpointTemplate = cfg.deleteMessageEndpointTemplate || '';
@@ -20,10 +21,16 @@
         const imagePreviewClose = document.getElementById('imagePreviewClose');
         const composeMediaModal = document.getElementById('composeMediaModal');
         const composeMediaPreview = document.getElementById('composeMediaPreview');
+        const composeMediaPreviewWrap = document.getElementById('composeMediaPreviewWrap');
+        const composeMediaTitle = document.getElementById('composeMediaTitle');
+        const composeMediaCount = document.getElementById('composeMediaCount');
+        const composeMediaFiles = document.getElementById('composeMediaFiles');
         const composeMediaCaption = document.getElementById('composeMediaCaption');
         const composeMediaClose = document.getElementById('composeMediaClose');
         const composeMediaCancelBtn = document.getElementById('composeMediaCancelBtn');
         const composeMediaSendBtn = document.getElementById('composeMediaSendBtn');
+        const composeMediaAddBtn = document.getElementById('composeMediaAddBtn');
+        const composeMediaAddInput = document.getElementById('composeMediaAddInput');
         const forwardTargetModal = document.getElementById('forwardTargetModal');
         const forwardTargetClose = document.getElementById('forwardTargetClose');
         const forwardTargetSearch = document.getElementById('forwardTargetSearch');
@@ -151,6 +158,12 @@
             if (activePresenceEl) {
                 activePresenceEl.textContent = c.presence_text || '';
             }
+            if (archiveConversationActionInput) {
+                archiveConversationActionInput.value = c.arquivada ? 'unarchive' : 'archive';
+            }
+            if (archiveConversationBtn) {
+                archiveConversationBtn.textContent = c.arquivada ? 'Desarquivar' : 'Arquivar';
+            }
         }
 
         function endpointFromTemplate(template, conversationId) {
@@ -173,6 +186,9 @@
             if (deleteConversationForm) {
                 deleteConversationForm.setAttribute('action', endpointFromTemplate(deleteConversationEndpointTemplate, activeConversationId));
             }
+            if (archiveConversationForm) {
+                archiveConversationForm.setAttribute('action', endpointFromTemplate(archiveConversationEndpointTemplate, activeConversationId));
+            }
         }
 
         function renderConversations(conversas) {
@@ -185,6 +201,7 @@
                 ultima_mensagem: c.ultima_mensagem || '',
                 ultima_mensagem_em: c.ultima_mensagem_em || '',
                 nao_lidas: Number(c.nao_lidas || 0),
+                arquivada: !!c.arquivada,
                 presence_text: c.presence_text || '',
                 etiquetas: c.etiquetas || [],
             })));
@@ -195,7 +212,9 @@
 
             const previousScrollTop = listEl.scrollTop;
             const baseUrl = cfg.inboxBaseUrl || '/whatsapp/';
-            listEl.innerHTML = (conversas || []).map((c) => {
+            const activeItems = (conversas || []).filter((c) => !c.arquivada);
+            const archivedItems = (conversas || []).filter((c) => !!c.arquivada);
+            const renderItem = (c, archived) => {
                 const activeClass = String(c.id) === String(activeConversationId) ? 'active' : '';
                 const unreadCount = Number(c.nao_lidas || 0);
                 const unreadClass = unreadCount > 0 ? 'unread' : '';
@@ -203,8 +222,13 @@
                 const avatar = c.avatar_url ? c.avatar_url : defaultAvatar;
                 const tags = (c.etiquetas || []).slice(0, 3).map((t) => `<span class="label-chip">${esc(t)}</span>`).join('');
                 const tagsRow = tags ? `<div class="label-row">${tags}</div>` : '';
-                return `<a class="chat-box ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}"><div class="img-box"><img class="dp" src="${avatar}" alt="Contato"></div><div class="chat-details"><div class="text-head"><h4>${esc(c.nome)}</h4><p class="time ${unreadClass}">${esc(c.ultima_mensagem_em)}</p></div><div class="text-message"><p>${esc((c.ultima_mensagem || '').slice(0, 42))}</p>${unreadBadge}</div>${tagsRow}</div></a>`;
-            }).join('');
+                return `<a class="chat-box ${archived ? 'archived' : ''} ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}"><div class="img-box"><img class="dp" src="${avatar}" alt="Contato"></div><div class="chat-details"><div class="text-head"><h4>${esc(c.nome)}</h4><p class="time ${unreadClass}">${esc(c.ultima_mensagem_em)}</p></div><div class="text-message"><p>${esc((c.ultima_mensagem || '').slice(0, 42))}</p>${unreadBadge}</div>${tagsRow}</div></a>`;
+            };
+            const activeHtml = activeItems.map((c) => renderItem(c, false)).join('');
+            const archivedHtml = archivedItems.length
+                ? `<div class="archive-divider"><span><i class="fa-regular fa-box-archive"></i> Arquivadas</span><b>${archivedItems.length}</b></div>${archivedItems.map((c) => renderItem(c, true)).join('')}`
+                : '';
+            listEl.innerHTML = `${activeHtml}${archivedHtml}` || '<div class="p-3 text-muted">Nenhuma conversa encontrada.</div>';
             listEl.scrollTop = previousScrollTop;
         }
 
@@ -463,25 +487,76 @@
             imagePreviewModal.setAttribute('aria-hidden', 'false');
         }
 
+        function clearComposeDraft() {
+            composeDraftFiles = [];
+            composeDraftPreviewUrls.forEach((url) => {
+                try { URL.revokeObjectURL(url); } catch (e) {}
+            });
+            composeDraftPreviewUrls = [];
+        }
+
+        function fileGroupKind(file) {
+            const type = String((file && file.type) || '').toLowerCase();
+            if (type.startsWith('image/') || type.startsWith('video/')) return 'media';
+            return 'document';
+        }
+
+        function renderComposeMediaModal() {
+            if (!composeMediaModal) return;
+            const total = composeDraftFiles.length;
+            if (composeMediaCount) composeMediaCount.textContent = `${total} arquivo(s) selecionado(s)`;
+            if (composeMediaTitle) composeMediaTitle.textContent = composeDraftKind === 'document' ? 'Pré-visualização de documentos' : 'Pré-visualização de mídia';
+            if (composeMediaFiles) {
+                composeMediaFiles.innerHTML = composeDraftFiles.map((f, idx) => {
+                    const sizeKb = Math.max(1, Math.round((Number(f.size || 0) / 1024)));
+                    return `<div class="compose-media-file"><div class="name">${esc(f.name || `arquivo_${idx + 1}`)}</div><small>${sizeKb} KB</small></div>`;
+                }).join('');
+            }
+            const firstFile = composeDraftFiles[0] || null;
+            const firstUrl = composeDraftPreviewUrls[0] || '';
+            const canPreviewImage = !!firstFile && String(firstFile.type || '').toLowerCase().startsWith('image/');
+            if (composeMediaPreview && composeMediaPreviewWrap) {
+                if (canPreviewImage && firstUrl) {
+                    composeMediaPreviewWrap.style.display = '';
+                    composeMediaPreview.src = firstUrl;
+                } else {
+                    composeMediaPreviewWrap.style.display = 'none';
+                    composeMediaPreview.src = '';
+                }
+            }
+        }
+
         function closeComposeMediaModal() {
             if (!composeMediaModal) return;
             composeMediaModal.classList.remove('show');
             composeMediaModal.setAttribute('aria-hidden', 'true');
-            pendingPastedFile = null;
-            if (pendingPastedPreviewUrl) {
-                URL.revokeObjectURL(pendingPastedPreviewUrl);
-                pendingPastedPreviewUrl = '';
-            }
+            clearComposeDraft();
             if (composeMediaPreview) composeMediaPreview.src = '';
+            if (composeMediaFiles) composeMediaFiles.innerHTML = '';
+            if (composeMediaCount) composeMediaCount.textContent = '0 arquivo(s) selecionado(s)';
             if (composeMediaCaption) composeMediaCaption.value = '';
         }
 
-        function openComposeMediaModal(file) {
-            if (!composeMediaModal || !composeMediaPreview || !file) return;
-            pendingPastedFile = file;
-            if (pendingPastedPreviewUrl) URL.revokeObjectURL(pendingPastedPreviewUrl);
-            pendingPastedPreviewUrl = URL.createObjectURL(file);
-            composeMediaPreview.src = pendingPastedPreviewUrl;
+        function openComposeMediaModal(files, kind, appendMode) {
+            const incoming = Array.isArray(files) ? files.filter(Boolean) : [];
+            if (!incoming.length || !composeMediaModal) return;
+            const baseKind = kind || fileGroupKind(incoming[0]);
+            const allowed = incoming.filter((f) => fileGroupKind(f) === baseKind);
+            if (!allowed.length) return;
+
+            if (!appendMode || composeDraftKind !== baseKind) {
+                clearComposeDraft();
+                composeDraftKind = baseKind;
+            }
+            const currentNames = new Set(composeDraftFiles.map((f) => `${f.name}|${f.size}|${f.type}`));
+            allowed.forEach((file) => {
+                const signature = `${file.name}|${file.size}|${file.type}`;
+                if (currentNames.has(signature)) return;
+                composeDraftFiles.push(file);
+                composeDraftPreviewUrls.push(URL.createObjectURL(file));
+                currentNames.add(signature);
+            });
+            renderComposeMediaModal();
             composeMediaModal.classList.add('show');
             composeMediaModal.setAttribute('aria-hidden', 'false');
             if (composeMediaCaption) composeMediaCaption.focus();
@@ -668,6 +743,9 @@
         const sendMessageForm = document.getElementById('sendMessageForm');
         const composeEmojiTrigger = document.getElementById('composeEmojiTrigger');
         const markReadForm = document.getElementById('markReadForm');
+        const archiveConversationForm = document.getElementById('archiveConversationForm');
+        const archiveConversationActionInput = archiveConversationForm ? archiveConversationForm.querySelector('input[name="archive_action"]') : null;
+        const archiveConversationBtn = archiveConversationForm ? archiveConversationForm.querySelector('button[type="submit"]') : null;
         const deleteConversationForm = document.getElementById('deleteConversationForm');
         const startConversationForm = document.getElementById('startConversationForm');
         const micRecordBtn = document.getElementById('micRecordBtn');
@@ -687,8 +765,10 @@
         let recordingStartedAt = 0;
         let recordingTimer = null;
         let isRecordingAudio = false;
-        let pendingPastedFile = null;
-        let pendingPastedPreviewUrl = '';
+        let composeDraftKind = 'media';
+        let composeDraftFiles = [];
+        let composeDraftPreviewUrls = [];
+        let attachPickerKind = 'media';
         ['👍', '❤️', '😂', '🙏', '😮', '😢', '👏', '🔥'].forEach((emoji) => {
             const btn = document.createElement('button');
             btn.type = 'button';
@@ -874,15 +954,31 @@
             chatFileInput.addEventListener('change', function () {
                 if (!selectedFileName) return;
                 const file = this.files && this.files[0] ? this.files[0] : null;
-                selectedFileName.textContent = file ? `Arquivo: ${file.name}` : '';
+                if (!file) {
+                    selectedFileName.textContent = '';
+                    setAudioReadyState(false);
+                    return;
+                }
+                const files = Array.from(this.files || []);
+                const lowerName = (file.name || '').toLowerCase();
+                const isRecordedAudio = lowerName.startsWith('audio_') && (String(file.type || '').startsWith('audio/') || ['.ogg', '.opus', '.webm', '.m4a', '.mp3', '.wav', '.aac'].some((ext) => lowerName.endsWith(ext)));
+                if (isRecordedAudio) {
+                    selectedFileName.textContent = `Arquivo: ${file.name}`;
+                    setAudioReadyState(true);
+                    return;
+                }
+                this.value = '';
+                selectedFileName.textContent = '';
                 setAudioReadyState(false);
+                const modalKind = attachPickerKind === 'document' ? 'document' : 'media';
+                openComposeMediaModal(files, modalKind, false);
             });
         }
         if (chatCameraInput) {
             chatCameraInput.addEventListener('change', function () {
                 const file = this.files && this.files[0] ? this.files[0] : null;
                 if (!file) return;
-                setAttachmentFile(file);
+                openComposeMediaModal([file], 'media', false);
                 this.value = '';
             });
         }
@@ -1020,22 +1116,80 @@
                         const file = item.getAsFile ? item.getAsFile() : null;
                         if (!file) return;
                         e.preventDefault();
-                        openComposeMediaModal(file);
+                        openComposeMediaModal([file], 'media', false);
                         return;
                     }
                 }
             });
         }
-        if (composeMediaSendBtn) {
-            composeMediaSendBtn.addEventListener('click', function () {
-                if (!pendingPastedFile) return;
-                setAttachmentFile(pendingPastedFile);
-                const textInput = sendMessageForm ? sendMessageForm.querySelector('input[name="mensagem"]') : null;
-                if (textInput && composeMediaCaption) {
-                    textInput.value = (composeMediaCaption.value || '').trim();
+        async function sendComposeDraftFiles() {
+            if (!sendMessageForm || !composeDraftFiles.length) return;
+            const endpoint = (sendMessageForm.getAttribute('action') || '').trim() || (window.location.pathname + window.location.search);
+            const conversaInput = sendMessageForm.querySelector('input[name="conversa_id"]');
+            const conversaId = (conversaInput && conversaInput.value) ? conversaInput.value : String(activeConversationId || '');
+            if (!conversaId) throw new Error('Conversa invalida.');
+            const caption = composeMediaCaption ? String(composeMediaCaption.value || '').trim() : '';
+            for (let i = 0; i < composeDraftFiles.length; i++) {
+                const file = composeDraftFiles[i];
+                const body = new FormData();
+                body.append('ajax', '1');
+                body.append('action', 'send_message');
+                body.append('conversa_id', conversaId);
+                body.append('arquivo', file, file.name || `arquivo_${Date.now()}_${i + 1}`);
+                if (caption && i === 0) body.append('mensagem', caption);
+                const resp = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': getCsrfToken(),
+                        'Accept': 'application/json'
+                    },
+                    body
+                });
+                const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+                if (!contentType.includes('application/json')) {
+                    throw new Error('Resposta invalida do servidor.');
                 }
-                closeComposeMediaModal();
-                if (sendMessageForm) sendMessageForm.requestSubmit();
+                const data = await resp.json().catch(() => ({ ok: false, error: 'Resposta invalida do servidor.' }));
+                if (!resp.ok || !data.ok) {
+                    throw new Error(data.error || 'Falha ao enviar arquivo.');
+                }
+            }
+        }
+        if (composeMediaSendBtn) {
+            composeMediaSendBtn.addEventListener('click', async function () {
+                if (!composeDraftFiles.length) return;
+                try {
+                    await sendComposeDraftFiles();
+                    closeComposeMediaModal();
+                    clearAttachmentInputs();
+                    if (selectedFileName) selectedFileName.textContent = '';
+                    await pollMessages();
+                    await pollConversations();
+                } catch (err) {
+                    alert(err.message || 'Falha ao enviar arquivos.');
+                }
+            });
+        }
+        if (composeMediaAddBtn) {
+            composeMediaAddBtn.addEventListener('click', function () {
+                if (!composeMediaAddInput) return;
+                composeMediaAddInput.value = '';
+                composeMediaAddInput.setAttribute('multiple', 'multiple');
+                if (composeDraftKind === 'document') {
+                    composeMediaAddInput.setAttribute('accept', '.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar');
+                } else {
+                    composeMediaAddInput.setAttribute('accept', 'image/*,video/*');
+                }
+                composeMediaAddInput.click();
+            });
+        }
+        if (composeMediaAddInput) {
+            composeMediaAddInput.addEventListener('change', function () {
+                const files = Array.from(this.files || []);
+                if (!files.length) return;
+                openComposeMediaModal(files, composeDraftKind, true);
+                this.value = '';
             });
         }
         if (composeMediaCancelBtn) {
@@ -1397,14 +1551,19 @@
             if (chatFileInput) chatFileInput.removeAttribute('capture');
             if (kind === 'media') {
                 if (!chatFileInput) return;
+                attachPickerKind = 'media';
                 chatFileInput.setAttribute('accept', 'image/*,video/*');
+                chatFileInput.setAttribute('multiple', 'multiple');
                 chatFileInput.click();
             } else if (kind === 'camera') {
+                attachPickerKind = 'media';
                 clearAttachmentInputs();
                 triggerCameraCapture();
             } else if (kind === 'document') {
                 if (!chatFileInput) return;
+                attachPickerKind = 'document';
                 chatFileInput.setAttribute('accept', '.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar');
+                chatFileInput.setAttribute('multiple', 'multiple');
                 chatFileInput.click();
             } else if (kind === 'contact') {
                 alert('Envio de contato sera habilitado em breve.');
@@ -1482,6 +1641,22 @@
         if (cfg.openNewChat && newChatCard) {
             newChatCard.classList.add('show');
             if (numeroInput) numeroInput.focus();
+        }
+        if (archiveConversationForm) {
+            archiveConversationForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                try {
+                    const data = await submitFormAjax(archiveConversationForm);
+                    const hiddenAction = archiveConversationForm.querySelector('input[name="archive_action"]');
+                    const btn = archiveConversationForm.querySelector('button[type="submit"]');
+                    const isArchived = !!(data && data.arquivada);
+                    if (hiddenAction) hiddenAction.value = isArchived ? 'unarchive' : 'archive';
+                    if (btn) btn.textContent = isArchived ? 'Desarquivar' : 'Arquivar';
+                    await pollConversations();
+                } catch (err) {
+                    alert(err.message || 'Erro ao arquivar conversa.');
+                }
+            });
         }
 
         if (activeConversationId) {

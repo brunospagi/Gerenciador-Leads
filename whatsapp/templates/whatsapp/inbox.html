@@ -1,8 +1,8 @@
-{% extends 'base_portal.html' %}
+﻿{% extends 'base_portal.html' %}
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}?v=20260317-5">
+<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}?v=20260317-13">
 <div class="wa-clone-wrap">
     <div class="wa-topbar">
         <div>
@@ -89,9 +89,15 @@
                 </form>
                 <i class="fa-sharp fa-solid fa-bars-filter"></i>
             </div>
+            <div class="conversation-filters">
+                <span class="chip active">Tudo</span>
+                <span class="chip">Não lidas</span>
+                <span class="chip">Arquivadas {{ conversas_arquivadas|length }}</span>
+            </div>
 
             <div class="chat-list" id="conversation-list">
-                {% for conversa in conversas %}
+                {% if conversas_ativas or conversas_arquivadas %}
+                {% for conversa in conversas_ativas %}
                 <a class="chat-box {% if conversa_ativa and conversa.pk == conversa_ativa.pk %}active{% endif %}" href="{% url 'whatsapp:inbox' %}?c={{ conversa.pk }}" data-conversation-id="{{ conversa.pk }}">
                     <div class="img-box">
                         {% if conversa.avatar_url %}
@@ -118,9 +124,37 @@
                         {% endif %}
                     </div>
                 </a>
-                {% empty %}
-                <div class="p-3 text-muted">Nenhuma conversa encontrada.</div>
                 {% endfor %}
+                {% if conversas_arquivadas %}
+                <div class="archive-divider">
+                    <span><i class="fa-regular fa-box-archive"></i> Arquivadas</span>
+                    <b>{{ conversas_arquivadas|length }}</b>
+                </div>
+                {% for conversa in conversas_arquivadas %}
+                <a class="chat-box archived {% if conversa_ativa and conversa.pk == conversa_ativa.pk %}active{% endif %}" href="{% url 'whatsapp:inbox' %}?c={{ conversa.pk }}" data-conversation-id="{{ conversa.pk }}">
+                    <div class="img-box">
+                        {% if conversa.avatar_url %}
+                        <img class="dp" src="{{ conversa.avatar_url }}" alt="Contato">
+                        {% else %}
+                        <img class="dp" src="https://ui-avatars.com/api/?name=Contato&background=e2e8f0&color=64748b&size=256&rounded=true" alt="Contato">
+                        {% endif %}
+                    </div>
+                    <div class="chat-details">
+                        <div class="text-head">
+                            <h4>{{ conversa.nome_exibicao }}</h4>
+                            <p class="time {% if conversa.nao_lidas %}unread{% endif %}">{{ conversa.ultima_mensagem_em|date:"d/m H:i" }}</p>
+                        </div>
+                        <div class="text-message">
+                            <p>{{ conversa.ultima_mensagem|default:"-"|truncatechars:42 }}</p>
+                            {% if conversa.nao_lidas %}<b>{{ conversa.nao_lidas }}</b>{% endif %}
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+                {% endif %}
+                {% else %}
+                <div class="p-3 text-muted">Nenhuma conversa encontrada.</div>
+                {% endif %}
             </div>
         </div>
 
@@ -156,6 +190,18 @@
                             <button type="submit" class="btn btn-sm btn-light border">Marcar lida</button>
                         </form>
                     </li>
+                    {% if can_archive_conversation %}
+                    <li>
+                        <form method="post" action="{% url 'whatsapp:archive_conversation' conversa_ativa.pk %}" id="archiveConversationForm">
+                            {% csrf_token %}
+                            <input type="hidden" name="ajax" value="1">
+                            <input type="hidden" name="archive_action" value="{% if conversa_ativa.arquivada %}unarchive{% else %}archive{% endif %}">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                {% if conversa_ativa.arquivada %}Desarquivar{% else %}Arquivar{% endif %}
+                            </button>
+                        </form>
+                    </li>
+                    {% endif %}
                     <li>
                         <form method="post" action="{% url 'whatsapp:delete_conversation' conversa_ativa.pk %}" id="deleteConversationForm">
                             {% csrf_token %}
@@ -290,12 +336,18 @@
 <div class="compose-media-modal" id="composeMediaModal" aria-hidden="true">
     <div class="compose-media-card">
         <div class="compose-media-header">
-            <h5>Pré-visualização da imagem</h5>
+            <h5 id="composeMediaTitle">Pré-visualização do envio</h5>
             <button type="button" class="compose-media-close" id="composeMediaClose" aria-label="Fechar">&times;</button>
         </div>
         <div class="compose-media-body">
-            <img id="composeMediaPreview" src="" alt="Imagem colada">
+            <div class="compose-media-count" id="composeMediaCount">0 arquivo(s) selecionado(s)</div>
+            <div id="composeMediaPreviewWrap">
+                <img id="composeMediaPreview" src="" alt="Pré-visualização">
+            </div>
+            <div class="compose-media-files" id="composeMediaFiles"></div>
             <textarea id="composeMediaCaption" class="compose-media-caption" rows="2" placeholder="Adicione uma legenda (opcional)"></textarea>
+            <button type="button" class="btn btn-light border compose-media-add-btn" id="composeMediaAddBtn">+ Adicionar mais</button>
+            <input type="file" id="composeMediaAddInput" class="hidden-file-input" multiple>
         </div>
         <div class="compose-media-footer">
             <button type="button" class="btn btn-light border" id="composeMediaCancelBtn">Cancelar</button>
@@ -350,6 +402,7 @@
         messagesEndpointTemplate: "{% url 'whatsapp:conversation_messages_feed' 0 %}",
         forwardMessagesBulkEndpoint: "{% url 'whatsapp:forward_messages_bulk' %}",
         markReadEndpointTemplate: "{% url 'whatsapp:mark_read' 0 %}",
+        archiveConversationEndpointTemplate: "{% url 'whatsapp:archive_conversation' 0 %}",
         deleteConversationEndpointTemplate: "{% url 'whatsapp:delete_conversation' 0 %}",
         editMessageEndpointTemplate: "{% url 'whatsapp:edit_message' 0 %}",
         deleteMessageEndpointTemplate: "{% url 'whatsapp:delete_message' 0 %}",
@@ -359,5 +412,5 @@
         openNewChat: {% if open_new_chat %}true{% else %}false{% endif %}
     };
 </script>
-<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-11"></script>
+<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-13"></script>
 {% endblock %}
