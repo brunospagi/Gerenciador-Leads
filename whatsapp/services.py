@@ -930,6 +930,18 @@ def map_delivery_status(payload: dict[str, Any]) -> str:
 
 def process_status_update(payload: dict[str, Any]) -> bool:
     data = payload.get('data', payload) if isinstance(payload, dict) else {}
+    if isinstance(data, list):
+        updated_any = False
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            nested_payload = dict(payload)
+            nested_payload['data'] = item
+            if process_status_update(nested_payload):
+                updated_any = True
+        return updated_any
+    if not isinstance(data, dict):
+        return False
     key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
     external_id = (
         key_data.get('id')
@@ -950,6 +962,93 @@ def process_status_update(payload: dict[str, Any]) -> bool:
     message.status = status
     message.payload = merged_payload
     message.save(update_fields=['status', 'payload'])
+    return True
+
+
+def process_message_content_update(payload: dict[str, Any]) -> bool:
+    data = payload.get('data', payload) if isinstance(payload, dict) else {}
+    if isinstance(data, list):
+        updated_any = False
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            nested_payload = dict(payload)
+            nested_payload['data'] = item
+            if process_message_content_update(nested_payload):
+                updated_any = True
+        return updated_any
+    if not isinstance(data, dict):
+        return False
+
+    key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
+    external_id = (
+        key_data.get('id')
+        or data.get('id')
+        or data.get('messageId')
+        or payload.get('id')
+    )
+    if not external_id:
+        return False
+
+    message_obj = WhatsAppMessage.objects.filter(external_id=external_id).first()
+    if not message_obj:
+        return False
+
+    changed_fields: list[str] = []
+    text_before = sanitize_text_content(message_obj.conteudo or '')
+    texto = parse_message_text(payload)
+    texto = sanitize_text_content(texto)
+    media_url, media_kind = parse_message_media(payload)
+
+    placeholder_values = {
+        '',
+        '[imagem]',
+        '[video]',
+        '[audio]',
+        '[documento]',
+        '[document]',
+        '[arquivo]',
+        '[mensagem nao suportada]',
+    }
+    text_before_norm = text_before.lower()
+    should_replace_text = text_before_norm in placeholder_values
+
+    if media_url and media_url != (message_obj.media_url or ''):
+        message_obj.media_url = media_url
+        changed_fields.append('media_url')
+
+    if texto and (should_replace_text or not text_before):
+        message_obj.conteudo = texto
+        changed_fields.append('conteudo')
+    elif media_url and media_kind and should_replace_text and not texto:
+        label = {
+            'image': '[IMAGEM]',
+            'video': '[VIDEO]',
+            'audio': '[AUDIO]',
+            'document': '[DOCUMENTO]',
+        }.get(media_kind.lower(), '')
+        if label:
+            message_obj.conteudo = label
+            changed_fields.append('conteudo')
+
+    if not changed_fields:
+        return False
+
+    merged_payload = dict(message_obj.payload or {})
+    merged_payload['message_update'] = payload
+    message_obj.payload = merged_payload
+    changed_fields.append('payload')
+    message_obj.save(update_fields=list(dict.fromkeys(changed_fields)))
+
+    convo = message_obj.conversa
+    if convo:
+        latest = convo.mensagens.order_by('-criado_em').first()
+        if latest and latest.pk == message_obj.pk:
+            preview_text = sanitize_text_content(message_obj.conteudo or '')
+            if preview_text:
+                convo.ultima_mensagem = preview_text[:500]
+                convo.ultima_mensagem_em = latest.criado_em
+                convo.save(update_fields=['ultima_mensagem', 'ultima_mensagem_em', 'atualizado_em'])
     return True
 
 
@@ -1160,9 +1259,13 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
             return
 
     if event_name_norm in {'MESSAGES_UPDATE', 'MESSAGE_UPDATE', 'MESSAGE_STATUS', 'SEND_MESSAGE'}:
-        if process_status_update(payload):
+        content_updated = process_message_content_update(payload)
+        status_updated = process_status_update(payload)
+        if content_updated:
+            logger.info('Webhook de update de conteudo processado para mensagem existente.')
+        if status_updated:
             logger.info('Webhook de status processado para mensagem existente.')
-        # Eventos de status nao devem criar conversa/mensagem nova
+        # Eventos de update/status nao devem criar conversa/mensagem nova
         return
 
     data = payload.get('data', payload)
