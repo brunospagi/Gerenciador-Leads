@@ -374,14 +374,79 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         try:
             storage = PublicMediaStorage()
             saved_path = storage.save(storage_path, file_obj)
+            logger.info('WhatsApp media base64 salva no MinIO: kind=%s path=%s', media_kind, saved_path)
             return storage.url(saved_path)
-        except Exception:
+        except Exception as exc:
+            logger.warning('Falha ao salvar media base64 no MinIO, tentando storage padrao: %s', exc)
             try:
                 fallback_file_obj = ContentFile(decoded, name=unique_name)
                 saved_path = default_storage.save(storage_path, fallback_file_obj)
+                logger.info('WhatsApp media base64 salva no storage padrao: kind=%s path=%s', media_kind, saved_path)
                 return default_storage.url(saved_path)
-            except Exception:
+            except Exception as fallback_exc:
+                logger.warning('Falha ao salvar media base64 no storage padrao, usando data URL: %s', fallback_exc)
                 return f'data:{mime};base64,{source_data}'
+
+    def _infer_kind_by_mime_or_type(raw_mime: str, raw_type: str, fallback: str = 'document') -> str:
+        mime = str(raw_mime or '').lower()
+        msg_type = str(raw_type or '').lower()
+        if mime.startswith('image/') or 'image' in msg_type:
+            return 'image'
+        if mime.startswith('video/') or 'video' in msg_type:
+            return 'video'
+        if mime.startswith('audio/') or 'audio' in msg_type or 'ptt' in msg_type:
+            return 'audio'
+        if 'document' in msg_type or 'file' in msg_type:
+            return 'document'
+        return fallback
+
+    def _deep_media_candidates(root: Any) -> list[dict[str, str]]:
+        candidates: list[dict[str, str]] = []
+
+        def walk(node: Any, parent_key: str = '') -> None:
+            if isinstance(node, dict):
+                raw_type = (
+                    node.get('messageType')
+                    or node.get('mediaType')
+                    or node.get('type')
+                    or parent_key
+                    or ''
+                )
+                raw_mime = (
+                    node.get('mimetype')
+                    or node.get('mimeType')
+                    or node.get('mediaMimeType')
+                    or ''
+                )
+                url = str(
+                    node.get('url')
+                    or node.get('mediaUrl')
+                    or node.get('fileUrl')
+                    or node.get('directPath')
+                    or ''
+                ).strip()
+                base64_data = (
+                    node.get('base64')
+                    or node.get('mediaBase64')
+                    or node.get('fileBase64')
+                    or ''
+                )
+                if url or (isinstance(base64_data, str) and base64_data.strip()):
+                    candidates.append({
+                        'url': url,
+                        'base64': str(base64_data or '').strip(),
+                        'mime': str(raw_mime or '').strip(),
+                        'kind': _infer_kind_by_mime_or_type(raw_mime, raw_type, fallback='document'),
+                    })
+
+                for child_key, child_value in node.items():
+                    walk(child_value, str(child_key or ''))
+            elif isinstance(node, list):
+                for item in node:
+                    walk(item, parent_key)
+
+        walk(root)
+        return candidates
 
     mapping = [
         ('imageMessage', 'image'),
@@ -484,6 +549,31 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
             if mime.startswith('audio/') or 'audio' in msg_type or 'ptt' in msg_type:
                 return persisted_url, 'audio'
             return persisted_url, 'document'
+
+    # Fallback profundo: algumas versoes enviam midia em estruturas nao padrao.
+    for candidate in _deep_media_candidates(data):
+        candidate_kind = candidate.get('kind') or 'document'
+        candidate_mime = candidate.get('mime') or 'application/octet-stream'
+        candidate_url = candidate.get('url') or ''
+        candidate_b64 = candidate.get('base64') or ''
+        if candidate_url and not _is_encrypted_media_ref(candidate_url):
+            return candidate_url, candidate_kind
+        if candidate_b64:
+            persisted_url = _media_from_base64(candidate_mime, candidate_b64, candidate_kind)
+            if persisted_url:
+                return persisted_url, candidate_kind
+
+    for candidate in _deep_media_candidates(payload):
+        candidate_kind = candidate.get('kind') or 'document'
+        candidate_mime = candidate.get('mime') or 'application/octet-stream'
+        candidate_url = candidate.get('url') or ''
+        candidate_b64 = candidate.get('base64') or ''
+        if candidate_url and not _is_encrypted_media_ref(candidate_url):
+            return candidate_url, candidate_kind
+        if candidate_b64:
+            persisted_url = _media_from_base64(candidate_mime, candidate_b64, candidate_kind)
+            if persisted_url:
+                return persisted_url, candidate_kind
 
     return '', ''
 
