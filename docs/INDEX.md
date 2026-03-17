@@ -16,6 +16,8 @@ Este diretorio concentra a documentacao tecnica e funcional do projeto.
 - [10 - Comentarios Adicionais e Melhorias](./10-comentarios-adicionais-e-melhorias.md)
 - [11 - Diagramas](./11-diagramas.md)
 - [12 - Diagrama de Banco de Dados](./12-diagrama-banco.md)
+- [13 - Implementacoes Recentes (WhatsApp, Permissoes e Relatorios)](./13-implementacoes-recentes.md)
+- [14 - Diagramas das Implementacoes Recentes](./14-diagramas-implementacoes-recentes.md)
 
 ## Leitura recomendada
 

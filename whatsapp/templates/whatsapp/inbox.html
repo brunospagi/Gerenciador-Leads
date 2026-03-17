@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}">
+<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}?v=20260317-5">
 <div class="wa-clone-wrap">
     <div class="wa-topbar">
         <div>
@@ -80,11 +80,11 @@
             </div>
 
             <div class="search-container">
-                <form method="get">
+                <form method="get" id="conversationSearchForm">
                     {% if conversa_ativa %}<input type="hidden" name="c" value="{{ conversa_ativa.pk }}">{% endif %}
                     <div class="input">
                         <i class="fa-solid fa-magnifying-glass"></i>
-                        <input type="text" name="q" value="{{ request.GET.q }}" placeholder="Buscar ou iniciar nova conversa">
+                        <input type="text" id="conversationSearchInput" name="q" value="{{ request.GET.q }}" placeholder="Buscar ou iniciar nova conversa">
                     </div>
                 </form>
                 <i class="fa-sharp fa-solid fa-bars-filter"></i>
@@ -183,13 +183,15 @@
                             <span class="bubble-media"><audio controls><source src="{{ mensagem.media_url }}"></audio></span>
                             {% elif mensagem.media_kind == 'video' %}
                             <span class="bubble-media media-video"><video controls preload="metadata"><source src="{{ mensagem.media_url }}"></video></span>
+                            {% elif mensagem.media_kind == 'sticker' %}
+                            <span class="bubble-media media-sticker"><img src="{{ mensagem.media_url }}" alt="figurinha" class="js-chat-image" data-full-src="{{ mensagem.media_url }}"></span>
                             {% elif mensagem.media_kind == 'image' %}
                             <span class="bubble-media media-image"><img src="{{ mensagem.media_url }}" alt="midia" class="js-chat-image" data-full-src="{{ mensagem.media_url }}"></span>
                             {% else %}
                             <span class="bubble-media"><a href="{{ mensagem.media_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a></span>
                             {% endif %}
                         {% endif %}
-                        {% if mensagem.conteudo and mensagem.conteudo != '[DOCUMENT]' and mensagem.conteudo != '[ARQUIVO]' %}
+                        {% if mensagem.conteudo and mensagem.conteudo != '[DOCUMENT]' and mensagem.conteudo != '[ARQUIVO]' and mensagem.conteudo != '[DOCUMENTO]' and mensagem.conteudo != '[IMAGEM]' and mensagem.conteudo != '[VIDEO]' and mensagem.conteudo != '[AUDIO]' and mensagem.conteudo != '[FIGURINHA]' %}
                         <div class="message-text">{{ mensagem.conteudo|linebreaksbr }}</div>
                         {% endif %}
                         <div class="message-meta">
@@ -206,6 +208,9 @@
                                 {% endif %}
                             {% endif %}
                         </div>
+                        {% if mensagem.reaction_emoji %}
+                        <div class="message-reaction-badge">{{ mensagem.reaction_emoji }}</div>
+                        {% endif %}
                         <div class="reaction-row reaction-hidden" id="reaction-row-{{ mensagem.pk }}">
                             <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '\uD83D\uDC4D')">&#128077;</button>
                             <button type="button" class="reaction-btn" onclick="sendReaction({{ mensagem.pk }}, '\u2764\uFE0F')">&#10084;&#65039;</button>
@@ -325,5 +330,5 @@
         openNewChat: {% if open_new_chat %}true{% else %}false{% endif %}
     };
 </script>
-<script src="{% static 'whatsapp/inbox.js' %}"></script>
+<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-6"></script>
 {% endblock %}

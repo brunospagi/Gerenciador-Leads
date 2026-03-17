@@ -56,9 +56,25 @@ def _visible_text(value: str) -> str:
     return text.strip()
 
 
+def _normalize_public_media_url(value: str) -> str:
+    candidate = str(value or '').strip()
+    if not candidate:
+        return ''
+    lowered = candidate.lower()
+    if lowered.startswith('data:'):
+        return candidate
+    if candidate.startswith('//'):
+        return f'https:{candidate}'
+    if lowered.startswith('http://') or lowered.startswith('https://'):
+        return candidate
+    if candidate.startswith('/'):
+        return f'https://mmg.whatsapp.net{candidate}'
+    return candidate
+
+
 def _is_noise_status_message(message: WhatsAppMessage) -> bool:
     content = _visible_text(message.conteudo or '')
-    has_media = bool((message.media_url or '').strip())
+    has_media = bool(_normalize_public_media_url(message.media_url or ''))
     if not content and not has_media and message.direcao != WhatsAppMessage.Direction.SISTEMA:
         return True
     if content or has_media:
@@ -104,6 +120,30 @@ def _presence_info(conversation: WhatsAppConversation) -> tuple[str, str]:
     if state == 'recording':
         return 'recording', 'gravando audio...'
     return '', ''
+
+
+def _message_reaction_emoji(message: WhatsAppMessage) -> str:
+    payload = message.payload or {}
+    if not isinstance(payload, dict):
+        return ''
+    last_reaction = payload.get('last_reaction')
+    if isinstance(last_reaction, dict):
+        emoji = _visible_text(last_reaction.get('emoji') or '')
+        if emoji:
+            return emoji
+    reaction_sent = payload.get('reaction_sent')
+    if isinstance(reaction_sent, dict):
+        emoji = _visible_text(reaction_sent.get('emoji') or '')
+        if emoji:
+            return emoji
+    reactions = payload.get('reactions')
+    if isinstance(reactions, list):
+        for item in reversed(reactions):
+            if isinstance(item, dict):
+                emoji = _visible_text(item.get('emoji') or '')
+                if emoji:
+                    return emoji
+    return ''
 
 
 def can_manage_whatsapp_instance(user) -> bool:
@@ -164,6 +204,8 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                 if _is_noise_status_message(m):
                     continue
                 m.conteudo = _visible_text(m.conteudo or '')
+                m.media_url = _normalize_public_media_url(m.media_url or '')
+                m.reaction_emoji = _message_reaction_emoji(m)
                 filtered.append(m)
             mensagens = filtered[-300:]
 
@@ -747,8 +789,9 @@ def conversation_messages_feed(request, pk):
             'id': m.pk,
             'direcao': m.direcao,
             'conteudo': _visible_text(m.conteudo or ''),
-            'media_url': m.media_url or '',
+            'media_url': _normalize_public_media_url(m.media_url or ''),
             'media_kind': m.media_kind or '',
+            'reaction_emoji': _message_reaction_emoji(m),
             'status_code': m.status,
             'status': m.get_status_display(),
             'criado_em': m.criado_em.strftime('%d/%m/%Y %H:%M') if m.criado_em else '',
@@ -843,7 +886,7 @@ def _forward_single_message(mensagem: WhatsAppMessage, numero: str, user):
         raise ValueError('Instancia ativa nao encontrada')
 
     conteudo = _visible_text(mensagem.conteudo or '')
-    media_url = (mensagem.media_url or '').strip()
+    media_url = _normalize_public_media_url(mensagem.media_url or '')
     media_kind = (mensagem.media_kind or '').strip().lower()
 
     placeholders = {'[imagem]', '[video]', '[audio]', '[documento]', '[document]', '[arquivo]', '[mensagem nao suportada]'}
@@ -860,13 +903,15 @@ def _forward_single_message(mensagem: WhatsAppMessage, numero: str, user):
             file_name = os.path.basename(parsed_path) or f'arquivo_{uuid.uuid4().hex}'
             guessed_mime = mimetypes.guess_type(parsed_path)[0] or ''
             if not guessed_mime:
-                guessed_mime = 'image/jpeg' if media_kind == 'image' else (
+                guessed_mime = 'image/webp' if media_kind == 'sticker' else (
+                    'image/jpeg' if media_kind == 'image' else (
                     'video/mp4' if media_kind == 'video' else 'application/octet-stream'
+                    )
                 )
             response = client.send_media(
                 number=numero,
                 media_url=media_url,
-                mediatype=media_kind if media_kind in {'image', 'video', 'document'} else 'document',
+                mediatype=('image' if media_kind == 'sticker' else media_kind) if media_kind in {'image', 'video', 'document', 'sticker'} else 'document',
                 mimetype=guessed_mime,
                 caption=caption,
                 file_name=file_name,
@@ -892,7 +937,7 @@ def _forward_single_message(mensagem: WhatsAppMessage, numero: str, user):
 
     forward_preview = caption or conteudo
     if media_url and not forward_preview:
-        forward_preview = {'image': '[IMAGEM]', 'video': '[VIDEO]', 'audio': '[AUDIO]'}.get(media_kind, '[DOCUMENTO]')
+        forward_preview = {'image': '[IMAGEM]', 'video': '[VIDEO]', 'audio': '[AUDIO]', 'sticker': '[FIGURINHA]'}.get(media_kind, '[DOCUMENTO]')
 
     forwarded = WhatsAppMessage.objects.create(
         conversa=conversa_destino,

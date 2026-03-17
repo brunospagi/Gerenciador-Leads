@@ -8,7 +8,7 @@
         const deleteConversationEndpointTemplate = cfg.deleteConversationEndpointTemplate || '';
         const listEl = document.getElementById('conversation-list');
         const messagesEl = document.getElementById('message-list');
-        const currentQuery = cfg.currentQuery || '';
+        let currentQuery = cfg.currentQuery || '';
         const activeNameEl = document.getElementById('active-contact-name');
         const activeAvatarEl = document.getElementById('active-contact-avatar');
         const activeLabelsEl = document.getElementById('active-contact-labels');
@@ -53,24 +53,43 @@
             return (str || '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
         }
 
+        function normalizeMediaUrl(url) {
+            const raw = String(url || '').trim();
+            if (!raw) return '';
+            const low = raw.toLowerCase();
+            if (low.startsWith('data:')) return raw;
+            if (raw.startsWith('//')) return `https:${raw}`;
+            if (low.startsWith('http://') || low.startsWith('https://')) return raw;
+            if (raw.startsWith('/')) return `https://mmg.whatsapp.net${raw}`;
+            return raw;
+        }
+
         function mediaMarkup(mediaUrl, mediaKind) {
-            if (!mediaUrl) return '';
+            const normalizedUrl = normalizeMediaUrl(mediaUrl);
+            if (!normalizedUrl) return '';
             const kind = (mediaKind || '').toLowerCase();
-            if (kind === 'audio') return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
-            if (kind === 'video') return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${mediaUrl}"></video></span>`;
-            if (kind === 'image') return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia" class="js-chat-image" data-full-src="${mediaUrl}"></span>`;
-            const url = mediaUrl.toLowerCase();
-            if (url.startsWith('data:image/')) return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia" class="js-chat-image" data-full-src="${mediaUrl}"></span>`;
-            if (url.startsWith('data:video/')) return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${mediaUrl}"></video></span>`;
-            if (url.startsWith('data:audio/')) return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
-            if (url.includes('.mp3') || url.includes('.ogg') || url.includes('.wav') || url.includes('.opus') || url.includes('.m4a') || url.includes('.aac')) return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
-            if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')) return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${mediaUrl}"></video></span>`;
-            if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.gif') || url.includes('.webp')) return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia" class="js-chat-image" data-full-src="${mediaUrl}"></span>`;
-            return `<span class="bubble-media"><a href="${mediaUrl}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a></span>`;
+            if (kind === 'audio') return `<span class="bubble-media"><audio controls><source src="${normalizedUrl}"></audio></span>`;
+            if (kind === 'video') return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${normalizedUrl}"></video></span>`;
+            if (kind === 'sticker') return `<span class="bubble-media media-sticker"><img src="${normalizedUrl}" alt="figurinha" class="js-chat-image" data-full-src="${normalizedUrl}"></span>`;
+            if (kind === 'image') return `<span class="bubble-media media-image"><img src="${normalizedUrl}" alt="midia" class="js-chat-image" data-full-src="${normalizedUrl}"></span>`;
+            const url = normalizedUrl.toLowerCase();
+            if (url.startsWith('data:image/')) return `<span class="bubble-media media-image"><img src="${normalizedUrl}" alt="midia" class="js-chat-image" data-full-src="${normalizedUrl}"></span>`;
+            if (url.startsWith('data:video/')) return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${normalizedUrl}"></video></span>`;
+            if (url.startsWith('data:audio/')) return `<span class="bubble-media"><audio controls><source src="${normalizedUrl}"></audio></span>`;
+            if (url.includes('.mp3') || url.includes('.ogg') || url.includes('.wav') || url.includes('.opus') || url.includes('.m4a') || url.includes('.aac')) return `<span class="bubble-media"><audio controls><source src="${normalizedUrl}"></audio></span>`;
+            if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')) return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${normalizedUrl}"></video></span>`;
+            if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.gif') || url.includes('.webp')) return `<span class="bubble-media media-image"><img src="${normalizedUrl}" alt="midia" class="js-chat-image" data-full-src="${normalizedUrl}"></span>`;
+            return `<span class="bubble-media"><a href="${normalizedUrl}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a></span>`;
         }
 
         function reactionMarkup(messageId) {
             return `<div class="reaction-row reaction-hidden" id="reaction-row-${messageId}"><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDC4D')">&#128077;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\u2764\\uFE0F')">&#10084;&#65039;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDE02')">&#128514;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDE4F')">&#128591;</button></div>`;
+        }
+
+        function reactionBadgeMarkup(emoji) {
+            const value = String(emoji || '').trim();
+            if (!value) return '';
+            return `<div class="message-reaction-badge">${esc(value)}</div>`;
         }
 
         function statusIconMarkup(message) {
@@ -90,7 +109,7 @@
         }
 
         function menuMarkup(message) {
-            const mediaUrl = message.media_url || '';
+            const mediaUrl = normalizeMediaUrl(message.media_url || '');
             const text = message.conteudo || '';
             const noMedia = mediaUrl ? '' : 'disabled';
             const encMedia = encodeURIComponent(mediaUrl);
@@ -192,6 +211,7 @@
                 u: m.media_url || '',
                 k: m.media_kind || '',
                 s: m.status_code || '',
+                r: m.reaction_emoji || '',
                 t: m.criado_em || '',
             })));
             if (signature === lastMessagesSignature) return;
@@ -203,18 +223,22 @@
                 if ((kind === 'document') && (cleanedText === '[DOCUMENT]' || cleanedText === '[ARQUIVO]')) {
                     cleanedText = '';
                 }
+                if ((kind === 'image' || kind === 'video' || kind === 'audio' || kind === 'sticker') && (cleanedText === '[IMAGEM]' || cleanedText === '[VIDEO]' || cleanedText === '[AUDIO]' || cleanedText === '[FIGURINHA]' || cleanedText === '[DOCUMENTO]')) {
+                    cleanedText = '';
+                }
                 const textHtml = esc(cleanedText).replaceAll('\n', '<br>');
                 const reactionRow = reactionMarkup(m.id);
+                const reactionBadge = reactionBadgeMarkup(m.reaction_emoji);
                 const timeText = esc((m.criado_em || '').split(' ')[1] || m.criado_em || '');
                 const messageText = textHtml ? `<div class="message-text">${textHtml}</div>` : '';
                 const hasMedia = !!m.media_url;
-                const isVisualMedia = kind === 'image' || kind === 'video';
+                const isVisualMedia = kind === 'image' || kind === 'video' || kind === 'sticker';
                 const mediaOnly = hasMedia && !cleanedText && isVisualMedia;
                 const bubbleClass = `message-bubble${hasMedia ? ' has-media' : ''}${mediaOnly ? ' media-only' : ''}`;
                 const isSelected = selectedForwardMessageIds.has(Number(m.id));
                 const selectedClass = isSelected ? 'is-selected' : '';
                 const checkClass = isSelected ? 'selected' : '';
-                return `<div class="message-box ${side} ${selectedClass}" data-message-id="${m.id}"><button type="button" class="forward-check ${checkClass}" onclick="toggleForwardMessageSelection(event, ${m.id})"><i class="fa-solid fa-check"></i></button><div class="${bubbleClass}">${menuMarkup(m)}${mediaMarkup(m.media_url, m.media_kind)}${messageText}<div class="message-meta"><span class="message-time">${timeText}</span>${statusIconMarkup(m)}</div>${reactionRow}</div></div>`;
+                return `<div class="message-box ${side} ${selectedClass}" data-message-id="${m.id}"><button type="button" class="forward-check ${checkClass}" onclick="toggleForwardMessageSelection(event, ${m.id})"><i class="fa-solid fa-check"></i></button><div class="${bubbleClass}">${menuMarkup(m)}${mediaMarkup(m.media_url, m.media_kind)}${messageText}<div class="message-meta"><span class="message-time">${timeText}</span>${statusIconMarkup(m)}</div>${reactionBadge}${reactionRow}</div></div>`;
             }).join('');
             updateForwardSelectionUi();
             if (shouldStickToBottom) {
@@ -283,6 +307,20 @@
             if (!exceptMessageId) activeMenuMessageId = null;
         }
 
+        function normalizeRenderedMediaUrls() {
+            document.querySelectorAll('#message-list img[src], #message-list video source[src], #message-list audio source[src], #message-list a[href]').forEach((el) => {
+                const attr = el.hasAttribute('src') ? 'src' : 'href';
+                const current = el.getAttribute(attr) || '';
+                const normalized = normalizeMediaUrl(current);
+                if (normalized && normalized !== current) {
+                    el.setAttribute(attr, normalized);
+                    if (el.classList && el.classList.contains('js-chat-image')) {
+                        el.setAttribute('data-full-src', normalized);
+                    }
+                }
+            });
+        }
+
         window.toggleMessageMenu = function (event, messageId) {
             event.preventDefault();
             event.stopPropagation();
@@ -338,7 +376,7 @@
             if (action === 'react') {
                 openEmojiPicker(messageId, sourceEl || null);
             } else if (action === 'download') {
-                const decoded = decodePayload(payload);
+                const decoded = normalizeMediaUrl(decodePayload(payload));
                 if (decoded) {
                     window.open(decoded, '_blank');
                 } else {
@@ -367,7 +405,7 @@
 
         function openImagePreview(src) {
             if (!imagePreviewModal || !imagePreviewTarget || !src) return;
-            imagePreviewTarget.src = src;
+            imagePreviewTarget.src = normalizeMediaUrl(src);
             imagePreviewModal.classList.add('show');
             imagePreviewModal.setAttribute('aria-hidden', 'false');
         }
@@ -542,6 +580,8 @@
         }
 
         const btnOpenNewChat = document.getElementById('btnOpenNewChat');
+        const conversationSearchForm = document.getElementById('conversationSearchForm');
+        const conversationSearchInput = document.getElementById('conversationSearchInput');
         const newChatCard = document.getElementById('newChatCard');
         const numeroInput = newChatCard ? newChatCard.querySelector('input[name="numero"]') : null;
         const attachTrigger = document.getElementById('attachTrigger');
@@ -873,6 +913,40 @@
                 exitForwardSelectionMode();
             });
         }
+
+        let searchDebounceTimer = null;
+        function applyConversationSearch(nextQuery) {
+            const normalized = String(nextQuery || '').trim();
+            if (normalized === String(currentQuery || '').trim()) return;
+            currentQuery = normalized;
+            lastConversationsSignature = '';
+            pollConversations();
+            const url = new URL(window.location.href);
+            if (currentQuery) {
+                url.searchParams.set('q', currentQuery);
+            } else {
+                url.searchParams.delete('q');
+            }
+            history.replaceState(history.state || {}, '', url.toString());
+        }
+
+        if (conversationSearchForm) {
+            conversationSearchForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                applyConversationSearch(conversationSearchInput ? conversationSearchInput.value : '');
+            });
+        }
+        if (conversationSearchInput) {
+            conversationSearchInput.addEventListener('input', function () {
+                const value = this.value || '';
+                if (searchDebounceTimer) {
+                    clearTimeout(searchDebounceTimer);
+                }
+                searchDebounceTimer = setTimeout(function () {
+                    applyConversationSearch(value);
+                }, 280);
+            });
+        }
         if (forwardSendBtn) {
             forwardSendBtn.addEventListener('click', function () {
                 const ids = Array.from(selectedForwardMessageIds.values());
@@ -883,6 +957,25 @@
                 openForwardTargetModal();
             });
         }
+        // Fallback por delegacao para cobrir re-render/polling e garantir clique.
+        document.addEventListener('click', function (e) {
+            const cancelBtn = e.target.closest('#forwardCancelBtn');
+            if (cancelBtn) {
+                e.preventDefault();
+                exitForwardSelectionMode();
+                return;
+            }
+            const sendBtn = e.target.closest('#forwardSendBtn');
+            if (sendBtn) {
+                e.preventDefault();
+                const ids = Array.from(selectedForwardMessageIds.values());
+                if (!ids.length) {
+                    alert('Selecione ao menos uma mensagem.');
+                    return;
+                }
+                openForwardTargetModal();
+            }
+        });
         if (forwardTargetSearch) {
             forwardTargetSearch.addEventListener('input', function () {
                 renderForwardTargetsList(this.value || '');
@@ -909,6 +1002,13 @@
         if (forwardTargetClose) {
             forwardTargetClose.addEventListener('click', closeForwardTargetModal);
         }
+        document.addEventListener('click', function (e) {
+            const cancelTargetBtn = e.target.closest('#forwardTargetCancelBtn, #forwardTargetClose');
+            if (cancelTargetBtn) {
+                e.preventDefault();
+                closeForwardTargetModal();
+            }
+        });
         if (forwardTargetSendBtn) {
             forwardTargetSendBtn.addEventListener('click', async function () {
                 const ids = Array.from(selectedForwardMessageIds.values());
@@ -1172,6 +1272,7 @@
         if (activeConversationId) {
             setActiveConversationId(activeConversationId);
         }
+        normalizeRenderedMediaUrls();
 
         document.addEventListener('visibilitychange', function () {
             if (document.hidden) {

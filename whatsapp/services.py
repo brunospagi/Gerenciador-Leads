@@ -384,8 +384,22 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         return (
             '.enc' in candidate
             or candidate.startswith('/v/t62')
-            or 'mmg.whatsapp.net' in candidate
         )
+
+    def _normalize_public_media_url(value: str) -> str:
+        candidate = str(value or '').strip()
+        if not candidate:
+            return ''
+        lower = candidate.lower()
+        if lower.startswith('data:'):
+            return candidate
+        if candidate.startswith('//'):
+            return f'https:{candidate}'
+        if lower.startswith('http://') or lower.startswith('https://'):
+            return candidate
+        if candidate.startswith('/'):
+            return f'https://mmg.whatsapp.net{candidate}'
+        return candidate
 
     def _media_from_base64(mime_value: str, raw_value: Any, media_kind: str) -> str:
         if not isinstance(raw_value, str):
@@ -440,6 +454,8 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
     def _infer_kind_by_mime_or_type(raw_mime: str, raw_type: str, fallback: str = 'document') -> str:
         mime = str(raw_mime or '').lower()
         msg_type = str(raw_type or '').lower()
+        if 'sticker' in msg_type:
+            return 'sticker'
         if mime.startswith('image/') or 'image' in msg_type:
             return 'image'
         if mime.startswith('video/') or 'video' in msg_type:
@@ -503,10 +519,12 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         ('videoMessage', 'video'),
         ('audioMessage', 'audio'),
         ('documentMessage', 'document'),
+        ('stickerMessage', 'sticker'),
         ('image', 'image'),
         ('video', 'video'),
         ('audio', 'audio'),
         ('document', 'document'),
+        ('sticker', 'sticker'),
     ]
     for field, media_kind in mapping:
         media_obj = message.get(field)
@@ -527,6 +545,7 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
                 or payload.get('mimeType')
                 or ''
             )
+            media_url = _normalize_public_media_url(media_url)
             base64_data = (
                 media_obj.get('base64')
                 or media_obj.get('mediaBase64')
@@ -549,6 +568,7 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
             # Fallback final: directPath pode vir como file.enc e nao eh renderizavel no browser.
             # Mantemos apenas se nao parecer referencia criptografada.
             direct_path = str(media_obj.get('directPath') or '').strip()
+            direct_path = _normalize_public_media_url(direct_path)
             if direct_path and not _is_encrypted_media_ref(direct_path):
                 return direct_path, media_kind
 
@@ -563,6 +583,7 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         or payload.get('media')
         or ''
     ).strip()
+    generic_url = _normalize_public_media_url(generic_url)
     if generic_url:
         mime = str(
             data.get('mimetype')
@@ -573,6 +594,8 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         ).lower()
         msg_type = str(data.get('messageType') or payload.get('messageType') or '').lower()
         if not _is_encrypted_media_ref(generic_url):
+            if 'sticker' in msg_type:
+                return generic_url, 'sticker'
             if mime.startswith('image/') or 'image' in msg_type:
                 return generic_url, 'image'
             if mime.startswith('video/') or 'video' in msg_type:
@@ -604,7 +627,7 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
     for candidate in _deep_media_candidates(data):
         candidate_kind = candidate.get('kind') or 'document'
         candidate_mime = candidate.get('mime') or 'application/octet-stream'
-        candidate_url = candidate.get('url') or ''
+        candidate_url = _normalize_public_media_url(candidate.get('url') or '')
         candidate_b64 = candidate.get('base64') or ''
         if candidate_url and not _is_encrypted_media_ref(candidate_url):
             return candidate_url, candidate_kind
@@ -616,7 +639,7 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
     for candidate in _deep_media_candidates(payload):
         candidate_kind = candidate.get('kind') or 'document'
         candidate_mime = candidate.get('mime') or 'application/octet-stream'
-        candidate_url = candidate.get('url') or ''
+        candidate_url = _normalize_public_media_url(candidate.get('url') or '')
         candidate_b64 = candidate.get('base64') or ''
         if candidate_url and not _is_encrypted_media_ref(candidate_url):
             return candidate_url, candidate_kind
@@ -673,6 +696,8 @@ def infer_message_kind(raw_message: dict[str, Any], data: dict[str, Any], payloa
             return kind
 
     msg_type = str(data.get('messageType') or payload.get('messageType') or '').strip().lower()
+    if 'sticker' in msg_type:
+        return 'sticker'
     if 'image' in msg_type:
         return 'image'
     if 'video' in msg_type:
@@ -1111,12 +1136,38 @@ def process_status_update(payload: dict[str, Any]) -> bool:
         data.get('messageId'),
         payload.get('id'),
     ]
+    if isinstance(data.get('message'), dict):
+        message_key = data.get('message', {}).get('key', {})
+        if isinstance(message_key, dict):
+            external_id_candidates.append(message_key.get('id'))
+    if isinstance(data.get('update'), dict):
+        update_key = data.get('update', {}).get('key', {})
+        if isinstance(update_key, dict):
+            external_id_candidates.append(update_key.get('id'))
     external_id_candidates = [str(v).strip() for v in external_id_candidates if v]
-    if not external_id_candidates:
-        return False
 
     status = map_delivery_status(payload)
-    message = resolve_message_by_external_candidates(external_id_candidates)
+    message = resolve_message_by_external_candidates(external_id_candidates) if external_id_candidates else None
+    if not message:
+        # Fallback: atualiza a ultima mensagem enviada da conversa quando webhook vem sem id.
+        remote_jid = ''
+        if isinstance(key_data, dict):
+            remote_jid = str(key_data.get('remoteJid') or key_data.get('participant') or '').strip()
+        if not remote_jid and isinstance(data.get('update'), dict) and isinstance(data.get('update', {}).get('key'), dict):
+            upd_key = data.get('update', {}).get('key', {})
+            remote_jid = str(upd_key.get('remoteJid') or upd_key.get('participant') or '').strip()
+        remote_jid = normalize_wa_id(remote_jid) if remote_jid else ''
+        if remote_jid:
+            conversation = (
+                WhatsAppConversation.objects.filter(wa_id=remote_jid).first()
+                or WhatsAppConversation.objects.filter(wa_id_alt=remote_jid).first()
+            )
+            if conversation:
+                message = (
+                    conversation.mensagens.filter(direcao=WhatsAppMessage.Direction.ENVIADA)
+                    .order_by('-criado_em')
+                    .first()
+                )
     if not message:
         return False
 
@@ -1184,7 +1235,7 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
         external_id = message_obj.external_id or (external_id_candidates[0] if external_id_candidates else '')
         if not external_id:
             return '', ''
-        if (inferred_kind or media_kind).lower() not in {'image', 'video', 'audio', 'document'}:
+        if (inferred_kind or media_kind).lower() not in {'image', 'video', 'audio', 'document', 'sticker'}:
             return '', ''
 
         instance = message_obj.conversa.instance or get_active_instance()
@@ -1239,6 +1290,7 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
         '[documento]',
         '[document]',
         '[arquivo]',
+        '[figurinha]',
         '[mensagem nao suportada]',
     }
     text_before_norm = text_before.lower()
@@ -1264,6 +1316,7 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
             'video': '[VIDEO]',
             'audio': '[AUDIO]',
             'document': '[DOCUMENTO]',
+            'sticker': '[FIGURINHA]',
         }.get(media_kind.lower(), '')
         if label:
             message_obj.conteudo = label
@@ -1287,6 +1340,88 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
                 convo.ultima_mensagem = preview_text[:500]
                 convo.ultima_mensagem_em = latest.criado_em
                 convo.save(update_fields=['ultima_mensagem', 'ultima_mensagem_em', 'atualizado_em'])
+    return True
+
+
+def process_reaction_update(payload: dict[str, Any]) -> bool:
+    data = payload.get('data', payload) if isinstance(payload, dict) else {}
+    if isinstance(data, list):
+        updated_any = False
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            nested_payload = dict(payload)
+            nested_payload['data'] = item
+            if process_reaction_update(nested_payload):
+                updated_any = True
+        return updated_any
+    if not isinstance(data, dict):
+        return False
+
+    message = data.get('message', {}) if isinstance(data.get('message'), dict) else {}
+    message = unwrap_message_content(message)
+    if not isinstance(message, dict):
+        return False
+
+    reaction_msg = message.get('reactionMessage')
+    if not isinstance(reaction_msg, dict):
+        return False
+
+    target_key = reaction_msg.get('key', {}) if isinstance(reaction_msg.get('key'), dict) else {}
+    target_candidates = [
+        target_key.get('id'),
+        data.get('messageId'),
+        data.get('id'),
+        payload.get('id'),
+    ]
+    target_candidates = [str(v).strip() for v in target_candidates if v]
+    if not target_candidates:
+        return False
+
+    target_message = resolve_message_by_external_candidates(target_candidates)
+    if not target_message:
+        return False
+
+    reaction_emoji = sanitize_text_content(
+        reaction_msg.get('text')
+        or reaction_msg.get('reaction')
+        or data.get('reaction')
+        or ''
+    )
+
+    actor_key = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
+    actor_id = str(actor_key.get('participant') or actor_key.get('remoteJid') or 'unknown').strip() or 'unknown'
+    actor_from_me = bool(actor_key.get('fromMe'))
+
+    merged_payload = dict(target_message.payload or {})
+    reactions_map = merged_payload.get('reactions_map')
+    if not isinstance(reactions_map, dict):
+        reactions_map = {}
+
+    if reaction_emoji:
+        reactions_map[actor_id] = {
+            'emoji': reaction_emoji,
+            'from_me': actor_from_me,
+            'at': timezone.now().isoformat(),
+        }
+    else:
+        reactions_map.pop(actor_id, None)
+
+    merged_payload['reactions_map'] = reactions_map
+    merged_payload['reactions'] = list(reactions_map.values())
+    if reaction_emoji:
+        merged_payload['last_reaction'] = {
+            'emoji': reaction_emoji,
+            'from_me': actor_from_me,
+            'actor': actor_id,
+            'at': timezone.now().isoformat(),
+        }
+    else:
+        merged_payload['last_reaction'] = {}
+    merged_payload['reaction_update'] = payload
+
+    target_message.payload = merged_payload
+    target_message.save(update_fields=['payload'])
     return True
 
 
@@ -1407,6 +1542,16 @@ def _normalize_presence_state(raw_state: Any) -> str:
 
 def process_presence_update(payload: dict[str, Any], instance: WhatsAppInstance | None = None) -> bool:
     data = payload.get('data', payload) if isinstance(payload, dict) else {}
+    if isinstance(data, list):
+        updated_any = False
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            nested_payload = dict(payload)
+            nested_payload['data'] = item
+            if process_presence_update(nested_payload, instance=instance):
+                updated_any = True
+        return updated_any
     if not isinstance(data, dict):
         return False
 
@@ -1414,6 +1559,10 @@ def process_presence_update(payload: dict[str, Any], instance: WhatsAppInstance 
     updates: list[tuple[str, str]] = []
 
     presences = data.get('presences')
+    if not presences:
+        presences = data.get('presence')
+    if not presences and isinstance(data.get('data'), (dict, list)):
+        presences = data.get('data')
     if isinstance(presences, dict):
         for jid_key, presence_info in presences.items():
             state = ''
@@ -1423,6 +1572,7 @@ def process_presence_update(payload: dict[str, Any], instance: WhatsAppInstance 
                     or presence_info.get('presence')
                     or presence_info.get('state')
                     or presence_info.get('status')
+                    or presence_info.get('type')
                 )
             else:
                 state = _normalize_presence_state(presence_info)
@@ -1431,9 +1581,22 @@ def process_presence_update(payload: dict[str, Any], instance: WhatsAppInstance 
         for item in presences:
             if not isinstance(item, dict):
                 continue
-            jid = normalize_wa_id(str(item.get('id') or item.get('jid') or item.get('remoteJid') or ''))
+            jid = normalize_wa_id(
+                str(
+                    item.get('id')
+                    or item.get('jid')
+                    or item.get('remoteJid')
+                    or item.get('participant')
+                    or item.get('from')
+                    or ''
+                )
+            )
             state = _normalize_presence_state(
-                item.get('lastKnownPresence') or item.get('presence') or item.get('state') or item.get('status')
+                item.get('lastKnownPresence')
+                or item.get('presence')
+                or item.get('state')
+                or item.get('status')
+                or item.get('type')
             )
             updates.append((jid, state))
 
@@ -1499,10 +1662,13 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
     if event_name_norm in {'MESSAGES_UPDATE', 'MESSAGE_UPDATE', 'MESSAGE_STATUS', 'SEND_MESSAGE'}:
         content_updated = process_message_content_update(payload)
         status_updated = process_status_update(payload)
+        reaction_updated = process_reaction_update(payload)
         if content_updated:
             logger.info('Webhook de update de conteudo processado para mensagem existente.')
         if status_updated:
             logger.info('Webhook de status processado para mensagem existente.')
+        if reaction_updated:
+            logger.info('Webhook de reacao processado para mensagem existente.')
         # Eventos de update/status nao devem criar conversa/mensagem nova
         return
 
@@ -1540,23 +1706,26 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
         # Evita criar bolha vazia (apenas horario) quando webhook nao traz conteudo real.
         if isinstance(raw_message, dict) and raw_message:
             inferred_kind = infer_message_kind(raw_message, data, payload)
-            if inferred_kind in {'image', 'video', 'audio', 'document'}:
+            if inferred_kind in {'image', 'video', 'audio', 'document', 'sticker'}:
                 media_kind = media_kind or inferred_kind
                 label = {
                     'image': 'IMAGEM',
                     'video': 'VIDEO',
                     'audio': 'AUDIO',
                     'document': 'DOCUMENTO',
+                    'sticker': 'FIGURINHA',
                 }.get(inferred_kind, inferred_kind.upper())
                 texto = f'[{label}]'
             elif inferred_kind in {'reaction', 'protocol', 'key_distribution', 'poll_update'}:
+                if inferred_kind == 'reaction':
+                    process_reaction_update(payload)
                 return
             else:
                 texto = '[Mensagem nao suportada]'
         if not texto:
             return
-    if not texto and media_kind in {'image', 'video', 'audio'}:
-        label = {'image': 'IMAGEM', 'video': 'VIDEO', 'audio': 'AUDIO'}.get(media_kind, media_kind.upper())
+    if not texto and media_kind in {'image', 'video', 'audio', 'sticker'}:
+        label = {'image': 'IMAGEM', 'video': 'VIDEO', 'audio': 'AUDIO', 'sticker': 'FIGURINHA'}.get(media_kind, media_kind.upper())
         texto = f'[{label}]'
     ts = parse_message_timestamp(payload)
     ext_id = (
