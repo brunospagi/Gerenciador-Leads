@@ -157,6 +157,49 @@ def _message_is_edited(message: WhatsAppMessage) -> bool:
     return False
 
 
+def _message_key_data(message: WhatsAppMessage) -> tuple[str, bool, str]:
+    payload = message.payload or {}
+    key_data = {}
+    if isinstance(payload.get('data'), dict) and isinstance(payload.get('data', {}).get('key'), dict):
+        key_data = payload.get('data', {}).get('key', {})
+    elif isinstance(payload.get('key'), dict):
+        key_data = payload.get('key', {})
+
+    conversa = message.conversa
+    remote_jid = (
+        key_data.get('remoteJid')
+        or key_data.get('participant')
+        or conversa.wa_id
+        or conversa.wa_id_alt
+        or ''
+    )
+    if '@' not in remote_jid:
+        remote_jid = normalize_wa_id(remote_jid)
+
+    from_me = key_data.get('fromMe')
+    if from_me is None:
+        from_me = (message.direcao == WhatsAppMessage.Direction.ENVIADA)
+
+    message_id = (
+        message.external_id
+        or key_data.get('id')
+        or payload.get('id')
+        or payload.get('messageId')
+    )
+    data_payload = payload.get('data', {}) if isinstance(payload.get('data'), dict) else {}
+    message_id = (
+        message_id
+        or data_payload.get('id')
+        or data_payload.get('messageId')
+        or (data_payload.get('key', {}) or {}).get('id')
+    )
+    message_payload = data_payload.get('message', {}) if isinstance(data_payload.get('message'), dict) else {}
+    if not message_id and isinstance(message_payload.get('key'), dict):
+        message_id = message_payload.get('key', {}).get('id')
+
+    return str(remote_jid or ''), bool(from_me), str(message_id or '')
+
+
 def can_manage_whatsapp_instance(user) -> bool:
     if not getattr(user, 'is_authenticated', False):
         return False
@@ -592,12 +635,37 @@ def edit_message(request, pk):
     if novo_texto == texto_antigo:
         return JsonResponse({'ok': True, 'message_id': mensagem.pk, 'conteudo': mensagem.conteudo or '', 'is_edited': _message_is_edited(mensagem)})
 
+    instance = mensagem.conversa.instance or get_active_instance()
+    if not instance:
+        return JsonResponse({'ok': False, 'error': 'Instancia ativa nao encontrada.'}, status=400)
+
+    remote_jid, from_me, message_id = _message_key_data(mensagem)
+    if not message_id:
+        return JsonResponse({'ok': False, 'error': 'Nao foi possivel identificar o id da mensagem para editar.'}, status=400)
+
+    try:
+        client = EvolutionAPIClient(instance=instance)
+        response = client.edit_message(
+            remote_jid=remote_jid,
+            from_me=from_me,
+            message_id=message_id,
+            text=novo_texto,
+        )
+    except Exception as exc:
+        return JsonResponse({'ok': False, 'error': f'Falha ao editar no WhatsApp: {exc}'}, status=400)
+
     merged_payload = dict(mensagem.payload or {})
     merged_payload['edited_local'] = {
         'old_text': texto_antigo,
         'new_text': novo_texto,
         'edited_at': timezone.now().isoformat(),
         'edited_by': getattr(request.user, 'username', ''),
+        'remote': {
+            'remote_jid': remote_jid,
+            'from_me': from_me,
+            'message_id': message_id,
+            'response': response,
+        },
     }
     mensagem.conteudo = novo_texto
     mensagem.payload = merged_payload
@@ -912,41 +980,7 @@ def react_message(request, pk):
         return JsonResponse({'ok': False, 'error': 'Instancia ativa nao encontrada'}, status=400)
 
     payload = mensagem.payload or {}
-    key_data = {}
-    if isinstance(payload.get('data'), dict) and isinstance(payload.get('data', {}).get('key'), dict):
-        key_data = payload.get('data', {}).get('key', {})
-    elif isinstance(payload.get('key'), dict):
-        key_data = payload.get('key', {})
-
-    remote_jid = (
-        key_data.get('remoteJid')
-        or key_data.get('participant')
-        or conversa.wa_id
-        or conversa.wa_id_alt
-        or ''
-    )
-    if '@' not in remote_jid:
-        remote_jid = normalize_wa_id(remote_jid)
-    from_me = key_data.get('fromMe')
-    if from_me is None:
-        from_me = (mensagem.direcao == WhatsAppMessage.Direction.ENVIADA)
-
-    message_id = (
-        mensagem.external_id
-        or key_data.get('id')
-        or payload.get('id')
-        or payload.get('messageId')
-    )
-    data_payload = payload.get('data', {}) if isinstance(payload.get('data'), dict) else {}
-    message_id = (
-        message_id
-        or data_payload.get('id')
-        or data_payload.get('messageId')
-        or (data_payload.get('key', {}) or {}).get('id')
-    )
-    message_payload = data_payload.get('message', {}) if isinstance(data_payload.get('message'), dict) else {}
-    if not message_id and isinstance(message_payload.get('key'), dict):
-        message_id = message_payload.get('key', {}).get('id')
+    remote_jid, from_me, message_id = _message_key_data(mensagem)
     if not message_id:
         return JsonResponse({'ok': False, 'error': 'Nao foi possivel identificar o id da mensagem para reagir'}, status=400)
 

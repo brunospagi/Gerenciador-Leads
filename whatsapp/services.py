@@ -941,6 +941,47 @@ class EvolutionAPIClient:
         response.raise_for_status()
         return response.json() if response.content else {}
 
+    def edit_message(self, remote_jid: str, from_me: bool, message_id: str, text: str) -> dict[str, Any]:
+        payload_variants = [
+            {
+                'key': {
+                    'remoteJid': remote_jid,
+                    'fromMe': bool(from_me),
+                    'id': message_id,
+                },
+                'text': text,
+            },
+            {
+                'key': {
+                    'remoteJid': remote_jid,
+                    'fromMe': bool(from_me),
+                    'id': message_id,
+                },
+                'message': text,
+            },
+        ]
+        endpoint_variants = [
+            f'{self.base_url}/message/editMessage/{self.instance.instance_name}',
+            f'{self.base_url}/message/updateMessage/{self.instance.instance_name}',
+            f'{self.base_url}/chat/updateMessage/{self.instance.instance_name}',
+            f'{self.base_url}/message/edit/{self.instance.instance_name}',
+        ]
+
+        last_error = None
+        for endpoint in endpoint_variants:
+            for payload in payload_variants:
+                try:
+                    response = requests.post(endpoint, json=payload, headers=self.headers, timeout=30)
+                    response.raise_for_status()
+                    return response.json() if response.content else {}
+                except requests.RequestException as exc:
+                    last_error = exc
+                    continue
+
+        if last_error:
+            raise last_error
+        raise RuntimeError('Nao foi possivel editar a mensagem na Evolution API.')
+
     def create_instance(self, qrcode: bool = True, integration: str = 'WHATSAPP-BAILEYS') -> dict[str, Any]:
         url = f'{self.base_url}/instance/create'
         payload = {

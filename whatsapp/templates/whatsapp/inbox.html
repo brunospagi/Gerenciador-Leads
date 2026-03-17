@@ -233,8 +233,8 @@
             <div class="forward-selection-bar" id="forwardSelectionBar">
                 <span id="forwardSelectionCount">0 selecionadas</span>
                 <div class="forward-selection-actions">
-                    <button type="button" class="btn btn-sm btn-light border" id="forwardCancelBtn">Cancelar</button>
-                    <button type="button" class="btn btn-sm btn-success" id="forwardSendBtn">Encaminhar</button>
+                    <button type="button" class="btn btn-sm btn-light border" id="forwardCancelBtn" onclick="forwardSelectionCancel()">Cancelar</button>
+                    <button type="button" class="btn btn-sm btn-success" id="forwardSendBtn" onclick="forwardSelectionProceed()">Encaminhar</button>
                 </div>
             </div>
 
@@ -314,8 +314,8 @@
         <div class="forward-target-footer">
             <small id="forwardTargetCount">0 contato(s) selecionado(s)</small>
             <div style="display:flex; gap:8px;">
-                <button type="button" class="btn btn-light border" id="forwardTargetCancelBtn">Cancelar</button>
-                <button type="button" class="btn btn-success" id="forwardTargetSendBtn">Encaminhar</button>
+                <button type="button" class="btn btn-light border" id="forwardTargetCancelBtn" onclick="forwardTargetCancel()">Cancelar</button>
+                <button type="button" class="btn btn-success" id="forwardTargetSendBtn" onclick="forwardTargetSend()">Encaminhar</button>
             </div>
         </div>
     </div>
@@ -357,5 +357,5 @@
         openNewChat: {% if open_new_chat %}true{% else %}false{% endif %}
     };
 </script>
-<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-8"></script>
+<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-9"></script>
 {% endblock %}

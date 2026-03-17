@@ -766,6 +766,16 @@
         }
 
         function triggerCameraCapture() {
+            const triggerPicker = (inputEl) => {
+                if (!inputEl) return;
+                try {
+                    if (typeof inputEl.showPicker === 'function') {
+                        inputEl.showPicker();
+                        return;
+                    }
+                } catch (e) {}
+                inputEl.click();
+            };
             const bindChange = (inputEl, removeAfterUse) => {
                 if (!inputEl) return;
                 inputEl.addEventListener('change', function onCameraChange() {
@@ -782,22 +792,22 @@
             };
 
             if (chatCameraInput) {
-                chatCameraInput.setAttribute('accept', 'image/*');
+                chatCameraInput.setAttribute('accept', 'image/*;capture=camera');
                 chatCameraInput.setAttribute('capture', 'environment');
                 bindChange(chatCameraInput, false);
-                chatCameraInput.click();
+                triggerPicker(chatCameraInput);
                 return;
             }
 
             // Fallback para navegadores que bloqueiam input fixo para captura.
             const tempInput = document.createElement('input');
             tempInput.type = 'file';
-            tempInput.accept = 'image/*';
+            tempInput.accept = 'image/*;capture=camera';
             tempInput.setAttribute('capture', 'environment');
             tempInput.className = 'camera-file-input';
             document.body.appendChild(tempInput);
             bindChange(tempInput, true);
-            tempInput.click();
+            triggerPicker(tempInput);
         }
 
         if (attachTrigger && attachMenu) {
@@ -1032,10 +1042,74 @@
                 }
             });
         }
+        window.forwardSelectionCancel = function () {
+            exitForwardSelectionMode();
+        };
+        window.forwardSelectionProceed = function () {
+            const ids = Array.from(selectedForwardMessageIds.values());
+            if (!ids.length) {
+                alert('Selecione ao menos uma mensagem.');
+                return;
+            }
+            openForwardTargetModal();
+        };
+        window.forwardTargetCancel = function () {
+            closeForwardTargetModal();
+        };
+        async function performForwardSelectedMessages() {
+            const ids = Array.from(selectedForwardMessageIds.values());
+            if (!ids.length) {
+                alert('Selecione ao menos uma mensagem.');
+                return;
+            }
+            const targets = Array.from(selectedForwardTargets.values());
+            if (!targets.length) {
+                alert('Selecione ao menos um contato.');
+                return;
+            }
+
+            let forwardedTotal = 0;
+            let firstError = '';
+            for (const numeroDestino of targets) {
+                const formData = new URLSearchParams();
+                formData.append('numero', numeroDestino);
+                formData.append('ids', ids.join(','));
+                try {
+                    const resp = await fetch(forwardMessagesBulkEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRFToken': getCsrfToken(),
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json',
+                        },
+                        body: formData.toString(),
+                    });
+                    const data = await resp.json().catch(() => ({}));
+                    if (data && data.ok) {
+                        forwardedTotal += Number(data.forwarded_count || 0);
+                    } else if (!firstError) {
+                        firstError = data.error || `Falha HTTP ${resp.status}`;
+                    }
+                } catch (e) {
+                    if (!firstError) firstError = 'Erro de comunicacao ao encaminhar.';
+                }
+            }
+
+            if (!forwardedTotal) {
+                alert(firstError || 'Nao foi possivel encaminhar as mensagens para os contatos selecionados.');
+                return;
+            }
+            closeForwardTargetModal();
+            exitForwardSelectionMode();
+            alert(`${forwardedTotal} mensagem(ns) encaminhada(s).`);
+            await pollConversations();
+        }
+        window.forwardTargetSend = function () {
+            performForwardSelectedMessages();
+        };
         if (forwardCancelBtn) {
-            forwardCancelBtn.addEventListener('click', function () {
-                exitForwardSelectionMode();
-            });
+            forwardCancelBtn.addEventListener('click', window.forwardSelectionCancel);
         }
 
         let searchDebounceTimer = null;
@@ -1072,32 +1146,20 @@
             });
         }
         if (forwardSendBtn) {
-            forwardSendBtn.addEventListener('click', function () {
-                const ids = Array.from(selectedForwardMessageIds.values());
-                if (!ids.length) {
-                    alert('Selecione ao menos uma mensagem.');
-                    return;
-                }
-                openForwardTargetModal();
-            });
+            forwardSendBtn.addEventListener('click', window.forwardSelectionProceed);
         }
         // Fallback por delegacao para cobrir re-render/polling e garantir clique.
         document.addEventListener('click', function (e) {
             const cancelBtn = e.target.closest('#forwardCancelBtn');
             if (cancelBtn) {
                 e.preventDefault();
-                exitForwardSelectionMode();
+                window.forwardSelectionCancel();
                 return;
             }
             const sendBtn = e.target.closest('#forwardSendBtn');
             if (sendBtn) {
                 e.preventDefault();
-                const ids = Array.from(selectedForwardMessageIds.values());
-                if (!ids.length) {
-                    alert('Selecione ao menos uma mensagem.');
-                    return;
-                }
-                openForwardTargetModal();
+                window.forwardSelectionProceed();
             }
         });
         if (forwardTargetSearch) {
@@ -1121,63 +1183,20 @@
             });
         }
         if (forwardTargetCancelBtn) {
-            forwardTargetCancelBtn.addEventListener('click', closeForwardTargetModal);
+            forwardTargetCancelBtn.addEventListener('click', window.forwardTargetCancel);
         }
         if (forwardTargetClose) {
-            forwardTargetClose.addEventListener('click', closeForwardTargetModal);
+            forwardTargetClose.addEventListener('click', window.forwardTargetCancel);
         }
         document.addEventListener('click', function (e) {
             const cancelTargetBtn = e.target.closest('#forwardTargetCancelBtn, #forwardTargetClose');
             if (cancelTargetBtn) {
                 e.preventDefault();
-                closeForwardTargetModal();
+                window.forwardTargetCancel();
             }
         });
         if (forwardTargetSendBtn) {
-            forwardTargetSendBtn.addEventListener('click', async function () {
-                const ids = Array.from(selectedForwardMessageIds.values());
-                if (!ids.length) {
-                    alert('Selecione ao menos uma mensagem.');
-                    return;
-                }
-                const targets = Array.from(selectedForwardTargets.values());
-                if (!targets.length) {
-                    alert('Selecione ao menos um contato.');
-                    return;
-                }
-
-                let forwardedTotal = 0;
-                for (const numeroDestino of targets) {
-                    const formData = new URLSearchParams();
-                    formData.append('numero', numeroDestino);
-                    formData.append('ids', ids.join(','));
-                    try {
-                        const resp = await fetch(forwardMessagesBulkEndpoint, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded',
-                                'X-CSRFToken': getCsrfToken(),
-                                'X-Requested-With': 'XMLHttpRequest',
-                                'Accept': 'application/json',
-                            },
-                            body: formData.toString(),
-                        });
-                        const data = await resp.json();
-                        if (data && data.ok) {
-                            forwardedTotal += Number(data.forwarded_count || 0);
-                        }
-                    } catch (e) {}
-                }
-
-                if (!forwardedTotal) {
-                    alert('Nao foi possivel encaminhar as mensagens para os contatos selecionados.');
-                    return;
-                }
-                closeForwardTargetModal();
-                exitForwardSelectionMode();
-                alert(`${forwardedTotal} mensagem(ns) encaminhada(s).`);
-                await pollConversations();
-            });
+            forwardTargetSendBtn.addEventListener('click', window.forwardTargetSend);
         }
 
         async function submitFormAjax(formEl) {
@@ -1323,15 +1342,16 @@
         });
 
         window.openAttachment = function (kind) {
-            if (!chatFileInput) return;
-            chatFileInput.removeAttribute('capture');
+            if (chatFileInput) chatFileInput.removeAttribute('capture');
             if (kind === 'media') {
+                if (!chatFileInput) return;
                 chatFileInput.setAttribute('accept', 'image/*,video/*');
                 chatFileInput.click();
             } else if (kind === 'camera') {
                 clearAttachmentInputs();
                 triggerCameraCapture();
             } else if (kind === 'document') {
+                if (!chatFileInput) return;
                 chatFileInput.setAttribute('accept', '.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar');
                 chatFileInput.click();
             } else if (kind === 'contact') {
