@@ -98,6 +98,16 @@
             return `<span class="bubble-media"><a href="${normalizedUrl}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a></span>`;
         }
 
+        function mediaAlbumMarkup(items) {
+            const list = Array.isArray(items) ? items : [];
+            if (!list.length) return '';
+            const html = list.slice(0, 8).map((it) => {
+                const src = normalizeMediaUrl(it.media_url || '');
+                return `<img src="${src}" alt="midia" class="js-chat-image" data-full-src="${src}">`;
+            }).join('');
+            return `<span class="bubble-media media-album">${html}</span>`;
+        }
+
         function reactionMarkup(messageId) {
             return `<div class="reaction-row reaction-hidden" id="reaction-row-${messageId}"><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDC4D')">&#128077;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\u2764\\uFE0F')">&#10084;&#65039;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDE02')">&#128514;</button><button type="button" class="reaction-btn" onclick="sendReaction(${messageId}, '\\uD83D\\uDE4F')">&#128591;</button></div>`;
         }
@@ -237,17 +247,66 @@
             const distanceFromBottom = messagesEl.scrollHeight - (messagesEl.scrollTop + messagesEl.clientHeight);
             const shouldStickToBottom = firstMessagesRender || distanceFromBottom <= AUTO_SCROLL_THRESHOLD;
             const sanitizeText = (value) => String(value || '').replace(/[\u200B-\u200D\uFEFF\u200E\u200F]/g, '').trim();
+            const isImageOnly = (msg) => {
+                const kind = String((msg && msg.media_kind) || '').toLowerCase();
+                const hasMedia = !!(msg && msg.media_url && String(msg.media_url).trim());
+                const hasText = !!sanitizeText(msg && msg.conteudo);
+                return kind === 'image' && hasMedia && !hasText;
+            };
             const safeMessages = (mensagens || []).filter((m) => {
                 const hasText = !!sanitizeText(m && m.conteudo);
                 const hasMedia = !!(m && m.media_url && String(m.media_url).trim());
                 return hasText || hasMedia || m.direcao === 'SYSTEM';
             });
+            const groupedMessages = [];
+            for (let i = 0; i < safeMessages.length; i++) {
+                const current = safeMessages[i];
+                if (!isImageOnly(current)) {
+                    groupedMessages.push(current);
+                    continue;
+                }
+                const albumItems = [current];
+                const currentGroupId = String(current.media_group_id || '').trim();
+                let j = i + 1;
+                while (j < safeMessages.length) {
+                    const next = safeMessages[j];
+                    if (!isImageOnly(next)) break;
+                    if (String(next.direcao || '') !== String(current.direcao || '')) break;
+                    const nextGroupId = String(next.media_group_id || '').trim();
+                    const sameExplicitGroup = !!currentGroupId && !!nextGroupId && currentGroupId === nextGroupId;
+                    const sameFallbackBucket = !currentGroupId && !nextGroupId && String(next.criado_em || '') === String(current.criado_em || '');
+                    if (!sameExplicitGroup && !sameFallbackBucket) break;
+                    albumItems.push(next);
+                    j += 1;
+                }
+                if (albumItems.length > 1) {
+                    const last = albumItems[albumItems.length - 1];
+                    groupedMessages.push({
+                        id: last.id,
+                        direcao: current.direcao,
+                        conteudo: '',
+                        media_url: '',
+                        media_kind: 'album',
+                        album_items: albumItems,
+                        reaction_emoji: '',
+                        media_group_id: currentGroupId || '',
+                        is_edited: false,
+                        status_code: last.status_code,
+                        status: last.status,
+                        criado_em: last.criado_em,
+                    });
+                    i = j - 1;
+                } else {
+                    groupedMessages.push(current);
+                }
+            }
             const signature = JSON.stringify((safeMessages || []).map((m) => ({
                 id: m.id,
                 d: m.direcao,
                 c: m.conteudo || '',
                 u: m.media_url || '',
                 k: m.media_kind || '',
+                g: m.media_group_id || '',
                 s: m.status_code || '',
                 r: m.reaction_emoji || '',
                 e: !!m.is_edited,
@@ -255,7 +314,7 @@
             })));
             if (signature === lastMessagesSignature) return;
             lastMessagesSignature = signature;
-            messagesEl.innerHTML = safeMessages.map((m) => {
+            messagesEl.innerHTML = groupedMessages.map((m) => {
                 const side = m.direcao === 'OUT' ? 'my-message' : (m.direcao === 'SYSTEM' ? 'system-message' : 'friend-message');
                 const kind = String(m.media_kind || '').toLowerCase();
                 let cleanedText = sanitizeText(m.conteudo);
@@ -278,7 +337,8 @@
                 const isSelected = selectedForwardMessageIds.has(Number(m.id));
                 const selectedClass = isSelected ? 'is-selected' : '';
                 const checkClass = isSelected ? 'selected' : '';
-                return `<div class="message-box ${side} ${selectedClass}" data-message-id="${m.id}"><button type="button" class="forward-check ${checkClass}" onclick="toggleForwardMessageSelection(event, ${m.id})"><i class="fa-solid fa-check"></i></button><div class="${bubbleClass}">${menuMarkup(m)}${mediaMarkup(m.media_url, m.media_kind)}${messageText}<div class="message-meta">${editedBadge}<span class="message-time">${timeText}</span>${statusIconMarkup(m)}</div>${reactionBadge}${reactionRow}</div></div>`;
+                const mediaHtml = kind === 'album' ? mediaAlbumMarkup(m.album_items || []) : mediaMarkup(m.media_url, m.media_kind);
+                return `<div class="message-box ${side} ${selectedClass}" data-message-id="${m.id}"><button type="button" class="forward-check ${checkClass}" onclick="toggleForwardMessageSelection(event, ${m.id})"><i class="fa-solid fa-check"></i></button><div class="${bubbleClass}">${menuMarkup(m)}${mediaHtml}${messageText}<div class="message-meta">${editedBadge}<span class="message-time">${timeText}</span>${statusIconMarkup(m)}</div>${reactionBadge}${reactionRow}</div></div>`;
             }).join('');
             updateForwardSelectionUi();
             if (shouldStickToBottom) {

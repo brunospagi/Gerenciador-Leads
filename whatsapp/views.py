@@ -72,6 +72,34 @@ def _normalize_public_media_url(value: str) -> str:
     return candidate
 
 
+def _guess_mime_from_bytes(content: bytes) -> str:
+    data_bytes = bytes(content or b'')
+    if not data_bytes:
+        return ''
+    head = data_bytes[:32]
+    if head.startswith(b'\xff\xd8\xff'):
+        return 'image/jpeg'
+    if head.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'image/png'
+    if head.startswith(b'GIF87a') or head.startswith(b'GIF89a'):
+        return 'image/gif'
+    if head.startswith(b'RIFF') and b'WEBP' in data_bytes[:16]:
+        return 'image/webp'
+    if head.startswith(b'%PDF'):
+        return 'application/pdf'
+    if head.startswith(b'OggS'):
+        return 'audio/ogg'
+    if len(data_bytes) > 12 and data_bytes[4:8] == b'ftyp':
+        return 'video/mp4'
+    if head.startswith(b'\x1aE\xdf\xa3'):
+        return 'video/webm'
+    if head[:3] == b'ID3' or (len(head) > 2 and (head[0] == 0xFF and (head[1] & 0xE0) == 0xE0)):
+        return 'audio/mpeg'
+    if head.startswith(b'PK\x03\x04'):
+        return 'application/zip'
+    return ''
+
+
 def _is_noise_status_message(message: WhatsAppMessage) -> bool:
     content = _visible_text(message.conteudo or '')
     has_media = bool(_normalize_public_media_url(message.media_url or ''))
@@ -155,6 +183,41 @@ def _message_is_edited(message: WhatsAppMessage) -> bool:
     if isinstance(payload.get('message_update'), dict):
         return True
     return False
+
+
+def _find_string_in_nested_payload(node, keys: set[str]) -> str:
+    if isinstance(node, dict):
+        for k, v in node.items():
+            key = str(k or '').strip().lower()
+            if key in keys and isinstance(v, (str, int, float)):
+                value = str(v).strip()
+                if value:
+                    return value
+            nested = _find_string_in_nested_payload(v, keys)
+            if nested:
+                return nested
+    elif isinstance(node, list):
+        for item in node:
+            nested = _find_string_in_nested_payload(item, keys)
+            if nested:
+                return nested
+    return ''
+
+
+def _message_media_group_id(message: WhatsAppMessage) -> str:
+    payload = message.payload or {}
+    if not isinstance(payload, dict):
+        return ''
+    keys = {
+        'mediagroupid',
+        'media_group_id',
+        'albumid',
+        'album_id',
+        'groupid',
+        'group_id',
+    }
+    found = _find_string_in_nested_payload(payload, keys)
+    return found[:120] if found else ''
 
 
 def _message_key_data(message: WhatsAppMessage) -> tuple[str, bool, str]:
@@ -296,6 +359,7 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                 m.media_url = _normalize_public_media_url(m.media_url or '')
                 m.reaction_emoji = _message_reaction_emoji(m)
                 m.is_edited = _message_is_edited(m)
+                m.media_group_id = _message_media_group_id(m)
                 filtered.append(m)
             mensagens = filtered[-300:]
 
@@ -500,7 +564,16 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             if external_id:
                 nova_mensagem.external_id = external_id
             nova_mensagem.status = WhatsAppMessage.Status.ENVIADA
-            nova_mensagem.payload = response
+            merged_payload = dict(response or {})
+            if arquivo:
+                merged_payload['mimetype'] = media_mimetype
+                merged_payload['mediaType'] = media_kind
+                merged_payload['upload'] = {
+                    'file_name': media_name,
+                    'storage_path': media_storage_path,
+                    'media_url': media_url,
+                }
+            nova_mensagem.payload = merged_payload
             nova_mensagem.save()
 
             if instance.pk:
@@ -563,7 +636,23 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
 
     @staticmethod
     def _save_upload_and_get_url(uploaded_file):
-        ext = os.path.splitext(uploaded_file.name or '')[1]
+        original_name = uploaded_file.name or ''
+        ext = os.path.splitext(original_name)[1]
+        try:
+            raw_bytes = uploaded_file.read()
+        except Exception:
+            raw_bytes = b''
+        try:
+            uploaded_file.seek(0)
+        except Exception:
+            pass
+        detected_mime = _guess_mime_from_bytes(raw_bytes)
+        mime_guess_by_name = mimetypes.guess_type(original_name or '')[0] or ''
+        mime = uploaded_file.content_type or mime_guess_by_name or detected_mime or 'application/octet-stream'
+        if mime in {'application/octet-stream', 'binary/octet-stream'} and detected_mime:
+            mime = detected_mime
+        if not ext:
+            ext = mimetypes.guess_extension(mime.split(';', 1)[0].strip().lower() or '') or ''
         unique_name = f"{uuid.uuid4().hex}{ext}"
         storage_path = f"whatsapp/uploads/{unique_name}"
         try:
@@ -571,14 +660,17 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             saved_path = storage.save(storage_path, uploaded_file)
             file_url = storage.url(saved_path)
         except Exception:
+            try:
+                uploaded_file.seek(0)
+            except Exception:
+                pass
             saved_path = default_storage.save(storage_path, uploaded_file)
             file_url = default_storage.url(saved_path)
-        mime = uploaded_file.content_type or mimetypes.guess_type(uploaded_file.name or '')[0] or 'application/octet-stream'
         if mime in {'application/octet-stream', 'binary/octet-stream'}:
-            lower_name = (uploaded_file.name or '').lower()
+            lower_name = (original_name or '').lower()
             if lower_name.startswith('audio_') and ext.lower() in {'.ogg', '.opus', '.webm', '.m4a', '.mp3', '.wav', '.aac'}:
                 mime = 'audio/ogg' if ext.lower() in {'.ogg', '.opus'} else 'audio/webm'
-        return file_url, mime, uploaded_file.name or unique_name, saved_path
+        return file_url, mime, original_name or unique_name, saved_path
 
 
 @login_required
@@ -999,6 +1091,7 @@ def conversation_messages_feed(request, pk):
             'media_url': _normalize_public_media_url(m.media_url or ''),
             'media_kind': m.media_kind or '',
             'reaction_emoji': _message_reaction_emoji(m),
+            'media_group_id': _message_media_group_id(m),
             'is_edited': _message_is_edited(m),
             'status_code': m.status,
             'status': m.get_status_display(),

@@ -166,6 +166,24 @@
         overflow: hidden;
         background: #f8fafc;
     }
+    .bubble-media.media-album {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px;
+        width: min(360px, 74vw);
+        border-radius: 12px;
+        overflow: hidden;
+        background: #f1f5f9;
+        padding: 2px;
+    }
+    .bubble-media.media-album img {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        object-fit: cover;
+        border-radius: 8px;
+        cursor: zoom-in;
+        background: #e5e7eb;
+    }
     .bubble-media.media-sticker {
         display: inline-block;
         width: min(180px, 45vw);
