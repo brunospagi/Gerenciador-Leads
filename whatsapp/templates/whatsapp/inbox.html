@@ -193,6 +193,24 @@
     }
     .chatbox-input { position: relative; width: 100%; min-height: 62px; background: #f0f0f0; display: flex; align-items: center; gap: 10px; padding: 8px 12px; z-index: 2; }
     .chatbox-input .icon-btn { color: #54656f; font-size: 1.3rem; line-height: 1; }
+    .chatbox-input .mic-btn {
+        border: 0;
+        background: transparent;
+        width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .chatbox-input .mic-btn.recording {
+        color: #dc2626;
+    }
+    .recording-hint {
+        font-size: .72rem;
+        color: #b91c1c;
+        font-weight: 600;
+        min-width: 120px;
+    }
     .chatbox-input .composer { display: flex; width: 100%; gap: 8px; align-items: center; }
     .chatbox-input input[type="text"] { width: 100%; border-radius: 8px; font-size: .95rem; border: none; outline: none; padding: 10px 12px; }
     .chatbox-input input[type="file"] { width: 210px; border-radius: 8px; font-size: .75rem; border: 1px solid #d1d5db; background: #fff; padding: 6px; }
@@ -503,13 +521,17 @@
                         <button type="button" onclick="openAttachment('buttons')"><i class="fa-solid fa-ellipsis text-primary"></i> Botoes</button>
                     </div>
                     <input type="file" class="hidden-file-input" id="chatFileInput" name="arquivo">
+                    <input type="file" class="hidden-file-input" id="chatCameraInput" accept="image/*" capture="environment">
                     <div class="selected-file" id="selectedFileName"></div>
                 </div>
                 <div class="composer">
                     <input type="text" name="mensagem" placeholder="Digite uma mensagem">
                 </div>
+                <span class="recording-hint" id="recordingHint" style="display:none;">Gravando 00:00</span>
                 <button class="send-btn" type="submit">Enviar</button>
-                <i class="fa-solid fa-microphone icon-btn"></i>
+                <button type="button" class="icon-btn mic-btn" id="micRecordBtn" title="Segure para gravar audio">
+                    <i class="fa-solid fa-microphone"></i>
+                </button>
             </form>
             {% else %}
             <div class="empty-chat">
@@ -881,15 +903,24 @@
         const attachTrigger = document.getElementById('attachTrigger');
         const attachMenu = document.getElementById('attachMenu');
         const chatFileInput = document.getElementById('chatFileInput');
+        const chatCameraInput = document.getElementById('chatCameraInput');
         const selectedFileName = document.getElementById('selectedFileName');
         const sendMessageForm = document.getElementById('sendMessageForm');
         const markReadForm = document.getElementById('markReadForm');
         const deleteConversationForm = document.getElementById('deleteConversationForm');
         const startConversationForm = document.getElementById('startConversationForm');
+        const micRecordBtn = document.getElementById('micRecordBtn');
+        const recordingHint = document.getElementById('recordingHint');
         const emojiPickerPanel = document.createElement('div');
         emojiPickerPanel.className = 'emoji-picker-panel';
         emojiPickerPanel.id = 'emojiPickerPanel';
         let emojiPickerMessageId = null;
+        let mediaRecorder = null;
+        let recordingStream = null;
+        let recordingChunks = [];
+        let recordingStartedAt = 0;
+        let recordingTimer = null;
+        let isRecordingAudio = false;
         ['👍', '❤️', '😂', '🙏', '😮', '😢', '👏', '🔥'].forEach((emoji) => {
             const btn = document.createElement('button');
             btn.type = 'button';
@@ -952,6 +983,19 @@
             if (attachMenu) attachMenu.classList.remove('show');
         }
 
+        function clearAttachmentInputs() {
+            if (chatFileInput) chatFileInput.value = '';
+            if (chatCameraInput) chatCameraInput.value = '';
+        }
+
+        function setAttachmentFile(file) {
+            if (!chatFileInput || !file) return;
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            chatFileInput.files = dt.files;
+            if (selectedFileName) selectedFileName.textContent = `Arquivo: ${file.name}`;
+        }
+
         if (attachTrigger && attachMenu) {
             attachTrigger.addEventListener('click', function (e) {
                 e.preventDefault();
@@ -966,6 +1010,123 @@
                 const file = this.files && this.files[0] ? this.files[0] : null;
                 selectedFileName.textContent = file ? `Arquivo: ${file.name}` : '';
             });
+        }
+        if (chatCameraInput) {
+            chatCameraInput.addEventListener('change', function () {
+                const file = this.files && this.files[0] ? this.files[0] : null;
+                if (!file) return;
+                setAttachmentFile(file);
+                this.value = '';
+            });
+        }
+
+        function formatRecordingTime(ms) {
+            const totalSec = Math.max(0, Math.floor(ms / 1000));
+            const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+            const ss = String(totalSec % 60).padStart(2, '0');
+            return `${mm}:${ss}`;
+        }
+
+        function stopRecordingTimer() {
+            if (recordingTimer) {
+                clearInterval(recordingTimer);
+                recordingTimer = null;
+            }
+        }
+
+        function resetRecordingUi() {
+            if (micRecordBtn) micRecordBtn.classList.remove('recording');
+            if (recordingHint) {
+                recordingHint.style.display = 'none';
+                recordingHint.textContent = 'Gravando 00:00';
+            }
+        }
+
+        async function startAudioRecording() {
+            if (isRecordingAudio) return;
+            if (!navigator.mediaDevices || !window.MediaRecorder) {
+                alert('Gravacao de audio nao suportada neste navegador.');
+                return;
+            }
+            try {
+                recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                recordingChunks = [];
+                let options = {};
+                if (window.MediaRecorder.isTypeSupported && window.MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                    options = { mimeType: 'audio/webm;codecs=opus' };
+                }
+                mediaRecorder = new MediaRecorder(recordingStream, options);
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data && event.data.size > 0) recordingChunks.push(event.data);
+                };
+                mediaRecorder.onstop = () => {
+                    const blobType = (recordingChunks[0] && recordingChunks[0].type) || 'audio/webm';
+                    const blob = new Blob(recordingChunks, { type: blobType });
+                    if (blob.size > 0) {
+                        clearAttachmentInputs();
+                        const ext = blobType.includes('ogg') ? 'ogg' : 'webm';
+                        const file = new File([blob], `audio_${Date.now()}.${ext}`, { type: blobType });
+                        setAttachmentFile(file);
+                    }
+                    if (recordingStream) {
+                        recordingStream.getTracks().forEach((track) => track.stop());
+                    }
+                    recordingStream = null;
+                    mediaRecorder = null;
+                    recordingChunks = [];
+                    isRecordingAudio = false;
+                    stopRecordingTimer();
+                    resetRecordingUi();
+                };
+                mediaRecorder.start();
+                isRecordingAudio = true;
+                recordingStartedAt = Date.now();
+                if (micRecordBtn) micRecordBtn.classList.add('recording');
+                if (recordingHint) {
+                    recordingHint.style.display = 'inline';
+                    recordingHint.textContent = 'Gravando 00:00';
+                }
+                recordingTimer = setInterval(() => {
+                    if (!recordingHint || !isRecordingAudio) return;
+                    recordingHint.textContent = `Gravando ${formatRecordingTime(Date.now() - recordingStartedAt)}`;
+                }, 250);
+            } catch (err) {
+                isRecordingAudio = false;
+                stopRecordingTimer();
+                resetRecordingUi();
+                alert('Nao foi possivel acessar o microfone.');
+            }
+        }
+
+        function stopAudioRecording() {
+            if (!isRecordingAudio) return;
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                return;
+            }
+            if (recordingStream) {
+                recordingStream.getTracks().forEach((track) => track.stop());
+            }
+            isRecordingAudio = false;
+            stopRecordingTimer();
+            resetRecordingUi();
+        }
+
+        if (micRecordBtn) {
+            const begin = (e) => {
+                e.preventDefault();
+                startAudioRecording();
+            };
+            const end = (e) => {
+                e.preventDefault();
+                stopAudioRecording();
+            };
+            micRecordBtn.addEventListener('mousedown', begin);
+            micRecordBtn.addEventListener('touchstart', begin, { passive: false });
+            micRecordBtn.addEventListener('mouseup', end);
+            micRecordBtn.addEventListener('mouseleave', end);
+            micRecordBtn.addEventListener('touchend', end);
+            micRecordBtn.addEventListener('touchcancel', end);
         }
 
         async function submitFormAjax(formEl) {
@@ -1008,7 +1169,7 @@
                     await submitFormAjax(sendMessageForm);
                     const textInput = sendMessageForm.querySelector('input[name="mensagem"]');
                     if (textInput) textInput.value = '';
-                    if (chatFileInput) chatFileInput.value = '';
+                    clearAttachmentInputs();
                     if (selectedFileName) selectedFileName.textContent = '';
                     closeAttachMenu();
                     pollMessages();
@@ -1116,9 +1277,14 @@
                 chatFileInput.setAttribute('accept', 'image/*,video/*');
                 chatFileInput.click();
             } else if (kind === 'camera') {
-                chatFileInput.setAttribute('accept', 'image/*,video/*');
-                chatFileInput.setAttribute('capture', 'environment');
-                chatFileInput.click();
+                clearAttachmentInputs();
+                if (chatCameraInput) {
+                    chatCameraInput.click();
+                } else {
+                    chatFileInput.setAttribute('accept', 'image/*');
+                    chatFileInput.setAttribute('capture', 'environment');
+                    chatFileInput.click();
+                }
             } else if (kind === 'document') {
                 chatFileInput.setAttribute('accept', '.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar');
                 chatFileInput.click();
