@@ -11,6 +11,10 @@
         const deleteMessageEndpointTemplate = cfg.deleteMessageEndpointTemplate || '';
         const listEl = document.getElementById('conversation-list');
         const messagesEl = document.getElementById('message-list');
+        const filterAllChip = document.getElementById('filterAllChip');
+        const filterUnreadChip = document.getElementById('filterUnreadChip');
+        const filterArchivedChip = document.getElementById('filterArchivedChip');
+        const filterArchivedCount = document.getElementById('filterArchivedCount');
         let currentQuery = cfg.currentQuery || '';
         const activeNameEl = document.getElementById('active-contact-name');
         const activeAvatarEl = document.getElementById('active-contact-avatar');
@@ -62,6 +66,7 @@
         let forwardSelectionMode = false;
         const selectedForwardMessageIds = new Set();
         let latestConversationsCache = [];
+        let currentConversationFilter = 'all';
         const selectedForwardTargets = new Set();
         let editingMessageId = null;
 
@@ -76,7 +81,12 @@
             if (low.startsWith('data:')) return raw;
             if (raw.startsWith('//')) return `https:${raw}`;
             if (low.startsWith('http://') || low.startsWith('https://')) return raw;
-            if (raw.startsWith('/')) return `https://mmg.whatsapp.net${raw}`;
+            if (raw.startsWith('/')) {
+                // Mantem URLs locais do proprio sistema (/media, /static, etc).
+                // Prefixa dominio do WhatsApp apenas para caminhos tipicos de midia remota.
+                if (/^\/(?:o\d+\/)?v\//i.test(raw)) return `https://mmg.whatsapp.net${raw}`;
+                return raw;
+            }
             return raw;
         }
 
@@ -181,6 +191,24 @@
             return template.replace('/0/', `/${conversationId}/`);
         }
 
+        function updateConversationFilterChips() {
+            const isAll = currentConversationFilter === 'all';
+            const isUnread = currentConversationFilter === 'unread';
+            const isArchived = currentConversationFilter === 'archived';
+            if (filterAllChip) filterAllChip.classList.toggle('active', isAll);
+            if (filterUnreadChip) filterUnreadChip.classList.toggle('active', isUnread);
+            if (filterArchivedChip) filterArchivedChip.classList.toggle('active', isArchived);
+        }
+
+        function setConversationFilter(nextFilter) {
+            const allowed = new Set(['all', 'unread', 'archived']);
+            const safeFilter = allowed.has(nextFilter) ? nextFilter : 'all';
+            if (safeFilter === currentConversationFilter) return;
+            currentConversationFilter = safeFilter;
+            updateConversationFilterChips();
+            renderConversations(latestConversationsCache || []);
+        }
+
         function setActiveConversationId(conversationId) {
             activeConversationId = String(conversationId || '');
             document.querySelectorAll('#conversation-list .chat-box').forEach((el) => {
@@ -204,7 +232,9 @@
         function renderConversations(conversas) {
             if (!listEl) return;
             latestConversationsCache = Array.isArray(conversas) ? conversas : [];
-            const signature = JSON.stringify((conversas || []).map((c) => ({
+            const signature = JSON.stringify({
+                filter: currentConversationFilter,
+                rows: (conversas || []).map((c) => ({
                 id: c.id,
                 nome: c.nome || '',
                 avatar_url: c.avatar_url || '',
@@ -214,7 +244,8 @@
                 arquivada: !!c.arquivada,
                 presence_text: c.presence_text || '',
                 etiquetas: c.etiquetas || [],
-            })));
+                })),
+            });
             const activeConversation = (conversas || []).find((c) => String(c.id) === String(activeConversationId));
             updateHeaderByConversation(activeConversation);
             if (signature === lastConversationsSignature) return;
@@ -224,6 +255,7 @@
             const baseUrl = cfg.inboxBaseUrl || '/whatsapp/';
             const activeItems = (conversas || []).filter((c) => !c.arquivada);
             const archivedItems = (conversas || []).filter((c) => !!c.arquivada);
+            if (filterArchivedCount) filterArchivedCount.textContent = String(archivedItems.length);
             const renderItem = (c, archived) => {
                 const activeClass = String(c.id) === String(activeConversationId) ? 'active' : '';
                 const unreadCount = Number(c.nao_lidas || 0);
@@ -234,11 +266,20 @@
                 const tagsRow = tags ? `<div class="label-row">${tags}</div>` : '';
                 return `<a class="chat-box ${archived ? 'archived' : ''} ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}"><div class="img-box"><img class="dp" src="${avatar}" alt="Contato"></div><div class="chat-details"><div class="text-head"><h4>${esc(c.nome)}</h4><p class="time ${unreadClass}">${esc(c.ultima_mensagem_em)}</p></div><div class="text-message"><p>${esc((c.ultima_mensagem || '').slice(0, 42))}</p>${unreadBadge}</div>${tagsRow}</div></a>`;
             };
-            const activeHtml = activeItems.map((c) => renderItem(c, false)).join('');
-            const archivedHtml = archivedItems.length
-                ? `<div class="archive-divider"><span><i class="fa-regular fa-box-archive"></i> Arquivadas</span><b>${archivedItems.length}</b></div>${archivedItems.map((c) => renderItem(c, true)).join('')}`
-                : '';
-            listEl.innerHTML = `${activeHtml}${archivedHtml}` || '<div class="p-3 text-muted">Nenhuma conversa encontrada.</div>';
+            let html = '';
+            if (currentConversationFilter === 'archived') {
+                html = archivedItems.map((c) => renderItem(c, true)).join('');
+            } else if (currentConversationFilter === 'unread') {
+                const unreadItems = activeItems.filter((c) => Number(c.nao_lidas || 0) > 0);
+                html = unreadItems.map((c) => renderItem(c, false)).join('');
+            } else {
+                const activeHtml = activeItems.map((c) => renderItem(c, false)).join('');
+                const archivedHtml = archivedItems.length
+                    ? `<div class="archive-divider"><span><i class="fa-regular fa-box-archive"></i> Arquivadas</span><b>${archivedItems.length}</b></div>${archivedItems.map((c) => renderItem(c, true)).join('')}`
+                    : '';
+                html = `${activeHtml}${archivedHtml}`;
+            }
+            listEl.innerHTML = html || '<div class="p-3 text-muted">Nenhuma conversa encontrada para este filtro.</div>';
             listEl.scrollTop = previousScrollTop;
         }
 
@@ -815,7 +856,7 @@
         emojiPickerPanel.className = 'emoji-picker-panel';
         emojiPickerPanel.id = 'emojiPickerPanel';
         const composeEmojiPickerPanel = document.createElement('div');
-        composeEmojiPickerPanel.className = 'emoji-picker-panel';
+        composeEmojiPickerPanel.className = 'emoji-picker-panel emoji-picker-compose';
         composeEmojiPickerPanel.id = 'composeEmojiPickerPanel';
         let emojiPickerMessageId = null;
         const composeInput = sendMessageForm ? sendMessageForm.querySelector('input[name="mensagem"]') : null;
@@ -829,7 +870,7 @@
         let composeDraftFiles = [];
         let composeDraftPreviewUrls = [];
         let attachPickerKind = 'media';
-        ['👍', '❤️', '😂', '🙏', '😮', '😢', '👏', '🔥'].forEach((emoji) => {
+        ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F64F}', '\u{1F62E}', '\u{1F622}', '\u{1F44F}', '\u{1F525}'].forEach((emoji) => {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.textContent = emoji;
@@ -841,23 +882,116 @@
             emojiPickerPanel.appendChild(btn);
         });
         document.body.appendChild(emojiPickerPanel);
-        ['😀', '😁', '😂', '🤣', '😊', '😍', '😘', '😎', '😢', '🙏', '👍', '🔥', '❤️'].forEach((emoji) => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.textContent = emoji;
-            btn.addEventListener('click', () => {
-                if (!composeInput) return;
-                const start = Number(composeInput.selectionStart || composeInput.value.length);
-                const end = Number(composeInput.selectionEnd || composeInput.value.length);
-                const current = composeInput.value || '';
-                composeInput.value = `${current.slice(0, start)}${emoji}${current.slice(end)}`;
-                const nextPos = start + emoji.length;
-                composeInput.focus();
-                composeInput.setSelectionRange(nextPos, nextPos);
-                closeComposeEmojiPicker();
+
+        const composeEmojiCatalog = [
+            { emoji: '\u{1F600}', name: 'sorrindo', cat: 'smileys' }, { emoji: '\u{1F603}', name: 'feliz', cat: 'smileys' }, { emoji: '\u{1F604}', name: 'rindo', cat: 'smileys' },
+            { emoji: '\u{1F601}', name: 'sorriso', cat: 'smileys' }, { emoji: '\u{1F606}', name: 'risada', cat: 'smileys' }, { emoji: '\u{1F923}', name: 'rolando de rir', cat: 'smileys' },
+            { emoji: '\u{1F602}', name: 'lagrimas de alegria', cat: 'smileys' }, { emoji: '\u{1F60A}', name: 'fofo', cat: 'smileys' }, { emoji: '\u{1F60D}', name: 'apaixonado', cat: 'smileys' },
+            { emoji: '\u{1F618}', name: 'beijo', cat: 'smileys' }, { emoji: '\u{1F60E}', name: 'oculos escuros', cat: 'smileys' }, { emoji: '\u{1F914}', name: 'pensando', cat: 'smileys' },
+            { emoji: '\u{1F62E}', name: 'surpreso', cat: 'smileys' }, { emoji: '\u{1F622}', name: 'chorando', cat: 'smileys' }, { emoji: '\u{1F62D}', name: 'choro forte', cat: 'smileys' },
+            { emoji: '\u{1F621}', name: 'bravo', cat: 'smileys' }, { emoji: '\u{1F44D}', name: 'curtir', cat: 'smileys' }, { emoji: '\u{1F44F}', name: 'palmas', cat: 'smileys' },
+            { emoji: '\u{1F64F}', name: 'oracao', cat: 'smileys' }, { emoji: '\u2764\uFE0F', name: 'coracao', cat: 'smileys' }, { emoji: '\u{1F525}', name: 'fogo', cat: 'smileys' },
+            { emoji: '\u{1F436}', name: 'cachorro', cat: 'animals' }, { emoji: '\u{1F431}', name: 'gato', cat: 'animals' }, { emoji: '\u{1F42D}', name: 'rato', cat: 'animals' },
+            { emoji: '\u{1F437}', name: 'porco', cat: 'animals' }, { emoji: '\u{1F430}', name: 'coelho', cat: 'animals' }, { emoji: '\u{1F98A}', name: 'raposa', cat: 'animals' },
+            { emoji: '\u{1F43C}', name: 'panda', cat: 'animals' }, { emoji: '\u{1F981}', name: 'leao', cat: 'animals' }, { emoji: '\u{1F42F}', name: 'tigre', cat: 'animals' },
+            { emoji: '\u{1F439}', name: 'hamster', cat: 'animals' }, { emoji: '\u{1F98B}', name: 'borboleta', cat: 'animals' }, { emoji: '\u{1F41F}', name: 'peixe', cat: 'animals' },
+            { emoji: '\u{1F95A}', name: 'ovo', cat: 'food' }, { emoji: '\u{1F354}', name: 'hamburguer', cat: 'food' }, { emoji: '\u{1F355}', name: 'pizza', cat: 'food' },
+            { emoji: '\u{1F35F}', name: 'batata frita', cat: 'food' }, { emoji: '\u{1F32D}', name: 'hot dog', cat: 'food' }, { emoji: '\u{1F36A}', name: 'cookie', cat: 'food' },
+            { emoji: '\u{1F369}', name: 'donut', cat: 'food' }, { emoji: '\u{1F382}', name: 'bolo', cat: 'food' }, { emoji: '\u{1F37A}', name: 'cerveja', cat: 'food' },
+            { emoji: '\u2615', name: 'cafe', cat: 'food' }, { emoji: '\u{1F697}', name: 'carro', cat: 'travel' }, { emoji: '\u{1F695}', name: 'taxi', cat: 'travel' },
+            { emoji: '\u{1F699}', name: 'suv', cat: 'travel' }, { emoji: '\u{1F68C}', name: 'onibus', cat: 'travel' }, { emoji: '\u{1F3CD}', name: 'moto', cat: 'travel' },
+            { emoji: '\u2708\uFE0F', name: 'aviao', cat: 'travel' }, { emoji: '\u{1F680}', name: 'foguete', cat: 'travel' }, { emoji: '\u{1F3C1}', name: 'bandeirada', cat: 'travel' },
+            { emoji: '\u{1F4A1}', name: 'ideia', cat: 'objects' }, { emoji: '\u{1F4BB}', name: 'notebook', cat: 'objects' }, { emoji: '\u{1F4F1}', name: 'celular', cat: 'objects' },
+            { emoji: '\u{1F50C}', name: 'tomada', cat: 'objects' }, { emoji: '\u{1F4E6}', name: 'caixa', cat: 'objects' }, { emoji: '\u{1F4C8}', name: 'grafico', cat: 'objects' },
+            { emoji: '\u{1F4B0}', name: 'dinheiro', cat: 'objects' }, { emoji: '\u2699\uFE0F', name: 'engrenagem', cat: 'objects' }, { emoji: '\u{1F6E0}\uFE0F', name: 'ferramentas', cat: 'objects' },
+            { emoji: '\u2696\uFE0F', name: 'balanca', cat: 'symbols' }, { emoji: '\u2705', name: 'check verde', cat: 'symbols' }, { emoji: '\u274C', name: 'x vermelho', cat: 'symbols' },
+            { emoji: '\u26A0\uFE0F', name: 'atencao', cat: 'symbols' }, { emoji: '\u{1F4AF}', name: 'cem', cat: 'symbols' }, { emoji: '\u{1F4A5}', name: 'impacto', cat: 'symbols' },
+            { emoji: '\u{1F1E7}\u{1F1F7}', name: 'brasil', cat: 'flags' }, { emoji: '\u{1F1FA}\u{1F1F8}', name: 'estados unidos', cat: 'flags' }, { emoji: '\u{1F1EA}\u{1F1F8}', name: 'espanha', cat: 'flags' },
+            { emoji: '\u{1F1E6}\u{1F1F7}', name: 'argentina', cat: 'flags' }, { emoji: '\u{1F3F3}\uFE0F', name: 'bandeira branca', cat: 'flags' }, { emoji: '\u{1F6A9}', name: 'bandeira vermelha', cat: 'flags' },
+        ];
+        const composeEmojiCategories = [
+            { id: 'smileys', icon: '\u{1F642}', label: 'Smileys e pessoas' },
+            { id: 'animals', icon: '\u{1F43B}', label: 'Animais e natureza' },
+            { id: 'food', icon: '\u2615', label: 'Comidas e bebidas' },
+            { id: 'travel', icon: '\u{1F697}', label: 'Viagem e lugares' },
+            { id: 'objects', icon: '\u{1F4A1}', label: 'Objetos' },
+            { id: 'symbols', icon: '\u{1F522}', label: 'Simbolos' },
+            { id: 'flags', icon: '\u{1F3F3}\uFE0F', label: 'Bandeiras' },
+        ];
+        let composeEmojiCategory = 'smileys';
+        let composeEmojiSearch = '';
+
+        function insertEmojiIntoComposer(emoji) {
+            if (!composeInput) return;
+            const start = Number(composeInput.selectionStart || composeInput.value.length);
+            const end = Number(composeInput.selectionEnd || composeInput.value.length);
+            const current = composeInput.value || '';
+            composeInput.value = `${current.slice(0, start)}${emoji}${current.slice(end)}`;
+            const nextPos = start + emoji.length;
+            composeInput.focus();
+            composeInput.setSelectionRange(nextPos, nextPos);
+        }
+
+        function renderComposeEmojiGrid() {
+            const bodyEl = composeEmojiPickerPanel.querySelector('[data-role="emoji-grid"]');
+            const titleEl = composeEmojiPickerPanel.querySelector('[data-role="emoji-category-title"]');
+            if (!bodyEl || !titleEl) return;
+
+            const search = String(composeEmojiSearch || '').trim().toLowerCase();
+            const currentCategory = composeEmojiCategories.find((c) => c.id === composeEmojiCategory) || composeEmojiCategories[0];
+            const filtered = composeEmojiCatalog.filter((item) => {
+                if (!item || !item.emoji) return false;
+                if (!search) return item.cat === composeEmojiCategory;
+                return item.cat === composeEmojiCategory && String(item.name || '').toLowerCase().includes(search);
             });
-            composeEmojiPickerPanel.appendChild(btn);
+
+            titleEl.textContent = currentCategory ? currentCategory.label : 'Emojis';
+            bodyEl.innerHTML = filtered.map((item) => `<button type="button" class="compose-emoji-item" data-emoji="${item.emoji}">${item.emoji}</button>`).join('')
+                || '<div class="compose-emoji-empty">Nenhum emoji encontrado.</div>';
+
+            composeEmojiPickerPanel.querySelectorAll('.compose-emoji-tab').forEach((tabEl) => {
+                tabEl.classList.toggle('active', tabEl.getAttribute('data-cat') === composeEmojiCategory);
+            });
+        }
+
+        composeEmojiPickerPanel.innerHTML = `
+            <div class="compose-emoji-head">
+                ${composeEmojiCategories.map((cat) => `<button type="button" class="compose-emoji-tab${cat.id === composeEmojiCategory ? ' active' : ''}" data-cat="${cat.id}" title="${cat.label}">${cat.icon}</button>`).join('')}
+            </div>
+            <div class="compose-emoji-search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" class="compose-emoji-search" placeholder="Pesquisar emoji" data-role="emoji-search">
+            </div>
+            <div class="compose-emoji-title" data-role="emoji-category-title">Smileys e pessoas</div>
+            <div class="compose-emoji-grid" data-role="emoji-grid"></div>
+            <div class="compose-emoji-foot">
+                <button type="button" class="active"><i class="fa-regular fa-face-smile"></i></button>
+                <button type="button" disabled>GIF</button>
+                <button type="button" disabled><i class="fa-regular fa-note-sticky"></i></button>
+            </div>
+        `;
+        composeEmojiPickerPanel.addEventListener('click', function (e) {
+            const tab = e.target.closest('.compose-emoji-tab');
+            if (tab) {
+                composeEmojiCategory = tab.getAttribute('data-cat') || 'smileys';
+                renderComposeEmojiGrid();
+                return;
+            }
+            const item = e.target.closest('.compose-emoji-item');
+            if (item) {
+                const emoji = item.getAttribute('data-emoji') || '';
+                if (emoji) insertEmojiIntoComposer(emoji);
+                closeComposeEmojiPicker();
+            }
         });
+        const composeEmojiSearchInput = composeEmojiPickerPanel.querySelector('[data-role="emoji-search"]');
+        if (composeEmojiSearchInput) {
+            composeEmojiSearchInput.addEventListener('input', function () {
+                composeEmojiSearch = this.value || '';
+                renderComposeEmojiGrid();
+            });
+        }
+        renderComposeEmojiGrid();
         document.body.appendChild(composeEmojiPickerPanel);
 
         function closeEmojiPicker() {
@@ -881,12 +1015,16 @@
 
         function openComposeEmojiPicker(anchorEl) {
             if (!composeInput) return;
+            composeEmojiSearch = '';
+            if (composeEmojiSearchInput) composeEmojiSearchInput.value = '';
+            renderComposeEmojiGrid();
             const rect = anchorEl ? anchorEl.getBoundingClientRect() : { left: 20, top: window.innerHeight - 90 };
-            const top = Math.max(12, rect.top - 58);
-            const left = Math.max(12, Math.min(rect.left - 8, window.innerWidth - 320));
+            const top = Math.max(12, rect.top - 590);
+            const left = Math.max(8, Math.min(rect.left - 20, window.innerWidth - 840));
             composeEmojiPickerPanel.style.top = `${top}px`;
             composeEmojiPickerPanel.style.left = `${left}px`;
             composeEmojiPickerPanel.classList.add('show');
+            if (composeEmojiSearchInput) composeEmojiSearchInput.focus();
         }
 
         if (composeEmojiTrigger) {
@@ -1719,9 +1857,26 @@
             });
         }
 
+        if (filterAllChip) {
+            filterAllChip.addEventListener('click', function () {
+                setConversationFilter('all');
+            });
+        }
+        if (filterUnreadChip) {
+            filterUnreadChip.addEventListener('click', function () {
+                setConversationFilter('unread');
+            });
+        }
+        if (filterArchivedChip) {
+            filterArchivedChip.addEventListener('click', function () {
+                setConversationFilter('archived');
+            });
+        }
+
         if (activeConversationId) {
             setActiveConversationId(activeConversationId);
         }
+        updateConversationFilterChips();
         normalizeRenderedMediaUrls();
 
         document.addEventListener('visibilitychange', function () {
@@ -1739,3 +1894,4 @@
         setInterval(pollConversations, 2000);
         setInterval(pollMessages, 2500);
     })();
+

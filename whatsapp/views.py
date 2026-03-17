@@ -68,7 +68,11 @@ def _normalize_public_media_url(value: str) -> str:
     if lowered.startswith('http://') or lowered.startswith('https://'):
         return candidate
     if candidate.startswith('/'):
-        return f'https://mmg.whatsapp.net{candidate}'
+        # Mantem URLs locais do proprio sistema (/media, /static, etc).
+        # Prefixa dominio do WhatsApp apenas para caminhos tipicos de midia remota.
+        if re.match(r'^/(?:o\d+/)?v/', candidate, flags=re.IGNORECASE):
+            return f'https://mmg.whatsapp.net{candidate}'
+        return candidate
     return candidate
 
 
@@ -1146,7 +1150,6 @@ def react_message(request, pk):
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
 
 
-@login_required
 def _forward_single_message(mensagem: WhatsAppMessage, numero: str, user):
     instance = mensagem.conversa.instance or get_active_instance()
     if not instance:

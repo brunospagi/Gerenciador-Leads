@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}?v=20260317-14">
+<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}?v=20260317-15">
 <div class="wa-clone-wrap">
     <div class="wa-topbar">
         <div>
@@ -90,9 +90,9 @@
                 <i class="fa-sharp fa-solid fa-bars-filter"></i>
             </div>
             <div class="conversation-filters">
-                <span class="chip active">Tudo</span>
-                <span class="chip">Não lidas</span>
-                <span class="chip">Arquivadas {{ conversas_arquivadas|length }}</span>
+                <button type="button" class="chip active" id="filterAllChip" data-filter="all">Tudo</button>
+                <button type="button" class="chip" id="filterUnreadChip" data-filter="unread">Não lidas</button>
+                <button type="button" class="chip" id="filterArchivedChip" data-filter="archived">Arquivadas <span id="filterArchivedCount">{{ conversas_arquivadas|length }}</span></button>
             </div>
 
             <div class="chat-list" id="conversation-list">
@@ -412,5 +412,5 @@
         openNewChat: {% if open_new_chat %}true{% else %}false{% endif %}
     };
 </script>
-<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-14"></script>
+<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-15"></script>
 {% endblock %}

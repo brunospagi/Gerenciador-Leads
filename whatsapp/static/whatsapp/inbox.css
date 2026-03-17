@@ -49,6 +49,9 @@
         color: #334155;
         font-size: .82rem;
         font-weight: 600;
+        cursor: pointer;
+        appearance: none;
+        outline: none;
     }
     .conversation-filters .chip.active {
         background: #dcfce7;
@@ -258,6 +261,119 @@
         line-height: 1;
     }
     .emoji-picker-panel button:hover { background: #f3f4f6; }
+    .emoji-picker-compose {
+        width: 820px;
+        max-width: calc(100vw - 16px);
+        height: 560px;
+        max-height: calc(100vh - 24px);
+        display: none;
+        flex-direction: column;
+        gap: 0;
+        padding: 0;
+        overflow: hidden;
+        border-radius: 18px;
+    }
+    .emoji-picker-compose.show { display: flex; }
+    .emoji-picker-compose .compose-emoji-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-bottom: 1px solid #e5e7eb;
+        background: #fff;
+    }
+    .emoji-picker-compose .compose-emoji-tab {
+        border: 0;
+        background: transparent;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        font-size: 20px;
+        color: #6b7280;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .emoji-picker-compose .compose-emoji-tab.active {
+        color: #0f172a;
+        box-shadow: inset 0 -3px 0 #22c55e;
+        border-radius: 0;
+    }
+    .emoji-picker-compose .compose-emoji-search-wrap {
+        margin: 10px 12px;
+        border: 2px solid #22c55e;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        background: #fff;
+    }
+    .emoji-picker-compose .compose-emoji-search-wrap i { color: #6b7280; }
+    .emoji-picker-compose .compose-emoji-search {
+        border: 0;
+        outline: none;
+        width: 100%;
+        font-size: 1.05rem;
+        color: #334155;
+        background: transparent;
+    }
+    .emoji-picker-compose .compose-emoji-title {
+        padding: 6px 14px 8px;
+        color: #4b5563;
+        font-weight: 700;
+        font-size: 1.02rem;
+    }
+    .emoji-picker-compose .compose-emoji-grid {
+        flex: 1;
+        overflow-y: auto;
+        padding: 4px 10px 10px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+        gap: 6px;
+        align-content: start;
+        background: #fff;
+    }
+    .emoji-picker-compose .compose-emoji-item {
+        border: 0;
+        background: transparent;
+        border-radius: 10px;
+        font-size: 30px;
+        width: 48px;
+        height: 48px;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .emoji-picker-compose .compose-emoji-item:hover { background: #f3f4f6; }
+    .emoji-picker-compose .compose-emoji-empty {
+        grid-column: 1 / -1;
+        padding: 16px;
+        color: #64748b;
+        font-size: .95rem;
+    }
+    .emoji-picker-compose .compose-emoji-foot {
+        border-top: 1px solid #e5e7eb;
+        padding: 10px 12px;
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        background: #fff;
+    }
+    .emoji-picker-compose .compose-emoji-foot button {
+        width: 104px;
+        height: 40px;
+        border-radius: 20px;
+        border: 1px solid #d1d5db;
+        background: #fff;
+        font-size: 1.15rem;
+        color: #374151;
+    }
+    .emoji-picker-compose .compose-emoji-foot button.active {
+        background: #f8fafc;
+        border-color: #94a3b8;
+    }
     .message-menu-trigger {
         position: absolute;
         top: 6px;

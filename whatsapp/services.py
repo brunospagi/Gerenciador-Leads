@@ -382,7 +382,7 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         if not candidate:
             return False
         return (
-            '.enc' in candidate
+            bool(re.search(r'(?:^|[/?])[^/?#]+\.enc(?:$|[?#])', candidate))
             or candidate.startswith('/v/t62')
         )
 
@@ -398,7 +398,11 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         if lower.startswith('http://') or lower.startswith('https://'):
             return candidate
         if candidate.startswith('/'):
-            return f'https://mmg.whatsapp.net{candidate}'
+            # Mantem URLs locais do proprio sistema (/media, /static, etc).
+            # Prefixa dominio do WhatsApp apenas para caminhos tipicos de midia remota.
+            if re.match(r'^/(?:o\d+/)?v/', candidate, flags=re.IGNORECASE):
+                return f'https://mmg.whatsapp.net{candidate}'
+            return candidate
         return candidate
 
     def _guess_mime_from_bytes(content: bytes) -> str:
