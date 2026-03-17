@@ -234,6 +234,48 @@
             }
         }
 
+        function setConversationActionsEnabled(enabled) {
+            const state = !!enabled;
+            const toggleFormButton = (formEl) => {
+                if (!formEl) return;
+                const btn = formEl.querySelector('button[type="submit"]');
+                if (btn) btn.disabled = !state;
+            };
+            toggleFormButton(markReadForm);
+            toggleFormButton(deleteConversationForm);
+            toggleFormButton(archiveConversationForm);
+            if (sendMessageSubmitBtn) sendMessageSubmitBtn.disabled = !state;
+            if (composeInput) composeInput.disabled = !state;
+            if (attachTrigger) attachTrigger.disabled = !state;
+            if (micRecordBtn) micRecordBtn.disabled = !state;
+            if (sendRecordedAudioBtn) sendRecordedAudioBtn.disabled = !state;
+        }
+
+        function clearActiveConversationUi() {
+            setActiveConversationId('');
+            setConversationActionsEnabled(false);
+            if (activeNameEl) {
+                activeNameEl.innerHTML = `Selecione uma conversa<br><span id="active-contact-jid">-</span>`;
+            }
+            if (activeAvatarEl) {
+                activeAvatarEl.src = defaultAvatar;
+            }
+            if (activeLabelsEl) {
+                activeLabelsEl.innerHTML = '';
+            }
+            if (activePresenceEl) {
+                activePresenceEl.textContent = '';
+            }
+            if (messagesEl) {
+                messagesEl.innerHTML = '<div class="text-muted">Sem mensagens.</div>';
+                messagesEl.scrollTop = 0;
+            }
+            lastMessagesSignature = '';
+            const url = new URL(window.location.href);
+            url.searchParams.delete('c');
+            history.replaceState({}, '', url.toString());
+        }
+
         function renderConversations(conversas) {
             if (!listEl) return;
             latestConversationsCache = Array.isArray(conversas) ? conversas : [];
@@ -1798,10 +1840,18 @@
                 const ok = window.confirm('Deseja realmente deletar esta conversa? Esta acao nao pode ser desfeita.');
                 if (!ok) return;
                 try {
+                    const deletedConversationId = String(activeConversationId || '');
                     await submitFormAjax(deleteConversationForm);
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete('c');
-                    window.location.href = url.toString();
+                    latestConversationsCache = (latestConversationsCache || []).filter((c) => String(c.id) !== deletedConversationId);
+                    renderConversations(latestConversationsCache);
+                    const fallbackConversation =
+                        (latestConversationsCache || []).find((c) => !c.arquivada)
+                        || (latestConversationsCache || [])[0];
+                    if (fallbackConversation && fallbackConversation.id) {
+                        await activateConversation(fallbackConversation.id, true);
+                    } else {
+                        clearActiveConversationUi();
+                    }
                 } catch (err) {
                     alert(err.message || 'Erro ao deletar conversa.');
                 }
@@ -2018,6 +2068,9 @@
 
         if (activeConversationId) {
             setActiveConversationId(activeConversationId);
+            setConversationActionsEnabled(true);
+        } else {
+            setConversationActionsEnabled(false);
         }
         updateConversationFilterChips();
         normalizeRenderedMediaUrls();

@@ -37,6 +37,7 @@ from .models import WhatsAppConversation, WhatsAppInstance, WhatsAppMessage
 from .services import (
     EvolutionAPIClient,
     extract_qr_base64,
+    fit_external_id,
     get_active_instance,
     normalize_number,
     normalize_wa_id,
@@ -148,7 +149,12 @@ def _presence_info(conversation: WhatsAppConversation) -> tuple[str, str]:
         return '', ''
     if timezone.is_naive(updated_at):
         updated_at = timezone.make_aware(updated_at)
-    if timezone.now() - updated_at > timedelta(seconds=8):
+    elapsed = timezone.now() - updated_at
+    if state == 'online':
+        if elapsed > timedelta(seconds=45):
+            return '', ''
+        return 'online', 'online'
+    if elapsed > timedelta(seconds=8):
         return '', ''
     if state == 'typing':
         return 'typing', 'digitando...'
@@ -476,10 +482,12 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             try:
                 client = EvolutionAPIClient(instance=instance)
                 response = client.send_text(number=numero, text=primeira_mensagem)
-                external_id = (
+                external_id = fit_external_id(
+                    (
                     response.get('key', {}).get('id')
                     or response.get('message', {}).get('key', {}).get('id')
                     or response.get('id')
+                    )
                 )
                 if external_id:
                     mensagem.external_id = external_id
@@ -591,10 +599,12 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                 )
             else:
                 response = client.send_text(number=number, text=texto)
-            external_id = (
+            external_id = fit_external_id(
+                (
                 response.get('key', {}).get('id')
                 or response.get('message', {}).get('key', {}).get('id')
                 or response.get('id')
+                )
             )
             if external_id:
                 nova_mensagem.external_id = external_id
@@ -1267,10 +1277,12 @@ def _forward_single_message(mensagem: WhatsAppMessage, numero: str, user):
             raise ValueError('Mensagem sem conteudo para encaminhar.')
         response = client.send_text(number=numero, text=conteudo)
 
-    external_id = (
+    external_id = fit_external_id(
+        (
         response.get('key', {}).get('id')
         or response.get('message', {}).get('key', {}).get('id')
         or response.get('id')
+        )
     )
 
     wa_id = normalize_wa_id(numero)

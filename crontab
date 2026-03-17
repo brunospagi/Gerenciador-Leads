@@ -3,3 +3,7 @@
 
 # Verifica clientes com contato atrasado todos os dias às 8h da manhã
 0 8 * * * /usr/local/bin/python /app/manage.py check_overdue_clients >> /app/cron.log 2>&1
+# Reconciliacao de status do WhatsApp a cada 2 minutos (entregue/lida)
+*/2 * * * * /usr/local/bin/python /app/manage.py check_whatsapp_status --minutes 240 --limit 300 >> /app/cron.log 2>&1
+# Reconciliacao de presenca do WhatsApp a cada 1 minuto (online/digitando/gravando)
+*/1 * * * * /usr/local/bin/python /app/manage.py check_whatsapp_presence --typing-seconds 12 --recording-seconds 12 --online-seconds 45 --limit 1500 >> /app/cron.log 2>&1

@@ -7,6 +7,7 @@ import base64
 import binascii
 import mimetypes
 import uuid
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -30,6 +31,16 @@ def sanitize_text_content(value: str) -> str:
     # Remove caracteres invisiveis que podem gerar bolhas "vazias"
     text = re.sub(r'[\u200b\u200c\u200d\ufeff\u200e\u200f]', '', text)
     return text.strip()
+
+
+def fit_external_id(value: Any, max_len: int = 150) -> str:
+    raw = str(value or '').strip()
+    if not raw:
+        return ''
+    if len(raw) <= max_len:
+        return raw
+    # Mantem o final do ID para continuar compatível com matching por sufixo.
+    return raw[-max_len:]
 
 
 def normalize_message_id(value: str) -> str:
@@ -1329,15 +1340,6 @@ def extract_qr_base64(payload: dict[str, Any]) -> str:
 
 def map_delivery_status(payload: dict[str, Any]) -> str:
     data = payload.get('data', payload) if isinstance(payload, dict) else {}
-
-    raw_status = (
-        data.get('status')
-        or data.get('messageStatus')
-        or data.get('update', {}).get('status')
-        or payload.get('status')
-        or ''
-    )
-    raw_status_str = str(raw_status).strip().lower()
     status_map = {
         'sent': WhatsAppMessage.Status.ENVIADA,
         'server_ack': WhatsAppMessage.Status.ENVIADA,
@@ -1348,9 +1350,42 @@ def map_delivery_status(payload: dict[str, Any]) -> str:
         'failed': WhatsAppMessage.Status.FALHA,
         'error': WhatsAppMessage.Status.FALHA,
         'pending': WhatsAppMessage.Status.PENDENTE,
+        'queued': WhatsAppMessage.Status.PENDENTE,
     }
-    if raw_status_str in status_map:
-        return status_map[raw_status_str]
+    raw_candidates = [
+        data.get('status'),
+        data.get('messageStatus'),
+        payload.get('status'),
+    ]
+    if isinstance(data.get('update'), dict):
+        raw_candidates.extend([
+            data.get('update', {}).get('status'),
+            data.get('update', {}).get('messageStatus'),
+        ])
+    for candidate in raw_candidates:
+        if candidate is None:
+            continue
+        raw_status_str = str(candidate).strip().lower()
+        if not raw_status_str:
+            continue
+        if raw_status_str in status_map:
+            return status_map[raw_status_str]
+        # Alguns provedores enviam ACK numerico em formato string no campo "status".
+        if raw_status_str in {'-1', '0', '1', '2', '3', '4'}:
+            try:
+                ack_as_status = int(raw_status_str)
+            except (TypeError, ValueError):
+                ack_as_status = None
+            if ack_as_status == -1:
+                return WhatsAppMessage.Status.FALHA
+            if ack_as_status == 0:
+                return WhatsAppMessage.Status.PENDENTE
+            if ack_as_status == 1:
+                return WhatsAppMessage.Status.ENVIADA
+            if ack_as_status == 2:
+                return WhatsAppMessage.Status.ENTREGUE
+            if ack_as_status in {3, 4}:
+                return WhatsAppMessage.Status.LIDA
 
     ack = data.get('ack')
     if ack is None:
@@ -1371,7 +1406,201 @@ def map_delivery_status(payload: dict[str, Any]) -> str:
     if ack in {3, 4}:
         return WhatsAppMessage.Status.LIDA
 
-    return WhatsAppMessage.Status.ENVIADA
+    return ''
+
+
+def _status_rank(status: str) -> int:
+    normalized = str(status or '').strip().lower()
+    if normalized == WhatsAppMessage.Status.PENDENTE:
+        return 0
+    if normalized == WhatsAppMessage.Status.ENVIADA:
+        return 1
+    if normalized == WhatsAppMessage.Status.ENTREGUE:
+        return 2
+    if normalized == WhatsAppMessage.Status.LIDA:
+        return 3
+    if normalized == WhatsAppMessage.Status.FALHA:
+        return -1
+    return -2
+
+
+def merge_delivery_status(current_status: str, incoming_status: str) -> str:
+    current = str(current_status or '').strip().lower()
+    incoming = str(incoming_status or '').strip().lower()
+    if not incoming:
+        return current or WhatsAppMessage.Status.PENDENTE
+    if not current:
+        return incoming
+
+    # Falha deve prevalecer apenas quando ainda nao houve confirmacao superior.
+    if incoming == WhatsAppMessage.Status.FALHA:
+        if _status_rank(current) >= _status_rank(WhatsAppMessage.Status.ENTREGUE):
+            return current
+        return incoming
+    if current == WhatsAppMessage.Status.FALHA:
+        return current
+
+    # Nunca faz downgrade (ex.: read -> sent).
+    if _status_rank(incoming) < _status_rank(current):
+        return current
+    return incoming
+
+
+def _iter_dict_nodes(root: Any):
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            yield node
+            for value in node.values():
+                if isinstance(value, (dict, list)):
+                    stack.append(value)
+        elif isinstance(node, list):
+            for item in node:
+                if isinstance(item, (dict, list)):
+                    stack.append(item)
+
+
+def _extract_node_message_ids(node: dict[str, Any]) -> list[str]:
+    if not isinstance(node, dict):
+        return []
+    ids: list[str] = []
+    candidates = [
+        node.get('id'),
+        node.get('messageId'),
+        node.get('msgId'),
+    ]
+    key_data = node.get('key', {}) if isinstance(node.get('key'), dict) else {}
+    candidates.append(key_data.get('id'))
+    update_data = node.get('update', {}) if isinstance(node.get('update'), dict) else {}
+    update_key = update_data.get('key', {}) if isinstance(update_data.get('key'), dict) else {}
+    candidates.append(update_data.get('id'))
+    candidates.append(update_data.get('messageId'))
+    candidates.append(update_key.get('id'))
+    for raw in candidates:
+        value = fit_external_id(raw)
+        if value and value not in ids:
+            ids.append(value)
+    return ids
+
+
+def reconcile_recent_outbound_statuses(*, minutes: int = 180, limit: int = 200, dry_run: bool = False) -> dict[str, int]:
+    now = timezone.now()
+    since = now - timedelta(minutes=max(1, int(minutes)))
+    rows = (
+        WhatsAppMessage.objects
+        .select_related('conversa', 'conversa__instance')
+        .filter(
+            direcao=WhatsAppMessage.Direction.ENVIADA,
+            criado_em__gte=since,
+            external_id__isnull=False,
+        )
+        .exclude(external_id='')
+        .filter(status__in=[WhatsAppMessage.Status.PENDENTE, WhatsAppMessage.Status.ENVIADA, WhatsAppMessage.Status.ENTREGUE])
+        .order_by('-criado_em')[:max(1, int(limit))]
+    )
+    messages = list(rows)
+    stats = {
+        'checked': len(messages),
+        'updated': 0,
+        'failed_lookups': 0,
+        'no_instance': 0,
+        'no_match': 0,
+    }
+    if not messages:
+        return stats
+
+    grouped: dict[tuple[str, str], list[WhatsAppMessage]] = defaultdict(list)
+    instance_cache: dict[str, WhatsAppInstance] = {}
+    for msg in messages:
+        conversa = msg.conversa
+        instance = conversa.instance or get_active_instance()
+        if not instance:
+            stats['no_instance'] += 1
+            continue
+        remote_jid = normalize_wa_id(conversa.wa_id or conversa.wa_id_alt or '')
+        if not remote_jid:
+            stats['no_match'] += 1
+            continue
+        key = f'{instance.instance_name}::{remote_jid}'
+        instance_cache[key] = instance
+        grouped[(key, remote_jid)].append(msg)
+
+    for (group_key, remote_jid), group_messages in grouped.items():
+        instance = instance_cache.get(group_key)
+        if not instance:
+            stats['no_instance'] += len(group_messages)
+            continue
+
+        client = EvolutionAPIClient(instance=instance)
+        remote_where = {'remoteJid': remote_jid}
+        responses: list[dict[str, Any]] = []
+        try:
+            responses.append(client.find_status_message(where=remote_where, page=1, offset=120))
+        except Exception:
+            stats['failed_lookups'] += 1
+        try:
+            responses.append(client.find_messages(where=remote_where, page=1, offset=120))
+        except Exception:
+            stats['failed_lookups'] += 1
+
+        status_by_id: dict[str, str] = {}
+        for resp in responses:
+            for node in _iter_dict_nodes(resp):
+                candidate_status = map_delivery_status({'data': node})
+                if not candidate_status:
+                    continue
+                for node_id in _extract_node_message_ids(node):
+                    norm = normalize_message_id(node_id)
+                    if not norm:
+                        continue
+                    existing = status_by_id.get(norm, '')
+                    merged = merge_delivery_status(existing, candidate_status)
+                    status_by_id[norm] = merged or candidate_status
+
+        if not status_by_id:
+            stats['no_match'] += len(group_messages)
+            continue
+
+        for msg in group_messages:
+            current = str(msg.status or '').strip().lower()
+            ext_norm = normalize_message_id(msg.external_id or '')
+            if not ext_norm:
+                stats['no_match'] += 1
+                continue
+            incoming = status_by_id.get(ext_norm, '')
+            if not incoming:
+                tail = ext_norm[-20:]
+                for cand_norm, cand_status in status_by_id.items():
+                    if not cand_norm or not cand_status:
+                        continue
+                    if cand_norm.endswith(tail) or ext_norm.endswith(cand_norm[-20:]):
+                        incoming = merge_delivery_status(incoming, cand_status)
+            if not incoming:
+                stats['no_match'] += 1
+                continue
+
+            final_status = merge_delivery_status(current, incoming)
+            if not final_status or final_status == current:
+                continue
+
+            if dry_run:
+                stats['updated'] += 1
+                continue
+
+            merged_payload = dict(msg.payload or {})
+            merged_payload['status_reconcile'] = {
+                'at': now.isoformat(),
+                'from': current,
+                'to': final_status,
+                'source': 'routine',
+            }
+            msg.status = final_status
+            msg.payload = merged_payload
+            msg.save(update_fields=['status', 'payload'])
+            stats['updated'] += 1
+
+    return stats
 
 
 def process_status_update(payload: dict[str, Any]) -> bool:
@@ -1430,9 +1659,17 @@ def process_status_update(payload: dict[str, Any]) -> bool:
     if not message:
         return False
 
+    # Confirmacao de entrega/leitura so faz sentido para mensagens enviadas.
+    if message.direcao != WhatsAppMessage.Direction.ENVIADA:
+        return False
+
+    final_status = merge_delivery_status(message.status, status)
+    if final_status == (message.status or '') and isinstance(message.payload, dict) and message.payload.get('status_update'):
+        return False
+
     merged_payload = dict(message.payload or {})
     merged_payload['status_update'] = payload
-    message.status = status
+    message.status = final_status
     message.payload = merged_payload
     message.save(update_fields=['status', 'payload'])
     return True
@@ -1833,13 +2070,94 @@ def _normalize_presence_state(raw_state: Any) -> str:
     state = str(raw_state or '').strip().lower()
     if not state:
         return ''
+    if state in {'online', 'available', 'active'}:
+        return 'online'
     if state in {'composing', 'typing'}:
         return 'typing'
     if state in {'recording', 'recordingaudio', 'recording_audio'}:
         return 'recording'
-    if state in {'paused', 'available', 'unavailable', 'idle', 'stop'}:
+    if state in {'paused', 'unavailable', 'idle', 'stop', 'offline'}:
         return ''
     return ''
+
+
+def reconcile_presence_states(
+    *,
+    typing_seconds: int = 12,
+    recording_seconds: int = 12,
+    online_seconds: int = 45,
+    limit: int = 1000,
+    dry_run: bool = False,
+) -> dict[str, int]:
+    rows = (
+        WhatsAppConversation.objects
+        .exclude(metadata={})
+        .order_by('-atualizado_em')[:max(1, int(limit))]
+    )
+    conversations = list(rows)
+    now = timezone.now()
+    stats = {
+        'checked': len(conversations),
+        'updated': 0,
+        'typing_expired': 0,
+        'recording_expired': 0,
+        'online_expired': 0,
+        'invalid_timestamp': 0,
+        'without_presence': 0,
+    }
+    for convo in conversations:
+        metadata = convo.metadata or {}
+        if not isinstance(metadata, dict):
+            stats['without_presence'] += 1
+            continue
+        presence = metadata.get('presence')
+        if not isinstance(presence, dict):
+            stats['without_presence'] += 1
+            continue
+
+        state = str(presence.get('state') or '').strip().lower()
+        raw_updated_at = str(presence.get('updated_at') or '').strip()
+        if not state or not raw_updated_at:
+            stats['without_presence'] += 1
+            continue
+
+        updated_at = parse_datetime(raw_updated_at)
+        if not updated_at:
+            stats['invalid_timestamp'] += 1
+            continue
+        if timezone.is_naive(updated_at):
+            updated_at = timezone.make_aware(updated_at)
+        elapsed = (now - updated_at).total_seconds()
+
+        should_clear = False
+        if state == 'typing' and elapsed > max(1, int(typing_seconds)):
+            should_clear = True
+            stats['typing_expired'] += 1
+        elif state == 'recording' and elapsed > max(1, int(recording_seconds)):
+            should_clear = True
+            stats['recording_expired'] += 1
+        elif state == 'online' and elapsed > max(1, int(online_seconds)):
+            should_clear = True
+            stats['online_expired'] += 1
+
+        if not should_clear:
+            continue
+
+        if dry_run:
+            stats['updated'] += 1
+            continue
+
+        merged_meta = dict(metadata)
+        merged_meta['presence'] = {
+            'state': '',
+            'updated_at': now.isoformat(),
+            'expired_from': state,
+        }
+        convo.metadata = merged_meta
+        convo.save(update_fields=['metadata', 'atualizado_em'])
+        stats['updated'] += 1
+
+    return stats
 
 
 def process_presence_update(payload: dict[str, Any], instance: WhatsAppInstance | None = None) -> bool:
@@ -1975,6 +2293,14 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
         return
 
     data = payload.get('data', payload)
+    if isinstance(data, list):
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            nested_payload = dict(payload)
+            nested_payload['data'] = item
+            process_webhook_payload(nested_payload, instance=instance)
+        return
     if not isinstance(data, dict):
         return
 
@@ -2031,10 +2357,12 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
         label = {'image': 'IMAGEM', 'video': 'VIDEO', 'audio': 'AUDIO', 'sticker': 'FIGURINHA'}.get(media_kind, media_kind.upper())
         texto = f'[{label}]'
     ts = parse_message_timestamp(payload)
-    ext_id = (
+    ext_id = fit_external_id(
+        (
         key_data.get('id')
         or data.get('id')
         or payload.get('id')
+        )
     )
 
     conversation = None
@@ -2112,7 +2440,12 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
         'direcao': direction,
         'conteudo': texto,
         'media_url': media_url or '',
-        'status': WhatsAppMessage.Status.ENTREGUE if from_me else WhatsAppMessage.Status.LIDA,
+        'status': (
+            merge_delivery_status(
+                WhatsAppMessage.Status.ENVIADA,
+                map_delivery_status(payload),
+            ) if from_me else WhatsAppMessage.Status.LIDA
+        ),
         'payload': payload,
         'recebido_em': ts if direction == WhatsAppMessage.Direction.RECEBIDA else None,
     }
@@ -2123,6 +2456,20 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
     else:
         WhatsAppMessage.objects.create(**defaults)
         message_created = True
+
+    # Alguns provedores entregam a imagem em dois passos:
+    # primeiro o upsert sem URL/base64 e depois a midia via lookup/update.
+    # Faz um backfill imediato para reduzir bolhas quebradas.
+    expected_media_kind = (media_kind or inferred_kind or '').lower()
+    if (
+        ext_id
+        and not (media_url or '').strip()
+        and expected_media_kind in {'image', 'video', 'audio', 'document', 'sticker'}
+    ):
+        try:
+            process_message_content_update(payload)
+        except Exception as exc:
+            logger.debug('Backfill imediato de midia falhou para ext_id=%s: %s', ext_id, exc)
 
     if direction == WhatsAppMessage.Direction.RECEBIDA and message_created:
         WhatsAppConversation.objects.filter(pk=conversation.pk).update(nao_lidas=F('nao_lidas') + 1)
