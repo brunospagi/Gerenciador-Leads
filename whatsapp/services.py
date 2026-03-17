@@ -2331,10 +2331,10 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
     texto = parse_message_text(payload)
     media_url, media_kind = parse_message_media(payload)
     raw_message = unwrap_message_content(data.get('message') if isinstance(data.get('message'), dict) else {})
+    inferred_kind = infer_message_kind(raw_message, data, payload) if isinstance(raw_message, dict) and raw_message else ''
     if not texto and not media_url:
         # Evita criar bolha vazia (apenas horario) quando webhook nao traz conteudo real.
         if isinstance(raw_message, dict) and raw_message:
-            inferred_kind = infer_message_kind(raw_message, data, payload)
             if inferred_kind in {'image', 'video', 'audio', 'document', 'sticker'}:
                 media_kind = media_kind or inferred_kind
                 label = {
