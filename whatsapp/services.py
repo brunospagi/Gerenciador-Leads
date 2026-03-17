@@ -3,16 +3,23 @@ from __future__ import annotations
 import logging
 import re
 import json
+import base64
+import binascii
+import mimetypes
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 import requests
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.db.models import F
 from django.conf import settings
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from crmspagi.storage_backends import PublicMediaStorage
 from .models import WhatsAppConversation, WhatsAppInstance, WhatsAppMessage
 
 logger = logging.getLogger(__name__)
@@ -314,6 +321,62 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
     if not isinstance(message, dict):
         return '', ''
 
+    def _is_encrypted_media_ref(value: str) -> bool:
+        candidate = str(value or '').strip().lower()
+        if not candidate:
+            return False
+        return (
+            '.enc' in candidate
+            or candidate.startswith('/v/t62')
+            or 'mmg.whatsapp.net' in candidate
+        )
+
+    def _media_from_base64(mime_value: str, raw_value: Any, media_kind: str) -> str:
+        if not isinstance(raw_value, str):
+            return ''
+        raw = raw_value.strip()
+        if not raw:
+            return ''
+        mime = str(mime_value or 'application/octet-stream').strip()
+        source_data = raw
+        if raw.startswith('data:'):
+            header, _, encoded = raw.partition(',')
+            if ';base64' in header:
+                mime = header[5:].split(';', 1)[0] or mime
+                source_data = encoded
+
+        try:
+            sanitized = re.sub(r'\s+', '', source_data)
+            if len(sanitized) % 4:
+                sanitized += '=' * (4 - (len(sanitized) % 4))
+            decoded = base64.b64decode(sanitized)
+        except (binascii.Error, ValueError):
+            return ''
+
+        extension = mimetypes.guess_extension(mime.split(';', 1)[0].strip().lower() or '') or ''
+        if not extension:
+            extension = {
+                'image': '.jpg',
+                'video': '.mp4',
+                'audio': '.ogg',
+                'document': '.bin',
+            }.get(media_kind or '', '.bin')
+        unique_name = f'{uuid.uuid4().hex}{extension}'
+        storage_path = f'whatsapp/webhook/{timezone.now().strftime("%Y/%m")}/{unique_name}'
+        file_obj = ContentFile(decoded, name=unique_name)
+
+        try:
+            storage = PublicMediaStorage()
+            saved_path = storage.save(storage_path, file_obj)
+            return storage.url(saved_path)
+        except Exception:
+            try:
+                fallback_file_obj = ContentFile(decoded, name=unique_name)
+                saved_path = default_storage.save(storage_path, fallback_file_obj)
+                return default_storage.url(saved_path)
+            except Exception:
+                return f'data:{mime};base64,{source_data}'
+
     mapping = [
         ('imageMessage', 'image'),
         ('videoMessage', 'video'),
@@ -323,14 +386,12 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
     for field, media_kind in mapping:
         media_obj = message.get(field)
         if isinstance(media_obj, dict):
-            media_url = (
+            media_url = str(
                 media_obj.get('url')
-                or media_obj.get('directPath')
                 or media_obj.get('mediaUrl')
+                or media_obj.get('fileUrl')
                 or ''
-            )
-            if media_url:
-                return str(media_url), media_kind
+            ).strip()
 
             mime = (
                 media_obj.get('mimetype')
@@ -343,16 +404,31 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
             )
             base64_data = (
                 media_obj.get('base64')
+                or media_obj.get('mediaBase64')
+                or media_obj.get('fileBase64')
                 or data.get('base64')
+                or data.get('mediaBase64')
+                or data.get('fileBase64')
                 or payload.get('base64')
+                or payload.get('mediaBase64')
+                or payload.get('fileBase64')
                 or ''
             )
-            if base64_data and isinstance(base64_data, str):
-                mime_val = str(mime or 'application/octet-stream')
-                return f'data:{mime_val};base64,{base64_data}', media_kind
+            if media_url and not _is_encrypted_media_ref(media_url):
+                return media_url, media_kind
+
+            persisted_url = _media_from_base64(str(mime or 'application/octet-stream'), base64_data, media_kind)
+            if persisted_url:
+                return persisted_url, media_kind
+
+            # Fallback final: directPath pode vir como file.enc e nao eh renderizavel no browser.
+            # Mantemos apenas se nao parecer referencia criptografada.
+            direct_path = str(media_obj.get('directPath') or '').strip()
+            if direct_path and not _is_encrypted_media_ref(direct_path):
+                return direct_path, media_kind
 
     # Fallback: algumas versoes enviam URL fora de message.{image,video,...}
-    generic_url = (
+    generic_url = str(
         data.get('mediaUrl')
         or data.get('url')
         or data.get('media')
@@ -361,7 +437,7 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         or payload.get('url')
         or payload.get('media')
         or ''
-    )
+    ).strip()
     if generic_url:
         mime = str(
             data.get('mimetype')
@@ -371,13 +447,33 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
             or ''
         ).lower()
         msg_type = str(data.get('messageType') or payload.get('messageType') or '').lower()
-        if mime.startswith('image/') or 'image' in msg_type:
-            return str(generic_url), 'image'
-        if mime.startswith('video/') or 'video' in msg_type:
-            return str(generic_url), 'video'
-        if mime.startswith('audio/') or 'audio' in msg_type or 'ptt' in msg_type:
-            return str(generic_url), 'audio'
-        return str(generic_url), 'document'
+        if not _is_encrypted_media_ref(generic_url):
+            if mime.startswith('image/') or 'image' in msg_type:
+                return generic_url, 'image'
+            if mime.startswith('video/') or 'video' in msg_type:
+                return generic_url, 'video'
+            if mime.startswith('audio/') or 'audio' in msg_type or 'ptt' in msg_type:
+                return generic_url, 'audio'
+            return generic_url, 'document'
+
+        generic_base64 = (
+            data.get('base64')
+            or data.get('mediaBase64')
+            or data.get('fileBase64')
+            or payload.get('base64')
+            or payload.get('mediaBase64')
+            or payload.get('fileBase64')
+            or ''
+        )
+        persisted_url = _media_from_base64(mime or 'application/octet-stream', generic_base64, 'document')
+        if persisted_url:
+            if mime.startswith('image/') or 'image' in msg_type:
+                return persisted_url, 'image'
+            if mime.startswith('video/') or 'video' in msg_type:
+                return persisted_url, 'video'
+            if mime.startswith('audio/') or 'audio' in msg_type or 'ptt' in msg_type:
+                return persisted_url, 'audio'
+            return persisted_url, 'document'
 
     return '', ''
 
