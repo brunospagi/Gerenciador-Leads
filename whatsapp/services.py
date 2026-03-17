@@ -32,6 +32,56 @@ def sanitize_text_content(value: str) -> str:
     return text.strip()
 
 
+def normalize_message_id(value: str) -> str:
+    raw = str(value or '').strip()
+    if not raw:
+        return ''
+    return re.sub(r'[^A-Za-z0-9]', '', raw).upper()
+
+
+def resolve_message_by_external_candidates(candidates: list[str]) -> WhatsAppMessage | None:
+    cleaned = []
+    for raw in candidates:
+        value = str(raw or '').strip()
+        if not value:
+            continue
+        if value not in cleaned:
+            cleaned.append(value)
+        if ':' in value:
+            base = value.split(':', 1)[0].strip()
+            if base and base not in cleaned:
+                cleaned.append(base)
+
+    for candidate in cleaned:
+        obj = WhatsAppMessage.objects.filter(external_id=candidate).first()
+        if obj:
+            return obj
+
+    for candidate in cleaned:
+        obj = WhatsAppMessage.objects.filter(external_id__iendswith=candidate).first()
+        if obj:
+            return obj
+
+    normalized_tail_candidates = []
+    for candidate in cleaned:
+        normalized = normalize_message_id(candidate)
+        if normalized:
+            normalized_tail_candidates.append(normalized[-20:])
+
+    if not normalized_tail_candidates:
+        return None
+
+    recent = WhatsAppMessage.objects.exclude(external_id__isnull=True).exclude(external_id='').order_by('-criado_em')[:1200]
+    for msg in recent:
+        msg_norm = normalize_message_id(msg.external_id or '')
+        if not msg_norm:
+            continue
+        for tail in normalized_tail_candidates:
+            if tail and msg_norm.endswith(tail):
+                return msg
+    return None
+
+
 def normalize_wa_id(raw_value: str) -> str:
     value = (raw_value or '').strip()
     if not value:
@@ -928,6 +978,28 @@ class EvolutionAPIClient:
         response.raise_for_status()
         return response.json() if response.content else {}
 
+    def find_messages(self, where: dict[str, Any], page: int = 1, offset: int = 20) -> dict[str, Any]:
+        url = f'{self.base_url}/chat/findMessages/{self.instance.instance_name}'
+        payload = {
+            'where': where or {},
+            'page': page,
+            'offset': offset,
+        }
+        response = requests.post(url, json=payload, headers=self.headers, timeout=30)
+        response.raise_for_status()
+        return response.json() if response.content else {}
+
+    def find_status_message(self, where: dict[str, Any], page: int = 1, offset: int = 20) -> dict[str, Any]:
+        url = f'{self.base_url}/chat/findStatusMessage/{self.instance.instance_name}'
+        payload = {
+            'where': where or {},
+            'page': page,
+            'offset': offset,
+        }
+        response = requests.post(url, json=payload, headers=self.headers, timeout=30)
+        response.raise_for_status()
+        return response.json() if response.content else {}
+
 
 def get_active_instance() -> WhatsAppInstance | None:
     instance = WhatsAppInstance.objects.filter(ativo=True).order_by('-atualizado_em').first()
@@ -1033,17 +1105,18 @@ def process_status_update(payload: dict[str, Any]) -> bool:
     if not isinstance(data, dict):
         return False
     key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
-    external_id = (
-        key_data.get('id')
-        or data.get('id')
-        or data.get('messageId')
-        or payload.get('id')
-    )
-    if not external_id:
+    external_id_candidates = [
+        key_data.get('id'),
+        data.get('id'),
+        data.get('messageId'),
+        payload.get('id'),
+    ]
+    external_id_candidates = [str(v).strip() for v in external_id_candidates if v]
+    if not external_id_candidates:
         return False
 
     status = map_delivery_status(payload)
-    message = WhatsAppMessage.objects.filter(external_id=external_id).first()
+    message = resolve_message_by_external_candidates(external_id_candidates)
     if not message:
         return False
 
@@ -1071,16 +1144,17 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
         return False
 
     key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
-    external_id = (
-        key_data.get('id')
-        or data.get('id')
-        or data.get('messageId')
-        or payload.get('id')
-    )
-    if not external_id:
+    external_id_candidates = [
+        key_data.get('id'),
+        data.get('id'),
+        data.get('messageId'),
+        payload.get('id'),
+    ]
+    external_id_candidates = [str(v).strip() for v in external_id_candidates if v]
+    if not external_id_candidates:
         return False
 
-    message_obj = WhatsAppMessage.objects.filter(external_id=external_id).first()
+    message_obj = resolve_message_by_external_candidates(external_id_candidates)
     if not message_obj:
         return False
 
@@ -1089,6 +1163,73 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
     texto = parse_message_text(payload)
     texto = sanitize_text_content(texto)
     media_url, media_kind = parse_message_media(payload)
+    raw_message = unwrap_message_content(data.get('message') if isinstance(data.get('message'), dict) else {})
+    inferred_kind = infer_message_kind(raw_message, data, payload)
+
+    def _iter_dict_nodes(root: Any):
+        stack = [root]
+        while stack:
+            node = stack.pop()
+            if isinstance(node, dict):
+                yield node
+                for value in node.values():
+                    if isinstance(value, (dict, list)):
+                        stack.append(value)
+            elif isinstance(node, list):
+                for item in node:
+                    if isinstance(item, (dict, list)):
+                        stack.append(item)
+
+    def _resolve_media_from_lookup() -> tuple[str, str]:
+        external_id = message_obj.external_id or (external_id_candidates[0] if external_id_candidates else '')
+        if not external_id:
+            return '', ''
+        if (inferred_kind or media_kind).lower() not in {'image', 'video', 'audio', 'document'}:
+            return '', ''
+
+        instance = message_obj.conversa.instance or get_active_instance()
+        if not instance:
+            return '', ''
+
+        remote_jid = ''
+        if isinstance(data.get('key'), dict):
+            remote_jid = str(data.get('key', {}).get('remoteJid') or data.get('key', {}).get('participant') or '').strip()
+        if not remote_jid:
+            remote_jid = message_obj.conversa.wa_id or message_obj.conversa.wa_id_alt or ''
+        remote_jid = normalize_wa_id(remote_jid) if remote_jid else ''
+
+        where_candidates = []
+        where_candidates.append({'key': {'id': external_id}})
+        where_candidates.append({'id': external_id})
+        if remote_jid:
+            where_candidates.append({'key': {'id': external_id, 'remoteJid': remote_jid}})
+            where_candidates.append({'remoteJid': remote_jid, 'id': external_id})
+
+        client = EvolutionAPIClient(instance=instance)
+        responses: list[dict[str, Any]] = []
+        for where in where_candidates[:4]:
+            try:
+                responses.append(client.find_messages(where=where, page=1, offset=20))
+            except Exception as exc:
+                logger.debug('findMessages falhou para where=%s: %s', where, exc)
+            try:
+                responses.append(client.find_status_message(where=where, page=1, offset=20))
+            except Exception as exc:
+                logger.debug('findStatusMessage falhou para where=%s: %s', where, exc)
+
+        for resp in responses:
+            for node in _iter_dict_nodes(resp):
+                candidate_id = ''
+                if isinstance(node.get('key'), dict):
+                    candidate_id = str(node.get('key', {}).get('id') or '')
+                candidate_id = candidate_id or str(node.get('id') or node.get('messageId') or '')
+                if candidate_id and candidate_id != external_id:
+                    continue
+                candidate_payload = {'data': node}
+                found_url, found_kind = parse_message_media(candidate_payload)
+                if found_url:
+                    return found_url, (found_kind or inferred_kind or media_kind or '').lower()
+        return '', ''
 
     placeholder_values = {
         '',
@@ -1102,6 +1243,13 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
     }
     text_before_norm = text_before.lower()
     should_replace_text = text_before_norm in placeholder_values
+
+    if not media_url:
+        looked_url, looked_kind = _resolve_media_from_lookup()
+        if looked_url:
+            media_url = looked_url
+            media_kind = looked_kind or media_kind or inferred_kind
+            logger.info('Media recuperada via Evolution lookup para external_id=%s kind=%s', message_obj.external_id or (external_id_candidates[0] if external_id_candidates else ''), media_kind)
 
     if media_url and media_url != (message_obj.media_url or ''):
         message_obj.media_url = media_url

@@ -4,6 +4,7 @@ import os
 import re
 import uuid
 from datetime import timedelta
+from urllib.parse import urlparse
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -401,12 +402,19 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
     @staticmethod
     def _resolve_media_kind(mimetype: str, file_name: str) -> str:
         mime = (mimetype or '').lower()
+        name = (file_name or '').lower()
+        ext = os.path.splitext(name)[1]
+        audio_exts = {'.ogg', '.opus', '.webm', '.m4a', '.mp3', '.wav', '.aac'}
+        if name.startswith('audio_') and ext in audio_exts:
+            return 'audio'
         if mime.startswith('audio/'):
             return 'audio'
         if mime.startswith('image/'):
             return 'image'
         if mime.startswith('video/'):
             return 'video'
+        if mime in {'application/octet-stream', 'binary/octet-stream'} and ext in audio_exts:
+            return 'audio'
         guessed, _ = mimetypes.guess_type(file_name or '')
         guessed = (guessed or '').lower()
         if guessed.startswith('audio/'):
@@ -430,6 +438,10 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             saved_path = default_storage.save(storage_path, uploaded_file)
             file_url = default_storage.url(saved_path)
         mime = uploaded_file.content_type or mimetypes.guess_type(uploaded_file.name or '')[0] or 'application/octet-stream'
+        if mime in {'application/octet-stream', 'binary/octet-stream'}:
+            lower_name = (uploaded_file.name or '').lower()
+            if lower_name.startswith('audio_') and ext.lower() in {'.ogg', '.opus', '.webm', '.m4a', '.mp3', '.wav', '.aac'}:
+                mime = 'audio/ogg' if ext.lower() in {'.ogg', '.opus'} else 'audio/webm'
         return file_url, mime, uploaded_file.name or unique_name, saved_path
 
 
@@ -822,3 +834,151 @@ def react_message(request, pk):
         return JsonResponse({'ok': True})
     except Exception as exc:
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
+
+
+@login_required
+def _forward_single_message(mensagem: WhatsAppMessage, numero: str, user):
+    instance = mensagem.conversa.instance or get_active_instance()
+    if not instance:
+        raise ValueError('Instancia ativa nao encontrada')
+
+    conteudo = _visible_text(mensagem.conteudo or '')
+    media_url = (mensagem.media_url or '').strip()
+    media_kind = (mensagem.media_kind or '').strip().lower()
+
+    placeholders = {'[imagem]', '[video]', '[audio]', '[documento]', '[document]', '[arquivo]', '[mensagem nao suportada]'}
+    caption = ''
+    if conteudo and conteudo.lower() not in placeholders:
+        caption = conteudo
+
+    try:
+        client = EvolutionAPIClient(instance=instance)
+        if media_url:
+            if media_kind == 'audio':
+                response = client.send_whatsapp_audio(number=numero, audio_url=media_url)
+            else:
+                parsed_path = urlparse(media_url).path or ''
+                file_name = os.path.basename(parsed_path) or f'arquivo_{uuid.uuid4().hex}'
+                guessed_mime = mimetypes.guess_type(parsed_path)[0] or ''
+                if not guessed_mime:
+                    guessed_mime = 'image/jpeg' if media_kind == 'image' else (
+                        'video/mp4' if media_kind == 'video' else 'application/octet-stream'
+                    )
+                response = client.send_media(
+                    number=numero,
+                    media_url=media_url,
+                    mediatype=media_kind if media_kind in {'image', 'video', 'document'} else 'document',
+                    mimetype=guessed_mime,
+                    caption=caption,
+                    file_name=file_name,
+                )
+        else:
+            if not conteudo:
+                raise ValueError('Mensagem sem conteudo para encaminhar.')
+            response = client.send_text(number=numero, text=conteudo)
+
+    external_id = (
+        response.get('key', {}).get('id')
+        or response.get('message', {}).get('key', {}).get('id')
+        or response.get('id')
+    )
+
+    wa_id = normalize_wa_id(numero)
+    conversa_destino, _ = WhatsAppConversation.objects.get_or_create(
+        wa_id=wa_id,
+        defaults={'nome_contato': '', 'ultima_mensagem': ''},
+    )
+    if instance.pk and not conversa_destino.instance:
+        conversa_destino.instance = instance
+
+    forward_preview = caption or conteudo
+    if media_url and not forward_preview:
+        forward_preview = {'image': '[IMAGEM]', 'video': '[VIDEO]', 'audio': '[AUDIO]'}.get(media_kind, '[DOCUMENTO]')
+
+    forwarded = WhatsAppMessage.objects.create(
+        conversa=conversa_destino,
+        external_id=external_id or None,
+        direcao=WhatsAppMessage.Direction.ENVIADA,
+        conteudo=forward_preview,
+        media_url=media_url,
+        status=WhatsAppMessage.Status.ENVIADA,
+        enviado_por=user,
+        payload={'forwarded_from_message_id': mensagem.pk, 'response': response},
+    )
+    conversa_destino.ultima_mensagem = (forward_preview or '')[:500]
+    conversa_destino.ultima_mensagem_em = forwarded.criado_em
+    conversa_destino.save()
+
+    return conversa_destino, forwarded
+
+
+@login_required
+def forward_message(request, pk):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Metodo nao permitido'}, status=405)
+    if not has_module_access(request.user, 'whatsapp'):
+        return JsonResponse({'ok': False, 'error': 'Sem permissao'}, status=403)
+
+    mensagem = get_object_or_404(WhatsAppMessage, pk=pk)
+    raw_number = (request.POST.get('numero') or request.POST.get('number') or '').strip()
+    numero = ensure_br_country_code(raw_number)
+    if not numero:
+        return JsonResponse({'ok': False, 'error': 'Informe um numero valido para encaminhar.'}, status=400)
+
+    try:
+        conversa_destino, forwarded = _forward_single_message(mensagem, numero, request.user)
+    except Exception as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
+
+    return JsonResponse({'ok': True, 'conversation_id': conversa_destino.pk, 'message_id': forwarded.pk})
+
+
+@login_required
+def forward_messages_bulk(request):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Metodo nao permitido'}, status=405)
+    if not has_module_access(request.user, 'whatsapp'):
+        return JsonResponse({'ok': False, 'error': 'Sem permissao'}, status=403)
+
+    raw_number = (request.POST.get('numero') or request.POST.get('number') or '').strip()
+    numero = ensure_br_country_code(raw_number)
+    if not numero:
+        return JsonResponse({'ok': False, 'error': 'Informe um numero valido para encaminhar.'}, status=400)
+
+    raw_ids = (request.POST.get('ids') or '').strip()
+    ids: list[int] = []
+    for part in raw_ids.split(','):
+        part = part.strip()
+        if part.isdigit():
+            ids.append(int(part))
+    ids = list(dict.fromkeys(ids))[:30]
+    if not ids:
+        return JsonResponse({'ok': False, 'error': 'Selecione ao menos uma mensagem para encaminhar.'}, status=400)
+
+    mensagens = list(WhatsAppMessage.objects.filter(pk__in=ids).order_by('criado_em'))
+    if not mensagens:
+        return JsonResponse({'ok': False, 'error': 'Mensagens selecionadas nao encontradas.'}, status=404)
+
+    forwarded_count = 0
+    last_conversation_id = None
+    last_message_id = None
+    for msg in mensagens:
+        try:
+            conversa_destino, forwarded = _forward_single_message(msg, numero, request.user)
+            forwarded_count += 1
+            last_conversation_id = conversa_destino.pk
+            last_message_id = forwarded.pk
+        except Exception:
+            continue
+
+    if forwarded_count == 0:
+        return JsonResponse({'ok': False, 'error': 'Nao foi possivel encaminhar as mensagens selecionadas.'}, status=400)
+
+    return JsonResponse(
+        {
+            'ok': True,
+            'forwarded_count': forwarded_count,
+            'conversation_id': last_conversation_id,
+            'message_id': last_message_id,
+        }
+    )
