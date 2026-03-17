@@ -74,18 +74,20 @@
     .bubble-media.media-image,
     .bubble-media.media-video {
         display: block;
-        width: min(380px, 70vw);
+        width: min(260px, 62vw);
         border-radius: 10px;
         overflow: hidden;
         background: #f8fafc;
     }
+    .bubble-media.media-image { aspect-ratio: 3 / 4; }
     .bubble-media.media-image img,
     .bubble-media.media-video video {
         display: block;
         width: 100%;
-        height: auto;
+        height: 100%;
         border-radius: 10px;
     }
+    .bubble-media.media-image img { object-fit: cover; cursor: zoom-in; }
     .message-bubble.media-only {
         padding: 6px;
         background: transparent;
@@ -244,6 +246,21 @@
     }
     .chatbox-input .hidden-file-input { display: none; }
     .empty-chat { position: relative; z-index: 2; height: calc(100% - 122px); display: flex; align-items: center; justify-content: center; color: #475569; }
+    .image-preview-modal {
+        position: fixed; inset: 0; z-index: 12000; display: none;
+        align-items: center; justify-content: center; padding: 22px;
+        background: rgba(15, 23, 42, .78);
+    }
+    .image-preview-modal.show { display: flex; }
+    .image-preview-modal .preview-inner { position: relative; max-width: min(94vw, 1100px); max-height: 90vh; }
+    .image-preview-modal img {
+        display: block; max-width: 100%; max-height: 90vh; object-fit: contain;
+        border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,.45);
+    }
+    .image-preview-modal .preview-close {
+        position: absolute; top: -12px; right: -12px; width: 34px; height: 34px;
+        border: 0; border-radius: 50%; background: #0f172a; color: #fff; font-size: 20px; line-height: 1;
+    }
     @media (max-width: 1100px) {
         .main-container { flex-direction: column; height: auto; min-height: 720px; }
         .left-container, .right-container { width: 100%; min-width: 100%; height: 50%; }
@@ -434,7 +451,7 @@
                             {% elif mensagem.media_kind == 'video' %}
                             <span class="bubble-media media-video"><video controls preload="metadata"><source src="{{ mensagem.media_url }}"></video></span>
                             {% elif mensagem.media_kind == 'image' %}
-                            <span class="bubble-media media-image"><img src="{{ mensagem.media_url }}" alt="midia"></span>
+                            <span class="bubble-media media-image"><img src="{{ mensagem.media_url }}" alt="midia" class="js-chat-image" data-full-src="{{ mensagem.media_url }}"></span>
                             {% else %}
                             <span class="bubble-media"><a href="{{ mensagem.media_url }}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a></span>
                             {% endif %}
@@ -505,6 +522,12 @@
         </div>
     </div>
 </div>
+<div class="image-preview-modal" id="imagePreviewModal" aria-hidden="true">
+    <div class="preview-inner">
+        <button type="button" class="preview-close" id="imagePreviewClose" aria-label="Fechar">&times;</button>
+        <img id="imagePreviewTarget" src="" alt="Visualizacao ampliada">
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -522,6 +545,9 @@
         const activeAvatarEl = document.getElementById('active-contact-avatar');
         const activeLabelsEl = document.getElementById('active-contact-labels');
         const activePresenceEl = document.getElementById('active-contact-presence');
+        const imagePreviewModal = document.getElementById('imagePreviewModal');
+        const imagePreviewTarget = document.getElementById('imagePreviewTarget');
+        const imagePreviewClose = document.getElementById('imagePreviewClose');
         const defaultAvatar = 'https://ui-avatars.com/api/?name=Contato&background=e2e8f0&color=64748b&size=256&rounded=true';
         const AUTO_SCROLL_THRESHOLD = 90;
         let firstMessagesRender = true;
@@ -543,14 +569,14 @@
             const kind = (mediaKind || '').toLowerCase();
             if (kind === 'audio') return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
             if (kind === 'video') return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${mediaUrl}"></video></span>`;
-            if (kind === 'image') return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia"></span>`;
+            if (kind === 'image') return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia" class="js-chat-image" data-full-src="${mediaUrl}"></span>`;
             const url = mediaUrl.toLowerCase();
-            if (url.startsWith('data:image/')) return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia"></span>`;
+            if (url.startsWith('data:image/')) return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia" class="js-chat-image" data-full-src="${mediaUrl}"></span>`;
             if (url.startsWith('data:video/')) return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${mediaUrl}"></video></span>`;
             if (url.startsWith('data:audio/')) return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
             if (url.includes('.mp3') || url.includes('.ogg') || url.includes('.wav') || url.includes('.opus') || url.includes('.m4a') || url.includes('.aac')) return `<span class="bubble-media"><audio controls><source src="${mediaUrl}"></audio></span>`;
             if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')) return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${mediaUrl}"></video></span>`;
-            if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.gif') || url.includes('.webp')) return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia"></span>`;
+            if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.gif') || url.includes('.webp')) return `<span class="bubble-media media-image"><img src="${mediaUrl}" alt="midia" class="js-chat-image" data-full-src="${mediaUrl}"></span>`;
             return `<span class="bubble-media"><a href="${mediaUrl}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a></span>`;
         }
 
@@ -760,6 +786,20 @@
             }
             closeAllMessageMenus();
         };
+
+        function closeImagePreview() {
+            if (!imagePreviewModal || !imagePreviewTarget) return;
+            imagePreviewModal.classList.remove('show');
+            imagePreviewModal.setAttribute('aria-hidden', 'true');
+            imagePreviewTarget.src = '';
+        }
+
+        function openImagePreview(src) {
+            if (!imagePreviewModal || !imagePreviewTarget || !src) return;
+            imagePreviewTarget.src = src;
+            imagePreviewModal.classList.add('show');
+            imagePreviewModal.setAttribute('aria-hidden', 'false');
+        }
 
         function getCsrfToken() {
             const name = 'csrftoken=';
@@ -1093,6 +1133,12 @@
         };
 
         document.addEventListener('click', function (e) {
+            const imageEl = e.target.closest('.js-chat-image');
+            if (imageEl) {
+                e.preventDefault();
+                openImagePreview(imageEl.getAttribute('data-full-src') || imageEl.getAttribute('src') || '');
+                return;
+            }
             if (!e.target.closest('.message-menu') && !e.target.closest('.message-menu-trigger')) {
                 closeAllMessageMenus();
             }
@@ -1101,6 +1147,18 @@
             }
             if (!e.target.closest('#emojiPickerPanel')) {
                 closeEmojiPicker();
+            }
+            if (imagePreviewModal && e.target === imagePreviewModal) {
+                closeImagePreview();
+            }
+        });
+
+        if (imagePreviewClose) {
+            imagePreviewClose.addEventListener('click', closeImagePreview);
+        }
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && imagePreviewModal && imagePreviewModal.classList.contains('show')) {
+                closeImagePreview();
             }
         });
 
