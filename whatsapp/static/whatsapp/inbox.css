@@ -460,6 +460,7 @@
     .chatbox-input input[type="text"] { width: 100%; border-radius: 8px; font-size: .95rem; border: none; outline: none; padding: 10px 12px; }
     .chatbox-input input[type="file"] { width: 210px; border-radius: 8px; font-size: .75rem; border: 1px solid #d1d5db; background: #fff; padding: 6px; }
     .chatbox-input .send-btn { border: none; background: #009688; color: #fff; border-radius: 8px; padding: 10px 14px; font-weight: 600; }
+    .chatbox-input.is-sending .send-btn { opacity: .72; cursor: wait; }
     .chatbox-input .send-audio-btn { border: none; background: #16a34a; color: #fff; border-radius: 8px; padding: 10px 14px; font-weight: 700; display: none; }
     .chatbox-input .send-audio-btn.show { display: inline-block; }
     .chatbox-input .attach-box { position: relative; }

@@ -843,6 +843,7 @@
         const selectedFileName = document.getElementById('selectedFileName');
         const sendMessageForm = document.getElementById('sendMessageForm');
         const composeEmojiTrigger = document.getElementById('composeEmojiTrigger');
+        const sendMessageSubmitBtn = sendMessageForm ? sendMessageForm.querySelector('button.send-btn[type="submit"]') : null;
         const markReadForm = document.getElementById('markReadForm');
         const archiveConversationForm = document.getElementById('archiveConversationForm');
         const archiveConversationActionInput = archiveConversationForm ? archiveConversationForm.querySelector('input[name="archive_action"]') : null;
@@ -870,6 +871,7 @@
         let composeDraftFiles = [];
         let composeDraftPreviewUrls = [];
         let attachPickerKind = 'media';
+        let isSendingMessage = false;
         ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F64F}', '\u{1F62E}', '\u{1F622}', '\u{1F44F}', '\u{1F525}'].forEach((emoji) => {
             const btn = document.createElement('button');
             btn.type = 'button';
@@ -1072,6 +1074,19 @@
 
         function closeAttachMenu() {
             if (attachMenu) attachMenu.classList.remove('show');
+        }
+
+        function setSendingMessageState(isSending) {
+            const state = !!isSending;
+            isSendingMessage = state;
+            if (sendMessageSubmitBtn) {
+                sendMessageSubmitBtn.disabled = state;
+                sendMessageSubmitBtn.textContent = state ? 'Enviando...' : 'Enviar';
+            }
+            if (sendRecordedAudioBtn) sendRecordedAudioBtn.disabled = state;
+            if (micRecordBtn) micRecordBtn.disabled = state;
+            if (composeInput) composeInput.readOnly = state;
+            if (sendMessageForm) sendMessageForm.classList.toggle('is-sending', state);
         }
 
         function setAudioReadyState(isReady) {
@@ -1300,6 +1315,7 @@
         }
         if (sendRecordedAudioBtn && sendMessageForm) {
             sendRecordedAudioBtn.addEventListener('click', function () {
+                if (isSendingMessage) return;
                 const hasFile = !!(chatFileInput && chatFileInput.files && chatFileInput.files.length);
                 if (!hasFile) return;
                 sendMessageForm.requestSubmit();
@@ -1639,6 +1655,8 @@
         if (sendMessageForm) {
             sendMessageForm.addEventListener('submit', async function (e) {
                 e.preventDefault();
+                if (isSendingMessage) return;
+                setSendingMessageState(true);
                 try {
                     await submitFormAjax(sendMessageForm);
                     const textInput = sendMessageForm.querySelector('input[name="mensagem"]');
@@ -1650,6 +1668,8 @@
                     pollConversations();
                 } catch (err) {
                     alert(err.message || 'Erro ao enviar mensagem.');
+                } finally {
+                    setSendingMessageState(false);
                 }
             });
         }

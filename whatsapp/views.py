@@ -3,6 +3,8 @@ import mimetypes
 import os
 import re
 import uuid
+import base64
+import binascii
 from datetime import timedelta
 from urllib.parse import urlparse
 
@@ -10,6 +12,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Q
+from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
@@ -179,12 +182,37 @@ def _message_reaction_emoji(message: WhatsAppMessage) -> str:
 
 
 def _message_is_edited(message: WhatsAppMessage) -> bool:
+    def _has_edit_marker(node) -> bool:
+        if isinstance(node, dict):
+            for raw_key, value in node.items():
+                key = re.sub(r'[^a-z0-9]+', '', str(raw_key or '').lower())
+                if key in {'editedmessage', 'editedmessagev2', 'editedmessagev2extension'}:
+                    return True
+                if key == 'protocolmessage' and isinstance(value, dict):
+                    raw_type = value.get('type')
+                    as_text = str(raw_type or '').strip().lower()
+                    if as_text in {'14', 'message_edit', 'editedmessage', 'edit'}:
+                        return True
+                    try:
+                        if int(raw_type) == 14:
+                            return True
+                    except (TypeError, ValueError):
+                        pass
+                if _has_edit_marker(value):
+                    return True
+        elif isinstance(node, list):
+            for item in node:
+                if _has_edit_marker(item):
+                    return True
+        return False
+
     payload = message.payload or {}
     if not isinstance(payload, dict):
         return False
     if isinstance(payload.get('edited_local'), dict):
         return True
-    if isinstance(payload.get('message_update'), dict):
+    message_update = payload.get('message_update')
+    if isinstance(message_update, dict) and _has_edit_marker(message_update):
         return True
     return False
 
@@ -531,8 +559,11 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         media_kind = ''
         if arquivo:
             media_url, media_mimetype, media_name, media_storage_path = self._save_upload_and_get_url(arquivo)
-            if media_url.startswith('/'):
-                media_url = request.build_absolute_uri(media_url)
+            if media_url.startswith('//'):
+                media_url = f'https:{media_url}'
+            elif not media_url.lower().startswith(('http://', 'https://', 'data:')):
+                normalized_local = media_url if media_url.startswith('/') else f'/{media_url.lstrip("/")}'
+                media_url = request.build_absolute_uri(normalized_local)
             media_kind = self._resolve_media_kind(media_mimetype, media_name)
 
         nova_mensagem = WhatsAppMessage.objects.create(
@@ -640,35 +671,66 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
 
     @staticmethod
     def _save_upload_and_get_url(uploaded_file):
+        def _decode_data_url_payload(raw_data: bytes) -> tuple[bytes, str]:
+            if not raw_data:
+                return b'', ''
+            try:
+                text = raw_data.decode('utf-8', errors='ignore').strip()
+            except Exception:
+                return b'', ''
+            if not text.lower().startswith('data:') or ';base64,' not in text.lower():
+                return b'', ''
+            try:
+                header, encoded = text.split(',', 1)
+            except ValueError:
+                return b'', ''
+            header_lower = header.lower()
+            if not header_lower.startswith('data:') or ';base64' not in header_lower:
+                return b'', ''
+            mime = header[5:].split(';', 1)[0].strip().lower()
+            if not mime.startswith(('image/', 'video/', 'audio/')):
+                return b'', ''
+            try:
+                sanitized = re.sub(r'\s+', '', encoded or '')
+                if len(sanitized) % 4:
+                    sanitized += '=' * (4 - (len(sanitized) % 4))
+                decoded = base64.b64decode(sanitized)
+            except (binascii.Error, ValueError):
+                return b'', ''
+            return decoded, mime
+
         original_name = uploaded_file.name or ''
         ext = os.path.splitext(original_name)[1]
         try:
             raw_bytes = uploaded_file.read()
         except Exception:
             raw_bytes = b''
+
+        decoded_bytes, decoded_mime = _decode_data_url_payload(raw_bytes)
+        if decoded_bytes:
+            raw_bytes = decoded_bytes
+
         try:
             uploaded_file.seek(0)
         except Exception:
             pass
         detected_mime = _guess_mime_from_bytes(raw_bytes)
         mime_guess_by_name = mimetypes.guess_type(original_name or '')[0] or ''
-        mime = uploaded_file.content_type or mime_guess_by_name or detected_mime or 'application/octet-stream'
+        mime = decoded_mime or uploaded_file.content_type or mime_guess_by_name or detected_mime or 'application/octet-stream'
         if mime in {'application/octet-stream', 'binary/octet-stream'} and detected_mime:
             mime = detected_mime
         if not ext:
             ext = mimetypes.guess_extension(mime.split(';', 1)[0].strip().lower() or '') or ''
         unique_name = f"{uuid.uuid4().hex}{ext}"
         storage_path = f"whatsapp/uploads/{unique_name}"
+        file_obj = ContentFile(raw_bytes, name=unique_name) if raw_bytes else uploaded_file
         try:
             storage = PublicMediaStorage()
-            saved_path = storage.save(storage_path, uploaded_file)
+            saved_path = storage.save(storage_path, file_obj)
             file_url = storage.url(saved_path)
         except Exception:
-            try:
-                uploaded_file.seek(0)
-            except Exception:
-                pass
-            saved_path = default_storage.save(storage_path, uploaded_file)
+            fallback_obj = ContentFile(raw_bytes, name=unique_name) if raw_bytes else uploaded_file
+            saved_path = default_storage.save(storage_path, fallback_obj)
             file_url = default_storage.url(saved_path)
         if mime in {'application/octet-stream', 'binary/octet-stream'}:
             lower_name = (original_name or '').lower()
