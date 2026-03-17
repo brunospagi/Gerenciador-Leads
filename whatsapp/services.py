@@ -513,6 +513,39 @@ def unwrap_message_content(message: Any, depth: int = 0) -> dict[str, Any]:
     return message
 
 
+def infer_message_kind(raw_message: dict[str, Any], data: dict[str, Any], payload: dict[str, Any]) -> str:
+    if not isinstance(raw_message, dict):
+        return ''
+
+    kind_by_key = {
+        'imageMessage': 'image',
+        'videoMessage': 'video',
+        'audioMessage': 'audio',
+        'documentMessage': 'document',
+        'stickerMessage': 'sticker',
+        'reactionMessage': 'reaction',
+        'protocolMessage': 'protocol',
+        'senderKeyDistributionMessage': 'key_distribution',
+        'pollUpdateMessage': 'poll_update',
+    }
+    for key, kind in kind_by_key.items():
+        if key in raw_message:
+            return kind
+
+    msg_type = str(data.get('messageType') or payload.get('messageType') or '').strip().lower()
+    if 'image' in msg_type:
+        return 'image'
+    if 'video' in msg_type:
+        return 'video'
+    if 'audio' in msg_type or 'ptt' in msg_type:
+        return 'audio'
+    if 'document' in msg_type or 'file' in msg_type:
+        return 'document'
+    if 'reaction' in msg_type:
+        return 'reaction'
+    return ''
+
+
 def parse_message_timestamp(payload: dict[str, Any]) -> datetime:
     data = payload.get('data', payload)
     raw_ts = (
@@ -1165,8 +1198,19 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
     if not texto and not media_url:
         # Evita criar bolha vazia (apenas horario) quando webhook nao traz conteudo real.
         if isinstance(raw_message, dict) and raw_message:
-            unsupported_type = next(iter(raw_message.keys()), '')
-            if unsupported_type:
+            inferred_kind = infer_message_kind(raw_message, data, payload)
+            if inferred_kind in {'image', 'video', 'audio', 'document'}:
+                media_kind = media_kind or inferred_kind
+                label = {
+                    'image': 'IMAGEM',
+                    'video': 'VIDEO',
+                    'audio': 'AUDIO',
+                    'document': 'DOCUMENTO',
+                }.get(inferred_kind, inferred_kind.upper())
+                texto = f'[{label}]'
+            elif inferred_kind in {'reaction', 'protocol', 'key_distribution', 'poll_update'}:
+                return
+            else:
                 texto = '[Mensagem nao suportada]'
         if not texto:
             return
