@@ -401,6 +401,65 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
             return f'https://mmg.whatsapp.net{candidate}'
         return candidate
 
+    def _persist_media_from_url(media_url: str, mime_value: str, media_kind: str) -> str:
+        normalized = _normalize_public_media_url(media_url)
+        if not normalized:
+            return ''
+        lower = normalized.lower()
+        if lower.startswith('data:'):
+            return normalized
+        if not (lower.startswith('http://') or lower.startswith('https://')):
+            return ''
+
+        mime = str(mime_value or '').strip().lower()
+        kind = str(media_kind or '').strip().lower() or 'document'
+
+        # Somente tenta persistir links temporarios/externos; para URLs internas locais, mantem como estao.
+        persist_hint = any(token in lower for token in ['mmg.whatsapp.net', 'lookaside.fbsbx.com', 'cdn.whatsapp.net'])
+        if not persist_hint:
+            return ''
+
+        try:
+            resp = requests.get(normalized, timeout=45)
+            resp.raise_for_status()
+            content = resp.content or b''
+            if not content:
+                return ''
+        except Exception as exc:
+            logger.debug('Falha ao baixar media remota para persistencia: %s', exc)
+            return ''
+
+        content_type = str(resp.headers.get('Content-Type') or '').split(';', 1)[0].strip().lower()
+        final_mime = content_type or mime or 'application/octet-stream'
+        extension = mimetypes.guess_extension(final_mime) or ''
+        if not extension:
+            extension = {
+                'image': '.jpg',
+                'video': '.mp4',
+                'audio': '.ogg',
+                'sticker': '.webp',
+                'document': '.bin',
+            }.get(kind, '.bin')
+
+        unique_name = f'{uuid.uuid4().hex}{extension}'
+        storage_path = f'whatsapp/webhook/{timezone.now().strftime("%Y/%m")}/{unique_name}'
+        file_obj = ContentFile(content, name=unique_name)
+        try:
+            storage = PublicMediaStorage()
+            saved_path = storage.save(storage_path, file_obj)
+            logger.info('WhatsApp media URL persistida no MinIO: kind=%s path=%s', kind, saved_path)
+            return storage.url(saved_path)
+        except Exception as exc:
+            logger.warning('Falha ao persistir media URL no MinIO, tentando storage padrao: %s', exc)
+            try:
+                fallback_file_obj = ContentFile(content, name=unique_name)
+                saved_path = default_storage.save(storage_path, fallback_file_obj)
+                logger.info('WhatsApp media URL persistida no storage padrao: kind=%s path=%s', kind, saved_path)
+                return default_storage.url(saved_path)
+            except Exception as fallback_exc:
+                logger.warning('Falha ao persistir media URL no storage padrao: %s', fallback_exc)
+                return ''
+
     def _media_from_base64(mime_value: str, raw_value: Any, media_kind: str) -> str:
         if not isinstance(raw_value, str):
             return ''
@@ -559,7 +618,8 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
                 or ''
             )
             if media_url and not _is_encrypted_media_ref(media_url):
-                return media_url, media_kind
+                persisted_remote = _persist_media_from_url(media_url, str(mime or 'application/octet-stream'), media_kind)
+                return (persisted_remote or media_url), media_kind
 
             persisted_url = _media_from_base64(str(mime or 'application/octet-stream'), base64_data, media_kind)
             if persisted_url:
@@ -594,15 +654,26 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         ).lower()
         msg_type = str(data.get('messageType') or payload.get('messageType') or '').lower()
         if not _is_encrypted_media_ref(generic_url):
+            inferred_kind = 'document'
             if 'sticker' in msg_type:
-                return generic_url, 'sticker'
+                inferred_kind = 'sticker'
+            elif mime.startswith('image/') or 'image' in msg_type:
+                inferred_kind = 'image'
+            elif mime.startswith('video/') or 'video' in msg_type:
+                inferred_kind = 'video'
+            elif mime.startswith('audio/') or 'audio' in msg_type or 'ptt' in msg_type:
+                inferred_kind = 'audio'
+            persisted_remote = _persist_media_from_url(generic_url, mime, inferred_kind)
+            final_url = persisted_remote or generic_url
+            if 'sticker' in msg_type:
+                return final_url, 'sticker'
             if mime.startswith('image/') or 'image' in msg_type:
-                return generic_url, 'image'
+                return final_url, 'image'
             if mime.startswith('video/') or 'video' in msg_type:
-                return generic_url, 'video'
+                return final_url, 'video'
             if mime.startswith('audio/') or 'audio' in msg_type or 'ptt' in msg_type:
-                return generic_url, 'audio'
-            return generic_url, 'document'
+                return final_url, 'audio'
+            return final_url, 'document'
 
         generic_base64 = (
             data.get('base64')
@@ -630,7 +701,8 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         candidate_url = _normalize_public_media_url(candidate.get('url') or '')
         candidate_b64 = candidate.get('base64') or ''
         if candidate_url and not _is_encrypted_media_ref(candidate_url):
-            return candidate_url, candidate_kind
+            persisted_remote = _persist_media_from_url(candidate_url, candidate_mime, candidate_kind)
+            return (persisted_remote or candidate_url), candidate_kind
         if candidate_b64:
             persisted_url = _media_from_base64(candidate_mime, candidate_b64, candidate_kind)
             if persisted_url:
@@ -642,7 +714,8 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         candidate_url = _normalize_public_media_url(candidate.get('url') or '')
         candidate_b64 = candidate.get('base64') or ''
         if candidate_url and not _is_encrypted_media_ref(candidate_url):
-            return candidate_url, candidate_kind
+            persisted_remote = _persist_media_from_url(candidate_url, candidate_mime, candidate_kind)
+            return (persisted_remote or candidate_url), candidate_kind
         if candidate_b64:
             persisted_url = _media_from_base64(candidate_mime, candidate_b64, candidate_kind)
             if persisted_url:
@@ -747,6 +820,20 @@ def resolve_contact_name(payload: dict[str, Any], data: dict[str, Any]) -> str:
     )
 
 
+def fallback_contact_name_by_wa_id(name: str, wa_id: str) -> str:
+    cleaned_name = str(name or '').strip()
+    if cleaned_name:
+        return cleaned_name
+    jid = str(wa_id or '').strip().lower()
+    if not jid:
+        return ''
+    if '@s.whatsapp.net' not in jid:
+        return ''
+    local = jid.split('@', 1)[0]
+    digits = re.sub(r'\D', '', local)
+    return digits or local
+
+
 def _find_nested_value(payload: Any, target_keys: set[str]) -> str:
     if isinstance(payload, dict):
         for key, value in payload.items():
@@ -800,24 +887,6 @@ def detect_facebook_ads_origin(payload: dict[str, Any], data: dict[str, Any]) ->
         'message': message,
         'context_info': context_info,
     }
-    search_keys = {
-        'source',
-        'sourceid',
-        'source_id',
-        'adid',
-        'ad_id',
-        'adsetid',
-        'adset_id',
-        'campaignid',
-        'campaign_id',
-        'fbclid',
-        'utm_source',
-        'utm_campaign',
-        'ref',
-        'externaladreply',
-        'ctwa',
-    }
-
     source = _find_nested_value(search_space, {'source', 'utm_source'}) or ''
     fbclid = _find_nested_value(search_space, {'fbclid'}) or ''
     campaign_id = _find_nested_value(search_space, {'campaignid', 'campaign_id'}) or ''
@@ -825,7 +894,21 @@ def detect_facebook_ads_origin(payload: dict[str, Any], data: dict[str, Any]) ->
     ad_id = _find_nested_value(search_space, {'adid', 'ad_id'}) or ''
     source_id = _find_nested_value(search_space, {'sourceid', 'source_id'}) or ''
     ref = _find_nested_value(search_space, {'ref'}) or ''
-    ad_link = _find_nested_value(search_space, {'url', 'link', 'adlink', 'ad_link', 'sourceurl', 'source_url'}) or ''
+    ad_link = _find_nested_value(search_space, {'adlink', 'ad_link', 'sourceurl', 'source_url'}) or ''
+    conversion_source = _find_nested_value(search_space, {'conversionsource', 'conversion_source'}) or ''
+    conversion_data = _find_nested_value(search_space, {'conversiondata', 'conversion_data'}) or ''
+
+    def _normalize_if_fb_link(value: str) -> str:
+        raw = str(value or '').strip()
+        if not raw:
+            return ''
+        low = raw.lower()
+        fb_tokens = ['facebook.com', 'instagram.com', 'fbclid=', 'utm_source=facebook', 'ctwa', 'click_to_whatsapp']
+        return raw if any(token in low for token in fb_tokens) else ''
+
+    ad_link = _normalize_if_fb_link(ad_link)
+    if not source and conversion_source:
+        source = conversion_source
 
     metadata = {
         'source': source,
@@ -836,24 +919,45 @@ def detect_facebook_ads_origin(payload: dict[str, Any], data: dict[str, Any]) ->
         'source_id': source_id,
         'ref': ref,
         'ad_link': ad_link,
+        'conversion_source': conversion_source,
     }
+    # Evita salvar payload gigante no metadata/aviso.
+    if conversion_data:
+        metadata['conversion_data'] = f'{conversion_data[:120]}...'
     metadata = {k: v for k, v in metadata.items() if v}
 
     lower_source = (source or '').strip().lower()
     lower_ref = (ref or '').strip().lower()
+    lower_conversion_source = (conversion_source or '').strip().lower()
     source_looks_facebook = any(
         token in lower_source for token in ['facebook', 'meta', 'instagram', 'ctwa', 'click_to_whatsapp']
     ) or any(token in lower_ref for token in ['facebook', 'meta', 'instagram', 'ctwa', 'click_to_whatsapp'])
+    conversion_source_looks_facebook = any(
+        token in lower_conversion_source for token in ['facebook', 'meta', 'instagram', 'fb_ads', 'ads', 'ctwa']
+    )
     has_fbclid = bool(fbclid)
     has_ad_ids = bool(campaign_id or adset_id or ad_id or source_id)
+    has_ctwa_hint = bool(_find_nested_value(search_space, {'ctwa', 'click_to_whatsapp', 'externaladreply'}))
+    has_conversion_hint = bool(conversion_source or conversion_data)
 
-    has_metadata_hint = bool(_find_nested_value(search_space, search_keys))
-    matched = has_indicator or has_fbclid or source_looks_facebook or (has_ad_ids and has_metadata_hint)
+    # Evita falso positivo (ex.: source=android ou URL de midia comum).
+    matched = (
+        has_fbclid
+        or source_looks_facebook
+        or conversion_source_looks_facebook
+        or has_ctwa_hint
+        or (has_ad_ids and (has_indicator or source_looks_facebook or conversion_source_looks_facebook))
+        or (has_conversion_hint and conversion_source_looks_facebook)
+    )
     return matched, metadata
 
 
 def _build_ads_system_message(ads_metadata: dict[str, str]) -> str:
-    source = ads_metadata.get('source') or 'Facebook Ads'
+    source = ads_metadata.get('source') or ''
+    conversion_source = ads_metadata.get('conversion_source') or ''
+    if conversion_source and source.strip().lower() in {'', 'android', 'ios', 'web', 'desktop'}:
+        source = conversion_source
+    source = source or 'Facebook Ads'
     campaign = ads_metadata.get('campaign_id') or '-'
     adset = ads_metadata.get('adset_id') or '-'
     ad_id = ads_metadata.get('ad_id') or '-'
@@ -1527,17 +1631,19 @@ def process_labels_update(payload: dict[str, Any]) -> bool:
     self_jids = _extract_self_jids(payload, data if isinstance(data, dict) else {}, instance=None)
     from_me = resolve_from_me(payload, data, key_data, self_jids)
 
-    labels = extract_labels(payload, data if isinstance(data, dict) else {})
-    avatar_url = resolve_avatar_url(payload, data if isinstance(data, dict) else {})
-    contact_name = resolve_contact_name(payload, data if isinstance(data, dict) else {}).strip()
-    if not labels and not avatar_url and not contact_name:
-        return False
-
     wa_id, real_jid, lid_jid = _choose_conversation_jid(
         jid_candidates=jid_candidates,
         from_me=from_me,
         self_jids=self_jids,
     )
+    labels = extract_labels(payload, data if isinstance(data, dict) else {})
+    avatar_url = resolve_avatar_url(payload, data if isinstance(data, dict) else {})
+    contact_name = fallback_contact_name_by_wa_id(
+        resolve_contact_name(payload, data if isinstance(data, dict) else {}).strip(),
+        wa_id,
+    )
+    if not labels and not avatar_url and not contact_name:
+        return False
 
     conversation = None
     if real_jid:
@@ -1735,6 +1841,7 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
     if from_me:
         # Evita sobrescrever contato com o proprio nome em mensagens enviadas do celular.
         contato = ''
+    contato = fallback_contact_name_by_wa_id(contato, wa_id)
     avatar_url = resolve_avatar_url(payload, data)
     etiquetas = extract_labels(payload, data)
     is_facebook_ads, ads_metadata = detect_facebook_ads_origin(payload, data)

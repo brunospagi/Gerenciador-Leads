@@ -335,15 +335,16 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             return self.render_to_response(context)
 
         wa_id = normalize_wa_id(numero)
+        fallback_nome = (form.cleaned_data.get('nome_contato') or '').strip() or numero
         conversa, _ = WhatsAppConversation.objects.get_or_create(
             wa_id=wa_id,
             defaults={
-                'nome_contato': form.cleaned_data.get('nome_contato', ''),
+                'nome_contato': fallback_nome,
                 'ultima_mensagem': 'Conversa iniciada no CRM.',
             },
         )
-        if form.cleaned_data.get('nome_contato') and not conversa.nome_contato:
-            conversa.nome_contato = form.cleaned_data['nome_contato']
+        if not conversa.nome_contato:
+            conversa.nome_contato = fallback_nome
             conversa.save(update_fields=['nome_contato'])
 
         primeira_mensagem = (form.cleaned_data.get('primeira_mensagem') or '').strip()
@@ -1055,10 +1056,12 @@ def _forward_single_message(mensagem: WhatsAppMessage, numero: str, user):
     wa_id = normalize_wa_id(numero)
     conversa_destino, _ = WhatsAppConversation.objects.get_or_create(
         wa_id=wa_id,
-        defaults={'nome_contato': '', 'ultima_mensagem': ''},
+        defaults={'nome_contato': numero, 'ultima_mensagem': ''},
     )
     if instance.pk and not conversa_destino.instance:
         conversa_destino.instance = instance
+    if not (conversa_destino.nome_contato or '').strip():
+        conversa_destino.nome_contato = numero
 
     forward_preview = caption or conteudo
     if media_url and not forward_preview:

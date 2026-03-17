@@ -245,6 +245,16 @@
     }
     .chatbox-input { position: relative; width: 100%; min-height: 62px; background: #f0f0f0; display: flex; align-items: center; gap: 10px; padding: 8px 12px; z-index: 2; }
     .chatbox-input .icon-btn { color: #54656f; font-size: 1.3rem; line-height: 1; }
+    .chatbox-input button.icon-btn {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
     .chatbox-input .mic-btn {
         border: 0;
         background: transparent;
@@ -329,17 +339,20 @@
     .empty-chat { position: relative; z-index: 2; height: calc(100% - 122px); display: flex; align-items: center; justify-content: center; color: #475569; }
     .forward-selection-bar {
         display: none;
+        position: relative;
         align-items: center;
         justify-content: space-between;
         gap: 10px;
         padding: 8px 12px;
         background: #e2fbe8;
         border-top: 1px solid #86efac;
-        z-index: 3;
+        z-index: 6;
+        pointer-events: auto;
     }
     .forward-selection-bar.show { display: flex; }
-    .forward-selection-actions { display: flex; gap: 8px; }
+    .forward-selection-actions { display: flex; gap: 8px; pointer-events: auto; }
     .forward-selection-actions .btn { cursor: pointer; }
+    .right-container.forward-selection-active .chat-container { height: calc(100% - 164px); }
     .image-preview-modal {
         position: fixed; inset: 0; z-index: 12000; display: none;
         align-items: center; justify-content: center; padding: 22px;

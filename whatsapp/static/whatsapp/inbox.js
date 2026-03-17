@@ -266,6 +266,8 @@
         function updateForwardSelectionUi() {
             if (!messagesEl) return;
             messagesEl.classList.toggle('forward-mode', !!forwardSelectionMode);
+            const rightContainer = messagesEl.closest('.right-container');
+            if (rightContainer) rightContainer.classList.toggle('forward-selection-active', !!forwardSelectionMode);
             if (forwardSelectionBar) forwardSelectionBar.classList.toggle('show', !!forwardSelectionMode);
             if (forwardSelectionCount) {
                 const total = selectedForwardMessageIds.size;
@@ -664,6 +666,7 @@
         const chatCameraInput = document.getElementById('chatCameraInput');
         const selectedFileName = document.getElementById('selectedFileName');
         const sendMessageForm = document.getElementById('sendMessageForm');
+        const composeEmojiTrigger = document.getElementById('composeEmojiTrigger');
         const markReadForm = document.getElementById('markReadForm');
         const deleteConversationForm = document.getElementById('deleteConversationForm');
         const startConversationForm = document.getElementById('startConversationForm');
@@ -673,7 +676,11 @@
         const emojiPickerPanel = document.createElement('div');
         emojiPickerPanel.className = 'emoji-picker-panel';
         emojiPickerPanel.id = 'emojiPickerPanel';
+        const composeEmojiPickerPanel = document.createElement('div');
+        composeEmojiPickerPanel.className = 'emoji-picker-panel';
+        composeEmojiPickerPanel.id = 'composeEmojiPickerPanel';
         let emojiPickerMessageId = null;
+        const composeInput = sendMessageForm ? sendMessageForm.querySelector('input[name="mensagem"]') : null;
         let mediaRecorder = null;
         let recordingStream = null;
         let recordingChunks = [];
@@ -694,10 +701,32 @@
             emojiPickerPanel.appendChild(btn);
         });
         document.body.appendChild(emojiPickerPanel);
+        ['😀', '😁', '😂', '🤣', '😊', '😍', '😘', '😎', '😢', '🙏', '👍', '🔥', '❤️'].forEach((emoji) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = emoji;
+            btn.addEventListener('click', () => {
+                if (!composeInput) return;
+                const start = Number(composeInput.selectionStart || composeInput.value.length);
+                const end = Number(composeInput.selectionEnd || composeInput.value.length);
+                const current = composeInput.value || '';
+                composeInput.value = `${current.slice(0, start)}${emoji}${current.slice(end)}`;
+                const nextPos = start + emoji.length;
+                composeInput.focus();
+                composeInput.setSelectionRange(nextPos, nextPos);
+                closeComposeEmojiPicker();
+            });
+            composeEmojiPickerPanel.appendChild(btn);
+        });
+        document.body.appendChild(composeEmojiPickerPanel);
 
         function closeEmojiPicker() {
             emojiPickerPanel.classList.remove('show');
             emojiPickerMessageId = null;
+        }
+
+        function closeComposeEmojiPicker() {
+            composeEmojiPickerPanel.classList.remove('show');
         }
 
         function openEmojiPicker(messageId, anchorEl) {
@@ -708,6 +737,29 @@
             emojiPickerPanel.style.top = `${top}px`;
             emojiPickerPanel.style.left = `${left}px`;
             emojiPickerPanel.classList.add('show');
+        }
+
+        function openComposeEmojiPicker(anchorEl) {
+            if (!composeInput) return;
+            const rect = anchorEl ? anchorEl.getBoundingClientRect() : { left: 20, top: window.innerHeight - 90 };
+            const top = Math.max(12, rect.top - 58);
+            const left = Math.max(12, Math.min(rect.left - 8, window.innerWidth - 320));
+            composeEmojiPickerPanel.style.top = `${top}px`;
+            composeEmojiPickerPanel.style.left = `${left}px`;
+            composeEmojiPickerPanel.classList.add('show');
+        }
+
+        if (composeEmojiTrigger) {
+            composeEmojiTrigger.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeEmojiPicker();
+                if (composeEmojiPickerPanel.classList.contains('show')) {
+                    closeComposeEmojiPicker();
+                } else {
+                    openComposeEmojiPicker(composeEmojiTrigger);
+                }
+            });
         }
 
         function applyBrPhoneMask(value) {
@@ -1380,6 +1432,9 @@
             if (!e.target.closest('#emojiPickerPanel')) {
                 closeEmojiPicker();
             }
+            if (!e.target.closest('#composeEmojiPickerPanel') && !e.target.closest('#composeEmojiTrigger')) {
+                closeComposeEmojiPicker();
+            }
             if (imagePreviewModal && e.target === imagePreviewModal) {
                 closeImagePreview();
             }
@@ -1408,10 +1463,19 @@
             }
             if (e.key === 'Escape' && forwardTargetModal && forwardTargetModal.classList.contains('show')) {
                 closeForwardTargetModal();
+                exitForwardSelectionMode();
                 return;
             }
             if (e.key === 'Escape' && editMessageModal && editMessageModal.classList.contains('show')) {
                 closeEditMessageModal();
+                return;
+            }
+            if (e.key === 'Escape' && composeEmojiPickerPanel.classList.contains('show')) {
+                closeComposeEmojiPicker();
+                return;
+            }
+            if (e.key === 'Escape' && forwardSelectionMode) {
+                exitForwardSelectionMode();
             }
         });
 

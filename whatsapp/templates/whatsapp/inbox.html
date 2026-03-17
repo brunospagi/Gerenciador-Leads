@@ -243,7 +243,9 @@
                 <input type="hidden" name="ajax" value="1">
                 <input type="hidden" name="action" value="send_message">
                 <input type="hidden" name="conversa_id" value="{{ conversa_ativa.pk }}">
-                <i class="fa-regular fa-face-grin icon-btn"></i>
+                <button type="button" class="icon-btn emoji-compose-btn" id="composeEmojiTrigger" title="Emojis">
+                    <i class="fa-regular fa-face-grin"></i>
+                </button>
                 <div class="attach-box">
                     <button type="button" class="attach-trigger" id="attachTrigger" title="Anexar">+</button>
                     <div class="attach-menu" id="attachMenu">
@@ -357,5 +359,5 @@
         openNewChat: {% if open_new_chat %}true{% else %}false{% endif %}
     };
 </script>
-<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-9"></script>
+<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-11"></script>
 {% endblock %}
