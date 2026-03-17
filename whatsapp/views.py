@@ -478,6 +478,40 @@ def ensure_br_country_code(number: str) -> str:
     return digits
 
 
+def _resolve_sender_display_name(user) -> str:
+    if not user:
+        return ''
+    full_name = ''
+    if hasattr(user, 'get_full_name'):
+        full_name = (user.get_full_name() or '').strip()
+    if full_name:
+        return full_name
+    first_name = (getattr(user, 'first_name', '') or '').strip()
+    last_name = (getattr(user, 'last_name', '') or '').strip()
+    if first_name or last_name:
+        return f'{first_name} {last_name}'.strip()
+    profile = getattr(user, 'profile', None)
+    for key in ('nome_completo', 'nome', 'full_name'):
+        value = (getattr(profile, key, '') or '').strip() if profile else ''
+        if value:
+            return value
+    return (getattr(user, 'username', '') or '').strip()
+
+
+def _apply_seller_signature(user, text: str) -> str:
+    body = _visible_text(text or '')
+    if not body:
+        return ''
+    sender_name = _resolve_sender_display_name(user)
+    if not sender_name:
+        return body
+    prefix = f'*{sender_name}:*'
+    first_line = (body.splitlines()[0] if body else '').strip()
+    if first_line.lower() == prefix.lower() or body.startswith(prefix):
+        return body
+    return f'{prefix}\n{body}'
+
+
 def _refresh_conversation_preview(conversa: WhatsAppConversation) -> None:
     latest = conversa.mensagens.order_by('-criado_em').first()
     if latest:
@@ -613,7 +647,10 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             conversa.nome_contato = fallback_nome
             conversa.save(update_fields=['nome_contato'])
 
-        primeira_mensagem = (form.cleaned_data.get('primeira_mensagem') or '').strip()
+        primeira_mensagem = _apply_seller_signature(
+            request.user,
+            (form.cleaned_data.get('primeira_mensagem') or '').strip(),
+        )
         if primeira_mensagem:
             instance = conversa.instance or get_active_instance()
             if not instance:
@@ -702,7 +739,10 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
             messages.error(request, 'Nenhuma instancia ativa configurada para envio via Evolution API.')
             return redirect(f"{reverse('whatsapp:inbox')}?c={conversa.pk}")
 
-        texto = (form.cleaned_data.get('mensagem') or '').strip()
+        texto = _apply_seller_signature(
+            request.user,
+            (form.cleaned_data.get('mensagem') or '').strip(),
+        )
         arquivo = form.cleaned_data.get('arquivo')
         reply_to_message_id_raw = (request.POST.get('reply_to_message_id') or '').strip()
         if not texto and not arquivo:
@@ -718,6 +758,7 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         media_kind = ''
         reply_to_message = None
         quoted_key_payload = None
+        quoted_text_payload = ''
         if reply_to_message_id_raw.isdigit():
             reply_to_message = conversa.mensagens.filter(pk=int(reply_to_message_id_raw)).first()
             if reply_to_message:
@@ -728,6 +769,16 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                         'fromMe': bool(q_from_me),
                         'id': q_message_id,
                     }
+                    quoted_text_payload = _visible_text(reply_to_message.conteudo or '')
+                    if not quoted_text_payload:
+                        mk = (reply_to_message.media_kind or '').strip().lower()
+                        quoted_text_payload = {
+                            'image': '[Foto]',
+                            'video': '[Video]',
+                            'audio': '[Audio]',
+                            'sticker': '[Figurinha]',
+                            'document': '[Documento]',
+                        }.get(mk, 'Mensagem')
         if arquivo:
             media_url, media_mimetype, media_name, media_storage_path = self._save_upload_and_get_url(arquivo)
             if media_url.startswith('//'):
@@ -754,6 +805,7 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                     number=number,
                     audio_url=media_url,
                     quoted_key=quoted_key_payload,
+                    quoted_text=quoted_text_payload,
                 )
             elif arquivo:
                 response = client.send_media(
@@ -764,9 +816,15 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
                     caption=texto,
                     file_name=media_name,
                     quoted_key=quoted_key_payload,
+                    quoted_text=quoted_text_payload,
                 )
             else:
-                response = client.send_text(number=number, text=texto, quoted_key=quoted_key_payload)
+                response = client.send_text(
+                    number=number,
+                    text=texto,
+                    quoted_key=quoted_key_payload,
+                    quoted_text=quoted_text_payload,
+                )
             external_id = fit_external_id(
                 (
                 response.get('key', {}).get('id')

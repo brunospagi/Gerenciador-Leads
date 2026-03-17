@@ -1325,12 +1325,41 @@ class EvolutionAPIClient:
         payload_variants: list[dict[str, Any]],
         timeout: int = 30,
     ) -> dict[str, Any]:
+        def _is_payload_error(data: Any) -> bool:
+            if not isinstance(data, dict):
+                return False
+            status = data.get('status')
+            status_code = data.get('statusCode')
+            for val in (status, status_code):
+                try:
+                    if int(val) >= 400:
+                        return True
+                except (TypeError, ValueError):
+                    pass
+            error_value = data.get('error')
+            if isinstance(error_value, bool) and error_value:
+                return True
+            if isinstance(error_value, str) and error_value.strip():
+                return True
+            message_value = data.get('message')
+            if isinstance(message_value, dict):
+                nested_error = message_value.get('error')
+                if isinstance(nested_error, bool) and nested_error:
+                    return True
+                if isinstance(nested_error, str) and nested_error.strip():
+                    return True
+            return False
+
         last_error = None
         for payload in payload_variants:
             try:
                 response = requests.post(endpoint, json=payload, headers=self.headers, timeout=timeout)
                 response.raise_for_status()
-                return response.json() if response.content else {}
+                data = response.json() if response.content else {}
+                if _is_payload_error(data):
+                    logger.debug('Evolution retornou erro sem HTTP fail. endpoint=%s payload_keys=%s', endpoint, list(payload.keys()))
+                    continue
+                return data
             except requests.RequestException as exc:
                 last_error = exc
                 continue
@@ -1343,6 +1372,7 @@ class EvolutionAPIClient:
         number: str,
         text: str,
         quoted_key: dict[str, Any] | None = None,
+        quoted_text: str = '',
     ) -> dict[str, Any]:
         url = f'{self.base_url}/message/sendText/{self.instance.instance_name}'
         base_payload = {'number': normalize_number(number), 'text': text}
@@ -1356,12 +1386,15 @@ class EvolutionAPIClient:
                     'fromMe': bool(quoted_key.get('fromMe')),
                     'id': q_id,
                 }
+                preview_text = str(quoted_text or '').strip()[:240] or 'Mensagem'
                 payload_variants = [
+                    {**base_payload, 'quoted': {'key': {'id': q_id}, 'message': {'conversation': preview_text}}},
+                    {**base_payload, 'quoted': {'key': normalized_key, 'message': {'conversation': preview_text}}},
+                    {**base_payload, 'quoted': {'key': {'id': q_id}}},
                     {**base_payload, 'quoted': normalized_key},
                     {**base_payload, 'quotedMessage': normalized_key},
                     {**base_payload, 'quotedMessageId': q_id},
                     {**base_payload, 'options': {'quoted': normalized_key}},
-                    base_payload,
                 ]
         return self._post_with_payload_variants(url, payload_variants, timeout=30)
 
@@ -1374,6 +1407,7 @@ class EvolutionAPIClient:
         caption: str = '',
         file_name: str = '',
         quoted_key: dict[str, Any] | None = None,
+        quoted_text: str = '',
     ) -> dict[str, Any]:
         url = f'{self.base_url}/message/sendMedia/{self.instance.instance_name}'
         base_payload = {
@@ -1395,12 +1429,15 @@ class EvolutionAPIClient:
                     'fromMe': bool(quoted_key.get('fromMe')),
                     'id': q_id,
                 }
+                preview_text = str(quoted_text or '').strip()[:240] or 'Mensagem'
                 payload_variants = [
+                    {**base_payload, 'quoted': {'key': {'id': q_id}, 'message': {'conversation': preview_text}}},
+                    {**base_payload, 'quoted': {'key': normalized_key, 'message': {'conversation': preview_text}}},
+                    {**base_payload, 'quoted': {'key': {'id': q_id}}},
                     {**base_payload, 'quoted': normalized_key},
                     {**base_payload, 'quotedMessage': normalized_key},
                     {**base_payload, 'quotedMessageId': q_id},
                     {**base_payload, 'options': {'quoted': normalized_key}},
-                    base_payload,
                 ]
         return self._post_with_payload_variants(url, payload_variants, timeout=60)
 
@@ -1409,6 +1446,7 @@ class EvolutionAPIClient:
         number: str,
         audio_url: str,
         quoted_key: dict[str, Any] | None = None,
+        quoted_text: str = '',
     ) -> dict[str, Any]:
         url = f'{self.base_url}/message/sendWhatsAppAudio/{self.instance.instance_name}'
         base_payload = {
@@ -1425,12 +1463,15 @@ class EvolutionAPIClient:
                     'fromMe': bool(quoted_key.get('fromMe')),
                     'id': q_id,
                 }
+                preview_text = str(quoted_text or '').strip()[:240] or 'Mensagem'
                 payload_variants = [
+                    {**base_payload, 'quoted': {'key': {'id': q_id}, 'message': {'conversation': preview_text}}},
+                    {**base_payload, 'quoted': {'key': normalized_key, 'message': {'conversation': preview_text}}},
+                    {**base_payload, 'quoted': {'key': {'id': q_id}}},
                     {**base_payload, 'quoted': normalized_key},
                     {**base_payload, 'quotedMessage': normalized_key},
                     {**base_payload, 'quotedMessageId': q_id},
                     {**base_payload, 'options': {'quoted': normalized_key}},
-                    base_payload,
                 ]
         return self._post_with_payload_variants(url, payload_variants, timeout=60)
 
