@@ -30,7 +30,9 @@ COPY . .
 
 # Copia e configura o agendador de tarefas (cron)
 COPY crontab /etc/cron.d/my-cron-jobs
-RUN chmod 0644 /etc/cron.d/my-cron-jobs
+RUN sed -i 's/\r$//' /etc/cron.d/my-cron-jobs \
+    && chmod 0644 /etc/cron.d/my-cron-jobs \
+    && touch /app/cron.log
 
 # Copia e dá permissão de execução para o script de entrypoint
 COPY entrypoint.sh /app/entrypoint.sh

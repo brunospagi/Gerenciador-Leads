@@ -204,10 +204,13 @@ def extract_jid_candidates(payload: dict[str, Any], data: dict[str, Any], key_da
     instance_data = data.get('instance') if isinstance(data.get('instance'), dict) else {}
     candidates = [
         key_data.get('remoteJid'),
+        key_data.get('remoteJidAlt'),
         key_data.get('participant'),
+        key_data.get('participantAlt'),
         key_data.get('jid'),
         key_data.get('id'),
         data.get('remoteJid'),
+        data.get('remoteJidAlt'),
         data.get('jid'),
         data.get('id'),
         data.get('wa_id'),
@@ -224,6 +227,7 @@ def extract_jid_candidates(payload: dict[str, Any], data: dict[str, Any], key_da
         instance_data.get('jid'),
         instance_data.get('id'),
         payload.get('remoteJid'),
+        payload.get('remoteJidAlt'),
         payload.get('jid'),
         payload.get('id'),
         payload.get('from'),
@@ -3233,6 +3237,28 @@ def process_presence_update(payload: dict[str, Any], instance: WhatsAppInstance 
     self_jids = _extract_self_jids(payload, data, instance=instance)
     updates: list[tuple[str, str]] = []
 
+    def _extract_presence_jids(raw_node: Any) -> list[str]:
+        found: list[str] = []
+
+        def _walk(node: Any) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    key_low = str(key or '').strip().lower()
+                    if key_low in {'id', 'jid', 'remotejid', 'remotejidalt', 'participant', 'participantalt', 'from', 'sender'}:
+                        if isinstance(value, str) and value.strip():
+                            normalized = normalize_wa_id(value.strip())
+                            if normalized and normalized not in found:
+                                found.append(normalized)
+                    if isinstance(value, (dict, list)):
+                        _walk(value)
+            elif isinstance(node, list):
+                for item in node:
+                    if isinstance(item, (dict, list)):
+                        _walk(item)
+
+        _walk(raw_node)
+        return found
+
     presences = data.get('presences')
     if not presences:
         presences = data.get('presence')
@@ -3251,7 +3277,18 @@ def process_presence_update(payload: dict[str, Any], instance: WhatsAppInstance 
                 )
             else:
                 state = _normalize_presence_state(presence_info)
-            updates.append((normalize_wa_id(str(jid_key or '')), state))
+            jid_candidates = []
+            primary = normalize_wa_id(str(jid_key or ''))
+            if primary:
+                jid_candidates.append(primary)
+            for extra_jid in _extract_presence_jids(presence_info):
+                if extra_jid and extra_jid not in jid_candidates:
+                    jid_candidates.append(extra_jid)
+            fallback_id = normalize_wa_id(str(data.get('id') or payload.get('id') or ''))
+            if fallback_id and fallback_id not in jid_candidates:
+                jid_candidates.append(fallback_id)
+            for jid in jid_candidates:
+                updates.append((jid, state))
     elif isinstance(presences, list):
         for item in presences:
             if not isinstance(item, dict):
@@ -3273,7 +3310,14 @@ def process_presence_update(payload: dict[str, Any], instance: WhatsAppInstance 
                 or item.get('status')
                 or item.get('type')
             )
-            updates.append((jid, state))
+            jid_candidates = []
+            if jid:
+                jid_candidates.append(jid)
+            for extra_jid in _extract_presence_jids(item):
+                if extra_jid and extra_jid not in jid_candidates:
+                    jid_candidates.append(extra_jid)
+            for jid_item in jid_candidates:
+                updates.append((jid_item, state))
 
     if not updates:
         key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
@@ -3290,7 +3334,16 @@ def process_presence_update(payload: dict[str, Any], instance: WhatsAppInstance 
             updates.append((jid, state))
 
     updated = False
-    for jid, state in updates:
+    dedup_updates: list[tuple[str, str]] = []
+    seen_update_keys = set()
+    for jid_value, state_value in updates:
+        key = (str(jid_value or ''), str(state_value or ''))
+        if not key[0] or key in seen_update_keys:
+            continue
+        seen_update_keys.add(key)
+        dedup_updates.append((key[0], key[1]))
+
+    for jid, state in dedup_updates:
         if not jid or jid in self_jids:
             continue
 

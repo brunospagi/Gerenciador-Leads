@@ -1,3 +1,6 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
 # Executa o comando check_inactivity todos os dias as 3 da manha
 0 3 * * * root /usr/local/bin/python /app/manage.py check_inactivity >> /app/cron.log 2>&1
 

@@ -1139,6 +1139,8 @@ class WhatsAppWebhookView(View):
             return JsonResponse({'ok': False, 'error': 'payload invalido'}, status=400)
 
         event_name = (kwargs.get('event_name') or '').strip()
+        if event_name.startswith('/'):
+            event_name = event_name.lstrip('/')
         if event_name and not payload.get('event'):
             payload['event'] = event_name.replace('-', '_').upper()
 

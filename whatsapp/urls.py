@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 
 from .views import (
     WhatsAppInboxView,
@@ -35,6 +35,7 @@ urlpatterns = [
     path('conversa/<int:pk>/deletar/', delete_conversation, name='delete_conversation'),
     path('webhook', WhatsAppWebhookView.as_view(), name='webhook_no_slash'),
     path('webhook/', WhatsAppWebhookView.as_view(), name='webhook'),
+    re_path(r'^webhook//+(?P<event_name>[-\w]+)/?$', WhatsAppWebhookView.as_view(), name='webhook_event_double_slash'),
     path('webhook/<slug:event_name>', WhatsAppWebhookView.as_view(), name='webhook_event_no_slash'),
     path('webhook/<slug:event_name>/', WhatsAppWebhookView.as_view(), name='webhook_event'),
 ]
