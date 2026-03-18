@@ -215,6 +215,9 @@ def extract_jid_candidates(payload: dict[str, Any], data: dict[str, Any], key_da
         data.get('id'),
         data.get('wa_id'),
         data.get('waId'),
+        data.get('number'),
+        data.get('phone'),
+        data.get('phoneNumber'),
         data.get('from'),
         data.get('sender'),
         data.get('participant'),
@@ -223,6 +226,9 @@ def extract_jid_candidates(payload: dict[str, Any], data: dict[str, Any], key_da
         contact_data.get('id'),
         contact_data.get('wa_id'),
         contact_data.get('waId'),
+        contact_data.get('number'),
+        contact_data.get('phone'),
+        contact_data.get('phoneNumber'),
         instance_data.get('remoteJid'),
         instance_data.get('jid'),
         instance_data.get('id'),
@@ -230,6 +236,9 @@ def extract_jid_candidates(payload: dict[str, Any], data: dict[str, Any], key_da
         payload.get('remoteJidAlt'),
         payload.get('jid'),
         payload.get('id'),
+        payload.get('number'),
+        payload.get('phone'),
+        payload.get('phoneNumber'),
         payload.get('from'),
         payload.get('sender'),
     ]
@@ -350,6 +359,14 @@ def resolve_from_me(
 
 def normalize_labels(raw_labels: Any) -> list[str]:
     labels: list[str] = []
+    if isinstance(raw_labels, dict) and any(k in raw_labels for k in ('labels', 'tags', 'tag', 'items', 'data', 'result', 'results')):
+        for nested_key in ('labels', 'tags', 'tag', 'items', 'data', 'result', 'results'):
+            nested_value = raw_labels.get(nested_key)
+            parsed_nested = normalize_labels(nested_value)
+            for item in parsed_nested:
+                if item and item not in labels:
+                    labels.append(item)
+        return labels
     if isinstance(raw_labels, list):
         for item in raw_labels:
             if isinstance(item, str):
@@ -361,14 +378,29 @@ def normalize_labels(raw_labels: Any) -> list[str]:
                     item.get('name')
                     or item.get('label')
                     or item.get('title')
+                    or item.get('value')
+                    or item.get('text')
                     or item.get('id')
                 )
                 if value:
                     labels.append(str(value).strip())
     elif isinstance(raw_labels, dict):
-        value = raw_labels.get('name') or raw_labels.get('label') or raw_labels.get('title') or raw_labels.get('id')
+        value = (
+            raw_labels.get('name')
+            or raw_labels.get('label')
+            or raw_labels.get('title')
+            or raw_labels.get('value')
+            or raw_labels.get('text')
+            or raw_labels.get('id')
+        )
         if value:
             labels.append(str(value).strip())
+        else:
+            for dict_value in raw_labels.values():
+                parsed_nested = normalize_labels(dict_value)
+                for item in parsed_nested:
+                    if item and item not in labels:
+                        labels.append(item)
     elif isinstance(raw_labels, str):
         value = raw_labels.strip()
         if value:
@@ -388,10 +420,22 @@ def extract_labels(payload: dict[str, Any], data: dict[str, Any]) -> list[str]:
         data.get('label'),
         data.get('tag'),
         data.get('tags'),
+        data.get('labelIds'),
+        data.get('labelNames'),
+        data.get('labelsAssociation'),
+        data.get('labelAssociation'),
+        data.get('associations'),
+        data.get('association'),
         payload.get('labels'),
         payload.get('label'),
         payload.get('tag'),
         payload.get('tags'),
+        payload.get('labelIds'),
+        payload.get('labelNames'),
+        payload.get('labelsAssociation'),
+        payload.get('labelAssociation'),
+        payload.get('associations'),
+        payload.get('association'),
     ]
     for raw in candidates:
         parsed = normalize_labels(raw)
@@ -2439,8 +2483,10 @@ def process_status_update(payload: dict[str, Any]) -> bool:
     key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
     external_id_candidates = [
         key_data.get('id'),
+        data.get('keyId'),
         data.get('id'),
         data.get('messageId'),
+        payload.get('keyId'),
         payload.get('id'),
     ]
     if isinstance(data.get('message'), dict):
@@ -2451,6 +2497,7 @@ def process_status_update(payload: dict[str, Any]) -> bool:
         update_key = data.get('update', {}).get('key', {})
         if isinstance(update_key, dict):
             external_id_candidates.append(update_key.get('id'))
+        external_id_candidates.append(data.get('update', {}).get('keyId'))
     external_id_candidates = [str(v).strip() for v in external_id_candidates if v]
 
     status = map_delivery_status(payload)
@@ -3408,7 +3455,14 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
         if process_presence_update(payload, instance=instance):
             logger.info('Webhook de presenca processado.')
             return
-    if event_name_norm in {'LABELS_ASSOCIATION', 'LABELS_EDIT', 'CONTACTS_UPDATE'}:
+    if event_name_norm in {
+        'LABELS_ASSOCIATION',
+        'LABELS_EDIT',
+        'LABELS_UPDATE',
+        'LABEL_UPDATE',
+        'CONTACTS_UPDATE',
+        'CONTACT_UPDATE',
+    }:
         if process_labels_update(payload):
             logger.info('Webhook de etiquetas processado.')
             return
