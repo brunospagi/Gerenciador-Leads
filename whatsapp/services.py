@@ -718,6 +718,10 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         if not resp:
             logger.debug('Falha ao baixar media remota para persistencia: url=%s', normalized)
             return ''
+        final_response_url = str(getattr(resp, 'url', '') or '').strip()
+        if _is_encrypted_media_ref(final_response_url):
+            logger.debug('URL final da midia ainda aponta para referencia criptografada: %s', final_response_url)
+            return ''
 
         content = resp.content or b''
         if not content:
@@ -730,6 +734,16 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
 
         detected_mime = _guess_mime_from_bytes(content)
         final_mime = detected_mime or content_type or mime or 'application/octet-stream'
+        # Para midias renderizaveis, nao confiar apenas no header remoto.
+        # Se os bytes nao forem reconhecidos, pode ser .enc/criptografado.
+        if kind in {'image', 'video', 'audio', 'sticker'} and not detected_mime:
+            logger.debug(
+                'Midia remota sem assinatura reconhecivel nos bytes (possivel .enc): kind=%s url=%s content_type=%s',
+                kind,
+                normalized,
+                content_type,
+            )
+            return ''
         if not _mime_matches_kind(final_mime, kind):
             logger.debug(
                 'Mime baixado nao confere com tipo esperado: expected_kind=%s final_mime=%s url=%s',
@@ -792,6 +806,13 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
 
         detected_mime = _guess_mime_from_bytes(decoded)
         final_mime = detected_mime or mime.split(';', 1)[0].strip().lower() or 'application/octet-stream'
+        if media_kind in {'image', 'video', 'audio', 'sticker'} and not detected_mime:
+            logger.debug(
+                'Base64 de midia sem assinatura reconhecivel (possivel conteudo criptografado): kind=%s mime_hint=%s',
+                media_kind,
+                mime,
+            )
+            return ''
         if not _mime_matches_kind(final_mime, media_kind):
             return ''
 
