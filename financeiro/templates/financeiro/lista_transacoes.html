@@ -2,85 +2,235 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Gestão Financeira</h2>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
-            {% if user.profile.nivel_acesso == 'ADMIN' %}
-            <a href="{% url 'financeiro:relatorio_dre' %}" class="btn btn-info me-2">Ver Relatório DRE</a>
+            <h2 class="mb-1">Gestao Financeira</h2>
+            <p class="text-muted mb-0">Controle de receitas, despesas e conciliacao em lote.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            {% if is_admin_financeiro %}
+            <a href="{% url 'financeiro:relatorio_dre' %}" class="btn btn-info">
+                <i class="fas fa-chart-line me-1"></i> Relatorio DRE
+            </a>
             {% endif %}
-            
-            <a href="{% url 'financeiro:nova_transacao' %}" class="btn btn-primary">+ Novo Lançamento</a>
+            <a href="{% url 'financeiro:nova_transacao' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Novo Lancamento
+            </a>
         </div>
     </div>
 
-    {% if user.profile.nivel_acesso != 'ADMIN' %}
-    <div class="alert alert-info shadow-sm">
-        <i class="fas fa-info-circle"></i> Apenas consegue visualizar as contas e despesas lançadas por si. Contas fixas globais são geridas pela Administração.
+    {% if messages %}
+    <div class="mb-3">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} mb-2">{{ message }}</div>
+        {% endfor %}
     </div>
     {% endif %}
 
-    <div class="card shadow">
-        <div class="card-body">
-            <table class="table table-striped table-hover">
-                <thead>
-                    <tr>
-                        <th>Vencimento</th>
-                        <th>Tipo</th>
-                        <th>Categoria</th>
-                        <th>Descrição</th>
-                        <th>Valor (R$)</th>
-                        <th>Status</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for transacao in transacoes %}
-                    <tr>
-                        <td>{{ transacao.data_vencimento|date:"d/m/Y" }}</td>
-                        <td>
-                            {% if transacao.tipo == 'RECEITA' %}
-                                <span class="badge bg-success">Receita</span>
-                            {% else %}
-                                <span class="badge bg-danger">Despesa</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ transacao.get_categoria_display }}</td>
-                        <td>
-                            {{ transacao.descricao }}
-                            
-                            {% if transacao.categoria == 'VEICULO' %}
-                                <br><small class="text-muted">{{ transacao.placa }} - {{ transacao.modelo_veiculo }}</small>
-                            {% endif %}
-                            
-                            {% if user.profile.nivel_acesso == 'ADMIN' and transacao.criado_por %}
-                                <br><small class="text-primary"><i class="fas fa-user"></i> Lançado por: {{ transacao.criado_por.first_name|default:transacao.criado_por.username }}</small>
-                            {% endif %}
-                        </td>
-                        <td class="fw-bold">R$ {{ transacao.valor }}</td>
-                        <td>
-                            {% if transacao.efetivado %}
-                                <span class="badge bg-success">Efetivado</span>
-                            {% else %}
-                                <span class="badge bg-warning text-dark">Pendente</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if user.profile.nivel_acesso == 'ADMIN' %}
-                                <a href="{% url 'financeiro:editar_transacao' transacao.pk %}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
-                                <a href="{% url 'financeiro:apagar_transacao' transacao.pk %}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>
-                            {% else %}
-                                <span class="text-muted"><small>Sem permissão</small></span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">Nenhuma transação registada até ao momento.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    {% if user.profile.nivel_acesso != 'ADMIN' and not user.is_superuser %}
+    <div class="alert alert-info shadow-sm">
+        <i class="fas fa-info-circle me-1"></i>
+        Voce visualiza apenas lancamentos criados por voce.
+    </div>
+    {% endif %}
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Total de Lancamentos</div>
+                    <div class="fs-4 fw-bold">{{ total_transacoes }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Pendentes</div>
+                    <div class="fs-4 fw-bold text-warning">{{ total_pendentes }}</div>
+                    <div class="small text-muted">R$ {{ soma_pendente|floatformat:2 }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Efetivadas</div>
+                    <div class="fs-4 fw-bold text-success">{{ total_efetivadas }}</div>
+                    <div class="small text-muted">R$ {{ soma_efetivada|floatformat:2 }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Saldo (Efetivado - Pendente)</div>
+                    <div class="fs-4 fw-bold">R$ {{ saldo_geral|floatformat:2 }}</div>
+                </div>
+            </div>
         </div>
     </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body">
+            <form method="get" class="d-flex flex-wrap align-items-end gap-2">
+                <div>
+                    <label for="mesRefInput" class="form-label mb-1">Mostrar somente o mes</label>
+                    <input type="month" id="mesRefInput" name="mes_ref" value="{{ mes_ref }}" class="form-control">
+                </div>
+                <button type="submit" class="btn btn-outline-primary">
+                    <i class="fas fa-filter me-1"></i> Filtrar
+                </button>
+                <a href="{% url 'financeiro:lista_transacoes' %}" class="btn btn-outline-secondary">Mes atual</a>
+            </form>
+        </div>
+    </div>
+
+    <form method="post" id="bulkForm">
+        {% csrf_token %}
+        <input type="hidden" name="mes_ref" value="{{ mes_ref }}">
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-body d-flex flex-wrap align-items-center gap-2">
+                <div class="form-check me-2">
+                    <input class="form-check-input" type="checkbox" id="checkAllRows">
+                    <label class="form-check-label fw-semibold" for="checkAllRows">Selecionar todos</label>
+                </div>
+
+                <select name="bulk_action" id="bulkAction" class="form-select" style="max-width: 260px;">
+                    <option value="">Acao em lote</option>
+                    <option value="marcar_efetivado">Marcar como efetivado</option>
+                    <option value="marcar_pendente">Marcar como pendente</option>
+                    {% if is_admin_financeiro %}
+                    <option value="excluir">Excluir selecionados</option>
+                    {% endif %}
+                </select>
+
+                <button type="submit" class="btn btn-dark" id="applyBulkBtn">
+                    <i class="fas fa-layer-group me-1"></i> Aplicar em lote
+                </button>
+
+                <span class="ms-auto text-muted small">
+                    <span id="selectedCount">0</span> selecionado(s)
+                </span>
+            </div>
+        </div>
+
+        <div class="card shadow border-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 44px;"></th>
+                            <th>Vencimento</th>
+                            <th>Tipo</th>
+                            <th>Categoria</th>
+                            <th>Descricao</th>
+                            <th>Valor (R$)</th>
+                            <th>Status</th>
+                            <th>Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transacao in transacoes %}
+                        <tr>
+                            <td>
+                                <input class="form-check-input row-check" type="checkbox" name="transacoes" value="{{ transacao.id }}">
+                            </td>
+                            <td>{{ transacao.data_vencimento|date:"d/m/Y" }}</td>
+                            <td>
+                                {% if transacao.tipo == 'RECEITA' %}
+                                <span class="badge bg-success">Receita</span>
+                                {% else %}
+                                <span class="badge bg-danger">Despesa</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ transacao.get_categoria_display }}</td>
+                            <td>
+                                <div class="fw-semibold">{{ transacao.descricao }}</div>
+                                {% if transacao.categoria == 'VEICULO' %}
+                                <small class="text-muted">{{ transacao.placa }} - {{ transacao.modelo_veiculo }}</small>
+                                {% endif %}
+                                {% if is_admin_financeiro and transacao.criado_por %}
+                                <div><small class="text-primary">Lancado por: {{ transacao.criado_por.first_name|default:transacao.criado_por.username }}</small></div>
+                                {% endif %}
+                            </td>
+                            <td class="fw-bold">R$ {{ transacao.valor|floatformat:2 }}</td>
+                            <td>
+                                {% if transacao.efetivado %}
+                                <span class="badge bg-success">Efetivado</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">Pendente</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if is_admin_financeiro %}
+                                <a href="{% url 'financeiro:editar_transacao' transacao.pk %}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
+                                <a href="{% url 'financeiro:apagar_transacao' transacao.pk %}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>
+                                {% else %}
+                                <span class="text-muted small">Sem permissao</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-muted">Nenhum lancamento registrado ate o momento.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </form>
 </div>
+
+<script>
+    (function () {
+        const checkAll = document.getElementById('checkAllRows');
+        const rowChecks = Array.from(document.querySelectorAll('.row-check'));
+        const selectedCount = document.getElementById('selectedCount');
+        const bulkForm = document.getElementById('bulkForm');
+        const bulkAction = document.getElementById('bulkAction');
+
+        function refreshCounter() {
+            const selected = rowChecks.filter((item) => item.checked).length;
+            selectedCount.textContent = String(selected);
+            if (checkAll) {
+                checkAll.checked = selected > 0 && selected === rowChecks.length;
+                checkAll.indeterminate = selected > 0 && selected < rowChecks.length;
+            }
+        }
+
+        if (checkAll) {
+            checkAll.addEventListener('change', function () {
+                rowChecks.forEach((checkbox) => { checkbox.checked = checkAll.checked; });
+                refreshCounter();
+            });
+        }
+
+        rowChecks.forEach((checkbox) => {
+            checkbox.addEventListener('change', refreshCounter);
+        });
+
+        if (bulkForm) {
+            bulkForm.addEventListener('submit', function (event) {
+                const selected = rowChecks.filter((item) => item.checked).length;
+                if (!bulkAction.value) {
+                    event.preventDefault();
+                    alert('Selecione uma acao em lote.');
+                    return;
+                }
+                if (selected === 0) {
+                    event.preventDefault();
+                    alert('Selecione pelo menos um lancamento.');
+                    return;
+                }
+                if (bulkAction.value === 'excluir' && !confirm('Tem certeza que deseja excluir os lancamentos selecionados?')) {
+                    event.preventDefault();
+                }
+            });
+        }
+
+        refreshCounter();
+    })();
+</script>
 {% endblock %}
