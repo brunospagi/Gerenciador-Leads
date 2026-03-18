@@ -1731,6 +1731,7 @@ class EvolutionAPIClient:
         message_id: str,
         convert_to_mp4: bool = False,
         message_key: dict[str, Any] | None = None,
+        message_payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         url = f'{self.base_url}/chat/getBase64FromMediaMessage/{self.instance.instance_name}'
         msg_id = str(message_id or '').strip()
@@ -1742,6 +1743,15 @@ class EvolutionAPIClient:
             key_payload['id'] = msg_id
 
         payload_variants = []
+        raw_message_payload = message_payload if isinstance(message_payload, dict) else {}
+        if raw_message_payload:
+            payload_variants.extend(
+                [
+                    {**base_payload, 'message': raw_message_payload},
+                    {**base_payload, 'data': raw_message_payload},
+                    {**base_payload, **raw_message_payload},
+                ]
+            )
         if key_payload.get('id'):
             payload_variants.extend(
                 [
@@ -1763,6 +1773,84 @@ class EvolutionAPIClient:
             )
 
         return self._post_with_payload_variants(url, payload_variants, timeout=60)
+
+    def get_s3_media_url(
+        self,
+        message_id: str,
+        message_key: dict[str, Any] | None = None,
+        message_payload: dict[str, Any] | None = None,
+        query: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        endpoint = f'{self.base_url}/s3/getMediaUrl/{self.instance.instance_name}'
+        msg_id = str(message_id or '').strip()
+        key_payload = dict(message_key or {})
+        if msg_id and not key_payload.get('id'):
+            key_payload['id'] = msg_id
+        raw_message_payload = message_payload if isinstance(message_payload, dict) else {}
+        query_payload = dict(query or {})
+        payload_variants: list[dict[str, Any]] = []
+        if query_payload:
+            payload_variants.append(query_payload)
+        if raw_message_payload:
+            payload_variants.extend(
+                [
+                    {'message': raw_message_payload},
+                    {'data': raw_message_payload},
+                    raw_message_payload,
+                ]
+            )
+        if key_payload.get('id'):
+            payload_variants.extend(
+                [
+                    {'message': {'key': key_payload}},
+                    {'message': {'key': {'id': key_payload.get('id')}}},
+                    {'key': key_payload},
+                    {'id': key_payload.get('id')},
+                    {'messageId': key_payload.get('id')},
+                ]
+            )
+        if msg_id:
+            payload_variants.extend([{'message': {'id': msg_id}}])
+        return self._post_with_payload_variants(endpoint, payload_variants, timeout=60)
+
+    def get_s3_media(
+        self,
+        message_id: str,
+        message_key: dict[str, Any] | None = None,
+        message_payload: dict[str, Any] | None = None,
+        query: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        endpoint = f'{self.base_url}/s3/getMedia/{self.instance.instance_name}'
+        msg_id = str(message_id or '').strip()
+        key_payload = dict(message_key or {})
+        if msg_id and not key_payload.get('id'):
+            key_payload['id'] = msg_id
+        raw_message_payload = message_payload if isinstance(message_payload, dict) else {}
+        query_payload = dict(query or {})
+        payload_variants: list[dict[str, Any]] = []
+        if query_payload:
+            payload_variants.append(query_payload)
+        if raw_message_payload:
+            payload_variants.extend(
+                [
+                    {'message': raw_message_payload},
+                    {'data': raw_message_payload},
+                    raw_message_payload,
+                ]
+            )
+        if key_payload.get('id'):
+            payload_variants.extend(
+                [
+                    {'message': {'key': key_payload}},
+                    {'message': {'key': {'id': key_payload.get('id')}}},
+                    {'key': key_payload},
+                    {'id': key_payload.get('id')},
+                    {'messageId': key_payload.get('id')},
+                ]
+            )
+        if msg_id:
+            payload_variants.extend([{'message': {'id': msg_id}}])
+        return self._post_with_payload_variants(endpoint, payload_variants, timeout=60)
 
 
 def get_active_instance() -> WhatsAppInstance | None:
@@ -2500,6 +2588,11 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
             (data.get('key', {}) if isinstance(data.get('key'), dict) else {}).get('fromMe')
             or message_obj.direcao == WhatsAppMessage.Direction.ENVIADA
         )
+        raw_message_payload = data if isinstance(data, dict) else {}
+        media_type_hint = (inferred_kind or media_kind or '').strip().lower()
+        media_type_for_query = media_type_hint if media_type_hint in {'image', 'video', 'audio', 'document', 'sticker'} else ''
+        raw_message_db_id = _find_nested_value(raw_message_payload, {'messageid'})
+        message_db_id = int(raw_message_db_id) if str(raw_message_db_id).isdigit() else None
 
         client = EvolutionAPIClient(instance=instance)
         responses: list[dict[str, Any]] = []
@@ -2552,13 +2645,147 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
         def _extract_base64_and_mime(root: Any) -> tuple[str, str]:
             if not isinstance(root, (dict, list)):
                 return '', ''
-            b64_keys = {'base64', 'mediabase64', 'filebase64'}
+            b64_keys = {'base64', 'mediabase64', 'filebase64', 'buffer', 'file', 'data'}
             mime_keys = {'mimetype', 'mediamimetype'}
             b64_val = _find_nested_value(root, b64_keys)
             mime_val = _find_nested_value(root, mime_keys)
             return str(b64_val or '').strip(), str(mime_val or '').strip().lower()
 
+        def _extract_url_and_kind(root: Any) -> tuple[str, str]:
+            if not isinstance(root, (dict, list)):
+                return '', ''
+            mime_hint = str(_find_nested_value(root, {'mimetype', 'mediamimetype'}) or '').strip().lower()
+            kind_hint = ''
+            if mime_hint.startswith('image/'):
+                kind_hint = 'image'
+            elif mime_hint.startswith('video/'):
+                kind_hint = 'video'
+            elif mime_hint.startswith('audio/'):
+                kind_hint = 'audio'
+            if isinstance(root, dict):
+                direct_url = str(
+                    root.get('url')
+                    or root.get('mediaUrl')
+                    or root.get('fileUrl')
+                    or ''
+                ).strip()
+                if direct_url:
+                    parsed_url, parsed_kind = parse_message_media({'data': {'url': direct_url, 'mimetype': mime_hint}})
+                    if parsed_url:
+                        return parsed_url, (parsed_kind or kind_hint or inferred_kind or media_kind or 'document').lower()
+            for node in _iter_dict_nodes(root):
+                parsed_url, parsed_kind = parse_message_media({'data': node})
+                if parsed_url:
+                    return parsed_url, (parsed_kind or kind_hint or inferred_kind or media_kind or 'document').lower()
+            return '', ''
+
         for external_id in candidate_ids[:6]:
+            # 1) Tenta S3 URL pronta da Evolution
+            try:
+                query_payload: dict[str, Any] = {}
+                if message_db_id is not None:
+                    query_payload['messageId'] = message_db_id
+                if media_type_for_query:
+                    query_payload['type'] = media_type_for_query
+                s3_url_resp = client.get_s3_media_url(
+                    external_id,
+                    message_key={**key_hint, 'id': external_id},
+                    message_payload=raw_message_payload,
+                    query=query_payload,
+                )
+                found_url, found_kind = _extract_url_and_kind(s3_url_resp)
+                if found_url:
+                    _console_log(
+                        f'Midia recuperada via s3/getMediaUrl: external_id={external_id} kind={found_kind or inferred_kind or media_kind}',
+                        'INFO',
+                    )
+                    return found_url, (found_kind or inferred_kind or media_kind or 'document').lower()
+            except Exception as exc:
+                logger.debug('s3/getMediaUrl falhou para id=%s: %s', external_id, exc)
+
+            # 2) Tenta S3 media (pode retornar URL ou base64 conforme config)
+            try:
+                query_payload = {}
+                if message_db_id is not None:
+                    query_payload['messageId'] = message_db_id
+                if media_type_for_query:
+                    query_payload['type'] = media_type_for_query
+                s3_media_resp = client.get_s3_media(
+                    external_id,
+                    message_key={**key_hint, 'id': external_id},
+                    message_payload=raw_message_payload,
+                    query=query_payload,
+                )
+                found_url, found_kind = _extract_url_and_kind(s3_media_resp)
+                if found_url:
+                    _console_log(
+                        f'Midia recuperada via s3/getMedia: external_id={external_id} kind={found_kind or inferred_kind or media_kind}',
+                        'INFO',
+                    )
+                    return found_url, (found_kind or inferred_kind or media_kind or 'document').lower()
+                s3_b64, s3_mime = _extract_base64_and_mime(s3_media_resp)
+                if s3_b64:
+                    inferred = (inferred_kind or media_kind or 'document').lower()
+                    field_by_kind = {
+                        'image': 'imageMessage',
+                        'video': 'videoMessage',
+                        'audio': 'audioMessage',
+                        'document': 'documentMessage',
+                        'sticker': 'stickerMessage',
+                    }
+                    target_field = field_by_kind.get(inferred, 'documentMessage')
+                    candidate_payload = {
+                        'data': {
+                            'message': {
+                                target_field: {
+                                    'base64': s3_b64,
+                                    'mimetype': s3_mime or 'application/octet-stream',
+                                }
+                            }
+                        }
+                    }
+                    parsed_url, parsed_kind = parse_message_media(candidate_payload)
+                    if parsed_url:
+                        _console_log(
+                            f'Midia recuperada via s3/getMedia(base64): external_id={external_id} kind={parsed_kind or inferred}',
+                            'INFO',
+                        )
+                        return parsed_url, (parsed_kind or inferred).lower()
+
+                # Quando getMedia retorna metadata (lista), busca URL assinada por ID da media.
+                media_nodes = []
+                if isinstance(s3_media_resp, list):
+                    media_nodes = [item for item in s3_media_resp if isinstance(item, dict)]
+                elif isinstance(s3_media_resp, dict):
+                    if isinstance(s3_media_resp.get('data'), list):
+                        media_nodes = [item for item in s3_media_resp.get('data') if isinstance(item, dict)]
+                    elif isinstance(s3_media_resp.get('media'), list):
+                        media_nodes = [item for item in s3_media_resp.get('media') if isinstance(item, dict)]
+
+                for media_item in media_nodes[:6]:
+                    media_id = str(media_item.get('id') or '').strip()
+                    if not media_id:
+                        continue
+                    try:
+                        s3_direct_url_resp = client.get_s3_media_url(
+                            external_id,
+                            message_key={**key_hint, 'id': external_id},
+                            message_payload=raw_message_payload,
+                            query={'id': media_id},
+                        )
+                    except Exception:
+                        continue
+                    found_direct_url, found_direct_kind = _extract_url_and_kind(s3_direct_url_resp)
+                    if found_direct_url:
+                        _console_log(
+                            f'Midia recuperada via s3/getMedia + getMediaUrl(id): external_id={external_id} media_id={media_id}',
+                            'INFO',
+                        )
+                        return found_direct_url, (found_direct_kind or inferred_kind or media_kind or 'document').lower()
+            except Exception as exc:
+                logger.debug('s3/getMedia falhou para id=%s: %s', external_id, exc)
+
+            # 3) Fallback legado: getBase64FromMediaMessage
             try:
                 convert_to_mp4 = (inferred_kind or media_kind or '').lower() == 'audio'
                 _console_log(
@@ -2569,6 +2796,7 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
                     external_id,
                     convert_to_mp4=convert_to_mp4,
                     message_key={**key_hint, 'id': external_id},
+                    message_payload=raw_message_payload,
                 )
             except Exception as exc:
                 _console_log(f'getBase64FromMediaMessage falhou para id={external_id}: {exc}', 'WARN')
@@ -3246,6 +3474,10 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
             payload_with_preview = dict(payload or {})
             payload_with_preview['link_preview'] = preview
 
+    existing_message = None
+    if ext_id:
+        existing_message = WhatsAppMessage.objects.filter(external_id=ext_id).first()
+
     defaults = {
         'conversa': conversation,
         'direcao': direction,
@@ -3260,6 +3492,42 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
         'payload': payload_with_preview,
         'recebido_em': ts if direction == WhatsAppMessage.Direction.RECEBIDA else None,
     }
+
+    if existing_message:
+        # Quando webhook vier com URL .enc/temporaria, nao apagar a midia ja persistida.
+        if not str(defaults.get('media_url') or '').strip() and str(existing_message.media_url or '').strip():
+            defaults['media_url'] = existing_message.media_url
+
+        # Para mensagens enviadas, evita trocar conteudo valido por placeholder.
+        placeholder_values = {
+            '',
+            '[IMAGEM]',
+            '[VIDEO]',
+            '[AUDIO]',
+            '[DOCUMENTO]',
+            '[FIGURINHA]',
+            '[Mensagem nao suportada]',
+        }
+        incoming_content = str(defaults.get('conteudo') or '').strip()
+        current_content = str(existing_message.conteudo or '').strip()
+        if (
+            direction == WhatsAppMessage.Direction.ENVIADA
+            and current_content
+            and incoming_content in placeholder_values
+        ):
+            defaults['conteudo'] = current_content
+
+        # Mantem status mais avancado entre o atual e o recebido no webhook.
+        defaults['status'] = merge_delivery_status(existing_message.status, defaults.get('status'))
+
+        # Mescla payload para manter metadados de upload/reply ja gravados.
+        merged_payload = dict(existing_message.payload or {})
+        if isinstance(payload_with_preview, dict):
+            merged_payload.update(payload_with_preview)
+        defaults['payload'] = merged_payload
+
+        if direction != WhatsAppMessage.Direction.RECEBIDA and existing_message.recebido_em:
+            defaults['recebido_em'] = existing_message.recebido_em
 
     message_created = False
     if ext_id:
