@@ -81,6 +81,77 @@ class TransacaoFinanceira(models.Model):
                 )
         super().save(*args, **kwargs)
 
+    @classmethod
+    def gerar_recorrentes_ate_mes_atual(cls, owner=None):
+        """
+        Gera automaticamente contas recorrentes faltantes até o mês atual.
+        Evita duplicidade por assinatura da transação + competência (mês/ano).
+        """
+        hoje = timezone.localdate()
+        competencia_atual = hoje.replace(day=1)
+
+        base_qs = cls.objects.filter(recorrente=True).order_by('data_vencimento', 'id')
+        if owner is not None:
+            base_qs = base_qs.filter(criado_por=owner)
+
+        # Mantém o item mais recente por assinatura
+        latest_by_signature = {}
+        for transacao in base_qs:
+            assinatura = (
+                transacao.tipo,
+                transacao.categoria,
+                transacao.descricao,
+                transacao.valor,
+                transacao.placa or '',
+                transacao.modelo_veiculo or '',
+                transacao.ano or '',
+                transacao.criado_por_id or 0,
+            )
+            latest_by_signature[assinatura] = transacao
+
+        criadas = 0
+        for assinatura, ultima in latest_by_signature.items():
+            cursor = ultima.data_vencimento
+
+            while cursor and cursor.replace(day=1) < competencia_atual:
+                proximo_venc = cursor + relativedelta(months=1)
+
+                existe_mes = cls.objects.filter(
+                    recorrente=True,
+                    tipo=ultima.tipo,
+                    categoria=ultima.categoria,
+                    descricao=ultima.descricao,
+                    valor=ultima.valor,
+                    placa=ultima.placa,
+                    modelo_veiculo=ultima.modelo_veiculo,
+                    ano=ultima.ano,
+                    criado_por=ultima.criado_por,
+                    data_vencimento__month=proximo_venc.month,
+                    data_vencimento__year=proximo_venc.year,
+                ).exists()
+
+                if existe_mes:
+                    cursor = proximo_venc
+                    continue
+
+                ultima = cls.objects.create(
+                    tipo=ultima.tipo,
+                    categoria=ultima.categoria,
+                    descricao=ultima.descricao,
+                    valor=ultima.valor,
+                    data_vencimento=proximo_venc,
+                    efetivado=False,
+                    recorrente=True,
+                    placa=ultima.placa,
+                    modelo_veiculo=ultima.modelo_veiculo,
+                    ano=ultima.ano,
+                    criado_por=ultima.criado_por,
+                )
+                criadas += 1
+                cursor = proximo_venc
+
+        return criadas
+
 
 def gerar_relatorio_DRE_mensal(mes, ano):
     """Calcula o lucro final e retorna os detalhes de cada transação."""

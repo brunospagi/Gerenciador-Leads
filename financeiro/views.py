@@ -36,11 +36,13 @@ class TransacaoListView(AcessoFinanceiroMixin, ListView):
     
     def get_queryset(self):
         user = self.request.user
-        
-        # Se for ADMIN, vê TODAS as transações
+
+        # Mantém recorrentes em dia ao virar o mês.
         if user.profile.nivel_acesso == 'ADMIN':
+            TransacaoFinanceira.gerar_recorrentes_ate_mes_atual(owner=None)
             return TransacaoFinanceira.objects.all().order_by('-data_vencimento')
-            
+
+        TransacaoFinanceira.gerar_recorrentes_ate_mes_atual(owner=user)
         # Se for o usuário do Financeiro, vê APENAS as que ele mesmo criou
         return TransacaoFinanceira.objects.filter(criado_por=user).order_by('-data_vencimento')
 
