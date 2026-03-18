@@ -237,13 +237,22 @@ class VendaProduto(models.Model):
 
         # 1. VENDA (SAÍDA DE ESTOQUE) -> GERA LUCRO
         if self.tipo_produto in ['VENDA_VEICULO', 'VENDA_MOTO']:
-            self.comissao_ajudante = Decimal('0.00')
+            comissao_total = Decimal('0.00')
             if self.tipo_produto == 'VENDA_VEICULO':
-                self.comissao_vendedor = config.comissao_carro_desconto if self.com_desconto else config.comissao_carro_padrao
+                comissao_total = config.comissao_carro_desconto if self.com_desconto else config.comissao_carro_padrao
             else:
-                self.comissao_vendedor = config.comissao_moto
-            
-            self.lucro_loja = valor - custo - self.comissao_vendedor
+                comissao_total = config.comissao_moto
+
+            if self.vendedor_ajudante:
+                ajudante_pct = config.split_ajudante
+                self.comissao_vendedor = comissao_total * (Decimal('1.00') - ajudante_pct)
+                self.comissao_ajudante = comissao_total * ajudante_pct
+            else:
+                self.comissao_vendedor = comissao_total
+                self.comissao_ajudante = Decimal('0.00')
+
+            # Lucro sempre desconta a comissao total da operacao.
+            self.lucro_loja = valor - custo - comissao_total
 
         # 2. ENTRADA (SEM LUCRO IMEDIATO)
         elif self.tipo_produto in ['CONSIGNACAO', 'COMPRA']:

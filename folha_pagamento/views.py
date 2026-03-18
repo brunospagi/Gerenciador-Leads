@@ -325,12 +325,44 @@ def detalhe_folha(request, pk):
 
     # Totalizadores para exibição
     total_vencimentos = folha.salario_base + folha.total_comissoes + folha.credito_vt + folha.total_creditos_manuais
-    
+
+    # Conferencia detalhada de comissoes (incluindo split de ajuda).
+    vendas_periodo = VendaProduto.objects.filter(
+        data_venda__range=[data_inicio, data_fim],
+        status='APROVADO',
+    ).filter(
+        Q(vendedor=folha.funcionario.user) | Q(vendedor_ajudante=folha.funcionario.user)
+    ).select_related('vendedor', 'vendedor_ajudante')
+
+    conferencias_comissoes = []
+    total_conferencia_minha = Decimal('0.00')
+    total_conferencia_outro = Decimal('0.00')
+    for venda in vendas_periodo:
+        sou_titular = venda.vendedor_id == folha.funcionario.user.id
+        minha_comissao = venda.comissao_vendedor if sou_titular else venda.comissao_ajudante
+        comissao_outro = venda.comissao_ajudante if sou_titular else venda.comissao_vendedor
+        outro_usuario = venda.vendedor_ajudante if sou_titular else venda.vendedor
+        meu_papel = 'Titular' if sou_titular else 'Ajudante'
+        conferencias_comissoes.append({
+            'data_venda': venda.data_venda,
+            'cliente_nome': venda.cliente_nome,
+            'tipo_produto': venda.get_tipo_produto_display(),
+            'papel': meu_papel,
+            'minha_comissao': minha_comissao or Decimal('0.00'),
+            'comissao_outro': comissao_outro or Decimal('0.00'),
+            'outro_nome': (outro_usuario.get_full_name() or outro_usuario.username) if outro_usuario else '-',
+        })
+        total_conferencia_minha += minha_comissao or Decimal('0.00')
+        total_conferencia_outro += comissao_outro or Decimal('0.00')
+
     return render(request, 'folha_pagamento/detalhe_folha.html', {
         'folha': folha,
         'itens': itens_holerite,
         'total_vencimentos': total_vencimentos,
         'total_descontos': folha.total_descontos,
+        'conferencias_comissoes': conferencias_comissoes,
+        'total_conferencia_minha': total_conferencia_minha,
+        'total_conferencia_outro': total_conferencia_outro,
     })
 
 @login_required
