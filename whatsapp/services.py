@@ -2621,10 +2621,17 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
     key_data = data.get('key', {}) if isinstance(data.get('key'), dict) else {}
     external_id_candidates = [
         key_data.get('id'),
+        data.get('keyId'),
         data.get('id'),
         data.get('messageId'),
+        payload.get('keyId'),
         payload.get('id'),
     ]
+    if isinstance(data.get('update'), dict):
+        update_key = data.get('update', {}).get('key', {})
+        if isinstance(update_key, dict):
+            external_id_candidates.append(update_key.get('id'))
+        external_id_candidates.append(data.get('update', {}).get('keyId'))
     external_id_candidates = [str(v).strip() for v in external_id_candidates if v]
 
     message_obj = resolve_message_by_external_candidates(external_id_candidates) if external_id_candidates else None
@@ -2634,6 +2641,9 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
     media_url, media_kind = parse_message_media(payload)
     raw_message = unwrap_message_content(data.get('message') if isinstance(data.get('message'), dict) else {})
     inferred_kind = infer_message_kind(raw_message, data, payload)
+    self_jids = _extract_self_jids(payload, data, instance=message_obj.conversa.instance if message_obj and message_obj.conversa else None)
+    from_me = resolve_from_me(payload, data, key_data, self_jids)
+    expected_direction = WhatsAppMessage.Direction.ENVIADA if from_me else WhatsAppMessage.Direction.RECEBIDA
 
     if not message_obj:
         # Fallback para updates sem id/correlacao perfeita:
@@ -2668,7 +2678,7 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
             ]
             message_obj = (
                 conversation.mensagens.filter(
-                    direcao=WhatsAppMessage.Direction.RECEBIDA,
+                    direcao=expected_direction,
                     criado_em__gte=recent_cut,
                     media_url='',
                     conteudo__in=placeholders,
@@ -2676,6 +2686,41 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
                 .order_by('-criado_em')
                 .first()
             )
+        if not message_obj and conversation and from_me:
+            candidate_kind = (media_kind or inferred_kind or '').strip().lower()
+            fallback_text = texto
+            if not fallback_text:
+                fallback_text = {
+                    'image': '[IMAGEM]',
+                    'video': '[VIDEO]',
+                    'audio': '[AUDIO]',
+                    'document': '[DOCUMENTO]',
+                    'sticker': '[FIGURINHA]',
+                }.get(candidate_kind, '[Mensagem nao suportada]')
+            ext_id = fit_external_id(external_id_candidates[0] if external_id_candidates else '')
+            payload_snapshot = {'message_update': payload}
+            status_value = merge_delivery_status(WhatsAppMessage.Status.ENVIADA, map_delivery_status(payload))
+            if ext_id:
+                message_obj, _ = WhatsAppMessage.objects.get_or_create(
+                    external_id=ext_id,
+                    defaults={
+                        'conversa': conversation,
+                        'direcao': expected_direction,
+                        'conteudo': fallback_text,
+                        'media_url': media_url or '',
+                        'status': status_value,
+                        'payload': payload_snapshot,
+                    },
+                )
+            else:
+                message_obj = WhatsAppMessage.objects.create(
+                    conversa=conversation,
+                    direcao=expected_direction,
+                    conteudo=fallback_text,
+                    media_url=media_url or '',
+                    status=status_value,
+                    payload=payload_snapshot,
+                )
         if not message_obj:
             return False
 
@@ -2706,9 +2751,6 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
                 candidate_ids.append(value)
         if not candidate_ids:
             return '', ''
-        if (inferred_kind or media_kind).lower() not in {'image', 'video', 'audio', 'document', 'sticker'}:
-            return '', ''
-
         instance = message_obj.conversa.instance or get_active_instance()
         if not instance:
             return '', ''
