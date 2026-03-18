@@ -648,9 +648,16 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         candidate = str(value or '').strip().lower()
         if not candidate:
             return False
+        parsed = urlparse(candidate) if candidate.startswith('http://') or candidate.startswith('https://') else None
+        check_value = (parsed.path or '') if parsed else candidate
+        host = (parsed.hostname or '').lower() if parsed else ''
         return (
             bool(re.search(r'(?:^|[/?])[^/?#]+\.enc(?:$|[?#])', candidate))
-            or candidate.startswith('/v/t62')
+            or check_value.startswith('/v/t62')
+            or check_value.startswith('/o1/v/t24')
+            or check_value.startswith('/v/t24')
+            or check_value.startswith('/o1/v/t62')
+            or (host.endswith('mmg.whatsapp.net') and ('/o1/v/t24/' in check_value or '/v/t24/' in check_value))
         )
 
     def _normalize_public_media_url(value: str) -> str:
@@ -733,9 +740,22 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         kind = str(media_kind or '').strip().lower() or 'document'
 
         # Somente tenta persistir links temporarios/externos; para URLs internas locais, mantem como estao.
-        persist_hint = any(token in lower for token in ['mmg.whatsapp.net', 'lookaside.fbsbx.com', 'cdn.whatsapp.net'])
+        # Inclui URLs pre-assinadas S3 (X-Amz-*) para evitar expiracao no chat.
+        is_whatsapp_cdn = any(token in lower for token in ['mmg.whatsapp.net', 'lookaside.fbsbx.com', 'cdn.whatsapp.net'])
+        is_presigned_s3 = (
+            ('x-amz-signature=' in lower)
+            or ('x-amz-credential=' in lower)
+            or ('x-amz-algorithm=' in lower)
+            or ('x-amz-date=' in lower)
+        )
+        is_evolution_s3_path = '/evolution/evolution-api/' in lower
+        persist_hint = is_whatsapp_cdn or is_presigned_s3 or is_evolution_s3_path
         if not persist_hint:
             return ''
+
+        # Se ja for URL estavel do nosso bucket principal sem assinatura, nao precisa copiar de novo.
+        if ('s3.spagisistemas.com.br' in lower) and ('x-amz-signature=' not in lower):
+            return normalized
 
         def _download_with_headers(url_value: str) -> requests.Response | None:
             browser_headers = {
@@ -987,6 +1007,9 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
                 media_obj.get('base64')
                 or media_obj.get('mediaBase64')
                 or media_obj.get('fileBase64')
+                or message.get('base64')
+                or message.get('mediaBase64')
+                or message.get('fileBase64')
                 or data.get('base64')
                 or data.get('mediaBase64')
                 or data.get('fileBase64')
@@ -1008,7 +1031,7 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
             if persisted_url:
                 return persisted_url, media_kind
 
-            # Fallback final: directPath pode vir como file.enc e nao eh renderizavel no browser.
+            # Fallback final: directPath quase sempre eh referencia criptografada.
             # Mantemos apenas se nao parecer referencia criptografada.
             direct_path = str(media_obj.get('directPath') or '').strip()
             direct_path = _normalize_public_media_url(direct_path)
@@ -3291,6 +3314,20 @@ def process_presence_update(payload: dict[str, Any], instance: WhatsAppInstance 
 
 
 def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance | None = None) -> None:
+    def _is_temporary_media_url(url_value: str) -> bool:
+        raw = str(url_value or '').strip().lower()
+        if not raw:
+            return False
+        if any(token in raw for token in ['mmg.whatsapp.net', 'lookaside.fbsbx.com', 'cdn.whatsapp.net']):
+            return True
+        if any(token in raw for token in ['x-amz-signature=', 'x-amz-credential=', 'x-amz-algorithm=', 'x-amz-date=']):
+            return True
+        if '/o1/v/t24/' in raw or '/v/t24/' in raw or '/o1/v/t62/' in raw or '/v/t62/' in raw:
+            return True
+        if '.enc' in raw:
+            return True
+        return False
+
     event_name = str(payload.get('event') or '').upper()
     event_name_norm = re.sub(r'[^A-Z0-9]+', '_', event_name).strip('_')
     if event_name_norm in {'PRESENCE_UPDATE', 'PRESENCE_UPSERT', 'PRESENCE'}:
@@ -3495,7 +3532,11 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
 
     if existing_message:
         # Quando webhook vier com URL .enc/temporaria, nao apagar a midia ja persistida.
-        if not str(defaults.get('media_url') or '').strip() and str(existing_message.media_url or '').strip():
+        incoming_media_url = str(defaults.get('media_url') or '').strip()
+        existing_media_url = str(existing_message.media_url or '').strip()
+        if not incoming_media_url and existing_media_url:
+            defaults['media_url'] = existing_message.media_url
+        elif existing_media_url and incoming_media_url and _is_temporary_media_url(incoming_media_url):
             defaults['media_url'] = existing_message.media_url
 
         # Para mensagens enviadas, evita trocar conteudo valido por placeholder.

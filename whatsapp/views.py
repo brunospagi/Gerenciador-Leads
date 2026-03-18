@@ -1226,7 +1226,7 @@ class WhatsAppInstanceConfigView(WhatsAppInstanceAdminMixin, TemplateView):
             if qr:
                 instance.qr_code_base64 = qr
 
-            webhook_url = request.build_absolute_uri(reverse('whatsapp:webhook'))
+            webhook_url = request.build_absolute_uri(reverse('whatsapp:webhook_no_slash'))
             response_webhook = client.set_webhook(
                 webhook_url=webhook_url,
                 webhook_secret=instance.webhook_secret or '',
@@ -1260,7 +1260,7 @@ class WhatsAppInstanceConfigView(WhatsAppInstanceAdminMixin, TemplateView):
             qr = extract_qr_base64(response)
             if qr:
                 instance.qr_code_base64 = qr
-            webhook_url = request.build_absolute_uri(reverse('whatsapp:webhook'))
+            webhook_url = request.build_absolute_uri(reverse('whatsapp:webhook_no_slash'))
             response_webhook = client.set_webhook(
                 webhook_url=webhook_url,
                 webhook_secret=instance.webhook_secret or '',
