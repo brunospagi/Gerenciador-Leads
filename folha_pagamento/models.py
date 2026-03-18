@@ -204,6 +204,19 @@ class FolhaPagamento(models.Model):
         data_inicio = timezone.datetime(self.ano, self.mes, 1).date()
         data_fim = timezone.datetime(self.ano, self.mes, ultimo_dia).date()
 
+        # Garante split atualizado para vendas com ajudante no periodo,
+        # inclusive registros antigos criados antes da regra de 50/50.
+        vendas_com_ajuda = VendaProduto.objects.filter(
+            data_venda__range=[data_inicio, data_fim],
+            status='APROVADO',
+            vendedor_ajudante__isnull=False,
+            tipo_produto__in=['VENDA_VEICULO', 'VENDA_MOTO', 'REFINANCIAMENTO'],
+        ).filter(
+            Q(vendedor=self.funcionario.user) | Q(vendedor_ajudante=self.funcionario.user)
+        )
+        for venda in vendas_com_ajuda:
+            venda.save()
+
         # Vendas Diretas
         vendas = VendaProduto.objects.filter(
             vendedor=self.funcionario.user,
