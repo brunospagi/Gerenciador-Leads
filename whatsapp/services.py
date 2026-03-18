@@ -785,8 +785,8 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         # Se os bytes nao forem reconhecidos, pode ser .enc/criptografado.
         if kind in {'image', 'video', 'audio', 'sticker'} and not detected_mime:
             _console_log(
-                f'Midia remota sem assinatura reconhecivel nos bytes (possivel .enc): kind={kind} url={normalized} content_type={content_type}',
-                'WARN',
+                f'Midia remota sem assinatura reconhecivel nos bytes (possivel .enc): kind={kind} url={normalized} content_type={content_type} - usando fallback por base64.',
+                'INFO',
             )
             return ''
         if not _mime_matches_kind(final_mime, kind):
@@ -1726,19 +1726,43 @@ class EvolutionAPIClient:
         response.raise_for_status()
         return response.json() if response.content else {}
 
-    def get_base64_from_media_message(self, message_id: str, convert_to_mp4: bool = False) -> dict[str, Any]:
+    def get_base64_from_media_message(
+        self,
+        message_id: str,
+        convert_to_mp4: bool = False,
+        message_key: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         url = f'{self.base_url}/chat/getBase64FromMediaMessage/{self.instance.instance_name}'
-        payload = {
-            'message': {
-                'key': {
-                    'id': str(message_id or '').strip(),
-                }
-            },
+        msg_id = str(message_id or '').strip()
+        base_payload = {
             'convertToMp4': bool(convert_to_mp4),
         }
-        response = requests.post(url, json=payload, headers=self.headers, timeout=60)
-        response.raise_for_status()
-        return response.json() if response.content else {}
+        key_payload = dict(message_key or {})
+        if msg_id and not key_payload.get('id'):
+            key_payload['id'] = msg_id
+
+        payload_variants = []
+        if key_payload.get('id'):
+            payload_variants.extend(
+                [
+                    {**base_payload, 'message': {'key': key_payload}},
+                    {**base_payload, 'message': {'key': {'id': key_payload.get('id')}}},
+                    {**base_payload, 'key': key_payload},
+                    {**base_payload, 'key': {'id': key_payload.get('id')}},
+                    {**base_payload, 'id': key_payload.get('id')},
+                    {**base_payload, 'messageId': key_payload.get('id')},
+                ]
+            )
+
+        if msg_id:
+            payload_variants.extend(
+                [
+                    {**base_payload, 'message': {'id': msg_id}},
+                    {**base_payload, 'message': {'key': {'id': msg_id}}},
+                ]
+            )
+
+        return self._post_with_payload_variants(url, payload_variants, timeout=60)
 
 
 def get_active_instance() -> WhatsAppInstance | None:
@@ -2449,10 +2473,14 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
                         stack.append(item)
 
     def _resolve_media_from_lookup() -> tuple[str, str]:
-        # Prefere o id bruto do webhook (quando existir) para consultas na Evolution.
+        # Prefere ids brutos do webhook (quando existir) para consultas na Evolution.
         # O external_id salvo no banco pode estar truncado para caber no campo.
-        external_id = (external_id_candidates[0] if external_id_candidates else '') or (message_obj.external_id or '')
-        if not external_id:
+        candidate_ids: list[str] = []
+        for raw in external_id_candidates + [message_obj.external_id or '']:
+            value = str(raw or '').strip()
+            if value and value not in candidate_ids:
+                candidate_ids.append(value)
+        if not candidate_ids:
             return '', ''
         if (inferred_kind or media_kind).lower() not in {'image', 'video', 'audio', 'document', 'sticker'}:
             return '', ''
@@ -2468,35 +2496,45 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
             remote_jid = message_obj.conversa.wa_id or message_obj.conversa.wa_id_alt or ''
         remote_jid = normalize_wa_id(remote_jid) if remote_jid else ''
 
-        where_candidates = []
-        where_candidates.append({'key': {'id': external_id}})
-        where_candidates.append({'id': external_id})
-        if remote_jid:
-            where_candidates.append({'key': {'id': external_id, 'remoteJid': remote_jid}})
-            where_candidates.append({'remoteJid': remote_jid, 'id': external_id})
+        from_me_hint = bool(
+            (data.get('key', {}) if isinstance(data.get('key'), dict) else {}).get('fromMe')
+            or message_obj.direcao == WhatsAppMessage.Direction.ENVIADA
+        )
 
         client = EvolutionAPIClient(instance=instance)
         responses: list[dict[str, Any]] = []
-        for where in where_candidates[:4]:
-            try:
-                responses.append(client.find_messages(where=where, page=1, offset=20))
-            except Exception as exc:
-                logger.debug('findMessages falhou para where=%s: %s', where, exc)
-            try:
-                responses.append(client.find_status_message(where=where, page=1, offset=20))
-            except Exception as exc:
-                logger.debug('findStatusMessage falhou para where=%s: %s', where, exc)
+        for external_id in candidate_ids[:6]:
+            where_candidates = []
+            where_candidates.append({'key': {'id': external_id}})
+            where_candidates.append({'id': external_id})
+            if remote_jid:
+                where_candidates.append({'key': {'id': external_id, 'remoteJid': remote_jid, 'fromMe': from_me_hint}})
+                where_candidates.append({'remoteJid': remote_jid, 'id': external_id})
+            for where in where_candidates[:6]:
+                try:
+                    responses.append(client.find_messages(where=where, page=1, offset=20))
+                except Exception as exc:
+                    logger.debug('findMessages falhou para where=%s: %s', where, exc)
+                try:
+                    responses.append(client.find_status_message(where=where, page=1, offset=20))
+                except Exception as exc:
+                    logger.debug('findStatusMessage falhou para where=%s: %s', where, exc)
 
+        normalized_candidates = [normalize_message_id(v) for v in candidate_ids if normalize_message_id(v)]
         for resp in responses:
             for node in _iter_dict_nodes(resp):
                 candidate_id = ''
                 if isinstance(node.get('key'), dict):
                     candidate_id = str(node.get('key', {}).get('id') or '')
                 candidate_id = candidate_id or str(node.get('id') or node.get('messageId') or '')
-                if candidate_id:
+                if candidate_id and normalized_candidates:
                     cand_norm = normalize_message_id(candidate_id)
-                    ext_norm = normalize_message_id(external_id)
-                    if cand_norm and ext_norm and cand_norm != ext_norm and not cand_norm.endswith(ext_norm[-20:]) and not ext_norm.endswith(cand_norm[-20:]):
+                    matches = False
+                    for ext_norm in normalized_candidates:
+                        if cand_norm == ext_norm or cand_norm.endswith(ext_norm[-20:]) or ext_norm.endswith(cand_norm[-20:]):
+                            matches = True
+                            break
+                    if not matches:
                         continue
                 candidate_payload = {'data': node}
                 found_url, found_kind = parse_message_media(candidate_payload)
@@ -2505,67 +2543,72 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
 
         # Fallback final: solicita o base64 diretamente para Evolution usando o message id.
         # Isso cobre casos em que apenas file.enc/url temporaria e retornada nos webhooks/findMessages.
-        try:
-            convert_to_mp4 = (inferred_kind or media_kind or '').lower() == 'audio'
-            _console_log(
-                f'Tentando fallback getBase64FromMediaMessage: external_id={external_id} convert_to_mp4={convert_to_mp4}',
-                'INFO',
-            )
-            base64_resp = client.get_base64_from_media_message(external_id, convert_to_mp4=convert_to_mp4)
-        except Exception as exc:
-            _console_log(f'getBase64FromMediaMessage falhou para id={external_id}: {exc}', 'WARN')
-            return '', ''
-
-        if not isinstance(base64_resp, dict):
-            return '', ''
-
-        b64_value = str(
-            base64_resp.get('base64')
-            or (base64_resp.get('message') or {}).get('base64')
-            or (base64_resp.get('data') or {}).get('base64')
-            or ''
-        ).strip()
-        if not b64_value:
-            _console_log(f'getBase64FromMediaMessage sem base64 para id={external_id}', 'WARN')
-            return '', ''
-
-        mime_hint = str(
-            base64_resp.get('mimetype')
-            or base64_resp.get('mimeType')
-            or (base64_resp.get('message') or {}).get('mimetype')
-            or (base64_resp.get('message') or {}).get('mimeType')
-            or (base64_resp.get('data') or {}).get('mimetype')
-            or (base64_resp.get('data') or {}).get('mimeType')
-            or ''
-        ).strip().lower()
-
-        inferred = (inferred_kind or media_kind or 'document').lower()
-        field_by_kind = {
-            'image': 'imageMessage',
-            'video': 'videoMessage',
-            'audio': 'audioMessage',
-            'document': 'documentMessage',
-            'sticker': 'stickerMessage',
+        key_hint = {
+            'id': candidate_ids[0] if candidate_ids else '',
+            'remoteJid': remote_jid,
+            'fromMe': from_me_hint,
         }
-        target_field = field_by_kind.get(inferred, 'documentMessage')
-        candidate_payload = {
-            'data': {
-                'message': {
-                    target_field: {
-                        'base64': b64_value,
-                        'mimetype': mime_hint or 'application/octet-stream',
+
+        def _extract_base64_and_mime(root: Any) -> tuple[str, str]:
+            if not isinstance(root, (dict, list)):
+                return '', ''
+            b64_keys = {'base64', 'mediabase64', 'filebase64'}
+            mime_keys = {'mimetype', 'mediamimetype'}
+            b64_val = _find_nested_value(root, b64_keys)
+            mime_val = _find_nested_value(root, mime_keys)
+            return str(b64_val or '').strip(), str(mime_val or '').strip().lower()
+
+        for external_id in candidate_ids[:6]:
+            try:
+                convert_to_mp4 = (inferred_kind or media_kind or '').lower() == 'audio'
+                _console_log(
+                    f'Tentando fallback getBase64FromMediaMessage: external_id={external_id} convert_to_mp4={convert_to_mp4}',
+                    'INFO',
+                )
+                base64_resp = client.get_base64_from_media_message(
+                    external_id,
+                    convert_to_mp4=convert_to_mp4,
+                    message_key={**key_hint, 'id': external_id},
+                )
+            except Exception as exc:
+                _console_log(f'getBase64FromMediaMessage falhou para id={external_id}: {exc}', 'WARN')
+                continue
+
+            if not isinstance(base64_resp, dict):
+                continue
+
+            b64_value, mime_hint = _extract_base64_and_mime(base64_resp)
+            if not b64_value:
+                _console_log(f'getBase64FromMediaMessage sem base64 para id={external_id}', 'WARN')
+                continue
+
+            inferred = (inferred_kind or media_kind or 'document').lower()
+            field_by_kind = {
+                'image': 'imageMessage',
+                'video': 'videoMessage',
+                'audio': 'audioMessage',
+                'document': 'documentMessage',
+                'sticker': 'stickerMessage',
+            }
+            target_field = field_by_kind.get(inferred, 'documentMessage')
+            candidate_payload = {
+                'data': {
+                    'message': {
+                        target_field: {
+                            'base64': b64_value,
+                            'mimetype': mime_hint or 'application/octet-stream',
+                        }
                     }
                 }
             }
-        }
-        found_url, found_kind = parse_message_media(candidate_payload)
-        if found_url:
-            _console_log(
-                f'Midia recuperada via getBase64FromMediaMessage: external_id={external_id} kind={found_kind or inferred} url_ok=true',
-                'INFO',
-            )
-            return found_url, (found_kind or inferred).lower()
-        _console_log(f'Fallback base64 nao gerou URL renderizavel para id={external_id}', 'WARN')
+            found_url, found_kind = parse_message_media(candidate_payload)
+            if found_url:
+                _console_log(
+                    f'Midia recuperada via getBase64FromMediaMessage: external_id={external_id} kind={found_kind or inferred} url_ok=true',
+                    'INFO',
+                )
+                return found_url, (found_kind or inferred).lower()
+            _console_log(f'Fallback base64 nao gerou URL renderizavel para id={external_id}', 'WARN')
         return '', ''
 
     placeholder_values = {
