@@ -339,7 +339,11 @@
                 const avatar = c.avatar_url ? c.avatar_url : defaultAvatar;
                 const tags = (c.etiquetas || []).slice(0, 3).map((t) => `<span class="label-chip">${esc(t)}</span>`).join('');
                 const tagsRow = tags ? `<div class="label-row">${tags}</div>` : '';
-                return `<a class="chat-box ${archived ? 'archived' : ''} ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}"><div class="img-box"><img class="dp" src="${avatar}" alt="Contato"></div><div class="chat-details"><div class="text-head"><h4>${esc(c.nome)}</h4><p class="time ${unreadClass}">${esc(c.ultima_mensagem_em)}</p></div><div class="text-message"><p>${esc((c.ultima_mensagem || '').slice(0, 42))}</p>${unreadBadge}</div>${tagsRow}</div></a>`;
+                const presenceText = String(c.presence_text || '').trim();
+                const snippet = presenceText
+                    ? `<p class="presence-inline">${esc(presenceText)}</p>`
+                    : `<p>${esc((c.ultima_mensagem || '').slice(0, 42))}</p>`;
+                return `<a class="chat-box ${archived ? 'archived' : ''} ${activeClass}" href="${baseUrl}?c=${c.id}" data-conversation-id="${c.id}"><div class="img-box"><img class="dp" src="${avatar}" alt="Contato"></div><div class="chat-details"><div class="text-head"><h4>${esc(c.nome)}</h4><p class="time ${unreadClass}">${esc(c.ultima_mensagem_em)}</p></div><div class="text-message">${snippet}${unreadBadge}</div>${tagsRow}</div></a>`;
             };
             let html = '';
             if (currentConversationFilter === 'archived') {

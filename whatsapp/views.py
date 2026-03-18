@@ -151,10 +151,10 @@ def _presence_info(conversation: WhatsAppConversation) -> tuple[str, str]:
         updated_at = timezone.make_aware(updated_at)
     elapsed = timezone.now() - updated_at
     if state == 'online':
-        if elapsed > timedelta(seconds=45):
+        if elapsed > timedelta(seconds=75):
             return '', ''
         return 'online', 'online'
-    if elapsed > timedelta(seconds=8):
+    if elapsed > timedelta(seconds=15):
         return '', ''
     if state == 'typing':
         return 'typing', 'digitando...'
@@ -557,6 +557,10 @@ class WhatsAppInboxView(WhatsAppAccessMixin, TemplateView):
         if query:
             conversas = conversas.filter(Q(nome_contato__icontains=query) | Q(wa_id__icontains=query))
         conversas = conversas.order_by('-ultima_mensagem_em')
+        for convo in conversas:
+            p_state, p_text = _presence_info(convo)
+            setattr(convo, 'presence_state', p_state)
+            setattr(convo, 'presence_text', p_text)
         conversas_ativas = [c for c in conversas if not c.arquivada]
         conversas_arquivadas = [c for c in conversas if c.arquivada]
 

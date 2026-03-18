@@ -160,25 +160,37 @@ def resolve_avatar_url(payload: dict[str, Any], data: dict[str, Any]) -> str:
     instance_contact = data.get('instance') if isinstance(data.get('instance'), dict) else {}
     candidates = [
         data.get('profilePicUrl'),
+        data.get('profilePic'),
+        data.get('profilePicUrlHd'),
         data.get('profilePictureUrl'),
         data.get('profilePicture'),
         data.get('pictureUrl'),
         data.get('imgUrl'),
+        data.get('imageUrl'),
         data.get('picture'),
         data.get('avatarUrl'),
         contact_data.get('profilePicUrl'),
+        contact_data.get('profilePic'),
+        contact_data.get('profilePicUrlHd'),
         contact_data.get('profilePictureUrl'),
         contact_data.get('profilePicture'),
         contact_data.get('picture'),
         contact_data.get('avatarUrl'),
         contact_data.get('imgUrl'),
+        contact_data.get('imageUrl'),
         instance_contact.get('profilePicUrl'),
+        instance_contact.get('profilePic'),
+        instance_contact.get('profilePicUrlHd'),
         instance_contact.get('profilePictureUrl'),
+        instance_contact.get('imgUrl'),
         payload.get('profilePicUrl'),
+        payload.get('profilePic'),
+        payload.get('profilePicUrlHd'),
         payload.get('profilePictureUrl'),
         payload.get('profilePicture'),
         payload.get('pictureUrl'),
         payload.get('imgUrl'),
+        payload.get('imageUrl'),
         payload.get('avatarUrl'),
     ]
     for value in candidates:
@@ -188,14 +200,32 @@ def resolve_avatar_url(payload: dict[str, Any], data: dict[str, Any]) -> str:
 
 
 def extract_jid_candidates(payload: dict[str, Any], data: dict[str, Any], key_data: dict[str, Any]) -> list[str]:
+    contact_data = data.get('contact') if isinstance(data.get('contact'), dict) else {}
+    instance_data = data.get('instance') if isinstance(data.get('instance'), dict) else {}
     candidates = [
         key_data.get('remoteJid'),
         key_data.get('participant'),
+        key_data.get('jid'),
+        key_data.get('id'),
         data.get('remoteJid'),
+        data.get('jid'),
+        data.get('id'),
+        data.get('wa_id'),
+        data.get('waId'),
         data.get('from'),
         data.get('sender'),
         data.get('participant'),
+        contact_data.get('remoteJid'),
+        contact_data.get('jid'),
+        contact_data.get('id'),
+        contact_data.get('wa_id'),
+        contact_data.get('waId'),
+        instance_data.get('remoteJid'),
+        instance_data.get('jid'),
+        instance_data.get('id'),
         payload.get('remoteJid'),
+        payload.get('jid'),
+        payload.get('id'),
         payload.get('from'),
         payload.get('sender'),
     ]
@@ -1627,6 +1657,53 @@ class EvolutionAPIClient:
         response.raise_for_status()
         return response.json() if response.content else {}
 
+    def find_contacts(self, where: dict[str, Any] | None = None, page: int = 1, offset: int = 200) -> dict[str, Any]:
+        payload = {
+            'where': where or {},
+            'page': max(1, int(page or 1)),
+            'offset': max(1, int(offset or 200)),
+        }
+        endpoints = [
+            f'{self.base_url}/chat/findContacts/{self.instance.instance_name}',
+            f'{self.base_url}/chat/findContact/{self.instance.instance_name}',
+            f'{self.base_url}/contacts/find/{self.instance.instance_name}',
+        ]
+        last_error = None
+        for endpoint in endpoints:
+            try:
+                response = requests.post(endpoint, json=payload, headers=self.headers, timeout=45)
+                response.raise_for_status()
+                return response.json() if response.content else {}
+            except requests.RequestException as exc:
+                last_error = exc
+                continue
+        if last_error:
+            raise last_error
+        return {}
+
+    def find_chats(self, where: dict[str, Any] | None = None, page: int = 1, offset: int = 200) -> dict[str, Any]:
+        payload = {
+            'where': where or {},
+            'page': max(1, int(page or 1)),
+            'offset': max(1, int(offset or 200)),
+        }
+        endpoints = [
+            f'{self.base_url}/chat/findChats/{self.instance.instance_name}',
+            f'{self.base_url}/chat/findChat/{self.instance.instance_name}',
+        ]
+        last_error = None
+        for endpoint in endpoints:
+            try:
+                response = requests.post(endpoint, json=payload, headers=self.headers, timeout=45)
+                response.raise_for_status()
+                return response.json() if response.content else {}
+            except requests.RequestException as exc:
+                last_error = exc
+                continue
+        if last_error:
+            raise last_error
+        return {}
+
     def find_messages(self, where: dict[str, Any], page: int = 1, offset: int = 20) -> dict[str, Any]:
         url = f'{self.base_url}/chat/findMessages/{self.instance.instance_name}'
         payload = {
@@ -1850,6 +1927,241 @@ def _extract_node_message_ids(node: dict[str, Any]) -> list[str]:
         if value and value not in ids:
             ids.append(value)
     return ids
+
+
+def _extract_contact_jid_from_node(node: dict[str, Any]) -> str:
+    if not isinstance(node, dict):
+        return ''
+    candidates = [
+        node.get('remoteJid'),
+        node.get('jid'),
+        node.get('wa_id'),
+        node.get('waId'),
+        node.get('whatsappId'),
+        node.get('id'),
+    ]
+    for raw in candidates:
+        if not isinstance(raw, str):
+            continue
+        value = raw.strip()
+        if not value:
+            continue
+        normalized = normalize_wa_id(value)
+        if normalized and ('@' in normalized or normalized.isdigit()):
+            return normalized
+    phone_candidates = [
+        node.get('number'),
+        node.get('phone'),
+        node.get('phoneNumber'),
+        node.get('mobile'),
+    ]
+    for raw in phone_candidates:
+        digits = normalize_number(str(raw or ''))
+        if digits:
+            return f'{digits}@s.whatsapp.net'
+    return ''
+
+
+def _extract_contact_name_from_node(node: dict[str, Any]) -> str:
+    if not isinstance(node, dict):
+        return ''
+    for key in ('pushName', 'name', 'fullName', 'shortName', 'notify'):
+        value = node.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ''
+
+
+def _extract_contact_avatar_from_node(node: dict[str, Any]) -> str:
+    if not isinstance(node, dict):
+        return ''
+    contact_data = node.get('contact') if isinstance(node.get('contact'), dict) else {}
+    for key in (
+        'profilePicUrl',
+        'profilePic',
+        'profilePicUrlHd',
+        'profilePictureUrl',
+        'profilePicture',
+        'pictureUrl',
+        'imgUrl',
+        'imageUrl',
+        'avatarUrl',
+    ):
+        value = node.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        nested_value = contact_data.get(key)
+        if isinstance(nested_value, str) and nested_value.strip():
+            return nested_value.strip()
+    return ''
+
+
+def _iter_contact_like_nodes(root: Any):
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            jid = _extract_contact_jid_from_node(node)
+            labels = normalize_labels(node.get('labels') or node.get('tags') or node.get('tag'))
+            name = _extract_contact_name_from_node(node)
+            avatar = _extract_contact_avatar_from_node(node)
+            if jid and (labels or name or avatar or jid.endswith('@s.whatsapp.net') or jid.endswith('@lid')):
+                yield node
+            for value in node.values():
+                if isinstance(value, (dict, list)):
+                    stack.append(value)
+        elif isinstance(node, list):
+            for item in node:
+                if isinstance(item, (dict, list)):
+                    stack.append(item)
+
+
+def reconcile_contact_labels(
+    *,
+    page_size: int = 200,
+    max_pages: int = 8,
+    clear_missing: bool = False,
+    dry_run: bool = False,
+) -> dict[str, int]:
+    instance = get_active_instance()
+    stats = {
+        'checked': 0,
+        'matched': 0,
+        'updated': 0,
+        'labels_updated': 0,
+        'name_updated': 0,
+        'avatar_updated': 0,
+        'cleared_labels': 0,
+        'no_conversation': 0,
+        'pages': 0,
+        'api_errors': 0,
+        'no_instance': 0,
+    }
+    if not instance:
+        stats['no_instance'] = 1
+        return stats
+
+    client = EvolutionAPIClient(instance=instance)
+    seen_jids: set[str] = set()
+    labels_by_jid: dict[str, list[str]] = {}
+    now = timezone.now().isoformat()
+
+    def _upsert_from_node(node: dict[str, Any]) -> None:
+        jid = normalize_wa_id(_extract_contact_jid_from_node(node))
+        if not jid:
+            return
+        seen_jids.add(jid)
+        labels = normalize_labels(node.get('labels') or node.get('tags') or node.get('tag'))
+        labels_by_jid[jid] = labels
+        contact_name = fallback_contact_name_by_wa_id(_extract_contact_name_from_node(node), jid)
+        avatar_url = _extract_contact_avatar_from_node(node)
+
+        stats['checked'] += 1
+        conversation = (
+            WhatsAppConversation.objects.filter(wa_id=jid).first()
+            or WhatsAppConversation.objects.filter(wa_id_alt=jid).first()
+        )
+        if not conversation:
+            stats['no_conversation'] += 1
+            return
+
+        stats['matched'] += 1
+        changed = False
+        update_fields = ['metadata', 'atualizado_em']
+
+        if labels and labels != (conversation.etiquetas or []):
+            conversation.etiquetas = labels
+            update_fields.append('etiquetas')
+            stats['labels_updated'] += 1
+            changed = True
+
+        if avatar_url and avatar_url != (conversation.avatar_url or ''):
+            conversation.avatar_url = avatar_url
+            update_fields.append('avatar_url')
+            stats['avatar_updated'] += 1
+            changed = True
+
+        if contact_name and contact_name != (conversation.nome_contato or ''):
+            conversation.nome_contato = contact_name
+            update_fields.append('nome_contato')
+            stats['name_updated'] += 1
+            changed = True
+
+        if not changed:
+            return
+
+        if dry_run:
+            stats['updated'] += 1
+            return
+
+        merged_meta = dict(conversation.metadata or {})
+        merged_meta['labels_reconcile'] = {
+            'at': now,
+            'instance': instance.instance_name,
+            'labels': labels,
+        }
+        conversation.metadata = merged_meta
+        conversation.save(update_fields=update_fields)
+        stats['updated'] += 1
+
+    def _consume_response(response_payload: dict[str, Any]) -> int:
+        count = 0
+        for node in _iter_contact_like_nodes(response_payload):
+            count += 1
+            _upsert_from_node(node)
+        return count
+
+    for page in range(1, max(1, int(max_pages)) + 1):
+        had_any = False
+        try:
+            contacts_resp = client.find_contacts(page=page, offset=page_size, where={})
+            found = _consume_response(contacts_resp)
+            had_any = had_any or (found > 0)
+        except Exception as exc:
+            stats['api_errors'] += 1
+            logger.debug('findContacts falhou (page=%s): %s', page, exc)
+
+        if not had_any:
+            try:
+                chats_resp = client.find_chats(page=page, offset=page_size, where={})
+                found = _consume_response(chats_resp)
+                had_any = had_any or (found > 0)
+            except Exception as exc:
+                stats['api_errors'] += 1
+                logger.debug('findChats falhou (page=%s): %s', page, exc)
+
+        stats['pages'] = page
+        if not had_any:
+            break
+
+    if clear_missing and seen_jids:
+        for conversation in WhatsAppConversation.objects.all().only('id', 'wa_id', 'wa_id_alt', 'etiquetas', 'metadata'):
+            jid = normalize_wa_id(conversation.wa_id or conversation.wa_id_alt or '')
+            if not jid or jid not in seen_jids:
+                continue
+            remote_labels = labels_by_jid.get(jid, [])
+            if remote_labels:
+                continue
+            if not (conversation.etiquetas or []):
+                continue
+            if dry_run:
+                stats['updated'] += 1
+                stats['cleared_labels'] += 1
+                continue
+            merged_meta = dict(conversation.metadata or {})
+            merged_meta['labels_reconcile'] = {
+                'at': now,
+                'instance': instance.instance_name,
+                'labels': [],
+                'cleared': True,
+            }
+            conversation.etiquetas = []
+            conversation.metadata = merged_meta
+            conversation.save(update_fields=['etiquetas', 'metadata', 'atualizado_em'])
+            stats['updated'] += 1
+            stats['cleared_labels'] += 1
+
+    return stats
 
 
 def reconcile_recent_outbound_statuses(*, minutes: int = 180, limit: int = 200, dry_run: bool = False) -> dict[str, int]:
@@ -2137,7 +2449,9 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
                         stack.append(item)
 
     def _resolve_media_from_lookup() -> tuple[str, str]:
-        external_id = message_obj.external_id or (external_id_candidates[0] if external_id_candidates else '')
+        # Prefere o id bruto do webhook (quando existir) para consultas na Evolution.
+        # O external_id salvo no banco pode estar truncado para caber no campo.
+        external_id = (external_id_candidates[0] if external_id_candidates else '') or (message_obj.external_id or '')
         if not external_id:
             return '', ''
         if (inferred_kind or media_kind).lower() not in {'image', 'video', 'audio', 'document', 'sticker'}:
@@ -2179,8 +2493,11 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
                 if isinstance(node.get('key'), dict):
                     candidate_id = str(node.get('key', {}).get('id') or '')
                 candidate_id = candidate_id or str(node.get('id') or node.get('messageId') or '')
-                if candidate_id and candidate_id != external_id:
-                    continue
+                if candidate_id:
+                    cand_norm = normalize_message_id(candidate_id)
+                    ext_norm = normalize_message_id(external_id)
+                    if cand_norm and ext_norm and cand_norm != ext_norm and not cand_norm.endswith(ext_norm[-20:]) and not ext_norm.endswith(cand_norm[-20:]):
+                        continue
                 candidate_payload = {'data': node}
                 found_url, found_kind = parse_message_media(candidate_payload)
                 if found_url:
@@ -2912,12 +3229,12 @@ def process_webhook_payload(payload: dict[str, Any], instance: WhatsAppInstance 
     # primeiro o upsert sem URL/base64 e depois a midia via lookup/update.
     # Faz um backfill imediato para reduzir bolhas quebradas.
     expected_media_kind = (media_kind or inferred_kind or '').lower()
-    if (
-        ext_id
-        and not (media_url or '').strip()
-        and expected_media_kind in {'image', 'video', 'audio', 'document', 'sticker'}
-    ):
+    if not (media_url or '').strip() and expected_media_kind in {'image', 'video', 'audio', 'document', 'sticker'}:
         try:
+            _console_log(
+                f'Backfill imediato de midia iniciado: ext_id={ext_id or "(vazio)"} kind={expected_media_kind}',
+                'INFO',
+            )
             process_message_content_update(payload)
         except Exception as exc:
             logger.debug('Backfill imediato de midia falhou para ext_id=%s: %s', ext_id, exc)

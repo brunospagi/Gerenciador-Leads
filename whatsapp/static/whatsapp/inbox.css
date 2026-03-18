@@ -72,6 +72,7 @@
     .chat-list .chat-box .chat-details .text-head .time { margin: 0; font-size: .75rem; color: #94a3b8; }
     .chat-list .chat-box .chat-details .text-message { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .chat-list .chat-box .chat-details .text-message p { margin: 0; color: #6b7280; font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+    .chat-list .chat-box .chat-details .text-message p.presence-inline { color: #16a34a; font-weight: 600; }
     .chat-list .chat-box .chat-details .text-message b { background: #06e744; color: #fff; min-width: 20px; height: 20px; border-radius: 50%; font-size: .75rem; font-weight: 500; display: flex; justify-content: center; align-items: center; }
     .label-row { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
     .label-chip { display: inline-block; font-size: .68rem; line-height: 1; padding: 4px 7px; border-radius: 999px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }

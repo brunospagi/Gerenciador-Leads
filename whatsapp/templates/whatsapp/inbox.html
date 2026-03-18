@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}?v=20260317-27">
+<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}?v=20260318-28">
 <div class="wa-clone-wrap">
     <div class="wa-topbar">
         <div>
@@ -112,7 +112,11 @@
                             <p class="time {% if conversa.nao_lidas %}unread{% endif %}">{{ conversa.ultima_mensagem_em|date:"d/m H:i" }}</p>
                         </div>
                         <div class="text-message">
+                            {% if conversa.presence_text %}
+                            <p class="presence-inline">{{ conversa.presence_text }}</p>
+                            {% else %}
                             <p>{{ conversa.ultima_mensagem|default:"-"|truncatechars:42 }}</p>
+                            {% endif %}
                             {% if conversa.nao_lidas %}<b>{{ conversa.nao_lidas }}</b>{% endif %}
                         </div>
                         {% if conversa.etiquetas %}
@@ -145,7 +149,11 @@
                             <p class="time {% if conversa.nao_lidas %}unread{% endif %}">{{ conversa.ultima_mensagem_em|date:"d/m H:i" }}</p>
                         </div>
                         <div class="text-message">
+                            {% if conversa.presence_text %}
+                            <p class="presence-inline">{{ conversa.presence_text }}</p>
+                            {% else %}
                             <p>{{ conversa.ultima_mensagem|default:"-"|truncatechars:42 }}</p>
+                            {% endif %}
                             {% if conversa.nao_lidas %}<b>{{ conversa.nao_lidas }}</b>{% endif %}
                         </div>
                     </div>
@@ -458,5 +466,5 @@
         openNewChat: {% if open_new_chat %}true{% else %}false{% endif %}
     };
 </script>
-<script src="{% static 'whatsapp/inbox.js' %}?v=20260317-27"></script>
+<script src="{% static 'whatsapp/inbox.js' %}?v=20260318-28"></script>
 {% endblock %}
