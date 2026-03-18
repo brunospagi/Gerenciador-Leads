@@ -8,6 +8,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta
 from django.views.decorators.http import require_POST
+from django.urls import reverse
 from .models import FolhaPagamento, Desconto, ParcelaDesconto, Credito, ParcelaCredito
 from funcionarios.models import Funcionario
 from vendas_produtos.models import VendaProduto
@@ -22,31 +23,84 @@ def is_admin_financeiro(user):
 @user_passes_test(is_admin_financeiro)
 def dashboard_rh(request):
     funcionarios = Funcionario.objects.filter(ativo=True)
-    folhas_recentes = FolhaPagamento.objects.all().order_by('-ano', '-mes')[:15]
-    
+    hoje = timezone.now()
+
+    def _resolve_mes_ano(source):
+        form = ProcessarFolhaForm(source)
+        if form.is_valid():
+            return form.cleaned_data['mes'], form.cleaned_data['ano']
+        return hoje.month, hoje.year
+
+    if request.method == 'POST':
+        mes, ano = _resolve_mes_ano(request.POST)
+    else:
+        mes, ano = _resolve_mes_ano(request.GET)
+
+    folhas_mes = (
+        FolhaPagamento.objects.filter(mes=mes, ano=ano)
+        .select_related('funcionario', 'funcionario__user')
+        .order_by('funcionario__user__first_name', 'funcionario__user__last_name')
+    )
+
     if request.method == 'POST':
         form_folha = ProcessarFolhaForm(request.POST)
         if form_folha.is_valid():
             mes = form_folha.cleaned_data['mes']
             ano = form_folha.cleaned_data['ano']
-            count = 0
-            for func in funcionarios:
-                folha, created = FolhaPagamento.objects.get_or_create(
-                    funcionario=func, mes=mes, ano=ano,
-                    defaults={'salario_base': func.salario_base}
-                )
-                if not folha.fechada:
-                    folha.calcular_folha()
-                    count += 1
-            messages.success(request, f"{count} folhas calculadas para {mes}/{ano}.")
-            return redirect('rh_dashboard')
+            acao = (request.POST.get('acao') or 'calcular').strip().lower()
+
+            if acao == 'fechar_mes':
+                count_fechadas = 0
+                for func in funcionarios:
+                    folha, _ = FolhaPagamento.objects.get_or_create(
+                        funcionario=func, mes=mes, ano=ano,
+                        defaults={'salario_base': func.salario_base}
+                    )
+                    if not folha.fechada:
+                        folha.fechar()
+                        count_fechadas += 1
+                messages.success(request, f"{count_fechadas} folhas fechadas para {mes:02d}/{ano}.")
+
+            elif acao == 'pagar_mes':
+                count_pagas = 0
+                for func in funcionarios:
+                    folha, _ = FolhaPagamento.objects.get_or_create(
+                        funcionario=func, mes=mes, ano=ano,
+                        defaults={'salario_base': func.salario_base}
+                    )
+                    if not folha.fechada:
+                        folha.fechar()
+                    if not folha.pago:
+                        folha.pago = True
+                        folha.save(update_fields=['pago'])
+                        count_pagas += 1
+                messages.success(request, f"{count_pagas} folhas marcadas como pagas para {mes:02d}/{ano}.")
+
+            else:
+                count = 0
+                for func in funcionarios:
+                    folha, _ = FolhaPagamento.objects.get_or_create(
+                        funcionario=func, mes=mes, ano=ano,
+                        defaults={'salario_base': func.salario_base}
+                    )
+                    if not folha.fechada:
+                        folha.calcular_folha()
+                        count += 1
+                messages.success(request, f"{count} folhas calculadas para {mes:02d}/{ano}.")
+
+            return redirect(f"{reverse('rh_dashboard')}?mes={mes}&ano={ano}")
     else:
-        form_folha = ProcessarFolhaForm()
+        form_folha = ProcessarFolhaForm(initial={'mes': mes, 'ano': ano})
 
     return render(request, 'folha_pagamento/dashboard_rh.html', {
         'funcionarios': funcionarios,
-        'folhas': folhas_recentes,
-        'form_folha': form_folha
+        'folhas': folhas_mes,
+        'form_folha': form_folha,
+        'mes_referencia': mes,
+        'ano_referencia': ano,
+        'total_folhas': folhas_mes.count(),
+        'total_fechadas': folhas_mes.filter(fechada=True).count(),
+        'total_pagas': folhas_mes.filter(pago=True).count(),
     })
 
 @login_required
@@ -294,4 +348,4 @@ def fechar_folha(request, pk):
         messages.success(request, f"Folha de {folha.funcionario.user.first_name} ({folha.mes}/{folha.ano}) fechada com sucesso! Os valores foram travados.")
         
     # Redireciona de volta para a tela de detalhes da folha
-    return redirect('detalhe_folha', pk=folha.pk)
+    return redirect('rh_detalhe_folha', pk=folha.pk)
