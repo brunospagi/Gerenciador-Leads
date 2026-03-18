@@ -156,4 +156,20 @@
         border-radius: 6px;
     }
 </style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const manualCheck = document.getElementById('id_lancamento_esporadico');
+    const vendedorSelect = document.getElementById('id_vendedor_manual');
+    if (!manualCheck || !vendedorSelect) return;
+
+    function syncManualFields() {
+        const enabled = !!manualCheck.checked;
+        vendedorSelect.disabled = !enabled;
+        if (!enabled) vendedorSelect.value = '';
+    }
+
+    manualCheck.addEventListener('change', syncManualFields);
+    syncManualFields();
+});
+</script>
 {% endblock %}

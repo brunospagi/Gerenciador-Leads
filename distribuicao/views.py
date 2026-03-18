@@ -31,8 +31,15 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
         is_redistribuicao = form.instance.pk is not None
         vendedor_antigo = form.instance.vendedor if is_redistribuicao else None
 
-        # 1. Define o novo vendedor (Rodízio)
-        vendedor_selecionado = definir_proximo_vendedor()
+        # 1. Define o novo vendedor:
+        # - Esporadico/manual: usa vendedor informado sem alterar fila
+        # - Normal: usa rodizio padrao
+        lancamento_esporadico = bool(form.cleaned_data.get('lancamento_esporadico'))
+        vendedor_manual = form.cleaned_data.get('vendedor_manual')
+        if lancamento_esporadico and vendedor_manual:
+            vendedor_selecionado = vendedor_manual
+        else:
+            vendedor_selecionado = definir_proximo_vendedor()
         
         if not vendedor_selecionado:
             form.add_error(None, "ERRO: Nenhum vendedor ativo no rodízio!")
@@ -57,12 +64,22 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
             # Registra no histórico que foi redistribuído na entrada
             Historico.objects.create(
                 cliente=self.object,
-                motivacao=f"Redistribuição via Entrada (Duplicidade detectada). De: {vendedor_antigo.username} Para: {vendedor_selecionado.username}."
+                motivacao=(
+                    f"Redistribuição via Entrada (Duplicidade detectada). "
+                    f"De: {vendedor_antigo.username} Para: {vendedor_selecionado.username}."
+                    + (" Lançamento manual esporádico (fila preservada)." if lancamento_esporadico else "")
+                )
             )
-            msg = f"Lead EXISTENTE atualizado e transferido de {vendedor_antigo.username} para: {vendedor_selecionado.username}"
+            msg = (
+                f"Lead EXISTENTE atualizado e transferido de {vendedor_antigo.username} para: {vendedor_selecionado.username}"
+                + (" (manual esporádico, fila preservada)." if lancamento_esporadico else "")
+            )
             messages.warning(self.request, msg)
         else:
-            msg = f"Novo lead cadastrado e enviado para: {vendedor_selecionado.username}"
+            msg = (
+                f"Novo lead cadastrado e enviado para: {vendedor_selecionado.username}"
+                + (" (manual esporádico, fila preservada)." if lancamento_esporadico else "")
+            )
             messages.success(self.request, msg)
 
         # Envia webhook
