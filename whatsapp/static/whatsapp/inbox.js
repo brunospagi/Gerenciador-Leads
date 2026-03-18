@@ -96,22 +96,88 @@
             return raw;
         }
 
+        function audioPlayerMarkup(url) {
+            const normalizedUrl = normalizeMediaUrl(url);
+            if (!normalizedUrl) return '';
+            return `<span class="bubble-media media-audio"><div class="wa-audio-player" data-audio-player><audio preload="metadata" src="${normalizedUrl}"></audio><button type="button" class="wa-audio-play" aria-label="Reproduzir audio"><i class="fa-solid fa-play"></i></button><div class="wa-audio-wave"><div class="wa-audio-wave-fill"></div></div><span class="wa-audio-duration">0:00</span></div></span>`;
+        }
+
         function mediaMarkup(mediaUrl, mediaKind) {
             const normalizedUrl = normalizeMediaUrl(mediaUrl);
             if (!normalizedUrl) return '';
             const kind = (mediaKind || '').toLowerCase();
-            if (kind === 'audio') return `<span class="bubble-media"><audio controls><source src="${normalizedUrl}"></audio></span>`;
+            if (kind === 'audio') return audioPlayerMarkup(normalizedUrl);
             if (kind === 'video') return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${normalizedUrl}"></video></span>`;
             if (kind === 'sticker') return `<span class="bubble-media media-sticker"><img src="${normalizedUrl}" alt="figurinha" class="js-chat-image" data-full-src="${normalizedUrl}"></span>`;
             if (kind === 'image') return `<span class="bubble-media media-image"><img src="${normalizedUrl}" alt="midia" class="js-chat-image" data-full-src="${normalizedUrl}"></span>`;
             const url = normalizedUrl.toLowerCase();
             if (url.startsWith('data:image/')) return `<span class="bubble-media media-image"><img src="${normalizedUrl}" alt="midia" class="js-chat-image" data-full-src="${normalizedUrl}"></span>`;
             if (url.startsWith('data:video/')) return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${normalizedUrl}"></video></span>`;
-            if (url.startsWith('data:audio/')) return `<span class="bubble-media"><audio controls><source src="${normalizedUrl}"></audio></span>`;
-            if (url.includes('.mp3') || url.includes('.ogg') || url.includes('.wav') || url.includes('.opus') || url.includes('.m4a') || url.includes('.aac')) return `<span class="bubble-media"><audio controls><source src="${normalizedUrl}"></audio></span>`;
+            if (url.startsWith('data:audio/')) return audioPlayerMarkup(normalizedUrl);
+            if (url.includes('.mp3') || url.includes('.ogg') || url.includes('.wav') || url.includes('.opus') || url.includes('.m4a') || url.includes('.aac')) return audioPlayerMarkup(normalizedUrl);
             if (url.includes('.mp4') || url.includes('.webm') || url.includes('.mov')) return `<span class="bubble-media media-video"><video controls preload="metadata"><source src="${normalizedUrl}"></video></span>`;
             if (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.gif') || url.includes('.webp')) return `<span class="bubble-media media-image"><img src="${normalizedUrl}" alt="midia" class="js-chat-image" data-full-src="${normalizedUrl}"></span>`;
             return `<span class="bubble-media"><a href="${normalizedUrl}" target="_blank" class="btn btn-sm btn-outline-secondary">Abrir arquivo</a></span>`;
+        }
+
+        function formatAudioTime(value) {
+            const total = Number(value || 0);
+            if (!Number.isFinite(total) || total <= 0) return '0:00';
+            const minutes = Math.floor(total / 60);
+            const seconds = Math.floor(total % 60);
+            return `${minutes}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function initAudioPlayers(scope) {
+            const root = scope || document;
+            root.querySelectorAll('[data-audio-player]').forEach((player) => {
+                if (player.dataset.bound === '1') return;
+                player.dataset.bound = '1';
+                const audio = player.querySelector('audio');
+                const btn = player.querySelector('.wa-audio-play');
+                const icon = btn ? btn.querySelector('i') : null;
+                const fill = player.querySelector('.wa-audio-wave-fill');
+                const durationEl = player.querySelector('.wa-audio-duration');
+                if (!audio || !btn || !icon || !fill || !durationEl) return;
+
+                const syncUi = () => {
+                    const current = Number(audio.currentTime || 0);
+                    const duration = Number(audio.duration || 0);
+                    const ratio = (duration > 0) ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
+                    fill.style.width = `${ratio}%`;
+                    durationEl.textContent = duration > 0
+                        ? `${formatAudioTime(current)} / ${formatAudioTime(duration)}`
+                        : '0:00';
+                };
+
+                const setPlaying = (playing) => {
+                    player.classList.toggle('is-playing', !!playing);
+                    icon.className = playing ? 'fa-solid fa-pause' : 'fa-solid fa-play';
+                };
+
+                btn.addEventListener('click', () => {
+                    if (audio.paused) {
+                        document.querySelectorAll('[data-audio-player].is-playing audio').forEach((otherAudio) => {
+                            if (otherAudio !== audio) otherAudio.pause();
+                        });
+                        audio.play().catch(() => {});
+                    } else {
+                        audio.pause();
+                    }
+                });
+                audio.addEventListener('play', () => setPlaying(true));
+                audio.addEventListener('pause', () => setPlaying(false));
+                audio.addEventListener('ended', () => {
+                    setPlaying(false);
+                    fill.style.width = '0%';
+                    durationEl.textContent = formatAudioTime(audio.duration || 0);
+                });
+                audio.addEventListener('timeupdate', syncUi);
+                audio.addEventListener('loadedmetadata', () => {
+                    durationEl.textContent = formatAudioTime(audio.duration || 0);
+                });
+                syncUi();
+            });
         }
 
         function mediaAlbumMarkup(items) {
@@ -464,6 +530,7 @@
                 return `<div class="message-box ${side} ${selectedClass}" data-message-id="${m.id}"><button type="button" class="forward-check ${checkClass}" onclick="toggleForwardMessageSelection(event, ${m.id})"><i class="fa-solid fa-check"></i></button><div class="${bubbleClass}">${menuMarkup(m)}${replyPreviewHtml}${mediaHtml}${messageText}${previewHtml}<div class="message-meta">${editedBadge}<span class="message-time">${timeText}</span>${statusIconMarkup(m)}</div>${reactionBadge}${reactionRow}</div></div>`;
             }).join('');
             updateForwardSelectionUi();
+            initAudioPlayers(messagesEl);
             if (shouldStickToBottom) {
                 messagesEl.scrollTop = messagesEl.scrollHeight;
             }
@@ -2284,6 +2351,7 @@
         }
         updateConversationFilterChips();
         normalizeRenderedMediaUrls();
+        initAudioPlayers(document);
 
         document.addEventListener('visibilitychange', function () {
             if (document.hidden) {

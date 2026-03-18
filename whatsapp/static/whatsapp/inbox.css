@@ -243,6 +243,71 @@
     .bubble-media { margin-bottom: 8px; }
     .bubble-media img, .bubble-media video, .bubble-media audio { max-width: 100%; border-radius: 8px; }
     .bubble-media audio { width: 100%; min-width: 230px; }
+    .bubble-media.media-audio { display: block; width: min(420px, 75vw); }
+    .wa-audio-player {
+        display: grid;
+        grid-template-columns: 34px 1fr auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 52px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+    }
+    .wa-audio-player audio { display: none; }
+    .wa-audio-play {
+        width: 30px;
+        height: 30px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: #6b7280;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        line-height: 1;
+    }
+    .wa-audio-wave {
+        position: relative;
+        height: 20px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #eef2f7;
+    }
+    .wa-audio-wave::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: repeating-linear-gradient(
+            90deg,
+            rgba(148, 163, 184, .9) 0px,
+            rgba(148, 163, 184, .9) 3px,
+            transparent 3px,
+            transparent 6px
+        );
+        opacity: .55;
+    }
+    .wa-audio-wave-fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 0%;
+        background: rgba(100, 116, 139, .28);
+        transition: width .12s linear;
+    }
+    .wa-audio-duration {
+        min-width: 86px;
+        text-align: right;
+        font-size: .82rem;
+        color: #64748b;
+        font-weight: 600;
+    }
+    .wa-audio-player.is-playing .wa-audio-play { color: #0ea5e9; }
+    .wa-audio-player.is-playing .wa-audio-wave-fill { background: rgba(14, 165, 233, .36); }
+    .wa-audio-player.is-playing .wa-audio-wave::before { opacity: .72; }
     .bubble-media.media-image,
     .bubble-media.media-video {
         display: block;

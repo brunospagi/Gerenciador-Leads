@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}?v=20260318-28">
+<link rel="stylesheet" href="{% static 'whatsapp/inbox.css' %}?v=20260318-29">
 <div class="wa-clone-wrap">
     <div class="wa-topbar">
         <div>
@@ -244,7 +244,14 @@
                         {% endif %}
                         {% if mensagem.media_url %}
                             {% if mensagem.media_kind == 'audio' %}
-                            <span class="bubble-media"><audio controls><source src="{{ mensagem.media_url }}"></audio></span>
+                            <span class="bubble-media media-audio">
+                                <div class="wa-audio-player" data-audio-player>
+                                    <audio preload="metadata" src="{{ mensagem.media_url }}"></audio>
+                                    <button type="button" class="wa-audio-play" aria-label="Reproduzir audio"><i class="fa-solid fa-play"></i></button>
+                                    <div class="wa-audio-wave"><div class="wa-audio-wave-fill"></div></div>
+                                    <span class="wa-audio-duration">0:00</span>
+                                </div>
+                            </span>
                             {% elif mensagem.media_kind == 'video' %}
                             <span class="bubble-media media-video"><video controls preload="metadata"><source src="{{ mensagem.media_url }}"></video></span>
                             {% elif mensagem.media_kind == 'sticker' %}
@@ -466,5 +473,5 @@
         openNewChat: {% if open_new_chat %}true{% else %}false{% endif %}
     };
 </script>
-<script src="{% static 'whatsapp/inbox.js' %}?v=20260318-28"></script>
+<script src="{% static 'whatsapp/inbox.js' %}?v=20260318-29"></script>
 {% endblock %}
