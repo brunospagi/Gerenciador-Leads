@@ -246,7 +246,12 @@ def extract_jid_candidates(payload: dict[str, Any], data: dict[str, Any], key_da
     for value in candidates:
         if isinstance(value, str) and value.strip():
             normalized = normalize_wa_id(value.strip())
-            if normalized and normalized not in result:
+            is_supported_jid = bool(
+                re.match(r'^\d+@s\.whatsapp\.net$', normalized or '')
+                or (normalized or '').endswith('@lid')
+                or (normalized or '').endswith('@g.us')
+            )
+            if normalized and is_supported_jid and normalized not in result:
                 result.append(normalized)
     return result
 
@@ -2229,6 +2234,28 @@ def reconcile_contact_labels(
     labels_by_jid: dict[str, list[str]] = {}
     now = timezone.now().isoformat()
 
+    def _find_conversation_for_jid(jid: str) -> WhatsAppConversation | None:
+        norm = normalize_wa_id(jid)
+        if not norm:
+            return None
+        conversation = (
+            WhatsAppConversation.objects.filter(wa_id=norm).first()
+            or WhatsAppConversation.objects.filter(wa_id_alt=norm).first()
+        )
+        if conversation:
+            return conversation
+
+        # Fallback por numero para cobrir diferencas entre @lid e @s.whatsapp.net.
+        local = norm.split('@', 1)[0]
+        digits = normalize_number(local)
+        if not digits:
+            return None
+        conversation = (
+            WhatsAppConversation.objects.filter(wa_id__startswith=f'{digits}@').first()
+            or WhatsAppConversation.objects.filter(wa_id_alt__startswith=f'{digits}@').first()
+        )
+        return conversation
+
     def _upsert_from_node(node: dict[str, Any]) -> None:
         jid = normalize_wa_id(_extract_contact_jid_from_node(node))
         if not jid:
@@ -2240,10 +2267,7 @@ def reconcile_contact_labels(
         avatar_url = _extract_contact_avatar_from_node(node)
 
         stats['checked'] += 1
-        conversation = (
-            WhatsAppConversation.objects.filter(wa_id=jid).first()
-            or WhatsAppConversation.objects.filter(wa_id_alt=jid).first()
-        )
+        conversation = _find_conversation_for_jid(jid)
         if not conversation:
             stats['no_conversation'] += 1
             return
@@ -2251,6 +2275,20 @@ def reconcile_contact_labels(
         stats['matched'] += 1
         changed = False
         update_fields = ['metadata', 'atualizado_em']
+
+        if is_real_number_jid(jid) and conversation.wa_id != jid:
+            collision = WhatsAppConversation.objects.filter(wa_id=jid).exclude(pk=conversation.pk).exists()
+            if not collision:
+                old_wa_id = conversation.wa_id
+                conversation.wa_id = jid
+                if is_lid_jid(old_wa_id) and not conversation.wa_id_alt:
+                    conversation.wa_id_alt = old_wa_id
+                update_fields.append('wa_id')
+                changed = True
+        if is_lid_jid(jid) and jid != conversation.wa_id and jid != (conversation.wa_id_alt or ''):
+            conversation.wa_id_alt = jid
+            update_fields.append('wa_id_alt')
+            changed = True
 
         if labels and labels != (conversation.etiquetas or []):
             conversation.etiquetas = labels

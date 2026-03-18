@@ -5,9 +5,20 @@ sed -i 's/\r$//' /etc/cron.d/my-cron-jobs 2>/dev/null || true
 chmod 0644 /etc/cron.d/my-cron-jobs 2>/dev/null || true
 touch /app/cron.log 2>/dev/null || true
 
-# Inicia o cron em segundo plano e valida processo
-cron
-if pgrep cron >/dev/null 2>&1; then
+# Inicia o cron em segundo plano e valida processo (com fallback)
+cron >/dev/null 2>&1 || true
+CRON_OK=0
+if command -v pgrep >/dev/null 2>&1; then
+  if pgrep -x cron >/dev/null 2>&1 || pgrep -x crond >/dev/null 2>&1; then
+    CRON_OK=1
+  fi
+fi
+if [ "$CRON_OK" -eq 0 ] && command -v ps >/dev/null 2>&1; then
+  if ps -ef 2>/dev/null | grep -Eq '[c]ron(d)?'; then
+    CRON_OK=1
+  fi
+fi
+if [ "$CRON_OK" -eq 1 ]; then
   echo "Cron iniciado com sucesso."
 else
   echo "Falha ao iniciar cron."
