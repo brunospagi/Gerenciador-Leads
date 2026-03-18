@@ -3039,9 +3039,30 @@ def process_connection_update(payload: dict[str, Any], instance: WhatsAppInstanc
     state = str(raw_state).strip().lower()
     instance.status_conexao = state
     merged = dict(instance.ultima_resposta or {})
+    profile_picture_url = str(
+        data.get('profilePictureUrl')
+        or data.get('profilePicUrl')
+        or data.get('profilePicture')
+        or ''
+    ).strip()
+    wuid = normalize_wa_id(str(data.get('wuid') or data.get('number') or '').strip())
+    if profile_picture_url:
+        merged['profile_picture_url'] = profile_picture_url
+    if wuid:
+        merged['wuid'] = wuid
     merged['connection_update'] = payload
     instance.ultima_resposta = merged
     instance.save(update_fields=['status_conexao', 'ultima_resposta', 'atualizado_em'])
+
+    # Sincroniza avatar da conversa da propria instancia (auto-chat) quando houver.
+    if profile_picture_url and wuid:
+        conversation = (
+            WhatsAppConversation.objects.filter(wa_id=wuid).first()
+            or WhatsAppConversation.objects.filter(wa_id_alt=wuid).first()
+        )
+        if conversation and profile_picture_url != (conversation.avatar_url or ''):
+            conversation.avatar_url = profile_picture_url
+            conversation.save(update_fields=['avatar_url', 'atualizado_em'])
     return True
 
 
