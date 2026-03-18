@@ -2347,6 +2347,68 @@ def reconcile_contact_labels(
     return stats
 
 
+def _find_contact_snapshot_for_jids(
+    *,
+    instance: WhatsAppInstance | None,
+    jid_candidates: list[str],
+) -> dict[str, Any] | None:
+    if not instance or not instance.pk:
+        return None
+
+    normalized_jids = []
+    for raw in jid_candidates:
+        jid = normalize_wa_id(str(raw or '').strip())
+        if jid and jid not in normalized_jids:
+            normalized_jids.append(jid)
+    if not normalized_jids:
+        return None
+
+    numbers = []
+    for jid in normalized_jids:
+        if '@' in jid:
+            digits = normalize_number(jid.split('@', 1)[0])
+        else:
+            digits = normalize_number(jid)
+        if digits and digits not in numbers:
+            numbers.append(digits)
+
+    where_variants: list[dict[str, Any]] = []
+    for jid in normalized_jids:
+        where_variants.extend([
+            {'remoteJid': jid},
+            {'jid': jid},
+            {'id': jid},
+            {'wa_id': jid},
+            {'waId': jid},
+        ])
+    for number in numbers:
+        where_variants.extend([
+            {'number': number},
+            {'phone': number},
+            {'phoneNumber': number},
+        ])
+
+    client = EvolutionAPIClient(instance=instance)
+
+    def _match_node(node: dict[str, Any]) -> bool:
+        node_jid = normalize_wa_id(_extract_contact_jid_from_node(node))
+        if node_jid and node_jid in normalized_jids:
+            return True
+        node_digits = normalize_number((node_jid.split('@', 1)[0] if '@' in node_jid else node_jid) if node_jid else '')
+        return bool(node_digits and node_digits in numbers)
+
+    for where in where_variants:
+        for fetch in (client.find_contacts, client.find_chats):
+            try:
+                response = fetch(where=where, page=1, offset=20)
+            except Exception:
+                continue
+            for node in _iter_contact_like_nodes(response):
+                if isinstance(node, dict) and _match_node(node):
+                    return node
+    return None
+
+
 def reconcile_recent_outbound_statuses(*, minutes: int = 180, limit: int = 200, dry_run: bool = False) -> dict[str, int]:
     now = timezone.now()
     since = now - timedelta(minutes=max(1, int(minutes)))
@@ -3161,9 +3223,6 @@ def process_labels_update(payload: dict[str, Any]) -> bool:
         resolve_contact_name(payload, data if isinstance(data, dict) else {}).strip(),
         wa_id,
     )
-    if not labels and not avatar_url and not contact_name:
-        return False
-
     conversation = None
     if real_jid:
         conversation = WhatsAppConversation.objects.filter(wa_id=real_jid).first()
@@ -3174,7 +3233,38 @@ def process_labels_update(payload: dict[str, Any]) -> bool:
     if not conversation:
         return False
 
+    # Fallback: alguns contacts.update chegam sem avatar/labels completos.
+    if not avatar_url or not labels:
+        snapshot_instance = conversation.instance or get_active_instance()
+        snapshot = _find_contact_snapshot_for_jids(
+            instance=snapshot_instance,
+            jid_candidates=[wa_id, real_jid, lid_jid, conversation.wa_id, conversation.wa_id_alt],
+        )
+        if isinstance(snapshot, dict):
+            if not labels:
+                labels = normalize_labels(
+                    snapshot.get('labels')
+                    or snapshot.get('tags')
+                    or snapshot.get('tag')
+                    or snapshot.get('label')
+                )
+            if not avatar_url:
+                avatar_url = _extract_contact_avatar_from_node(snapshot)
+            if not contact_name:
+                contact_name = fallback_contact_name_by_wa_id(_extract_contact_name_from_node(snapshot), wa_id)
+
     update_fields = ['metadata', 'atualizado_em']
+    if real_jid and conversation.wa_id != real_jid:
+        collision = WhatsAppConversation.objects.filter(wa_id=real_jid).exclude(pk=conversation.pk).exists()
+        if not collision:
+            old_wa_id = conversation.wa_id
+            conversation.wa_id = real_jid
+            if is_lid_jid(old_wa_id) and not conversation.wa_id_alt:
+                conversation.wa_id_alt = old_wa_id
+            update_fields.append('wa_id')
+    if lid_jid and lid_jid != conversation.wa_id and lid_jid != (conversation.wa_id_alt or ''):
+        conversation.wa_id_alt = lid_jid
+        update_fields.append('wa_id_alt')
     if labels:
         conversation.etiquetas = labels
         update_fields.append('etiquetas')
