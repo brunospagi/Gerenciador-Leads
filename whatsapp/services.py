@@ -31,6 +31,23 @@ logger = logging.getLogger(__name__)
 URL_REGEX = re.compile(r'https?://[^\s<>"\']+', flags=re.IGNORECASE)
 
 
+def _console_log(message: str, level: str = 'INFO') -> None:
+    text = f'[WA-MEDIA][{level}] {message}'
+    try:
+        print(text, flush=True)
+    except Exception:
+        pass
+    log_level = str(level or 'INFO').upper()
+    if log_level == 'ERROR':
+        logger.error(message)
+    elif log_level == 'WARN':
+        logger.warning(message)
+    elif log_level == 'DEBUG':
+        logger.debug(message)
+    else:
+        logger.info(message)
+
+
 def sanitize_text_content(value: str) -> str:
     text = str(value or '')
     # Remove caracteres invisiveis que podem gerar bolhas "vazias"
@@ -716,11 +733,11 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
 
         resp = _download_with_headers(normalized)
         if not resp:
-            logger.debug('Falha ao baixar media remota para persistencia: url=%s', normalized)
+            _console_log(f'Falha ao baixar media remota para persistencia: url={normalized}', 'DEBUG')
             return ''
         final_response_url = str(getattr(resp, 'url', '') or '').strip()
         if _is_encrypted_media_ref(final_response_url):
-            logger.debug('URL final da midia ainda aponta para referencia criptografada: %s', final_response_url)
+            _console_log(f'URL final da midia ainda aponta para referencia criptografada: {final_response_url}', 'WARN')
             return ''
 
         content = resp.content or b''
@@ -737,11 +754,9 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         # Para midias renderizaveis, nao confiar apenas no header remoto.
         # Se os bytes nao forem reconhecidos, pode ser .enc/criptografado.
         if kind in {'image', 'video', 'audio', 'sticker'} and not detected_mime:
-            logger.debug(
-                'Midia remota sem assinatura reconhecivel nos bytes (possivel .enc): kind=%s url=%s content_type=%s',
-                kind,
-                normalized,
-                content_type,
+            _console_log(
+                f'Midia remota sem assinatura reconhecivel nos bytes (possivel .enc): kind={kind} url={normalized} content_type={content_type}',
+                'WARN',
             )
             return ''
         if not _mime_matches_kind(final_mime, kind):
@@ -807,10 +822,9 @@ def parse_message_media(payload: dict[str, Any]) -> tuple[str, str]:
         detected_mime = _guess_mime_from_bytes(decoded)
         final_mime = detected_mime or mime.split(';', 1)[0].strip().lower() or 'application/octet-stream'
         if media_kind in {'image', 'video', 'audio', 'sticker'} and not detected_mime:
-            logger.debug(
-                'Base64 de midia sem assinatura reconhecivel (possivel conteudo criptografado): kind=%s mime_hint=%s',
-                media_kind,
-                mime,
+            _console_log(
+                f'Base64 de midia sem assinatura reconhecivel (possivel conteudo criptografado): kind={media_kind} mime_hint={mime}',
+                'WARN',
             )
             return ''
         if not _mime_matches_kind(final_mime, media_kind):
@@ -1635,6 +1649,20 @@ class EvolutionAPIClient:
         response.raise_for_status()
         return response.json() if response.content else {}
 
+    def get_base64_from_media_message(self, message_id: str, convert_to_mp4: bool = False) -> dict[str, Any]:
+        url = f'{self.base_url}/chat/getBase64FromMediaMessage/{self.instance.instance_name}'
+        payload = {
+            'message': {
+                'key': {
+                    'id': str(message_id or '').strip(),
+                }
+            },
+            'convertToMp4': bool(convert_to_mp4),
+        }
+        response = requests.post(url, json=payload, headers=self.headers, timeout=60)
+        response.raise_for_status()
+        return response.json() if response.content else {}
+
 
 def get_active_instance() -> WhatsAppInstance | None:
     instance = WhatsAppInstance.objects.filter(ativo=True).order_by('-atualizado_em').first()
@@ -2157,6 +2185,70 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
                 found_url, found_kind = parse_message_media(candidate_payload)
                 if found_url:
                     return found_url, (found_kind or inferred_kind or media_kind or '').lower()
+
+        # Fallback final: solicita o base64 diretamente para Evolution usando o message id.
+        # Isso cobre casos em que apenas file.enc/url temporaria e retornada nos webhooks/findMessages.
+        try:
+            convert_to_mp4 = (inferred_kind or media_kind or '').lower() == 'audio'
+            _console_log(
+                f'Tentando fallback getBase64FromMediaMessage: external_id={external_id} convert_to_mp4={convert_to_mp4}',
+                'INFO',
+            )
+            base64_resp = client.get_base64_from_media_message(external_id, convert_to_mp4=convert_to_mp4)
+        except Exception as exc:
+            _console_log(f'getBase64FromMediaMessage falhou para id={external_id}: {exc}', 'WARN')
+            return '', ''
+
+        if not isinstance(base64_resp, dict):
+            return '', ''
+
+        b64_value = str(
+            base64_resp.get('base64')
+            or (base64_resp.get('message') or {}).get('base64')
+            or (base64_resp.get('data') or {}).get('base64')
+            or ''
+        ).strip()
+        if not b64_value:
+            _console_log(f'getBase64FromMediaMessage sem base64 para id={external_id}', 'WARN')
+            return '', ''
+
+        mime_hint = str(
+            base64_resp.get('mimetype')
+            or base64_resp.get('mimeType')
+            or (base64_resp.get('message') or {}).get('mimetype')
+            or (base64_resp.get('message') or {}).get('mimeType')
+            or (base64_resp.get('data') or {}).get('mimetype')
+            or (base64_resp.get('data') or {}).get('mimeType')
+            or ''
+        ).strip().lower()
+
+        inferred = (inferred_kind or media_kind or 'document').lower()
+        field_by_kind = {
+            'image': 'imageMessage',
+            'video': 'videoMessage',
+            'audio': 'audioMessage',
+            'document': 'documentMessage',
+            'sticker': 'stickerMessage',
+        }
+        target_field = field_by_kind.get(inferred, 'documentMessage')
+        candidate_payload = {
+            'data': {
+                'message': {
+                    target_field: {
+                        'base64': b64_value,
+                        'mimetype': mime_hint or 'application/octet-stream',
+                    }
+                }
+            }
+        }
+        found_url, found_kind = parse_message_media(candidate_payload)
+        if found_url:
+            _console_log(
+                f'Midia recuperada via getBase64FromMediaMessage: external_id={external_id} kind={found_kind or inferred} url_ok=true',
+                'INFO',
+            )
+            return found_url, (found_kind or inferred).lower()
+        _console_log(f'Fallback base64 nao gerou URL renderizavel para id={external_id}', 'WARN')
         return '', ''
 
     placeholder_values = {
@@ -2181,6 +2273,10 @@ def process_message_content_update(payload: dict[str, Any]) -> bool:
             logger.info('Media recuperada via Evolution lookup para external_id=%s kind=%s', message_obj.external_id or (external_id_candidates[0] if external_id_candidates else ''), media_kind)
 
     if media_url and media_url != (message_obj.media_url or ''):
+        _console_log(
+            f'Atualizando media_url da mensagem: external_id={message_obj.external_id or (external_id_candidates[0] if external_id_candidates else "")} kind={media_kind or inferred_kind or ""}',
+            'INFO',
+        )
         message_obj.media_url = media_url
         changed_fields.append('media_url')
 
