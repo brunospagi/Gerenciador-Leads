@@ -105,11 +105,12 @@ class RelatorioDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, Templat
     def test_func(self):
         user_profile = getattr(self.request.user, 'profile', None)
         if self.request.user.is_superuser: return True
-        if user_profile and user_profile.nivel_acesso in ['ADMIN', 'GERENTE']: return True
+        if user_profile and user_profile.nivel_acesso in ['ADMIN', 'GERENTE', 'DISTRIBUIDOR']: return True
+        if user_profile and user_profile.pode_distribuir_leads: return True
         return False
 
     def handle_no_permission(self):
-        messages.error(self.request, "Acesso restrito a Gerentes e Administradores.")
+        messages.error(self.request, "Acesso restrito a perfis com permissao de distribuicao.")
         return redirect('portal')
 
     def get_context_data(self, **kwargs):
