@@ -247,7 +247,7 @@ def detalhe_folha(request, pk):
     is_gerente = False
     try:
         nivel = folha.funcionario.user.profile.nivel_acesso
-        if nivel == 'GERENTE' or nivel == 'ADMIN':
+        if nivel == 'GERENTE':
             is_gerente = True
     except: pass
 

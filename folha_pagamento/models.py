@@ -236,7 +236,7 @@ class FolhaPagamento(models.Model):
         is_gerente = False
         try:
             nivel = self.funcionario.user.profile.nivel_acesso
-            if nivel == 'GERENTE' or nivel == 'ADMIN':
+            if nivel == 'GERENTE':
                 is_gerente = True
         except:
             pass
