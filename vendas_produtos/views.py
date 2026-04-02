@@ -293,6 +293,20 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
 
         relatorio_vendedores = []
         
+        def _chave_exibicao_venda(venda, vendedor_id):
+            papel = 'GERENCIA'
+            if not getattr(venda, 'is_comissao_gerente', False):
+                papel = 'AJUDA' if venda.vendedor_ajudante_id == vendedor_id else 'TITULAR'
+            return (
+                venda.data_venda,
+                venda.tipo_produto,
+                (venda.cliente_nome or '').strip().lower(),
+                (venda.placa or '').strip().upper(),
+                (venda.modelo_veiculo or '').strip().lower(),
+                Decimal(venda.valor_venda or 0),
+                papel,
+            )
+        
         for vid in ids_para_processar:
             vendedor_obj = User.objects.filter(pk=vid).first()
             if vendedor_obj:
@@ -304,9 +318,15 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
                 vendas_ajudante = qs_base.filter(vendedor_ajudante_id=vid)
                 soma_ajudante = vendas_ajudante.aggregate(Sum('comissao_ajudante'))['comissao_ajudante__sum'] or 0
                 
-                todas_vendas = list(vendas_titular) + list(vendas_ajudante)
+                # Evita duplicidade no mesmo bloco do vendedor.
+                todas_vendas = list(vendas_titular)
+                ids_vendas = {v.id for v in todas_vendas}
+                for v in vendas_ajudante:
+                    if v.id not in ids_vendas:
+                        todas_vendas.append(v)
+                        ids_vendas.add(v.id)
                 
-                total_geral = soma_titular + soma_ajudante
+                total_geral = Decimal('0.00')
 
                 # 3. Se for EXCLUSIVAMENTE GERENTE, busca vendas da equipe (ADMIN fica de fora)
                 is_gerente_row = False
@@ -319,9 +339,13 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
                     vendas_equipe = qs_base.filter(
                         status='APROVADO', 
                         tipo_produto__in=['VENDA_VEICULO', 'VENDA_MOTO']
-                    ).exclude(vendedor=vendedor_obj)
+                    ).exclude(
+                        Q(vendedor=vendedor_obj) | Q(vendedor_ajudante=vendedor_obj)
+                    )
                     
                     for v in vendas_equipe:
+                        if v.id in ids_vendas:
+                            continue
                         v.is_comissao_gerente = True
                         if v.tipo_produto == 'VENDA_VEICULO':
                             v.valor_comissao_gerente = Decimal('150.00')
@@ -329,15 +353,33 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
                             v.valor_comissao_gerente = Decimal('80.00')
                         
                         todas_vendas.append(v)
-                        total_geral += v.valor_comissao_gerente
+                        ids_vendas.add(v.id)
 
                 # Ordena tudo por data
                 todas_vendas.sort(key=lambda x: x.data_venda)
 
-                if todas_vendas:
+                # Blindagem final: remove duplicidades por chave de exibição
+                # (casos de dados repetidos/inconsistentes no período).
+                vendas_unicas = []
+                chaves_vendas = set()
+                for venda in todas_vendas:
+                    chave = _chave_exibicao_venda(venda, vid)
+                    if chave in chaves_vendas:
+                        continue
+                    chaves_vendas.add(chave)
+                    vendas_unicas.append(venda)
+
+                    if getattr(venda, 'is_comissao_gerente', False):
+                        total_geral += getattr(venda, 'valor_comissao_gerente', Decimal('0.00')) or Decimal('0.00')
+                    elif venda.vendedor_ajudante_id == vid:
+                        total_geral += venda.comissao_ajudante or Decimal('0.00')
+                    else:
+                        total_geral += venda.comissao_vendedor or Decimal('0.00')
+
+                if vendas_unicas:
                     relatorio_vendedores.append({
                         'vendedor': vendedor_obj,
-                        'vendas': todas_vendas,
+                        'vendas': vendas_unicas,
                         'total_comissao': total_geral
                     })
         
