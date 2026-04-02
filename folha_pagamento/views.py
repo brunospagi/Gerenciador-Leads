@@ -205,12 +205,13 @@ def detalhe_folha(request, pk):
         folha.refresh_from_db() 
 
     itens_holerite = []
+    dias_salario_ref = folha.get_dias_trabalhados_mes()
     
     # === VENCIMENTOS (CRÉDITOS) ===
     
     # 1. Salário Base
     itens_holerite.append({
-        'codigo': '001', 'descricao': 'SALARIO BASE', 'referencia': '30 Dias',
+        'codigo': '001', 'descricao': 'SALARIO BASE', 'referencia': f'{dias_salario_ref} Dias',
         'vencimentos': folha.salario_base, 'descontos': 0
     })
 

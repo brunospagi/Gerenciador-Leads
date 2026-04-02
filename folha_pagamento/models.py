@@ -3,7 +3,7 @@ from django.utils import timezone
 from funcionarios.models import Funcionario
 from vendas_produtos.models import VendaProduto
 from django.db.models import Sum, Q
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import calendar
 
 # === 1. FERIADOS ===
@@ -172,8 +172,50 @@ class FolhaPagamento(models.Model):
         unique_together = ['funcionario', 'mes', 'ano']
         ordering = ['-ano', '-mes']
 
+    def _periodo_referencia(self):
+        ultimo_dia = calendar.monthrange(self.ano, self.mes)[1]
+        data_inicio = timezone.datetime(self.ano, self.mes, 1).date()
+        data_fim = timezone.datetime(self.ano, self.mes, ultimo_dia).date()
+        return data_inicio, data_fim
+
+    def _data_inicio_trabalho_no_mes(self):
+        data_inicio, data_fim = self._periodo_referencia()
+        data_admissao = getattr(self.funcionario, 'data_admissao', None)
+        if not data_admissao:
+            return data_inicio
+        if data_admissao > data_fim:
+            return None
+        if data_admissao <= data_inicio:
+            return data_inicio
+        return data_admissao
+
+    def get_dias_trabalhados_mes(self):
+        data_inicio, data_fim = self._periodo_referencia()
+        inicio_trabalho = self._data_inicio_trabalho_no_mes()
+        if not inicio_trabalho:
+            return 0
+        total_mes = (data_fim - data_inicio).days + 1
+        dias_trabalhados = (data_fim - inicio_trabalho).days + 1
+        return min(max(dias_trabalhados, 0), total_mes)
+
+    def get_salario_base_proporcional(self):
+        salario_integral = self.funcionario.salario_base or Decimal('0.00')
+        data_inicio, data_fim = self._periodo_referencia()
+        total_dias_mes = (data_fim - data_inicio).days + 1
+        dias_trabalhados = self.get_dias_trabalhados_mes()
+        if dias_trabalhados <= 0:
+            return Decimal('0.00')
+        if dias_trabalhados >= total_dias_mes:
+            return salario_integral
+        proporcional = (salario_integral / Decimal(total_dias_mes)) * Decimal(dias_trabalhados)
+        return proporcional.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
     def get_dias_uteis_vt(self):
         """Conta dias de Segunda(0) a Sábado(5) excluindo Feriados."""
+        inicio_trabalho = self._data_inicio_trabalho_no_mes()
+        if not inicio_trabalho:
+            return 0
+
         cal = calendar.monthcalendar(self.ano, self.mes)
         dias_uteis = 0
         
@@ -189,7 +231,7 @@ class FolhaPagamento(models.Model):
                 # day != 0: dia existe no calendário
                 # day_idx < 6: Segunda a Sábado
                 if day != 0 and day_idx < 6:
-                    if day not in dias_feriados:
+                    if day >= inicio_trabalho.day and day not in dias_feriados:
                         dias_uteis += 1
         return dias_uteis
 
@@ -197,12 +239,10 @@ class FolhaPagamento(models.Model):
         if self.fechada: return
 
         # 1. Base
-        self.salario_base = self.funcionario.salario_base
+        self.salario_base = self.get_salario_base_proporcional()
 
         # 2. Comissões
-        ultimo_dia = calendar.monthrange(self.ano, self.mes)[1]
-        data_inicio = timezone.datetime(self.ano, self.mes, 1).date()
-        data_fim = timezone.datetime(self.ano, self.mes, ultimo_dia).date()
+        data_inicio, data_fim = self._periodo_referencia()
 
         # Garante split atualizado para vendas com ajudante no periodo,
         # inclusive registros antigos criados antes da regra de 50/50.
