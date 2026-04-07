@@ -98,7 +98,11 @@ def dashboard_rh(request):
                     if not folha.fechada:
                         folha.calcular_folha()
                         count += 1
-                messages.success(request, f"{count} folhas calculadas para {mes:02d}/{ano}.")
+                messages.success(
+                    request,
+                    f"{count} folhas abertas calculadas para {mes:02d}/{ano}. "
+                    "Folhas fechadas permanecem travadas."
+                )
 
             return redirect(f"{reverse('rh_dashboard')}?mes={mes}&ano={ano}")
     else:
