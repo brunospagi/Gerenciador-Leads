@@ -8,7 +8,7 @@ from django.db.models import Sum, Q
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 import calendar
 from dateutil.relativedelta import relativedelta
@@ -128,6 +128,23 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
         main_venda = form.instance
         if not main_venda.vendedor_id:
             main_venda.vendedor = self.request.user
+
+        # Guarda backend contra duplo envio acidental (duplo clique/reenvio de rede).
+        janela = timezone.now() - timedelta(seconds=25)
+        vendedor_ref = main_venda.vendedor
+        duplicada = VendaProduto.objects.filter(
+            vendedor=vendedor_ref,
+            tipo_produto=main_venda.tipo_produto,
+            cliente_nome=main_venda.cliente_nome,
+            placa=main_venda.placa,
+            data_venda=main_venda.data_venda,
+            valor_venda=main_venda.valor_venda,
+            data_criacao__gte=janela,
+        ).exists()
+        if duplicada:
+            messages.warning(self.request, "Envio duplicado detectado. O lançamento já foi registrado.")
+            return redirect('venda_produto_list')
+
         response = super().form_valid(form)
         
         if main_venda.tipo_produto == 'VENDA_VEICULO':

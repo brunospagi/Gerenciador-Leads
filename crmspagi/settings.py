@@ -27,10 +27,33 @@ ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split('
 # O CSRF_TRUSTED_ORIGINS também deve ser configurado via variável de ambiente
 CSRF_TRUSTED_ORIGINS = os.getenv('DJANGO_CSRF_TRUSTED_ORIGINS', 'http://127.0.0.1,http://localhost').split(',')
 
+# Completa CSRF trusted origins com base em ALLOWED_HOSTS (evita falhas intermitentes em produção).
+_csrf_from_env = [o.strip() for o in CSRF_TRUSTED_ORIGINS if o.strip()]
+_csrf_dynamic = []
+for host in [h.strip() for h in ALLOWED_HOSTS if h.strip()]:
+    if host in ('*',):
+        continue
+    if '://' in host:
+        _csrf_dynamic.append(host)
+        continue
+    if host.startswith('.'):
+        wildcard_host = f"*.{host.lstrip('.')}"
+        _csrf_dynamic.append(f"https://{wildcard_host}")
+        _csrf_dynamic.append(f"http://{wildcard_host}")
+        continue
+    _csrf_dynamic.append(f"https://{host}")
+    if host in ('127.0.0.1', 'localhost'):
+        _csrf_dynamic.append(f"http://{host}")
+CSRF_TRUSTED_ORIGINS = sorted(set(_csrf_from_env + _csrf_dynamic))
 
 # Configurações de sessão
 SESSION_COOKIE_AGE = 43200
 SESSION_SAVE_EVERY_REQUEST = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_FAILURE_VIEW = 'crmspagi.views.csrf_failure'
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'

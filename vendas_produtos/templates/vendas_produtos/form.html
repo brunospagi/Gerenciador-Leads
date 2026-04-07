@@ -482,13 +482,35 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const form = document.getElementById('vendaForm');
+    let isSubmitting = false;
     if(form) {
         form.addEventListener('submit', function(e) {
+            if (isSubmitting) {
+                e.preventDefault();
+                return;
+            }
+
             if (modoCaptacaoBtn && modoCaptacaoBtn.checked) {
                 if (optCompra && optCompra.checked) realTipoSelect.value = 'COMPRA';
                 else realTipoSelect.value = 'CONSIGNACAO';
             }
+
+            // Sincroniza financiamento do modo padrão para os campos reais antes de enviar.
+            if (cardFinanceiroPadrao.style.display !== 'none') {
+                if (inputFinanPadrao) inputFinanReal.value = inputFinanPadrao.value;
+                if (inputFakeBancoPadrao) inputBancoReal.value = inputFakeBancoPadrao.value;
+                if (inputFakePropostaPadrao) inputPropostaReal.value = inputFakePropostaPadrao.value;
+            }
+
             moneyInputs.forEach(input => { if (input.value) input.value = parseMonetary(input.value); });
+
+            // Trava anti duplo submit.
+            isSubmitting = true;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerText = 'Enviando...';
+            }
         });
     }
 
@@ -505,12 +527,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if ((parseMonetary(inputFinanPadrao.value) || 0) > 0) {
             divFinanPadrao.style.display = 'block';
-            if(inputFakeBancoPadrao) inputFakeBancoPadrao.required = true;
-            if(inputFakePropostaPadrao) inputFakePropostaPadrao.required = true;
+            // Campos visuais no modo padrão não devem bloquear HTML5 validation.
+            if(inputFakeBancoPadrao) inputFakeBancoPadrao.required = false;
+            if(inputFakePropostaPadrao) inputFakePropostaPadrao.required = false;
+            // Validação real fica nos campos do model.
+            if(inputBancoReal) inputBancoReal.required = true;
+            if(inputPropostaReal) inputPropostaReal.required = true;
         } else {
             divFinanPadrao.style.display = 'none';
             if(inputFakeBancoPadrao) { inputFakeBancoPadrao.required = false; inputFakeBancoPadrao.value = ''; }
             if(inputFakePropostaPadrao) { inputFakePropostaPadrao.required = false; inputFakePropostaPadrao.value = ''; }
+            if(inputBancoReal) inputBancoReal.required = false;
+            if(inputPropostaReal) inputPropostaReal.required = false;
             if(inputBancoReal) inputBancoReal.value = '';
             if(inputPropostaReal) inputPropostaReal.value = '';
         }

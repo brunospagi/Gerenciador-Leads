@@ -53,3 +53,70 @@ def admin_dashboard(request):
     }
     
     return render(request, 'dashboard_admin.html', context)
+
+
+def _render_error_page(request, status_code, title, message):
+    return render(
+        request,
+        'error_generic.html',
+        {
+            'status_code': status_code,
+            'error_title': title,
+            'error_message': message,
+        },
+        status=status_code,
+    )
+
+
+def error_400(request, exception=None):
+    return _render_error_page(
+        request,
+        400,
+        'Solicitacao invalida',
+        'Nao foi possivel processar esta solicitacao. Tente novamente.',
+    )
+
+
+def error_403(request, exception=None):
+    return _render_error_page(
+        request,
+        403,
+        'Acesso negado',
+        'Voce nao possui permissao para acessar este recurso.',
+    )
+
+
+def error_404(request, exception=None):
+    return _render_error_page(
+        request,
+        404,
+        'Pagina nao encontrada',
+        'A pagina solicitada nao existe ou foi movida.',
+    )
+
+
+def error_500(request):
+    return _render_error_page(
+        request,
+        500,
+        'Erro interno do sistema',
+        'Ocorreu uma instabilidade. Nossa equipe tecnica ja pode atuar neste caso.',
+    )
+
+
+def error_503(request, exception=None):
+    return _render_error_page(
+        request,
+        503,
+        'Servico temporariamente indisponivel',
+        'O sistema esta passando por manutencao ou instabilidade momentanea. Tente novamente em instantes.',
+    )
+
+
+def csrf_failure(request, reason=''):
+    return _render_error_page(
+        request,
+        403,
+        'Sessao expirada ou validacao de seguranca',
+        'Sua sessao expirou ou houve falha de validacao. Atualize a pagina e tente novamente.',
+    )

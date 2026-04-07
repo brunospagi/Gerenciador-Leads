@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Erro {{ status_code }}</title>
+    <style>
+        :root {
+            --bg: #f4f7fb;
+            --card: #ffffff;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --accent: #0f766e;
+            --accent-dark: #115e59;
+            --danger: #b91c1c;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: radial-gradient(circle at top, #e9f5f3 0%, var(--bg) 40%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .card {
+            width: 100%;
+            max-width: 720px;
+            background: var(--card);
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+            padding: 28px;
+            border: 1px solid #e5e7eb;
+        }
+        .status {
+            display: inline-block;
+            background: #fee2e2;
+            color: var(--danger);
+            font-weight: 700;
+            border-radius: 999px;
+            padding: 6px 14px;
+            font-size: 13px;
+            margin-bottom: 14px;
+        }
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+            line-height: 1.2;
+        }
+        p {
+            margin: 0 0 12px 0;
+            color: var(--muted);
+            font-size: 16px;
+        }
+        .box {
+            margin-top: 20px;
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 14px;
+        }
+        .box strong {
+            color: var(--accent-dark);
+            display: block;
+            margin-bottom: 6px;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            text-decoration: none;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-weight: 600;
+            font-size: 14px;
+            border: 1px solid transparent;
+        }
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: var(--accent-dark);
+        }
+        .btn-light {
+            background: #fff;
+            color: var(--text);
+            border-color: #d1d5db;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <span class="status">Erro {{ status_code }}</span>
+        <h1>{{ error_title }}</h1>
+        <p>{{ error_message }}</p>
+
+        <div class="box">
+            <strong>Equipe tecnica</strong>
+            <p>Se o problema persistir, entre em contato com a equipe tecnica e informe o codigo do erro: <b>{{ status_code }}</b>.</p>
+        </div>
+
+        <div class="actions">
+            <a href="/" class="btn btn-primary">Voltar ao Portal</a>
+            <a href="javascript:location.reload();" class="btn btn-light">Tentar novamente</a>
+        </div>
+    </div>
+</body>
+</html>

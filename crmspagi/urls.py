@@ -25,4 +25,10 @@ urlpatterns = [
     path('financeiro/', include('financeiro.urls')),
     path('ponto/', include('controle_ponto.urls')),
     path('whatsapp/', include('whatsapp.urls')),
+    path('erro/503/', views.error_503, name='erro_503'),
 ]
+
+handler400 = 'crmspagi.views.error_400'
+handler403 = 'crmspagi.views.error_403'
+handler404 = 'crmspagi.views.error_404'
+handler500 = 'crmspagi.views.error_500'
