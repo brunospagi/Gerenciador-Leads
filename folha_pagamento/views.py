@@ -95,13 +95,12 @@ def dashboard_rh(request):
                         funcionario=func, mes=mes, ano=ano,
                         defaults={'salario_base': func.salario_base}
                     )
-                    if not folha.fechada:
-                        folha.calcular_folha()
-                        count += 1
+                    folha.calcular_folha(force=True)
+                    count += 1
                 messages.success(
                     request,
-                    f"{count} folhas abertas calculadas para {mes:02d}/{ano}. "
-                    "Folhas fechadas permanecem travadas."
+                    f"{count} folhas recalculadas para {mes:02d}/{ano} "
+                    "(incluindo fechadas, sem alterar status)."
                 )
 
             return redirect(f"{reverse('rh_dashboard')}?mes={mes}&ano={ano}")

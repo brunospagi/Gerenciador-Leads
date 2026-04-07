@@ -235,8 +235,9 @@ class FolhaPagamento(models.Model):
                         dias_uteis += 1
         return dias_uteis
 
-    def calcular_folha(self):
-        if self.fechada: return
+    def calcular_folha(self, force=False):
+        if self.fechada and not force:
+            return
 
         # 1. Base
         self.salario_base = self.get_salario_base_proporcional()

@@ -4,10 +4,10 @@
 {% block content %}
 <div class="container-fluid mt-3">
     
-    {# --- BARRA DE NAVEGAÃ‡ÃƒO DE DATA --- #}
+    {# --- BARRA DE NAVEGAÇÃO DE DATA --- #}
     <div class="alert alert-light border shadow-sm d-flex justify-content-between align-items-center mb-4">
         <div class="d-flex align-items-center">
-            <a href="?data_inicio={{ nav_anterior_inicio }}" class="btn btn-outline-secondary btn-sm me-2" title="MÃªs Anterior">
+            <a href="?data_inicio={{ nav_anterior_inicio }}" class="btn btn-outline-secondary btn-sm me-2" title="Mês Anterior">
                 <i class="fa fa-chevron-left"></i>
             </a>
             
@@ -20,7 +20,7 @@
                 </small>
             </div>
 
-            <a href="?data_inicio={{ nav_proximo_inicio }}" class="btn btn-outline-secondary btn-sm ms-2" title="PrÃ³ximo MÃªs">
+            <a href="?data_inicio={{ nav_proximo_inicio }}" class="btn btn-outline-secondary btn-sm ms-2" title="Próximo Mês">
                 <i class="fa fa-chevron-right"></i>
             </a>
         </div>
@@ -28,17 +28,17 @@
         {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
         <div>
             <a href="{% url 'configuracao_comissao' %}" class="btn btn-outline-dark btn-sm me-2">
-                <i class="fa fa-cogs me-2"></i> ConfiguraÃ§Ãµes
+                <i class="fa fa-cogs me-2"></i> Configurações
             </a>
             <a href="{% url 'venda_produto_relatorio' %}?data_inicio={{ periodo_inicio|date:'Y-m-d' }}" class="btn btn-dark btn-sm">
-                <i class="fa fa-file-invoice-dollar me-2"></i> RelatÃ³rio
+                <i class="fa fa-file-invoice-dollar me-2"></i> Relatório
             </a>
         </div>
         {% endif %}
     </div>
 
     <div class="row mb-4">
-        <div class="col-md-3 mb-3"><div class="card bg-primary text-white h-100 shadow-sm border-0"><div class="card-body"><h6>Minha ComissÃ£o</h6><h3 class="fw-bold">R$ {{ minha_comissao|floatformat:2 }}</h3></div></div></div>
+        <div class="col-md-3 mb-3"><div class="card bg-primary text-white h-100 shadow-sm border-0"><div class="card-body"><h6>Minha Comissão</h6><h3 class="fw-bold">R$ {{ minha_comissao|floatformat:2 }}</h3></div></div></div>
         {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
         <div class="col-md-3 mb-3"><div class="card bg-info text-dark h-100 shadow-sm border-0"><div class="card-body"><h6>Total Equipe</h6><h3 class="fw-bold">R$ {{ total_comissao_equipe|floatformat:2 }}</h3></div></div></div>
         {% endif %}
@@ -51,7 +51,7 @@
                 <div class="card bg-warning text-dark h-100 shadow-sm border-0 element-hover">
                     <div class="card-body d-flex flex-column justify-content-center">
                         <div class="d-flex justify-content-between align-items-center">
-                            <div><h6 class="fw-bold mb-1"><i class="fa fa-handshake me-1"></i> ConsignaÃ§Ã£o</h6><small class="text-dark opacity-75">Captura / Compra</small></div>
+                            <div><h6 class="fw-bold mb-1"><i class="fa fa-handshake me-1"></i> Consignação</h6><small class="text-dark opacity-75">Captura / Compra</small></div>
                             <div class="text-end"><span class="badge bg-dark text-warning">R$ 350,00</span><div class="mt-1 small fw-bold">NOVO <i class="fa fa-plus-circle"></i></div></div>
                         </div>
                     </div>
@@ -73,11 +73,11 @@
                         <tr>
                             <th>Data</th>
                             {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}<th>Vendedor</th>{% endif %}
-                            <th>Produto / VeÃ­culo</th>
+                            <th>Produto / Veículo</th>
                             <th>Cliente</th>
                             <th>Valores</th>
                             <th>Status</th>
-                            <th class="text-end">AÃ§Ãµes</th>
+                            <th class="text-end">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -98,7 +98,7 @@
                             <td>
                                 <div class="fw-bold">{{ item.get_tipo_produto_display }}</div>
                                 
-                                {# --- NOVA EXIBIÃ‡ÃƒO: MODELO, ANO E PLACA --- #}
+                                {# --- NOVA EXIBIÇÃO: MODELO, ANO E PLACA --- #}
                                 {% if item.modelo_veiculo %}
                                     <div class="mt-1" style="line-height: 1.2;">
                                         <span class="fw-bold text-dark">{{ item.modelo_veiculo }}</span>
@@ -124,7 +124,7 @@
                                     <div class="mt-1 small text-primary fw-bold"><i class="fa fa-exchange-alt"></i> Split com {{ item.vendedor.first_name }}</div>
                                 {% endif %}
 
-                                {% if item.numero_apolice %}<div class="mt-1 small border-top pt-1"><strong>ApÃ³lice:</strong> {{ item.numero_apolice }} <a href="{{ item.arquivo_apolice.url }}" target="_blank" class="text-danger ms-1 fw-bold"><i class="fa fa-file-pdf"></i> PDF</a></div>{% endif %}
+                                {% if item.numero_apolice %}<div class="mt-1 small border-top pt-1"><strong>Apólice:</strong> {{ item.numero_apolice }} <a href="{{ item.arquivo_apolice.url }}" target="_blank" class="text-danger ms-1 fw-bold"><i class="fa fa-file-pdf"></i> PDF</a></div>{% endif %}
                             </td>
                             
                             {# --- Cliente (Removido Placa daqui) --- #}
@@ -132,16 +132,16 @@
                                 <strong>{{ item.cliente_nome }}</strong>
                             </td>
                             
-                            {# --- LÃ“GICA DE EXIBIÃ‡ÃƒO DA COMISSÃƒO --- #}
+                            {# --- LÓGICA DE EXIBIÇÃO DA COMISSÃO --- #}
                             <td>
                                 <small>Venda: {{ item.valor_venda }}</small><br>
                                 
                                 {% if item.vendedor_ajudante_id == user.id %}
-                                    {# Sou o Ajudante: Mostra Minha ComissÃ£o #}
+                                    {# Sou o Ajudante: Mostra Minha Comissão #}
                                     <strong class="text-primary">Com: {{ item.comissao_ajudante }}</strong>
                                     <span class="badge bg-info text-dark ms-1" style="font-size: 0.6em;">AJUDA</span>
                                 {% else %}
-                                    {# Sou o Titular ou Gestor: Mostra ComissÃ£o do Vendedor #}
+                                    {# Sou o Titular ou Gestor: Mostra Comissão do Vendedor #}
                                     <strong class="text-success">Com: {{ item.comissao_vendedor }}</strong>
                                 {% endif %}
                             </td>
@@ -155,7 +155,7 @@
                                 {% if item.comprovante %}<button class="btn btn-sm btn-info text-white" data-bs-toggle="modal" data-bs-target="#modalComprovante{{ item.pk }}" title="Ver Comprovante"><i class="fa fa-eye"></i></button>{% endif %}
                                 <a href="{% url 'venda_produto_print' item.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Imprimir"><i class="fa fa-print"></i></a>
                                 
-                                {# Permite editar se nÃ£o estiver aprovado, ou se for admin #}
+                                {# Permite editar se não estiver aprovado, ou se for admin #}
                                 {% if item.status != 'APROVADO' or user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
                                     <a href="{% url 'venda_produto_update' item.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fa fa-pencil-alt"></i></a>
                                     <a href="{% url 'venda_produto_delete' item.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fa fa-trash"></i></a>
@@ -180,21 +180,21 @@
                                                     <p class="mb-2"><strong>Tipo:</strong> {{ item.get_tipo_produto_display }}</p>
 
                                                     {% if item.tipo_produto == 'GARANTIA' %}
-                                                        <div class="mb-3"><label class="form-label fw-bold">NÂº ApÃ³lice</label><input type="text" name="numero_apolice" class="form-control" required></div>
-                                                        <div class="mb-3"><label class="form-label fw-bold">PDF da ApÃ³lice</label><input type="file" name="arquivo_apolice" class="form-control" accept="application/pdf" required></div>
+                                                        <div class="mb-3"><label class="form-label fw-bold">Nº Apólice</label><input type="text" name="numero_apolice" class="form-control" required></div>
+                                                        <div class="mb-3"><label class="form-label fw-bold">PDF da Apólice</label><input type="file" name="arquivo_apolice" class="form-control" accept="application/pdf" required></div>
                                                     
                                                     {% elif item.tipo_produto == 'VENDA_VEICULO' or item.tipo_produto == 'VENDA_MOTO' %}
                                                         <div class="mb-3"><label class="form-label fw-bold text-success">Valor da Venda (R$)</label><input type="text" name="valor_venda" class="form-control money-mask" value="{{ item.valor_venda|floatformat:2 }}" required></div>
-                                                        <div class="mb-3"><label class="form-label fw-bold text-danger">Custo do VeÃ­culo (Loja)</label><input type="text" name="custo_base" class="form-control money-mask" placeholder="R$ 0,00" required><div class="form-text">Custo de compra para cÃ¡lculo do lucro.</div></div>
+                                                        <div class="mb-3"><label class="form-label fw-bold text-danger">Custo do Veículo (Loja)</label><input type="text" name="custo_base" class="form-control money-mask" placeholder="R$ 0,00" required><div class="form-text">Custo de compra para cálculo do lucro.</div></div>
 
                                                     {% elif item.tipo_produto == 'CONSIGNACAO' or item.tipo_produto == 'COMPRA' %}
-                                                        <div class="mb-3"><label class="form-label fw-bold text-danger">Valor Pago / Custo de Entrada</label><input type="text" name="custo_base" class="form-control money-mask" placeholder="R$ 0,00" required><div class="form-text">Informe quanto a loja pagou pelo veÃ­culo.</div></div>
+                                                        <div class="mb-3"><label class="form-label fw-bold text-danger">Valor Pago / Custo de Entrada</label><input type="text" name="custo_base" class="form-control money-mask" placeholder="R$ 0,00" required><div class="form-text">Informe quanto a loja pagou pelo veículo.</div></div>
 
                                                     {% else %}
-                                                        <p class="text-muted">Confirma a aprovaÃ§Ã£o deste serviÃ§o?</p>
+                                                        <p class="text-muted">Confirma a aprovação deste serviço?</p>
                                                     {% endif %}
                                                 </div>
-                                                <div class="modal-footer"><button type="submit" class="btn btn-success">Confirmar AprovaÃ§Ã£o</button></div>
+                                                <div class="modal-footer"><button type="submit" class="btn btn-success">Confirmar Aprovação</button></div>
                                             </div>
                                         </form>
                                     </div>
