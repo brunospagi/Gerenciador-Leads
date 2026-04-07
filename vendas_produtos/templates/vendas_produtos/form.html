@@ -312,6 +312,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputCor = document.getElementById('id_cor');
     const inputAno = document.getElementById('id_ano');
 
+    function ensureFinanciamentoDefaultZero() {
+        // Mantem o campo editavel, mas com valor inicial padrao quando estiver vazio.
+        if (inputFinanPadrao && !String(inputFinanPadrao.value || '').trim()) {
+            inputFinanPadrao.value = 'R$ 0,00';
+        }
+        if (inputFinanReal && !String(inputFinanReal.value || '').trim()) {
+            inputFinanReal.value = 'R$ 0,00';
+        }
+    }
+
     if(inputFinanPadrao) {
         inputFinanPadrao.addEventListener('input', function() {
             if(cardFinanceiroPadrao.style.display !== 'none') {
@@ -404,6 +414,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if(inputValorVendaReal && targetPadraoValorVenda) targetPadraoValorVenda.appendChild(inputValorVendaReal);
             checkCustoVisibility('VENDA_VEICULO');
             if(inputValorVendaReal) inputValorVendaReal.required = true;
+            ensureFinanciamentoDefaultZero();
             updateFinanceiroPadrao();
 
         } else if (mode === 'MOTO') {
@@ -592,6 +603,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if(inputFakePropostaPadrao) inputFakePropostaPadrao.value = inputPropostaReal.value;
             updateFinanceiroPadrao();
         }
+    }
+
+    // Garante padrao ao abrir tela nova sem valor de financiamento.
+    if (modoVeiculoBtn && modoVeiculoBtn.checked) {
+        ensureFinanciamentoDefaultZero();
+        updateFinanceiroPadrao();
     }
 });
 </script>

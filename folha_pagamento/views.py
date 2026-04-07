@@ -123,14 +123,14 @@ def lancar_desconto(request):
         if form.is_valid():
             desconto = form.save()
             _recalcular_folhas_abertas_por_parcelas(desconto.funcionario, desconto.parcelas.all())
-            messages.success(request, "Desconto lanÃ§ado com sucesso.")
+            messages.success(request, "Desconto lançado com sucesso.")
             return redirect('rh_lista_lancamentos') # Redireciona para a lista
     else:
         form = LancarDescontoForm()
     
     return render(request, 'folha_pagamento/form_desconto.html', {
         'form': form, 
-        'titulo': 'LanÃ§ar DÃ©bito/Desconto',
+        'titulo': 'Lançar Débito/Desconto',
         'cor_card': 'danger',      # Define cor Vermelha
         'icone': 'fa-minus-circle',
         'btn_label': 'Confirmar Desconto'
@@ -144,7 +144,7 @@ def lancar_credito(request):
         if form.is_valid():
             credito = form.save()
             _recalcular_folhas_abertas_por_parcelas(credito.funcionario, credito.parcelas.all())
-            messages.success(request, "CrÃ©dito/BÃ´nus lanÃ§ado com sucesso.")
+            messages.success(request, "Crédito/Bônus lançado com sucesso.")
             return redirect('rh_lista_lancamentos') # Redireciona para a lista
     else:
         form = LancarCreditoForm()
@@ -152,10 +152,10 @@ def lancar_credito(request):
     # Reutiliza o template, mas muda as cores e textos
     return render(request, 'folha_pagamento/form_desconto.html', {
         'form': form, 
-        'titulo': 'LanÃ§ar CrÃ©dito/BÃ´nus',
+        'titulo': 'Lançar Crédito/Bônus',
         'cor_card': 'success',     # Define cor Verde
         'icone': 'fa-plus-circle',
-        'btn_label': 'Confirmar CrÃ©dito'
+        'btn_label': 'Confirmar Crédito'
     })
 
 @login_required
@@ -176,11 +176,11 @@ def lista_lancamentos_manuais(request):
     mes = data_referencia.month
     ano = data_referencia.year
 
-    # NavegaÃ§Ã£o
+    # Navegação
     mes_anterior = data_referencia - relativedelta(months=1)
     proximo_mes = data_referencia + relativedelta(months=1)
 
-    # Buscando as PARCELAS que caem neste mÃªs (pois Ã© isso que vai pra folha)
+    # Buscando as PARCELAS que caem neste mês (pois é isso que vai pra folha)
     descontos = ParcelaDesconto.objects.filter(
         mes_referencia=mes, 
         ano_referencia=ano
@@ -208,12 +208,12 @@ def lista_lancamentos_manuais(request):
 def detalhe_folha(request, pk):
     folha = get_object_or_404(FolhaPagamento, pk=pk)
     
-    # PermissÃ£o: Apenas Admin ou o prÃ³prio dono da folha
+    # Permissão: Apenas Admin ou o próprio dono da folha
     if not is_admin_financeiro(request.user) and folha.funcionario.user != request.user:
         messages.error(request, "Acesso negado aos detalhes financeiros.")
         return redirect('rh_dashboard')
 
-    # --- FORÃ‡A O RECÃLCULO PARA ATUALIZAR VALORES (SE A FOLHA ESTIVER ABERTA) ---
+    # --- FORÇA O RECÁLCULO PARA ATUALIZAR VALORES (SE A FOLHA ESTIVER ABERTA) ---
     if not folha.fechada:
         folha.calcular_folha()
         folha.refresh_from_db() 
@@ -221,15 +221,15 @@ def detalhe_folha(request, pk):
     itens_holerite = []
     dias_salario_ref = folha.get_dias_trabalhados_mes()
     
-    # === VENCIMENTOS (CRÃ‰DITOS) ===
+    # === VENCIMENTOS (CRÉDITOS) ===
     
-    # 1. SalÃ¡rio Base
+    # 1. Salário Base
     itens_holerite.append({
         'codigo': '001', 'descricao': 'SALARIO BASE', 'referencia': f'{dias_salario_ref} Dias',
         'vencimentos': folha.salario_base, 'descontos': 0
     })
 
-    # 2. ComissÃµes
+    # 2. Comissões
     ultimo_dia = calendar.monthrange(folha.ano, folha.mes)[1]
     data_inicio = date(folha.ano, folha.mes, 1)
     data_fim = date(folha.ano, folha.mes, ultimo_dia)
@@ -258,7 +258,7 @@ def detalhe_folha(request, pk):
             'vencimentos': val_ajuda, 'descontos': 0
         })
 
-    # === CÃLCULO VISUAL DE COMISSÃƒO DE GERÃŠNCIA ===
+    # === CÁLCULO VISUAL DE COMISSÃO DE GERÊNCIA ===
     is_gerente = False
     try:
         nivel = folha.funcionario.user.profile.nivel_acesso
@@ -286,14 +286,14 @@ def detalhe_folha(request, pk):
         if val_gerencia > 0:
             itens_holerite.append({
                 'codigo': '060', 
-                'descricao': 'COMISSÃƒO GERÃŠNCIA (EQUIPE)', 
+                'descricao': 'COMISSÃO GERÊNCIA (EQUIPE)', 
                 'referencia': f"{qtd_carros_equipe} Car / {qtd_motos_equipe} Moto",
                 'vencimentos': val_gerencia, 
                 'descontos': 0
             })
     # ===============================================
 
-    # 3. AuxÃ­lio Transporte (CrÃ©dito)
+    # 3. Auxílio Transporte (Crédito)
     if folha.credito_vt > 0:
         dias_uteis = folha.get_dias_uteis_vt()
         itens_holerite.append({
@@ -301,7 +301,7 @@ def detalhe_folha(request, pk):
             'vencimentos': folha.credito_vt, 'descontos': 0
         })
 
-    # 4. CrÃ©ditos Manuais (BÃ´nus, etc)
+    # 4. Créditos Manuais (Bônus, etc)
     creditos_manuais = ParcelaCredito.objects.filter(
         credito_pai__funcionario=folha.funcionario,
         mes_referencia=folha.mes, ano_referencia=folha.ano
@@ -315,9 +315,9 @@ def detalhe_folha(request, pk):
             'vencimentos': c.valor, 'descontos': 0
         })
 
-    # === DESCONTOS (DÃ‰BITOS) ===
+    # === DESCONTOS (DÉBITOS) ===
 
-    # 5. Vale Transporte (Desconto Parte FuncionÃ¡rio 6%)
+    # 5. Vale Transporte (Desconto Parte Funcionário 6%)
     if folha.desconto_vt > 0:
         itens_holerite.append({
             'codigo': '105', 'descricao': 'DESC. VALE TRANSPORTE', 'referencia': '6.00 %',
@@ -338,8 +338,13 @@ def detalhe_folha(request, pk):
             'vencimentos': 0, 'descontos': p.valor
         })
 
-    # Totalizadores para exibiÃ§Ã£o
-    total_vencimentos = folha.salario_base + folha.total_comissoes + folha.credito_vt + folha.total_creditos_manuais
+    # Totalizadores para exibição (sempre baseados na mesma grade exibida no holerite)
+    total_vencimentos = Decimal('0.00')
+    total_descontos = Decimal('0.00')
+    for item in itens_holerite:
+        total_vencimentos += Decimal(item.get('vencimentos') or 0)
+        total_descontos += Decimal(item.get('descontos') or 0)
+    salario_liquido_exibicao = total_vencimentos - total_descontos
 
     # Conferencia detalhada de comissoes (incluindo split de ajuda).
     vendas_periodo = VendaProduto.objects.filter(
@@ -374,7 +379,8 @@ def detalhe_folha(request, pk):
         'folha': folha,
         'itens': itens_holerite,
         'total_vencimentos': total_vencimentos,
-        'total_descontos': folha.total_descontos,
+        'total_descontos': total_descontos,
+        'salario_liquido_exibicao': salario_liquido_exibicao,
         'conferencias_comissoes': conferencias_comissoes,
         'total_conferencia_minha': total_conferencia_minha,
         'total_conferencia_outro': total_conferencia_outro,
@@ -384,13 +390,13 @@ def detalhe_folha(request, pk):
 @user_passes_test(is_admin_financeiro)
 @require_POST
 def fechar_folha(request, pk):
-    # Busca a folha especÃ­fica
+    # Busca a folha específica
     folha = get_object_or_404(FolhaPagamento, pk=pk)
     
     if folha.fechada:
-        messages.warning(request, "Esta folha jÃ¡ encontra-se fechada.")
+        messages.warning(request, "Esta folha já encontra-se fechada.")
     else:
-        # Chama a funÃ§Ã£o que vocÃª jÃ¡ criou no models.py
+        # Chama a função que você já criou no models.py
         folha.fechar()
         messages.success(request, f"Folha de {folha.funcionario.user.first_name} ({folha.mes}/{folha.ano}) fechada com sucesso! Os valores foram travados.")
         

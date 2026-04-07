@@ -39,12 +39,12 @@
             <div class="col-6">
                 <h4 class="fw-bold mb-0 text-uppercase">SPAGI MOTORS COMERCIO DE VEICULOS LTDA.</h4>
                 <small class="text-muted">CNPJ: 08.824.721/0001-28</small><br>
-                <small class="text-muted">Rua Senador Accioly Filho, 440 - Afonso Pena - SÃ£o JosÃ© dos Pinhais/PR</small>
+                <small class="text-muted">Rua Senador Accioly Filho, 440 - Afonso Pena - São José dos Pinhais/PR</small>
             </div>
             <div class="col-4 text-end">
                 <div class="border p-2 rounded bg-light">
                     <small class="d-block fw-bold text-muted">RECIBO DE PAGAMENTO</small>
-                    <h5 class="fw-bold mb-0">MÃŠS: {{ folha.mes|stringformat:"02d" }}/{{ folha.ano }}</h5>
+                    <h5 class="fw-bold mb-0">MÊS: {{ folha.mes|stringformat:"02d" }}/{{ folha.ano }}</h5>
                 </div>
             </div>
         </div>
@@ -54,10 +54,10 @@
                 <table class="table table-bordered table-sm mb-0">
                     <thead class="bg-light">
                         <tr>
-                            <th>CÃ³digo</th>
+                            <th>Código</th>
                             <th>Nome do Colaborador</th>
                             <th>CBO / Cargo</th>
-                            <th>AdmissÃ£o</th>
+                            <th>Admissão</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -76,8 +76,8 @@
             <table class="table table-bordered table-striped table-sm">
                 <thead>
                     <tr class="table-dark">
-                        <th style="width: 80px;">CÃ³d.</th>
-                        <th>DescriÃ§Ã£o</th>
+                        <th style="width: 80px;">Cód.</th>
+                        <th>Descrição</th>
                         <th class="text-center" style="width: 100px;">Ref.</th>
                         <th class="text-end" style="width: 120px;">Vencimentos</th>
                         <th class="text-end" style="width: 120px;">Descontos</th>
@@ -118,8 +118,8 @@
                             <td colspan="3" class="align-middle">
                                 <small class="text-muted">Banco: {{ folha.funcionario.banco }} | Ag: {{ folha.funcionario.agencia }} | CC: {{ folha.funcionario.conta }}</small>
                             </td>
-                            <td class="text-end bg-dark text-white align-middle">LÃQUIDO A RECEBER</td>
-                            <td class="text-end bg-dark text-white fs-5">R$ {{ folha.salario_liquido|floatformat:2 }}</td>
+                            <td class="text-end bg-dark text-white align-middle">LÍQUIDO A RECEBER</td>
+                            <td class="text-end bg-dark text-white fs-5">R$ {{ salario_liquido_exibicao|floatformat:2 }}</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -184,7 +184,7 @@
                     <small class="text-muted">DATA: _____/_____/__________</small>
                 </div>
             </div>
-            <p class="text-center mt-3 mb-0 text-muted small">Declaramos ter recebido a importÃ¢ncia lÃ­quida discriminada neste recibo.</p>
+            <p class="text-center mt-3 mb-0 text-muted small">Declaramos ter recebido a importância líquida discriminada neste recibo.</p>
         </div>
 
     </div>
@@ -211,7 +211,7 @@
         .no-print {
             display: none !important;
         }
-        /* Ajuste para forÃ§ar impressÃ£o de cores de fundo (opcional, depende do navegador) */
+        /* Ajuste para forçar impressão de cores de fundo (opcional, depende do navegador) */
         .table-dark {
             background-color: #212529 !important;
             color: white !important;
