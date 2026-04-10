@@ -5,6 +5,8 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3 class="fw-bold text-dark"><i class="fas fa-calendar-check text-primary"></i> Espelho de Ponto Mensal</h3>
         <div>
+            <a href="{% url 'controle_ponto:ocorrencias_mensais' %}" class="btn btn-warning shadow-sm me-2"><i class="fas fa-exclamation-triangle"></i> Ocorrências</a>
+            <a href="{% url 'controle_ponto:relatorio_entradas' %}" class="btn btn-outline-primary shadow-sm me-2"><i class="fas fa-user-clock"></i> Relatório Entradas</a>
             <a href="{% url 'controle_ponto:mapa_pontos' %}" class="btn btn-danger shadow-sm me-2"><i class="fas fa-map-marker-alt"></i> Ver no Mapa</a>
             <button onclick="window.print()" class="btn btn-secondary shadow-sm"><i class="fas fa-print"></i> Imprimir</button>
         </div>
@@ -57,6 +59,10 @@
                             <th>Saída Almoço</th>
                             <th>Retorno Almoço</th>
                             <th>Saída Final</th>
+                            <th>Escala</th>
+                            <th>Atraso (min)</th>
+                            <th>Justificativa</th>
+                            <th>Homologação</th>
                             <th>IP Registrado</th>
                             <th class="d-print-none">Ações</th>
                         </tr>
@@ -69,29 +75,29 @@
                                 <span class="fw-bold">{{ p.funcionario.nome_completo }}</span><br>
                                 <small class="text-muted">{{ p.funcionario.cargo }}</small>
                             </td>
-                            
                             <td><span class="badge bg-success bg-opacity-10 text-success border border-success px-2 py-1">{{ p.entrada|time:"H:i"|default:"--" }}</span></td>
                             <td><span class="badge bg-warning bg-opacity-10 text-warning border border-warning px-2 py-1">{{ p.saida_almoco|time:"H:i"|default:"--" }}</span></td>
                             <td><span class="badge bg-info bg-opacity-10 text-info border border-info px-2 py-1">{{ p.retorno_almoco|time:"H:i"|default:"--" }}</span></td>
                             <td><span class="badge bg-danger bg-opacity-10 text-danger border border-danger px-2 py-1">{{ p.saida|time:"H:i"|default:"--" }}</span></td>
-                            
+                            <td>{{ p.horario_escala_entrada|time:"H:i"|default:"--" }}</td>
+                            <td>{% if p.atraso_minutos > 0 %}<span class="badge bg-warning text-dark">{{ p.atraso_minutos }}</span>{% else %}--{% endif %}</td>
+                            <td class="text-start" style="max-width:220px;">{{ p.justificativa_atraso|default:"-" }}</td>
+                            <td>
+                                {% if p.status_homologacao == 'PENDENTE' %}<span class="badge bg-warning text-dark">Pendente</span>
+                                {% elif p.status_homologacao == 'ACEITO' %}<span class="badge bg-success">Aceito</span>
+                                {% elif p.status_homologacao == 'RECUSADO' %}<span class="badge bg-danger">Recusado</span>
+                                {% else %}<span class="badge bg-secondary">N/A</span>{% endif %}
+                            </td>
                             <td class="text-muted small">{{ p.ip_registrado|default:"-" }}</td>
-                            
                             <td class="d-print-none text-nowrap">
-                                <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-info shadow-sm rounded-3 me-1" title="Ver Fotos e Localização">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                                <a href="{% url 'controle_ponto:editar_ponto' p.id %}" class="btn btn-sm btn-outline-primary shadow-sm rounded-3 me-1" title="Corrigir Horários">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <a href="{% url 'controle_ponto:excluir_ponto' p.id %}" class="btn btn-sm btn-outline-danger shadow-sm rounded-3" title="Excluir Registo">
-                                    <i class="fas fa-trash"></i>
-                                </a>
+                                <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-info shadow-sm rounded-3 me-1" title="Ver Fotos e Localização"><i class="fas fa-eye"></i></a>
+                                <a href="{% url 'controle_ponto:editar_ponto' p.id %}" class="btn btn-sm btn-outline-primary shadow-sm rounded-3 me-1" title="Corrigir Horários"><i class="fas fa-edit"></i></a>
+                                <a href="{% url 'controle_ponto:excluir_ponto' p.id %}" class="btn btn-sm btn-outline-danger shadow-sm rounded-3" title="Excluir Registro"><i class="fas fa-trash"></i></a>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="py-5 text-muted">Nenhum ponto registado no período selecionado.</td>
+                            <td colspan="12" class="py-5 text-muted">Nenhum ponto registrado no período selecionado.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -102,12 +108,15 @@
 </div>
 
 <style>
-    /* Ocultar elementos desnecessários ao Imprimir a Folha de Ponto */
+    @page { size: A4 landscape; margin: 10mm; }
+
     @media print {
         .d-print-none, header, nav, #sidebar { display: none !important; }
         #content-wrapper { margin-left: 0 !important; width: 100% !important; }
-        body { background: white; padding: 0; margin: 0; }
+        body { background: white; padding: 0; margin: 0; font-size: 11px; }
         .card { box-shadow: none !important; border: 1px solid #ccc !important; }
+        .container-fluid { padding: 0 !important; }
+        .table { width: 100% !important; font-size: 10px; }
         .table-dark { background-color: #f8f9fa !important; color: black !important; -webkit-print-color-adjust: exact; }
         .badge { border: none !important; background: transparent !important; color: black !important; font-weight: bold; font-size: 1rem; }
     }

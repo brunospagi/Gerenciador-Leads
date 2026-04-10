@@ -154,6 +154,7 @@
                             <td class="text-end">
                                 {% if item.comprovante %}<button class="btn btn-sm btn-info text-white" data-bs-toggle="modal" data-bs-target="#modalComprovante{{ item.pk }}" title="Ver Comprovante"><i class="fa fa-eye"></i></button>{% endif %}
                                 <a href="{% url 'venda_produto_print' item.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Imprimir"><i class="fa fa-print"></i></a>
+                                <a href="{% url 'venda_produto_minuta' item.pk %}" target="_blank" class="btn btn-sm btn-outline-dark" title="Imprimir Minuta"><i class="fa fa-file-alt"></i></a>
                                 
                                 {# Permite editar se não estiver aprovado, ou se for admin #}
                                 {% if item.status != 'APROVADO' or user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}

@@ -15,7 +15,7 @@ def admin_dashboard(request):
     nivel = getattr(request.user.profile, 'nivel_acesso', '')
     if not request.user.is_superuser and nivel not in ['ADMIN', 'GERENTE']:
         messages.error(request, "Acesso negado. Esta área é restrita à diretoria.")
-        return redirect('dashboard') # Redireciona para o portal inicial comum
+        return redirect('portal') # Redireciona para o portal inicial comum
 
     hoje = timezone.now().date()
     mes_atual = hoje.month

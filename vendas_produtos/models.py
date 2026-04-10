@@ -119,16 +119,27 @@ class VendaProduto(models.Model):
     comissao_ajudante = models.DecimalField(max_digits=10, decimal_places=2, default=0, editable=False)
 
     cliente_nome = models.CharField(max_length=150, verbose_name="Nome do Cliente")
+    dtnasc_cliente = models.DateField(blank=True, null=True, verbose_name="Data Nasc.")
+    rgIE_cliente = models.CharField(max_length=30, blank=True, null=True, verbose_name="RG/IE")
+    telCel_cliente = models.CharField(max_length=20, blank=True, null=True, verbose_name="Celular")
+    cpfCNPJ_cliente = models.CharField(max_length=20, blank=True, null=True, verbose_name="CPF/CNPJ")
+    endereco_cliente = models.CharField(max_length=255, blank=True, null=True, verbose_name="Rua")
+    numero_cliente = models.CharField(max_length=20, blank=True, null=True, verbose_name="Número")
+    cep_cliente = models.CharField(max_length=15, blank=True, null=True, verbose_name="CEP")
+    bairro_cliente = models.CharField(max_length=100, blank=True, null=True, verbose_name="Bairro")
+    cidade_com_cliente = models.CharField(max_length=100, blank=True, null=True, verbose_name="Cidade")
     origem_cliente = models.CharField(
         max_length=20,
         choices=ORIGEM_CLIENTE_CHOICES,
         default='OUTRO',
         verbose_name="Origem do Cliente"
     )
+    marca_veiculo = models.CharField(max_length=100, blank=True, null=True, verbose_name="Marca")
     placa = models.CharField(max_length=10)
     modelo_veiculo = models.CharField(max_length=100, blank=True, null=True, verbose_name="Modelo")
     cor = models.CharField(max_length=50, blank=True, null=True, verbose_name="Cor")
     ano = models.CharField(max_length=9, blank=True, null=True, verbose_name="Ano (Ex: 2023/2024)")
+    km_veiculo = models.CharField(max_length=20, blank=True, null=True, verbose_name="KM")
     
     tipo_produto = models.CharField(max_length=20, choices=TIPO_CHOICES)
     
@@ -173,7 +184,9 @@ class VendaProduto(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDENTE')
     motivo_recusa = models.TextField(blank=True, null=True, verbose_name="Motivo da Recusa")
     
+    data_compra = models.DateField(blank=True, null=True, verbose_name="Data de Entrada")
     data_venda = models.DateField(default=timezone.now, verbose_name="Data da Venda")
+    documentacao_veiculo = models.TextField(blank=True, null=True, verbose_name="Documentação do Veículo")
     observacoes = models.TextField(blank=True, null=True, verbose_name="Observações")
     
     data_criacao = models.DateTimeField(auto_now_add=True)

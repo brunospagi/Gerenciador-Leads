@@ -1,6 +1,6 @@
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, TemplateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
 from django.utils import timezone
@@ -239,6 +239,50 @@ class VendaProdutoPrintView(LoginRequiredMixin, DetailView):
     template_name = 'vendas_produtos/comprovante.html'
     context_object_name = 'venda'
 
+class VendaProdutoMinutaPrintView(LoginRequiredMixin, DetailView):
+    model = VendaProduto
+    template_name = 'vendas_produtos/minuta.html'
+    context_object_name = 'venda'
+
+    def _formas_pagamento_extenso(self, venda):
+        formas = []
+        if (venda.pgto_pix or 0) > 0:
+            formas.append(f"Pix (R$ {venda.pgto_pix:.2f})")
+        if (venda.pgto_transferencia or 0) > 0:
+            formas.append(f"Transferência (R$ {venda.pgto_transferencia:.2f})")
+        if (venda.pgto_debito or 0) > 0:
+            formas.append(f"Débito (R$ {venda.pgto_debito:.2f})")
+        if (venda.pgto_credito or 0) > 0:
+            formas.append(f"Crédito (R$ {venda.pgto_credito:.2f})")
+        if (venda.pgto_financiamento or 0) > 0:
+            formas.append(f"Financiamento (R$ {venda.pgto_financiamento:.2f})")
+        return " + ".join(formas) if formas else "Não informado"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        venda = context['venda']
+        dtnasc_cliente = (venda.dtnasc_cliente or '').strftime('%d/%m/%Y') if venda.dtnasc_cliente else 'Não informado'
+        modelo = (venda.modelo_veiculo or '').strip()
+        marca_veiculo = (venda.marca_veiculo or '').strip()
+        if not marca_veiculo and modelo:
+            marca_veiculo = modelo.split(' ')[0]
+        origem = (venda.origem_cliente or '').upper()
+        context['marca_veiculo'] = marca_veiculo
+        context['formas_pagamento_extenso'] = self._formas_pagamento_extenso(venda)
+        context['origem_flags'] = {
+            'OLX': origem == 'OLX',
+            'SOCARRAO': origem == 'LOJA',
+            'SITE': origem == 'SITE',
+            'FACEBOOK': origem == 'FACEBOOK',
+            'WHATSAPP': origem == 'WHATSAPP',
+            'OUTRO': origem == 'OUTRO',
+            'INDICACAO': origem == 'INDICACAO',
+            'REDES_VENDEDOR': origem == 'INSTAGRAM',
+        }
+        context['dtnasc_cliente'] = dtnasc_cliente
+        context['auto_print'] = self.request.GET.get('auto_print') == '1'
+        return context
+
 class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
     template_name = 'vendas_produtos/relatorio.html'
     
@@ -447,7 +491,7 @@ def aprovar_venda_produto(request, pk):
         
         venda.save() 
         messages.success(request, "Venda APROVADA.")
-    return redirect('venda_produto_list')
+    return redirect(f"{reverse('venda_produto_minuta', kwargs={'pk': venda.pk})}?auto_print=1")
 
 @login_required
 @require_POST

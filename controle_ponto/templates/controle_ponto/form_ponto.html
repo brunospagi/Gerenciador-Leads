@@ -1,13 +1,13 @@
 {% extends 'base_portal.html' %}
 
 {% block content %}
-<div class="container py-4" style="max-width: 600px;">
+<div class="container py-4" style="max-width: 760px;">
     <div class="card shadow-sm border-0 rounded-4">
         <div class="card-header bg-primary text-white p-4 border-0 rounded-top-4">
             <h4 class="mb-0 fw-bold"><i class="fas fa-edit"></i> Corrigir Registo de Ponto</h4>
             <small>{{ object.funcionario.nome_completo }} | {{ object.data|date:"d/m/Y" }}</small>
         </div>
-        
+
         <div class="card-body p-4 bg-light">
             <div class="alert alert-warning small">
                 <i class="fas fa-info-circle"></i> As correções manuais substituem os horários originais da biometria.
@@ -16,21 +16,37 @@
             <form method="POST">
                 {% csrf_token %}
                 <div class="row g-3">
-                    <div class="col-6">
+                    <div class="col-md-6">
                         <label class="form-label fw-bold">Entrada</label>
                         {{ form.entrada }}
                     </div>
-                    <div class="col-6">
+                    <div class="col-md-6">
                         <label class="form-label fw-bold">Saída Almoço</label>
                         {{ form.saida_almoco }}
                     </div>
-                    <div class="col-6">
+                    <div class="col-md-6">
                         <label class="form-label fw-bold">Retorno Almoço</label>
                         {{ form.retorno_almoco }}
                     </div>
-                    <div class="col-6">
+                    <div class="col-md-6">
                         <label class="form-label fw-bold">Saída Final</label>
                         {{ form.saida }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Atraso (min)</label>
+                        {{ form.atraso_minutos }}
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label fw-bold">Status de Homologação</label>
+                        {{ form.status_homologacao }}
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Justificativa de Atraso</label>
+                        {{ form.justificativa_atraso }}
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Observação da Homologação</label>
+                        {{ form.observacao_homologacao }}
                     </div>
                 </div>
 

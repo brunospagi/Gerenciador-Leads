@@ -63,13 +63,15 @@ class VendaProdutoForm(forms.ModelForm):
         # Incluímos 'vendedor' na lista de campos possíveis
         fields = [
             'vendedor', 'tipo_produto', 'com_desconto', 'cliente_nome', 'origem_cliente',
-            'modelo_veiculo', 'placa', 'cor', 'ano',
+            'dtnasc_cliente', 'rgIE_cliente', 'telCel_cliente', 'cpfCNPJ_cliente',
+            'endereco_cliente', 'numero_cliente', 'cep_cliente', 'bairro_cliente', 'cidade_com_cliente',
+            'marca_veiculo', 'modelo_veiculo', 'placa', 'cor', 'ano', 'km_veiculo',
             'custo_base', 
             'valor_venda', 
             'qtd_parcelas', 'valor_parcela', 'valor_retorno_operacao',
             'pgto_pix', 'pgto_transferencia', 'pgto_debito', 'pgto_credito', 'pgto_financiamento',
             'comprovante', 'banco_financiamento', 
-            'numero_proposta', 'observacoes', 'data_venda',
+            'numero_proposta', 'data_compra', 'documentacao_veiculo', 'observacoes', 'data_venda',
             'vendedor_ajudante' 
         ]
         widgets = {
@@ -78,11 +80,22 @@ class VendaProdutoForm(forms.ModelForm):
             
             'data_venda': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control'}),
             'cliente_nome': forms.TextInput(attrs={'class': 'form-control'}),
+            'dtnasc_cliente': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control'}),
+            'rgIE_cliente': forms.TextInput(attrs={'class': 'form-control'}),
+            'telCel_cliente': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '(00) 00000-0000', 'maxlength': '15'}),
+            'cpfCNPJ_cliente': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '000.000.000-00', 'maxlength': '18'}),
+            'endereco_cliente': forms.TextInput(attrs={'class': 'form-control'}),
+            'numero_cliente': forms.TextInput(attrs={'class': 'form-control'}),
+            'cep_cliente': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '00000-000', 'maxlength': '9'}),
+            'bairro_cliente': forms.TextInput(attrs={'class': 'form-control'}),
+            'cidade_com_cliente': forms.TextInput(attrs={'class': 'form-control'}),
             'origem_cliente': forms.Select(attrs={'class': 'form-select'}),
+            'marca_veiculo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Chevrolet'}),
             'modelo_veiculo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Onix LTZ 1.4'}),
             'placa': forms.TextInput(attrs={'style': 'text-transform:uppercase', 'class': 'form-control'}),
             'cor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Prata'}),
             'ano': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 2023/2024'}),
+            'km_veiculo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: 65000'}),
             'tipo_produto': forms.Select(attrs={'class': 'form-select'}), 
             'custo_base': forms.TextInput(attrs={'class': 'form-control money-mask'}),
             'valor_venda': forms.TextInput(attrs={'class': 'form-control fw-bold fs-5 text-success money-mask'}),
@@ -98,6 +111,8 @@ class VendaProdutoForm(forms.ModelForm):
             'comprovante': forms.ClearableFileInput(attrs={'class': 'form-control'}),
             'banco_financiamento': forms.TextInput(attrs={'class': 'form-control'}),
             'numero_proposta': forms.TextInput(attrs={'class': 'form-control'}),
+            'data_compra': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control'}),
+            'documentacao_veiculo': forms.Textarea(attrs={'rows': 3, 'class': 'form-control', 'placeholder': 'Descreva a situação da documentação do veículo'}),
             'vendedor_ajudante': forms.Select(attrs={'class': 'form-select'}), 
         }
 
@@ -107,17 +122,32 @@ class VendaProdutoForm(forms.ModelForm):
 
         if 'data_venda' not in self.initial or not self.initial['data_venda']:
             self.initial['data_venda'] = timezone.now().date()
+        if 'data_compra' not in self.initial or not self.initial['data_compra']:
+            self.initial['data_compra'] = timezone.now().date()
             
         self.fields['banco_financiamento'].required = False
         self.fields['numero_proposta'].required = False
         self.fields['comprovante'].required = False
+        self.fields['dtnasc_cliente'].required = False
+        self.fields['rgIE_cliente'].required = False
+        self.fields['telCel_cliente'].required = False
+        self.fields['cpfCNPJ_cliente'].required = False
+        self.fields['endereco_cliente'].required = False
+        self.fields['numero_cliente'].required = False
+        self.fields['cep_cliente'].required = False
+        self.fields['bairro_cliente'].required = False
+        self.fields['cidade_com_cliente'].required = False
+        self.fields['marca_veiculo'].required = False
         self.fields['modelo_veiculo'].required = False
         self.fields['cor'].required = False
         self.fields['ano'].required = False
+        self.fields['km_veiculo'].required = False
         self.fields['custo_base'].required = False
         self.fields['qtd_parcelas'].required = False
         self.fields['valor_parcela'].required = False
         self.fields['valor_retorno_operacao'].required = False
+        self.fields['data_compra'].required = False
+        self.fields['documentacao_veiculo'].required = False
         self.fields['vendedor_ajudante'].required = False
         self.fields['vendedor_ajudante'].label = "Teve ajuda? (Divide 50%)"
 

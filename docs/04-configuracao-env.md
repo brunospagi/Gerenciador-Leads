@@ -9,7 +9,9 @@
   - `DJANGO_CSRF_TRUSTED_ORIGINS`
 
 - Banco
-  - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`
+  - `DB_ENGINE` (`postgres` ou `sqlite`)
+  - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` (quando `DB_ENGINE=postgres`)
+  - `SQLITE_PATH` (quando `DB_ENGINE=sqlite`)
 
 - Storage MinIO
   - `MINIO_EXTERNAL_ENDPOINT`
@@ -40,3 +42,21 @@
 ## Observacao
 
 Garanta que os valores de producao nao sejam versionados.
+
+O arquivo `.env.example` contem somente valores ficticios e deve ser usado como base.
+
+Exemplo rapido:
+
+```env
+# PostgreSQL
+DB_ENGINE=postgres
+DB_NAME=app_exemplo
+DB_USER=app_user
+DB_PASSWORD=senha_ficticia_123
+DB_HOST=postgres
+DB_PORT=5432
+
+# SQLite
+# DB_ENGINE=sqlite
+# SQLITE_PATH=db.sqlite3
+```

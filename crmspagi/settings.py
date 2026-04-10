@@ -8,6 +8,11 @@ load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def _env_to_bool(name, default=False):
+    value = os.getenv(name, str(default))
+    return str(value).strip().lower() in {'1', 'true', 't', 'yes', 'y', 'on'}
+
 # Configurações do Webhook do Ponto (Lida do .ENV)
 WEBHOOK_PONTO_URL = os.getenv('WEBHOOK_PONTO_URL')
 EVOLUTION_API_URL = os.getenv('EVOLUTION_API_URL', '')
@@ -19,7 +24,7 @@ EVOLUTION_INSTANCE = os.getenv('EVOLUTION_INSTANCE', '')
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-default-key-for-dev')
 
 # DEBUG é False em produção por padrão. Mude para 'True' no .env apenas para desenvolvimento.
-DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'False'
+DEBUG = _env_to_bool('DJANGO_DEBUG', False)
 
 # Lê os hosts permitidos de uma variável de ambiente (separados por vírgula)
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
@@ -175,25 +180,27 @@ LOGIN_URL = '/contas/login/'
 
 
 # --- Database (LIDO DO .ENV) ---
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DB_NAME", "spagileads"),
-        "USER": os.getenv("DB_USER", "postgres"),
-        "PASSWORD": os.getenv("DB_PASSWORD"),
-        "HOST": os.getenv("DB_HOST", "postgres"),
-        "PORT": os.getenv("DB_PORT", "5432"),
-    }
-}
+# DB_ENGINE aceitos: postgres | sqlite
+DB_ENGINE = os.getenv("DB_ENGINE", "postgres").strip().lower()
 
-'''
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if DB_ENGINE in {"sqlite", "sqlite3"}:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.getenv("SQLITE_PATH", str(BASE_DIR / "db.sqlite3")),
+        }
     }
-}
-'''
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("DB_NAME", "spagileads"),
+            "USER": os.getenv("DB_USER", "postgres"),
+            "PASSWORD": os.getenv("DB_PASSWORD"),
+            "HOST": os.getenv("DB_HOST", "postgres"),
+            "PORT": os.getenv("DB_PORT", "5432"),
+        }
+    }
 
 # --- Autenticação personalizada com OIDC ---
 

@@ -1157,9 +1157,22 @@ class WhatsAppWebhookView(View):
         if instance_name:
             instance = WhatsAppInstance.objects.filter(instance_name=instance_name).first()
 
-        if instance and instance.webhook_secret:
-            secret = request.headers.get('X-Webhook-Secret')
-            if secret != instance.webhook_secret:
+        received_secret = request.headers.get('X-Webhook-Secret', '')
+        has_any_secret_configured = WhatsAppInstance.objects.exclude(
+            webhook_secret__isnull=True
+        ).exclude(
+            webhook_secret=''
+        ).exists()
+
+        # Endurece a segurança: se qualquer instância usar segredo,
+        # o webhook precisa apontar para uma instância válida e trazer o header correto.
+        if has_any_secret_configured:
+            if not instance:
+                return JsonResponse({'ok': False, 'error': 'instancia invalida'}, status=403)
+            if not received_secret or received_secret != (instance.webhook_secret or ''):
+                return JsonResponse({'ok': False, 'error': 'assinatura invalida'}, status=403)
+        elif instance and instance.webhook_secret:
+            if received_secret != instance.webhook_secret:
                 return JsonResponse({'ok': False, 'error': 'assinatura invalida'}, status=403)
 
         process_webhook_payload(payload=payload, instance=instance)

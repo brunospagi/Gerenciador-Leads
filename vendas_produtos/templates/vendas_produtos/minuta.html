@@ -1,0 +1,183 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minuta #{{ venda.pk }} - {{ venda.placa }}</title>
+    <style>
+        @page { size: A4; margin: 12mm; }
+        body { font-family: Arial, sans-serif; color: #000; font-size: 12px; line-height: 1.35; }
+        .page { max-width: 190mm; margin: 0 auto; }
+        .header { border: 1px solid #000; padding: 8px; text-align: center; font-weight: 700; font-size: 20px; margin-bottom: 10px; }
+        .header-logo { max-height: 60px; max-width: 240px; display: block; margin: 0 auto 6px; object-fit: contain; }
+        .line { margin-bottom: 6px; }
+        .label { font-weight: 700; display: inline-block; min-width: 92px; }
+        .value { border-bottom: 1px solid #000; padding: 0 4px 1px; display: inline-block; min-width: 210px; }
+        .value-sm { min-width: 120px; }
+        .value-lg { min-width: 420px; }
+        .section { margin-top: 10px; margin-bottom: 8px; }
+        .section-title { font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+        .textbox {
+            border: 1px solid #000;
+            padding: 8px;
+            margin-top: 8px;
+            min-height: 90px;
+        }
+        .checkbox-line { margin-top: 8px; }
+        .check { display: inline-block; min-width: 160px; margin-bottom: 5px; }
+        .mark { font-weight: 700; font-size: 13px; }
+        .manual-line {
+            display: inline-block;
+            border-bottom: 1px solid #000;
+            min-width: 220px;
+            height: 16px;
+            vertical-align: bottom;
+        }
+        .actions { margin: 10px auto; max-width: 190mm; text-align: right; }
+        .footer {
+            margin-top: 14px;
+            border-top: 1px solid #000;
+            padding-top: 6px;
+            font-size: 10px;
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .btn {
+            background: #111;
+            color: #fff;
+            border: 0;
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .btn-link {
+            display: inline-block;
+            text-decoration: none;
+            margin-left: 8px;
+            background: #ddd;
+            color: #000;
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+        @media print {
+            .actions { display: none; }
+            body { margin: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="actions">
+        <button class="btn" onclick="window.print()">Imprimir Minuta</button>
+        <a class="btn-link" href="{% url 'venda_produto_list' %}">Voltar</a>
+    </div>
+
+    <div class="page">
+        <div class="header">
+            <span> <p>MINUTA SPAGI MOTORS - {{ venda.pk }} -  MARCA: {{ venda.marca_veiculo|default:"SEM MARCA" }} / {{ venda.placa|default:"SEM PLACA" }}
+            {% if venda.loja %}
+                <div style="font-size: 14px; margin-top: 4px;">{{ venda.loja }}</div>
+            {% endif %} </span></p>
+        </div>
+
+        <div class="line">
+            <span class="label">NOME:</span>
+            <span class="value value-lg">{{ venda.cliente_nome|default:"______________________________" }}</span>
+        </div>
+        <div class="line">
+            <span class="label">DATA NASC:</span>
+            <span class="value value-sm">{{ venda.dtnasc_cliente|date:"d/m/Y"|default:"____________________" }}</span>
+        </div>
+
+        <div class="section">
+            <div class="section-title">VEICULO : <span class="value value-lg"> {{ marca_veiculo|default:"________________" }} / {{ venda.modelo_veiculo|default:"________________" }} - COR: {{ venda.cor|default:"________________" }}</span></div>
+            <div class="line">
+            </div>
+            <div class="line">
+                <span class="label">DATA ENTRADA / DATA VENDA</span>
+                <span class="value value-sm">{{ venda.data_compra|date:"d/m/Y"|default:"__/__/____" }}</span>
+                <span class="value value-sm">{{ venda.data_venda|date:"d/m/Y"|default:"__/__/____" }}</span>
+            </div>
+            <div class="line">
+                <span class="label">VEND.:</span>
+                <span class="value value-lg">{{ venda.vendedor.get_full_name|default:venda.vendedor.username }}</span>
+            </div>
+        </div>
+
+        <div class="line">
+            <span class="label">RG:</span>
+            <span class="value value-sm">{{ venda.rgIE_cliente|default:"____________________" }}</span>
+            <span class="label">ANO / KM:</span>
+            <span class="value value-sm">{{ venda.ano|default:"________" }}</span>
+            <span class="value value-sm">{{ venda.km_veiculo|default:"________" }}</span>
+        </div>
+        <div class="line">
+            <span class="label">PLACA:</span>
+            <span class="value value-sm">{{ venda.placa|default:"________" }}</span>
+            <span class="label">CEL:</span>
+            <span class="value value-sm">{{ venda.telCel_cliente|default:"____________________" }}</span>
+        </div>
+        <div class="line">
+            <span class="label">CPF:</span>
+            <span class="value value-sm">{{ venda.cpfCNPJ_cliente|default:"____________________" }}</span>
+            <span class="label">RUA:</span>
+            <span class="value value-sm">{{ venda.endereco_cliente|default:"______________________________" }}</span>
+        </div>
+        <div class="line">
+            <span class="label">Nº:</span>
+            <span class="value value-sm">{{ venda.numero_cliente|default:"________" }}</span>
+            <span class="label">CEP:</span>
+            <span class="value value-sm">{{ venda.cep_cliente|default:"________" }}</span>
+            <span class="label">BAIRRO:</span>
+            <span class="value value-sm">{{ venda.bairro_cliente|default:"____________________" }}</span>
+        </div>
+        <div class="line">
+            <span class="label">CIDADE:</span>
+            <span class="value value-lg">{{ venda.cidade_com_cliente|default:"______________________________" }}</span>
+        </div>
+
+        <div class="textbox">
+            <div class="section-title">CLIENTE COMPROU ATRAVES DO QUE</div>
+            <div class="line">Sendo forma de pagamento: <strong>{{ formas_pagamento_extenso }}</strong></div>
+            <div class="line">DESCREVA COMO ESTA A DOCUMENTACAO DO VEICULO, SE POSSUI PENDENCIAS A SEREM RESOLVIDA, SE TIVER TUDO OK ESCREVA.</div>
+            <div class="line">{{ venda.documentacao_veiculo|default:venda.observacoes|default:"" }}</div>
+        </div>
+
+        <div class="textbox">
+            <div class="section-title">CLIENTE COMPROU ATRAVES DO QUE</div>
+            <div class="checkbox-line">
+                <span class="check">OLX (<span class="mark">{% if origem_flags.OLX %}X{% endif %}</span>)</span>
+                <span class="check">SOCARRAO (<span class="mark">{% if origem_flags.SOCARRAO %}X{% endif %}</span>)</span>
+                <span class="check">SITE DA LOJA (<span class="mark">{% if origem_flags.SITE %}X{% endif %}</span>)</span>
+                <span class="check">FACEBOOK (<span class="mark">{% if origem_flags.FACEBOOK %}X{% endif %}</span>)</span>
+                <span class="check">WHATSAPP (<span class="mark">{% if origem_flags.WHATSAPP %}X{% endif %}</span>)</span>
+                <span class="check">OUTRO (<span class="mark">{% if origem_flags.OUTRO %}X{% endif %}</span>)</span>
+                <span class="check">INDICACAO (<span class="mark">{% if origem_flags.INDICACAO %}X{% endif %}</span>)</span>
+                <span class="check">REDES DO VENDEDOR (<span class="mark">{% if origem_flags.REDES_VENDEDOR %}X{% endif %}</span>)</span>
+            </div>
+        </div>
+
+        <div class="textbox">
+            <div class="section-title">CONSIGNADO (   )    PROPRIO (   )</div>
+            <div class="line"><strong>VALOR DE VENDA:</strong> R$ {{ venda.valor_venda|floatformat:2 }}</div>
+            <div class="line"><strong>VALOR PAGO:</strong> <span class="manual-line"></span></div>
+            <div class="line"><strong>LUCRO:</strong> <span class="manual-line"></span></div>
+        </div>
+
+        <div class="footer">
+            <div><strong>Gerado por:</strong> {{ request.user.get_full_name|default:request.user.username }}</div>
+            <div><strong>Horário:</strong> {% now "d/m/Y H:i" %}</div>
+            <div><strong>Spagi Sistemas - v1</strong></div>
+        </div>
+    </div>
+
+    {% if auto_print %}
+    <script>
+        window.addEventListener('load', function () {
+            window.print();
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

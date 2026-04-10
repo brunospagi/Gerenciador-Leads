@@ -4,8 +4,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
 
 <script>
-    const LOJA_LATITUDE = {{ config.latitude_loja|safe|default:"0" }};  
-    const LOJA_LONGITUDE = {{ config.longitude_loja|safe|default:"0" }}; 
+    const LOJA_LATITUDE = {{ config.latitude_loja|safe|default:"0" }};
+    const LOJA_LONGITUDE = {{ config.longitude_loja|safe|default:"0" }};
     const RAIO_PERMITIDO_METROS = {{ config.raio_permitido|safe|default:"100" }};
 </script>
 
@@ -14,9 +14,15 @@
         <i class="fas fa-map-marker-alt text-danger"></i> Ponto Seguro (GPS + IA)
     </h3>
     <div id="relogio-tempo-real" class="text-primary fw-bold mb-4 fs-5"></div>
-    
+
     <div id="ai-status" class="alert alert-warning shadow-sm">
         <i class="fas fa-spinner fa-spin"></i> Solicitando localização GPS...
+    </div>
+
+    <div class="alert alert-info shadow-sm text-start">
+        <div><strong>Escala de Entrada:</strong> {{ config.horario_escala_entrada|time:"H:i" }}</div>
+        <div><strong>Tolerância:</strong> {{ config.tolerancia_atraso_minutos }} minuto(s)</div>
+        <small>Se a entrada passar da tolerância, a justificativa é obrigatória e vai para homologação.</small>
     </div>
 
     {% if not foto_url %}
@@ -42,7 +48,7 @@
                     <video id="videoElement" autoplay playsinline style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);"></video>
                     <div class="position-absolute top-50 start-50 translate-middle" style="width:200px;height:260px;border:3px dashed rgba(255,255,255,0.7); border-radius:50%;"></div>
                 </div>
-                
+
                 <div class="d-grid gap-2">
                     <button id="btnEntrada" class="btn btn-lg fw-bold text-white btn-success" onclick="tirarFoto('entrada','Entrada')" disabled>
                         Entrada {% if ponto.entrada %}({{ ponto.entrada|time:"H:i" }}){% endif %}
@@ -53,9 +59,9 @@
                     <button id="btnRetornoAlmoco" class="btn btn-lg fw-bold text-white btn-info" onclick="tirarFoto('retorno_almoco','Retorno Almoço')" disabled>
                         Retorno Almoço {% if ponto.retorno_almoco %}({{ ponto.retorno_almoco|time:"H:i" }}){% endif %}
                     </button>
-                   <!-- <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger" onclick="tirarFoto('saida','Saída Final')" disabled>
+                    <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger" onclick="tirarFoto('saida','Saída Final')" disabled>
                         Saída Final {% if ponto.saida %}({{ ponto.saida|time:"H:i" }}){% endif %}
-                    </button> -->
+                    </button>
                 </div>
             </div>
 
@@ -79,6 +85,10 @@
                 <input type="hidden" name="foto_base64" id="fotoBase64Input">
                 <input type="hidden" name="latitude" id="latInput">
                 <input type="hidden" name="longitude" id="lngInput">
+                <div class="mt-3 text-start">
+                    <label for="justificativaAtraso" class="form-label fw-bold">Justificativa de atraso (se houver):</label>
+                    <textarea name="justificativa_atraso" id="justificativaAtraso" rows="3" class="form-control" placeholder="Ex.: trânsito, consulta médica, ocorrência no trajeto."></textarea>
+                </div>
             </form>
             <canvas id="canvasElement" style="display:none;"></canvas>
         </div>
@@ -86,22 +96,20 @@
 </div>
 
 <script>
-// Variáveis Globais
 const video = document.getElementById('videoElement');
 const canvas = document.getElementById('canvasElement');
 const statusDiv = document.getElementById('ai-status');
 const refImage = document.getElementById('refImage');
 let referenceDescriptor = null;
-const DISTANCE_THRESHOLD = 0.50; 
+const DISTANCE_THRESHOLD = 0.50;
 
 const temEntrada = {% if ponto.entrada %}true{% else %}false{% endif %};
 const temSaidaAlmoco = {% if ponto.saida_almoco %}true{% else %}false{% endif %};
 const temRetornoAlmoco = {% if ponto.retorno_almoco %}true{% else %}false{% endif %};
 const temSaida = {% if ponto.saida %}true{% else %}false{% endif %};
 
-// --- FÓRMULA HAVERSINE (DISTÂNCIA EM METROS) ---
 function calcularDistancia(lat1, lon1, lat2, lon2) {
-    const R = 6371e3; 
+    const R = 6371e3;
     const p1 = lat1 * Math.PI/180;
     const p2 = lat2 * Math.PI/180;
     const dp = (lat2-lat1) * Math.PI/180;
@@ -111,11 +119,10 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// --- 1. SOLICITA GPS PRIMEIRO ---
 function validarGeolocalizacao() {
     if (!navigator.geolocation) {
         statusDiv.className = 'alert alert-danger';
-        statusDiv.innerHTML = "Navegador não suporta Geolocalização.";
+        statusDiv.innerHTML = 'Navegador não suporta Geolocalização.';
         return;
     }
 
@@ -123,7 +130,7 @@ function validarGeolocalizacao() {
         (position) => {
             const userLat = position.coords.latitude;
             const userLng = position.coords.longitude;
-            
+
             document.getElementById('latInput').value = userLat;
             document.getElementById('lngInput').value = userLng;
 
@@ -137,15 +144,14 @@ function validarGeolocalizacao() {
                 iniciarIA();
             }
         },
-        (error) => {
+        () => {
             statusDiv.className = 'alert alert-danger';
-            statusDiv.innerHTML = "🚫 <strong>Permissão de GPS Negada:</strong> Libere a localização do navegador para liberar o ponto.";
+            statusDiv.innerHTML = '🚫 <strong>Permissão de GPS Negada:</strong> Libere a localização do navegador para liberar o ponto.';
         },
         { enableHighAccuracy: true }
     );
 }
 
-// --- 2. INICIA A IA ---
 async function iniciarIA() {
     statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando Validação Biométrica...';
     try {
@@ -159,16 +165,16 @@ async function iniciarIA() {
         if (refImage) {
             await new Promise(resolve => { if (refImage.complete && refImage.naturalWidth !== 0) resolve(); else refImage.onload = resolve; });
             const detection = await faceapi.detectSingleFace(refImage, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-            
+
             if (detection) {
                 referenceDescriptor = detection.descriptor;
                 statusDiv.className = 'alert alert-success shadow-sm';
-                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Localização e Biometria Aprovadas!';
+                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Localização e Biometria aprovadas!';
                 document.getElementById('mainCard').style.display = 'block';
                 ligarCamera();
             } else {
                 statusDiv.className = 'alert alert-danger';
-                statusDiv.innerHTML = 'Erro: Rosto não identificado no perfil do RH.';
+                statusDiv.innerHTML = 'Erro: rosto não identificado na foto do RH.';
             }
         }
     } catch (e) {
@@ -177,9 +183,8 @@ async function iniciarIA() {
     }
 }
 
-// --- 3. ABRE A CÂMERA E LIBERA BOTÕES ---
 function ligarCamera() {
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
         .then(stream => {
             video.srcObject = stream;
             liberarBotoes();
@@ -194,15 +199,15 @@ function liberarBotoes() {
     if (!temEntrada) document.getElementById('btnEntrada').disabled = false;
     if (temEntrada && !temSaidaAlmoco) document.getElementById('btnSaidaAlmoco').disabled = false;
     if (temSaidaAlmoco && !temRetornoAlmoco) document.getElementById('btnRetornoAlmoco').disabled = false;
-    if (temRetornoAlmoco && !temSaida) document.getElementById('btnSaida').disabled = false;
+    const btnSaida = document.getElementById('btnSaida');
+    if (btnSaida && temRetornoAlmoco && !temSaida) btnSaida.disabled = false;
 }
 
-// --- 4. TIRA A FOTO ---
 function tirarFoto(tipoInterno, nomeAmigavel) {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    
+
     const dataURL = canvas.toDataURL('image/jpeg', 0.8);
     document.getElementById('photoPreview').src = dataURL;
     document.getElementById('fotoBase64Input').value = dataURL;
@@ -213,26 +218,28 @@ function tirarFoto(tipoInterno, nomeAmigavel) {
     document.getElementById('confirmationSection').style.display = 'block';
 }
 
-// --- 5. VALIDA FOTO VS CRACHÁ ---
 async function confirmarPonto() {
     const btnConfirmar = document.getElementById('btnConfirmar');
     const btnCancelar = document.getElementById('btnCancelar');
     btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A analisar rosto...';
-    btnConfirmar.disabled = true; btnCancelar.disabled = true;
+    btnConfirmar.disabled = true;
+    btnCancelar.disabled = true;
 
     const detection = await faceapi.detectSingleFace(document.getElementById('photoPreview'), new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
 
     if (!detection) {
-        alert("Nenhum rosto detectado na foto!");
-        resetarBotoes(btnConfirmar, btnCancelar); return;
+        alert('Nenhum rosto detectado na foto!');
+        resetarBotoes(btnConfirmar, btnCancelar);
+        return;
     }
 
-    // Trava do Crachá (Rosto >= 15%)
     const box = detection.detection.box;
     const proporcaoRosto = ((box.width * box.height) / (video.videoWidth * video.videoHeight)) * 100;
     if (proporcaoRosto < 15) {
-        alert(`FRAUDE DETECTADA!\nO rosto está pequeno demais (${proporcaoRosto.toFixed(1)}%).\nNão use fotos ou crachás. Aproxime seu rosto da câmera!`);
-        cancelarFoto(); resetarBotoes(btnConfirmar, btnCancelar); return;
+        alert(`FRAUDE DETECTADA!\nO rosto está pequeno demais (${proporcaoRosto.toFixed(1)}%).\nAproxime seu rosto da câmera.`);
+        cancelarFoto();
+        resetarBotoes(btnConfirmar, btnCancelar);
+        return;
     }
 
     const distance = faceapi.euclideanDistance(referenceDescriptor, detection.descriptor);
@@ -241,12 +248,13 @@ async function confirmarPonto() {
         btnConfirmar.className = 'btn btn-lg btn-success w-100 fw-bold';
         document.getElementById('pontoForm').submit();
     } else {
-        alert("Acesso Negado! Rosto incompatível com a foto do sistema.");
-        cancelarFoto(); resetarBotoes(btnConfirmar, btnCancelar);
+        alert('Acesso negado! Rosto incompatível com a foto do sistema.');
+        cancelarFoto();
+        resetarBotoes(btnConfirmar, btnCancelar);
     }
 }
 
-function cancelarFoto(){
+function cancelarFoto() {
     document.getElementById('fotoBase64Input').value = '';
     document.getElementById('confirmationSection').style.display = 'none';
     document.getElementById('liveCameraSection').style.display = 'block';
@@ -254,22 +262,19 @@ function cancelarFoto(){
 
 function resetarBotoes(btnC, btnX) {
     btnC.innerHTML = 'Sim, sou eu!';
-    btnC.disabled = false; btnX.disabled = false;
+    btnC.disabled = false;
+    btnX.disabled = false;
 }
 
-// --- RELÓGIO EM TEMPO REAL ---
 function atualizarRelogio() {
     const agora = new Date();
     const data = agora.toLocaleDateString('pt-BR');
     const hora = agora.toLocaleTimeString('pt-BR');
-    
     document.getElementById('relogio-tempo-real').innerHTML = `<i class="fas fa-clock"></i> ${data} - ${hora}`;
 }
 
-// Inicia o relógio
 setInterval(atualizarRelogio, 1000);
 atualizarRelogio();
-
 window.onload = validarGeolocalizacao;
 </script>
 {% endblock %}

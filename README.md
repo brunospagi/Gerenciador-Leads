@@ -66,7 +66,7 @@ Implementacoes recentes:
 - Gestao via tela: `Usuarios -> Permissoes por Modulo`
 - Sidebar e portal exibem apenas modulos permitidos
 
-## 5. Campo Novo em Vendas
+## 5. Novidades em Vendas
 
 Foi adicionado o campo `origem_cliente` em `VendaProduto` com opcoes:
 
@@ -78,6 +78,19 @@ Foi adicionado o campo `origem_cliente` em `VendaProduto` com opcoes:
 - Passagem na Loja
 - WhatsApp
 - Outro
+
+Tambem foi adicionada a impressao de `MINUTA` no fluxo de aprovacao:
+
+- Ao aprovar uma venda, o sistema redireciona para a minuta com impressao automatica
+- A minuta possui logo, rodape com horario e usuario que gerou
+- A minuta inclui campos de cadastro do cliente/veiculo para preenchimento completo
+- Bloco final com marcacao manual: `CONSIGNADO ( )` e `PROPRIO ( )`
+
+Campos novos no modelo `VendaProduto` para suportar a minuta:
+
+- `dtnasc_cliente`, `rgIE_cliente`, `telCel_cliente`, `cpfCNPJ_cliente`
+- `endereco_cliente`, `numero_cliente`, `cep_cliente`, `bairro_cliente`, `cidade_com_cliente`
+- `marca_veiculo`, `km_veiculo`, `data_compra`, `documentacao_veiculo`
 
 Arquivos relacionados:
 
@@ -108,12 +121,19 @@ Variaveis principais:
 - `DJANGO_DEBUG`
 - `DJANGO_ALLOWED_HOSTS`
 - `DJANGO_CSRF_TRUSTED_ORIGINS`
-- `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`
+- `DB_ENGINE` (`postgres` ou `sqlite`)
+- `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` (quando `DB_ENGINE=postgres`)
+- `SQLITE_PATH` (quando `DB_ENGINE=sqlite`)
 - `MINIO_*`
 - `OIDC_*` (se usar login SSO)
 - `VAPID_*` (webpush)
 - `N8N_WEBHOOK_URL`, `WEBHOOK_PONTO_URL`
 - `GEMINI_API_KEY`
+
+Observacoes importantes:
+
+- `.env.example` foi sanitizado com valores ficticios (somente modelo)
+- `DJANGO_DEBUG` agora e interpretado corretamente como booleano (`True`/`False`)
 
 ## 8. Rodando Localmente
 
