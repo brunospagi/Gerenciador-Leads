@@ -7,11 +7,3 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Verifica clientes com contato atrasado todos os dias as 8h da manha
 0 8 * * * root /usr/local/bin/python /app/manage.py check_overdue_clients >> /app/cron.log 2>&1
 
-# Reconciliacao de status do WhatsApp a cada 2 minutos (entregue/lida)
-*/2 * * * * root /usr/local/bin/python /app/manage.py check_whatsapp_status --minutes 240 --limit 300 >> /app/cron.log 2>&1
-
-# Reconciliacao de presenca do WhatsApp a cada 1 minuto (online/digitando/gravando)
-*/1 * * * * root /usr/local/bin/python /app/manage.py check_whatsapp_presence --typing-seconds 12 --recording-seconds 12 --online-seconds 45 --limit 1500 >> /app/cron.log 2>&1
-
-# Reconciliacao de labels/avatar dos contatos WhatsApp a cada 5 minutos
-*/5 * * * * root /usr/local/bin/python /app/manage.py check_whatsapp_labels --max-pages 10 >> /app/cron.log 2>&1

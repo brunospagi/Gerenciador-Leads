@@ -97,8 +97,7 @@ INSTALLED_APPS = [
     'funcionarios',  
     'folha_pagamento',
     'financeiro',
-    'controle_ponto',    
-    'whatsapp',
+    'controle_ponto',
 ]
 
 MIDDLEWARE = [

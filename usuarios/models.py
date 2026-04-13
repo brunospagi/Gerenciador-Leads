@@ -68,7 +68,6 @@ class ModulePermission(models.Model):
     modulo_relatorios = models.BooleanField(default=False)
     modulo_admin_usuarios = models.BooleanField(default=False)
     modulo_credenciais = models.BooleanField(default=False)
-    modulo_whatsapp = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Permissoes de modulos: {self.user.username}"

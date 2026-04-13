@@ -23,7 +23,6 @@ class ModulePermissionMiddleware:
         ('/acessos/', 'credenciais'),
         ('/administracao/dashboard/', 'relatorios'),
         ('/painel-admin/', 'relatorios'),
-        ('/whatsapp/', 'whatsapp'),
     ]
 
     def __init__(self, get_response):

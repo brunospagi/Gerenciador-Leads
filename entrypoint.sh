@@ -32,10 +32,6 @@ python manage.py migrate --noinput
 echo "Coletando arquivos estaticos..."
 python manage.py collectstatic --noinput --clear
 
-# Sincronizacao inicial de contatos/labels/avatar para refletir fotos no boot
-echo "Sincronizando labels/avatar do WhatsApp no boot..."
-python manage.py check_whatsapp_labels --max-pages 10 || true
-
 # Inicia o servidor Gunicorn (ou o comando passado do CMD do Dockerfile)
 echo "Iniciando a aplicacao..."
 exec "$@"
