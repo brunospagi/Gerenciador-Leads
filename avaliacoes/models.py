@@ -71,3 +71,43 @@ class AvaliacaoFoto(models.Model):
 
     def __str__(self):
         return f"Foto de {self.avaliacao.modelo}"
+
+
+class ConfiguracaoIA(models.Model):
+    provider = models.CharField(
+        max_length=20,
+        default='GEMINI',
+        editable=False,
+        verbose_name='Provedor',
+    )
+    modelo = models.CharField(
+        max_length=100,
+        default='gemini-2.5-flash',
+        verbose_name='Modelo',
+        help_text='Ex.: gemini-2.5-flash',
+    )
+    api_key = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name='API Key',
+        help_text='Se vazio, usa GEMINI_API_KEY do .env',
+    )
+    ativo = models.BooleanField(default=True, verbose_name='Ativo')
+    atualizado_em = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
+
+    class Meta:
+        verbose_name = 'Configuração de IA'
+        verbose_name_plural = 'Configurações de IA'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return f'IA ({self.provider}) - {self.modelo}'

@@ -1,4 +1,4 @@
-{% extends 'base_portal.html' %}
+﻿{% extends 'base_portal.html' %}
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
@@ -16,19 +16,19 @@
     <div id="relogio-tempo-real" class="text-primary fw-bold mb-4 fs-5"></div>
 
     <div id="ai-status" class="alert alert-warning shadow-sm">
-        <i class="fas fa-spinner fa-spin"></i> Solicitando localização GPS...
+        <i class="fas fa-spinner fa-spin"></i> Solicitando localizaÃ§Ã£o GPS...
     </div>
 
     <div class="alert alert-info shadow-sm text-start">
         <div><strong>Escala de Entrada:</strong> {{ config.horario_escala_entrada|time:"H:i" }}</div>
-        <div><strong>Tolerância:</strong> {{ config.tolerancia_atraso_minutos }} minuto(s)</div>
-        <small>Se a entrada passar da tolerância, a justificativa é obrigatória e vai para homologação.</small>
+        <div><strong>TolerÃ¢ncia:</strong> {{ config.tolerancia_atraso_minutos }} minuto(s)</div>
+        <small>Se a entrada passar da tolerÃ¢ncia, a justificativa Ã© obrigatÃ³ria e vai para homologaÃ§Ã£o.</small>
     </div>
 
     {% if not foto_url %}
     <div class="alert alert-danger shadow-sm">
         <i class="fas fa-exclamation-triangle"></i>
-        <strong>Acesso Bloqueado:</strong> Você não possui foto cadastrada no RH.
+        <strong>Acesso Bloqueado:</strong> VocÃª nÃ£o possui foto cadastrada no RH.
     </div>
     {% endif %}
 
@@ -53,14 +53,14 @@
                     <button id="btnEntrada" class="btn btn-lg fw-bold text-white btn-success" onclick="tirarFoto('entrada','Entrada')" disabled>
                         Entrada {% if ponto.entrada %}({{ ponto.entrada|time:"H:i" }}){% endif %}
                     </button>
-                    <button id="btnSaidaAlmoco" class="btn btn-lg fw-bold text-white btn-warning" onclick="tirarFoto('saida_almoco','Saída Almoço')" disabled>
-                        Saída Almoço {% if ponto.saida_almoco %}({{ ponto.saida_almoco|time:"H:i" }}){% endif %}
+                    <button id="btnSaidaAlmoco" class="btn btn-lg fw-bold text-white btn-warning" onclick="tirarFoto('saida_almoco','SaÃ­da AlmoÃ§o')" disabled>
+                        SaÃ­da AlmoÃ§o {% if ponto.saida_almoco %}({{ ponto.saida_almoco|time:"H:i" }}){% endif %}
                     </button>
-                    <button id="btnRetornoAlmoco" class="btn btn-lg fw-bold text-white btn-info" onclick="tirarFoto('retorno_almoco','Retorno Almoço')" disabled>
-                        Retorno Almoço {% if ponto.retorno_almoco %}({{ ponto.retorno_almoco|time:"H:i" }}){% endif %}
+                    <button id="btnRetornoAlmoco" class="btn btn-lg fw-bold text-white btn-info" onclick="tirarFoto('retorno_almoco','Retorno AlmoÃ§o')" disabled>
+                        Retorno AlmoÃ§o {% if ponto.retorno_almoco %}({{ ponto.retorno_almoco|time:"H:i" }}){% endif %}
                     </button>
-                    <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger" onclick="tirarFoto('saida','Saída Final')" disabled>
-                        Saída Final {% if ponto.saida %}({{ ponto.saida|time:"H:i" }}){% endif %}
+                    <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger" onclick="tirarFoto('saida','SaÃ­da Final')" disabled>
+                        SaÃ­da Final {% if ponto.saida %}({{ ponto.saida|time:"H:i" }}){% endif %}
                     </button>
                 </div>
             </div>
@@ -81,13 +81,15 @@
 
             <form id="pontoForm" method="POST">
                 {% csrf_token %}
+                <input type="hidden" name="ponto_token" id="pontoTokenInput" value="{{ ponto_token }}">
                 <input type="hidden" name="tipo_batida" id="tipoBatidaInput">
                 <input type="hidden" name="foto_base64" id="fotoBase64Input">
                 <input type="hidden" name="latitude" id="latInput">
                 <input type="hidden" name="longitude" id="lngInput">
+                <input type="hidden" name="geo_checked_at" id="geoCheckedAtInput">
                 <div class="mt-3 text-start">
                     <label for="justificativaAtraso" class="form-label fw-bold">Justificativa de atraso (se houver):</label>
-                    <textarea name="justificativa_atraso" id="justificativaAtraso" rows="3" class="form-control" placeholder="Ex.: trânsito, consulta médica, ocorrência no trajeto."></textarea>
+                    <textarea name="justificativa_atraso" id="justificativaAtraso" rows="3" class="form-control" placeholder="Ex.: trÃ¢nsito, consulta mÃ©dica, ocorrÃªncia no trajeto."></textarea>
                 </div>
             </form>
             <canvas id="canvasElement" style="display:none;"></canvas>
@@ -107,6 +109,40 @@ const temEntrada = {% if ponto.entrada %}true{% else %}false{% endif %};
 const temSaidaAlmoco = {% if ponto.saida_almoco %}true{% else %}false{% endif %};
 const temRetornoAlmoco = {% if ponto.retorno_almoco %}true{% else %}false{% endif %};
 const temSaida = {% if ponto.saida %}true{% else %}false{% endif %};
+const TOKEN_TTL_SECONDS = Number('{{ ponto_token_ttl_seconds|default:"120" }}');
+const TOKEN_ISSUED_AT = Number('{{ ponto_token_issued_at|default:"0" }}');
+const GEO_TTL_SECONDS = 120;
+
+let geoCheckedAt = 0;
+let geoAprovado = false;
+let iaInicializada = false;
+let cameraLigada = false;
+
+function tokenExpirado() {
+    if (!TOKEN_ISSUED_AT) return true;
+    const agoraEpoch = Math.floor(Date.now() / 1000);
+    return (agoraEpoch - TOKEN_ISSUED_AT) > TOKEN_TTL_SECONDS;
+}
+
+function validarTokenOuAtualizar() {
+    if (!tokenExpirado()) return true;
+    alert('Sua sessão para bater ponto expirou (mais de 2 minutos). A página será atualizada para gerar novo token.');
+    window.location.reload();
+    return false;
+}
+
+function geoExpirado() {
+    if (!geoCheckedAt) return true;
+    const agoraEpoch = Math.floor(Date.now() / 1000);
+    return (agoraEpoch - geoCheckedAt) > GEO_TTL_SECONDS;
+}
+
+function validarGeoOuAtualizar() {
+    if (geoAprovado && !geoExpirado()) return true;
+    alert('Localização expirada (mais de 2 minutos). Vamos atualizar o GPS antes de continuar.');
+    validarGeolocalizacao();
+    return false;
+}
 
 function calcularDistancia(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
@@ -121,6 +157,7 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
 
 function validarGeolocalizacao() {
     if (!navigator.geolocation) {
+        geoAprovado = false;
         statusDiv.className = 'alert alert-danger';
         statusDiv.innerHTML = 'Navegador não suporta Geolocalização.';
         return;
@@ -133,18 +170,31 @@ function validarGeolocalizacao() {
 
             document.getElementById('latInput').value = userLat;
             document.getElementById('lngInput').value = userLng;
+            geoCheckedAt = Math.floor(Date.now() / 1000);
+            const geoInput = document.getElementById('geoCheckedAtInput');
+            if (geoInput) geoInput.value = String(geoCheckedAt);
 
             const distanciaMetros = calcularDistancia(userLat, userLng, LOJA_LATITUDE, LOJA_LONGITUDE);
 
             if (distanciaMetros > RAIO_PERMITIDO_METROS) {
+                geoAprovado = false;
                 statusDiv.className = 'alert alert-danger shadow-sm';
                 statusDiv.innerHTML = `🚫 <strong>FORA DA ÁREA:</strong> Você está a ${distanciaMetros.toFixed(0)}m da loja. Raio permitido: ${RAIO_PERMITIDO_METROS}m.`;
+                document.getElementById('mainCard').style.display = 'none';
             } else {
+                geoAprovado = true;
                 document.getElementById('distanciaText').innerText = `Distância: ${distanciaMetros.toFixed(0)}m da Loja`;
-                iniciarIA();
+                if (!iaInicializada) {
+                    iniciarIA();
+                } else {
+                    statusDiv.className = 'alert alert-success shadow-sm';
+                    statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Localização revalidada com sucesso.';
+                    document.getElementById('mainCard').style.display = 'block';
+                }
             }
         },
         () => {
+            geoAprovado = false;
             statusDiv.className = 'alert alert-danger';
             statusDiv.innerHTML = '🚫 <strong>Permissão de GPS Negada:</strong> Libere a localização do navegador para liberar o ponto.';
         },
@@ -153,7 +203,7 @@ function validarGeolocalizacao() {
 }
 
 async function iniciarIA() {
-    statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando Validação Biométrica...';
+    statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando validação biométrica...';
     try {
         const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
         await Promise.all([
@@ -168,8 +218,9 @@ async function iniciarIA() {
 
             if (detection) {
                 referenceDescriptor = detection.descriptor;
+                iaInicializada = true;
                 statusDiv.className = 'alert alert-success shadow-sm';
-                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Localização e Biometria aprovadas!';
+                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Localização e biometria aprovadas!';
                 document.getElementById('mainCard').style.display = 'block';
                 ligarCamera();
             } else {
@@ -184,9 +235,11 @@ async function iniciarIA() {
 }
 
 function ligarCamera() {
+    if (cameraLigada) return;
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
         .then(stream => {
             video.srcObject = stream;
+            cameraLigada = true;
             liberarBotoes();
         })
         .catch(() => {
@@ -204,6 +257,9 @@ function liberarBotoes() {
 }
 
 function tirarFoto(tipoInterno, nomeAmigavel) {
+    if (!validarTokenOuAtualizar()) return;
+    if (!validarGeoOuAtualizar()) return;
+
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -219,6 +275,9 @@ function tirarFoto(tipoInterno, nomeAmigavel) {
 }
 
 async function confirmarPonto() {
+    if (!validarTokenOuAtualizar()) return;
+    if (!validarGeoOuAtualizar()) return;
+
     const btnConfirmar = document.getElementById('btnConfirmar');
     const btnCancelar = document.getElementById('btnCancelar');
     btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> A analisar rosto...';
@@ -274,7 +333,25 @@ function atualizarRelogio() {
 }
 
 setInterval(atualizarRelogio, 1000);
+setInterval(() => {
+    if (tokenExpirado()) {
+        statusDiv.className = 'alert alert-warning shadow-sm';
+        statusDiv.innerHTML = '<i class="fas fa-sync-alt"></i> Sessão de ponto expirada. Atualize a página para gerar novo token.';
+    }
+}, 10000);
+setInterval(() => {
+    validarGeolocalizacao();
+}, GEO_TTL_SECONDS * 1000);
+setInterval(() => {
+    if (geoExpirado()) {
+        geoAprovado = false;
+        statusDiv.className = 'alert alert-warning shadow-sm';
+        statusDiv.innerHTML = '<i class="fas fa-map-marker-alt"></i> Localização expirada. Aguardando nova validação de GPS.';
+    }
+}, 10000);
+
 atualizarRelogio();
 window.onload = validarGeolocalizacao;
 </script>
 {% endblock %}
+

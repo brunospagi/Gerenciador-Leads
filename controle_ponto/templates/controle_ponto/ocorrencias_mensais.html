@@ -88,6 +88,11 @@
                             </td>
                             <td>{% if p.homologado_por %}{{ p.homologado_por.get_full_name|default:p.homologado_por.username }}{% else %}--{% endif %}</td>
                             <td class="d-print-none">
+                                <div class="mb-2">
+                                    <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-primary w-100">
+                                        <i class="fas fa-camera me-1"></i> Ver Fotos
+                                    </a>
+                                </div>
                                 <form method="post" action="{% url 'controle_ponto:homologar_ocorrencia' p.id %}" class="d-flex gap-2">
                                     {% csrf_token %}
                                     <input type="hidden" name="mes" value="{{ mes_atual }}">

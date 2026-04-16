@@ -1,6 +1,7 @@
 import json
 import threading
 from datetime import datetime
+import secrets
 
 import requests
 from django.conf import settings
@@ -18,6 +19,9 @@ from funcionarios.models import Funcionario
 
 from .forms import RegistroPontoForm
 from .models import ConfiguracaoPonto, RegistroPonto
+
+TOKEN_PONTO_TTL_SECONDS = 120
+GEO_CHECK_TTL_SECONDS = 120
 
 
 def obter_ip_cliente(request):
@@ -64,11 +68,54 @@ def relogio_ponto(request):
     ponto, _ = RegistroPonto.objects.get_or_create(funcionario=funcionario, data=hoje)
 
     if request.method == 'POST':
+        token_form = (request.POST.get('ponto_token') or '').strip()
+        token_sessao = (request.session.get('ponto_token') or '').strip()
+        token_gerado_em = request.session.get('ponto_token_issued_at')
+        agora_epoch = int(timezone.now().timestamp())
+
+        token_expirado = False
+        if not token_gerado_em:
+            token_expirado = True
+        else:
+            try:
+                token_expirado = (agora_epoch - int(token_gerado_em)) > TOKEN_PONTO_TTL_SECONDS
+            except Exception:
+                token_expirado = True
+
+        if not token_form or token_form != token_sessao or token_expirado:
+            messages.error(
+                request,
+                'Sessão de registro expirada (mais de 2 minutos) ou inválida. '
+                'Atualize a página e tente novamente.',
+            )
+            return redirect('controle_ponto:relogio')
+
         tipo_batida = request.POST.get('tipo_batida')
         foto_base64 = request.POST.get('foto_base64')
         lat = request.POST.get('latitude')
         lng = request.POST.get('longitude')
+        geo_checked_at = request.POST.get('geo_checked_at')
         justificativa_atraso = (request.POST.get('justificativa_atraso') or '').strip()
+
+        if not lat or not lng:
+            messages.error(request, 'Localização não validada. Aguarde o GPS e tente novamente.')
+            return redirect('controle_ponto:relogio')
+
+        if not geo_checked_at:
+            messages.error(request, 'Validação de localização expirou. Atualize a página e tente novamente.')
+            return redirect('controle_ponto:relogio')
+
+        try:
+            geo_checked_at = int(float(geo_checked_at))
+            geo_expirada = (agora_epoch - geo_checked_at) > GEO_CHECK_TTL_SECONDS
+        except Exception:
+            geo_expirada = True
+        if geo_expirada:
+            messages.error(
+                request,
+                'Localização expirada (mais de 2 minutos). Atualize a localização na página e tente novamente.',
+            )
+            return redirect('controle_ponto:relogio')
 
         if not foto_base64:
             messages.error(request, 'Falha ao receber a foto. Tente novamente.')
@@ -164,10 +211,21 @@ def relogio_ponto(request):
         return redirect('controle_ponto:relogio')
 
     foto_url = funcionario.foto_biometria.url if funcionario.foto_biometria else None
+    ponto_token = secrets.token_urlsafe(24)
+    request.session['ponto_token'] = ponto_token
+    request.session['ponto_token_issued_at'] = int(timezone.now().timestamp())
     return render(
         request,
         'controle_ponto/relogio.html',
-        {'ponto': ponto, 'ip_atual': ip_atual, 'foto_url': foto_url, 'config': config},
+        {
+            'ponto': ponto,
+            'ip_atual': ip_atual,
+            'foto_url': foto_url,
+            'config': config,
+            'ponto_token': ponto_token,
+            'ponto_token_ttl_seconds': TOKEN_PONTO_TTL_SECONDS,
+            'ponto_token_issued_at': request.session.get('ponto_token_issued_at'),
+        },
     )
 
 
