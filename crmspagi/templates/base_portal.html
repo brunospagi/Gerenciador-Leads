@@ -116,11 +116,23 @@
         .main-content { padding: 30px; flex-grow: 1; }
         .card { border: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
         .card-header { background: transparent; border-bottom: 1px solid #f1f5f9; padding: 20px; font-weight: 600; }
+        .app-footer {
+            border-top: 1px solid #e2e8f0;
+            background: #fff;
+            color: #64748b;
+            font-size: 0.82rem;
+            padding: 10px 30px;
+        }
+        .app-footer .build-tag {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            color: #0f172a;
+        }
 
         @media (max-width: 768px) {
             #sidebar { position: fixed; height: 100vh; margin-left: -260px; }
             #sidebar.active { margin-left: 0; }
             .main-content { padding: 15px; }
+            .app-footer { padding: 10px 15px; }
         }
     </style>
 </head>
@@ -235,6 +247,15 @@
                 {% block content %}
                 {% endblock %}
             </main>
+
+            <footer class="app-footer d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>Sistema CRM Spagi</div>
+                <div>
+                    Build:
+                    <span class="build-tag">#{{ app_build_number }}</span>
+                    {% if app_build_sha %}<span class="build-tag">({{ app_build_sha }})</span>{% endif %}
+                </div>
+            </footer>
         </div>
     </div>
 

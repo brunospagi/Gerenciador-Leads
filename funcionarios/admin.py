@@ -26,7 +26,7 @@ admin.site.register(User, UserAdmin)
 # Admin isolado de Funcionários (para listagem rápida)
 @admin.register(Funcionario)
 class FuncionarioAdmin(admin.ModelAdmin):
-    list_display = ('get_nome', 'cargo', 'salario_base', 'telefone', 'ativo')
+    list_display = ('get_nome', 'cargo', 'salario_base', 'telefone', 'ativo', 'data_ultimo_dia_trabalhado')
     search_fields = ('user__username', 'user__first_name', 'cpf')
     list_filter = ('ativo', 'cargo')
 

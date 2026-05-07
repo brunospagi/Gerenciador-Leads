@@ -18,6 +18,14 @@ WEBHOOK_PONTO_URL = os.getenv('WEBHOOK_PONTO_URL')
 EVOLUTION_API_URL = os.getenv('EVOLUTION_API_URL', '')
 EVOLUTION_API_KEY = os.getenv('EVOLUTION_API_KEY', '')
 EVOLUTION_INSTANCE = os.getenv('EVOLUTION_INSTANCE', '')
+APP_BUILD_NUMBER = os.getenv('APP_BUILD_NUMBER', '0')
+APP_BUILD_SHA = (
+    os.getenv('APP_BUILD_SHA')
+    or os.getenv('GITHUB_SHA')
+    or os.getenv('RENDER_GIT_COMMIT')
+    or ''
+)
+APP_BUILD_SHA_SHORT = APP_BUILD_SHA[:8] if APP_BUILD_SHA else ''
 
 # --- CONFIGURAÇÕES DE PRODUÇÃO (LIDAS DO .ENV) ---
 # A SECRET_KEY é lida do ambiente. Use uma chave forte em produção!
@@ -164,6 +172,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'notificacoes.context_processors.unread_notifications_context',
                 'core.context_processors.banner_context',
+                'core.context_processors.build_info_context',
                 'usuarios.context_processors.module_access_context',
             ],
         },

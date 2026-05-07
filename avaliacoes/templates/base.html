@@ -38,6 +38,9 @@
         .navbar-collapse .dropdown .nav-link {
             white-space: nowrap;
         }
+        .build-tag {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
     </style>
 </head>
 <body class="d-flex flex-column h-100">
@@ -151,6 +154,13 @@
                     <img src="{% static 'images/logo-spagi.png' %}" alt="Logo Spagi Sistemas" style="height: 36px; vertical-align: middle;">
                 </a>
             </div>
+        </div>
+        <div class="text-center mt-2">
+            <small class="text-muted">
+                Build:
+                <span class="build-tag fw-semibold">#{{ app_build_number }}</span>
+                {% if app_build_sha %}<span class="build-tag">({{ app_build_sha }})</span>{% endif %}
+            </small>
         </div>
       </div>
     </footer>

@@ -161,6 +161,14 @@
                                     <a href="{% url 'venda_produto_update' item.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fa fa-pencil-alt"></i></a>
                                     <a href="{% url 'venda_produto_delete' item.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fa fa-trash"></i></a>
                                 {% endif %}
+
+                                {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+                                    {% if item.tipo_produto == 'VENDA_VEICULO' or item.tipo_produto == 'VENDA_MOTO' or item.tipo_produto == 'CONSIGNACAO' or item.tipo_produto == 'COMPRA' %}
+                                        <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#modalAjustarCusto{{ item.pk }}" title="Ajustar Custo">
+                                            <i class="fa fa-coins"></i>
+                                        </button>
+                                    {% endif %}
+                                {% endif %}
                                 
                                 {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
                                     {% if item.status == 'PENDENTE' %}
@@ -179,6 +187,15 @@
                                                 <div class="modal-body text-start">
                                                     <p class="mb-2"><strong>Cliente:</strong> {{ item.cliente_nome }}</p>
                                                     <p class="mb-2"><strong>Tipo:</strong> {{ item.get_tipo_produto_display }}</p>
+                                                    {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+                                                        <div class="alert alert-info py-2 small">
+                                                            <i class="fa fa-shield-alt me-1"></i> Perfil ADMIN: edição de custo liberada.
+                                                        </div>
+                                                    {% else %}
+                                                        <div class="alert alert-secondary py-2 small">
+                                                            <i class="fa fa-lock me-1"></i> Perfil GERENTE: custo do veículo protegido (somente leitura).
+                                                        </div>
+                                                    {% endif %}
 
                                                     {% if item.tipo_produto == 'GARANTIA' %}
                                                         <div class="mb-3"><label class="form-label fw-bold">Nº Apólice</label><input type="text" name="numero_apolice" class="form-control" required></div>
@@ -186,10 +203,18 @@
                                                     
                                                     {% elif item.tipo_produto == 'VENDA_VEICULO' or item.tipo_produto == 'VENDA_MOTO' %}
                                                         <div class="mb-3"><label class="form-label fw-bold text-success">Valor da Venda (R$)</label><input type="text" name="valor_venda" class="form-control money-mask" value="{{ item.valor_venda|floatformat:2 }}" required></div>
-                                                        <div class="mb-3"><label class="form-label fw-bold text-danger">Custo do Veículo (Loja)</label><input type="text" name="custo_base" class="form-control money-mask" placeholder="R$ 0,00" required><div class="form-text">Custo de compra para cálculo do lucro.</div></div>
+                                                        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+                                                            <div class="mb-3"><label class="form-label fw-bold text-danger">Custo do Veículo (Loja)</label><input type="text" name="custo_base" class="form-control money-mask" value="{{ item.custo_base|floatformat:2 }}" placeholder="R$ 0,00" required><div class="form-text">Custo de compra para cálculo do lucro.</div></div>
+                                                        {% else %}
+                                                            <div class="mb-3"><label class="form-label fw-bold text-danger">Custo do Veículo (Loja)</label><input type="text" class="form-control" value="R$ {{ item.custo_base|floatformat:2 }}" disabled><div class="form-text">Valor protegido. Solicite ajuste ao ADMIN se necessário.</div></div>
+                                                        {% endif %}
 
                                                     {% elif item.tipo_produto == 'CONSIGNACAO' or item.tipo_produto == 'COMPRA' %}
-                                                        <div class="mb-3"><label class="form-label fw-bold text-danger">Valor Pago / Custo de Entrada</label><input type="text" name="custo_base" class="form-control money-mask" placeholder="R$ 0,00" required><div class="form-text">Informe quanto a loja pagou pelo veículo.</div></div>
+                                                        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+                                                            <div class="mb-3"><label class="form-label fw-bold text-danger">Valor Pago / Custo de Entrada</label><input type="text" name="custo_base" class="form-control money-mask" value="{{ item.custo_base|floatformat:2 }}" placeholder="R$ 0,00" required><div class="form-text">Informe quanto a loja pagou pelo veículo.</div></div>
+                                                        {% else %}
+                                                            <div class="mb-3"><label class="form-label fw-bold text-danger">Valor Pago / Custo de Entrada</label><input type="text" class="form-control" value="R$ {{ item.custo_base|floatformat:2 }}" disabled><div class="form-text">Valor protegido. Solicite ajuste ao ADMIN se necessário.</div></div>
+                                                        {% endif %}
 
                                                     {% else %}
                                                         <p class="text-muted">Confirma a aprovação deste serviço?</p>
@@ -200,7 +225,34 @@
                                         </form>
                                     </div>
                                 </div>
-                                
+
+                                <div class="modal fade" id="modalAjustarCusto{{ item.pk }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <form action="{% url 'venda_produto_adjust_cost' item.pk %}" method="post">
+                                            {% csrf_token %}
+                                            <div class="modal-content">
+                                                <div class="modal-header bg-warning text-dark">
+                                                    <h5 class="modal-title">Ajustar Custo do Veículo</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body text-start">
+                                                    <p class="mb-2"><strong>Cliente:</strong> {{ item.cliente_nome }}</p>
+                                                    <p class="mb-2"><strong>Veículo:</strong> {{ item.modelo_veiculo }} {% if item.placa %}({{ item.placa }}){% endif %}</p>
+                                                    <p class="mb-3"><strong>Status:</strong> {{ item.get_status_display }}</p>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold text-danger">Novo Custo (R$)</label>
+                                                        <input type="text" name="custo_base" class="form-control money-mask" value="{{ item.custo_base|floatformat:2 }}" required>
+                                                        <div class="form-text">Disponível inclusive para vendas já aprovadas.</div>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="submit" class="btn btn-warning fw-bold">Salvar Novo Custo</button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+
                                 {% if item.comprovante %}<div class="modal fade" id="modalComprovante{{ item.pk }}" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Comprovante</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body text-center"><img src="{{ item.comprovante.url }}" class="img-fluid" style="max-height:500px"><div class="mt-2"><a href="{{ item.comprovante.url }}" target="_blank" class="btn btn-primary btn-sm">Baixar</a></div></div></div></div></div>{% endif %}
                                 <div class="modal fade" id="modalRecusa{{ item.pk }}" tabindex="-1"><div class="modal-dialog"><form action="{% url 'venda_produto_reject' item.pk %}" method="post">{% csrf_token %}<div class="modal-content"><div class="modal-header bg-danger text-white"><h5 class="modal-title">Recusar</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><textarea name="motivo_recusa" class="form-control" rows="3" required placeholder="Motivo..."></textarea></div><div class="modal-footer"><button type="submit" class="btn btn-danger">Confirmar</button></div></div></form></div></div>
                             </td>

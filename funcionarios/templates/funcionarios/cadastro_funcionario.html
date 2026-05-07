@@ -1,59 +1,70 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Novo Colaborador{% endblock %}
+{% block title %}{{ page_title }}{% endblock %}
 
 {% block content %}
-<div class="container py-5" style="max-width: 900px;">
-    
+<div class="container py-4" style="max-width: 980px;">
+
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold text-dark mb-0">Cadastro de Colaborador</h2>
-        <a href="{% url 'rh_dashboard' %}" class="btn btn-outline-secondary">
-            <i class="fa fa-arrow-left me-2"></i> Voltar ao RH
+        <div>
+            <h2 class="fw-bold text-dark mb-0">{{ page_title }}</h2>
+            <small class="text-muted">Dados cadastrais, contratuais e bancários do colaborador</small>
+        </div>
+        <a href="{% url back_url %}" class="btn btn-outline-secondary">
+            <i class="fa fa-arrow-left me-2"></i> Voltar
         </a>
     </div>
 
     <div class="card shadow-sm border-0 rounded-3">
         <div class="card-header bg-primary text-white py-3">
-            <h5 class="mb-0 fw-bold"><i class="fa fa-user-plus me-2"></i> Preencha os dados</h5>
+            <h5 class="mb-0 fw-bold"><i class="fa fa-id-card me-2"></i> Formulário de Colaborador</h5>
         </div>
         <div class="card-body p-4">
-            <form method="post">
+            <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
-                
+
                 {% if user_form.errors or func_form.errors %}
                     <div class="alert alert-danger shadow-sm">
-                        <strong>Atenção!</strong> Verifique os erros abaixo.
+                        <strong>Atenção.</strong> Verifique os erros abaixo.
                         {{ user_form.errors }}
                         {{ func_form.errors }}
                     </div>
                 {% endif %}
 
-                <h6 class="text-primary fw-bold border-bottom pb-2 mb-3 mt-2">1. Acesso ao Sistema (Login)</h6>
+                <h6 class="text-primary fw-bold border-bottom pb-2 mb-3">1. Acesso ao Sistema</h6>
                 <div class="row g-3 mb-4">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label class="form-label small fw-bold text-muted">Nome *</label>
                         {{ user_form.first_name }}
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <label class="form-label small fw-bold text-muted">Sobrenome *</label>
                         {{ user_form.last_name }}
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label small fw-bold text-muted">Usuário (Login) *</label>
+                        <label class="form-label small fw-bold text-muted">Usuário (login) *</label>
                         {{ user_form.username }}
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                         <label class="form-label small fw-bold text-muted">E-mail *</label>
                         {{ user_form.email }}
                     </div>
-                    <div class="col-md-4">
+                    {% if not is_edit %}
+                    <div class="col-md-6">
                         <label class="form-label small fw-bold text-muted">Senha Inicial *</label>
                         {{ user_form.password }}
                     </div>
+                    {% else %}
+                    <div class="col-md-6 d-flex align-items-end">
+                        <div class="alert alert-light border w-100 mb-0 py-2">
+                            <small class="text-muted">Edição de senha permanece no módulo de usuários/perfil.</small>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
 
-                <h6 class="text-success fw-bold border-bottom pb-2 mb-3">2. Dados Pessoais & Contratuais</h6>
+                <h6 class="text-success fw-bold border-bottom pb-2 mb-3">2. Dados Pessoais e Contratuais</h6>
                 <div class="row g-3 mb-4">
                     <div class="col-md-3">
                         <label class="form-label small fw-bold text-muted">CPF *</label>
@@ -68,37 +79,68 @@
                         {{ func_form.data_nascimento }}
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label small fw-bold text-muted">Celular/WhatsApp</label>
+                        <label class="form-label small fw-bold text-muted">Telefone</label>
                         {{ func_form.telefone }}
                     </div>
-                    
+
                     <div class="col-md-9">
-                        <label class="form-label small fw-bold text-muted">Endereço Completo</label>
+                        <label class="form-label small fw-bold text-muted">Endereço</label>
                         {{ func_form.endereco }}
                     </div>
                     <div class="col-md-3">
                         <label class="form-label small fw-bold text-muted">CEP</label>
                         {{ func_form.cep }}
                     </div>
-                    
+
                     <div class="col-md-4">
                         <label class="form-label small fw-bold text-muted">Cargo *</label>
                         {{ func_form.cargo }}
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label small fw-bold text-muted">Data Admissão *</label>
+                        <label class="form-label small fw-bold text-muted">Data de admissão *</label>
                         {{ func_form.data_admissao }}
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label small fw-bold text-muted">Salário Base *</label>
+                        <label class="form-label small fw-bold text-muted">Salário base *</label>
                         <div class="input-group">
                             <span class="input-group-text bg-light">R$</span>
                             {{ func_form.salario_base }}
                         </div>
                     </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">Status</label>
+                        <div class="form-check mt-2">
+                            {{ func_form.ativo }}
+                            <label class="form-check-label" for="{{ func_form.ativo.id_for_label }}">Colaborador ativo</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4" id="boxUltimoDia">
+                        <label class="form-label small fw-bold text-muted">Último dia trabalhado</label>
+                        {{ func_form.data_ultimo_dia_trabalhado }}
+                        <small class="text-muted">Obrigatório quando inativo.</small>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">Foto biometria</label>
+                        {{ func_form.foto_biometria }}
+                    </div>
                 </div>
 
-                <h6 class="text-danger fw-bold border-bottom pb-2 mb-3">3. Dados Bancários (Pagamento)</h6>
+                <h6 class="text-info fw-bold border-bottom pb-2 mb-3">3. Vale Transporte</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="form-check mt-2">
+                            {{ func_form.opta_vt }}
+                            <label class="form-check-label" for="{{ func_form.opta_vt.id_for_label }}">Opta por vale transporte</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">Valor diário VT</label>
+                        {{ func_form.valor_diario_vt }}
+                    </div>
+                </div>
+
+                <h6 class="text-danger fw-bold border-bottom pb-2 mb-3">4. Dados Bancários</h6>
                 <div class="row g-3 mb-4">
                     <div class="col-md-4">
                         <label class="form-label small fw-bold text-muted">Banco</label>
@@ -117,22 +159,15 @@
                         {{ func_form.tipo_conta }}
                     </div>
                     <div class="col-md-12">
-                        <label class="form-label small fw-bold text-muted">Chave Pix</label>
+                        <label class="form-label small fw-bold text-muted">Chave PIX</label>
                         {{ func_form.chave_pix }}
                     </div>
                 </div>
-                
-                <div class="form-check mb-4">
-                    {{ func_form.ativo }}
-                    <label class="form-check-label" for="{{ func_form.ativo.id_for_label }}">
-                        Cadastro Ativo (Acesso Liberado)
-                    </label>
-                </div>
 
                 <div class="d-grid gap-2 d-md-flex justify-content-md-end border-top pt-4">
-                    <a href="{% url 'rh_dashboard' %}" class="btn btn-light btn-lg border px-4">Cancelar</a>
+                    <a href="{% url back_url %}" class="btn btn-light btn-lg border px-4">Cancelar</a>
                     <button type="submit" class="btn btn-success btn-lg px-5 fw-bold shadow-sm">
-                        <i class="fa fa-check-circle me-2"></i> Salvar Cadastro
+                        <i class="fa fa-check-circle me-2"></i> {{ submit_label }}
                     </button>
                 </div>
             </form>
@@ -141,12 +176,25 @@
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
+    function alternarCampoUltimoDia() {
+        const ativo = document.getElementById('id_ativo');
+        const box = document.getElementById('boxUltimoDia');
+        if (!ativo || !box) return;
+        box.style.display = ativo.checked ? 'none' : 'block';
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
         if (typeof $ !== 'undefined' && $.fn.mask) {
-            $('.money-mask').mask('000.000.000.000.000,00', {reverse: true});
-            $('.cpf-mask').mask('000.000.000-00', {reverse: true});
+            $('.money-mask').mask('000.000.000.000.000,00', { reverse: true });
+            $('.cpf-mask').mask('000.000.000-00', { reverse: true });
             $('.cep-mask').mask('00000-000');
             $('.phone-mask').mask('(00) 00000-0000');
+        }
+
+        const ativo = document.getElementById('id_ativo');
+        if (ativo) {
+            alternarCampoUltimoDia();
+            ativo.addEventListener('change', alternarCampoUltimoDia);
         }
     });
 </script>

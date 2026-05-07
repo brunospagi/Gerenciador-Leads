@@ -1,9 +1,11 @@
+from decimal import Decimal
 from django import forms
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from .models import VendaProduto, ParametrosComissao
 
 User = get_user_model()
+TIPOS_CUSTO_ADMIN = {'VENDA_VEICULO', 'VENDA_MOTO', 'CONSIGNACAO', 'COMPRA'}
 
 # --- FORMULÁRIO DE CONFIGURAÇÃO (ADMIN) ---
 class ParametrosComissaoForm(forms.ModelForm):
@@ -118,6 +120,7 @@ class VendaProdutoForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
+        self.is_admin = False
         super().__init__(*args, **kwargs)
 
         if 'data_venda' not in self.initial or not self.initial['data_venda']:
@@ -188,3 +191,18 @@ class VendaProdutoForm(forms.ModelForm):
         if not is_consignador:
             novas_choices = [c for c in self.fields['tipo_produto'].choices if c[0] not in ['CONSIGNACAO', 'COMPRA']]
             self.fields['tipo_produto'].choices = novas_choices
+
+        self.is_admin = is_admin
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo = cleaned_data.get('tipo_produto') or getattr(self.instance, 'tipo_produto', None)
+
+        # Defesa em profundidade: custo de veículo só pode ser definido por ADMIN.
+        if (not self.is_admin) and tipo in TIPOS_CUSTO_ADMIN:
+            if self.instance and self.instance.pk:
+                cleaned_data['custo_base'] = self.instance.custo_base
+            else:
+                cleaned_data['custo_base'] = Decimal('0.00')
+
+        return cleaned_data

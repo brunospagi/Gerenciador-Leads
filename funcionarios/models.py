@@ -1,59 +1,65 @@
-from django.db import models
+﻿from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 
-# Importa o seu storage configurado para o MinIO S3
+# Importa o storage configurado para o MinIO S3
 from crmspagi.storage_backends import PublicMediaStorage
+
 
 class Funcionario(models.Model):
     TIPO_CONTA_CHOICES = [
         ('CORRENTE', 'Conta Corrente'),
-        ('POUPANCA', 'Poupança'),
+        ('POUPANCA', 'Conta Poupança'),
         ('SALARIO', 'Conta Salário'),
     ]
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='dados_funcionais', verbose_name="Usuário do Sistema")
-    
-    # === CAMPO NOVO: FOTO BIOMETRIA (Upload direto para o S3) ===
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='dados_funcionais', verbose_name='Usuário do Sistema')
+
     foto_biometria = models.ImageField(
-        upload_to='biometria/', 
-        storage=PublicMediaStorage(), 
-        null=True, 
-        blank=True, 
-        verbose_name="Foto Base para Biometria Facial"
+        upload_to='biometria/',
+        storage=PublicMediaStorage(),
+        null=True,
+        blank=True,
+        verbose_name='Foto Base para Biometria Facial',
     )
 
-    # Dados Pessoais
-    cpf = models.CharField(max_length=14, unique=True, verbose_name="CPF")
-    rg = models.CharField(max_length=20, blank=True, null=True, verbose_name="RG")
-    data_nascimento = models.DateField(blank=True, null=True, verbose_name="Data de Nascimento")
-    telefone = models.CharField(max_length=20, verbose_name="Telefone/WhatsApp")
-    
+    # Dados pessoais
+    cpf = models.CharField(max_length=14, unique=True, verbose_name='CPF')
+    rg = models.CharField(max_length=20, blank=True, null=True, verbose_name='RG')
+    data_nascimento = models.DateField(blank=True, null=True, verbose_name='Data de Nascimento')
+    telefone = models.CharField(max_length=20, verbose_name='Telefone/WhatsApp')
+
     # Endereço
-    endereco = models.CharField(max_length=255, verbose_name="Endereço Completo")
-    cep = models.CharField(max_length=9, blank=True, null=True, verbose_name="CEP")
+    endereco = models.CharField(max_length=255, verbose_name='Endereço Completo')
+    cep = models.CharField(max_length=9, blank=True, null=True, verbose_name='CEP')
 
-    # Dados Contratuais
-    cargo = models.CharField(max_length=100, verbose_name="Cargo")
-    data_admissao = models.DateField(verbose_name="Data de Admissão")
-    salario_base = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Salário Base (R$)", validators=[MinValueValidator(0)])
-    ativo = models.BooleanField(default=True, verbose_name="Colaborador Ativo?")
-
-    # === CAMPOS VT ===
-    opta_vt = models.BooleanField(default=False, verbose_name="Opta por Vale Transporte?")
-    valor_diario_vt = models.DecimalField(
-        max_digits=5, 
-        decimal_places=2, 
-        default=0, 
-        verbose_name="Valor Diário VT (Ida+Volta)"
+    # Dados contratuais
+    cargo = models.CharField(max_length=100, verbose_name='Cargo')
+    data_admissao = models.DateField(verbose_name='Data de Admissão')
+    salario_base = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Salário Base (R$)', validators=[MinValueValidator(0)])
+    ativo = models.BooleanField(default=True, verbose_name='Colaborador Ativo?')
+    data_ultimo_dia_trabalhado = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name='Último dia trabalhado',
+        help_text='Preencha quando o colaborador for marcado como inativo.',
     )
 
-    # Dados Bancários
-    banco = models.CharField(max_length=100, verbose_name="Nome do Banco")
-    agencia = models.CharField(max_length=20, verbose_name="Agência")
-    conta = models.CharField(max_length=30, verbose_name="Nº da Conta")
-    tipo_conta = models.CharField(max_length=20, choices=TIPO_CONTA_CHOICES, default='CORRENTE', verbose_name="Tipo de Conta")
-    chave_pix = models.CharField(max_length=100, blank=True, null=True, verbose_name="Chave Pix")
+    # VT
+    opta_vt = models.BooleanField(default=False, verbose_name='Opta por Vale Transporte?')
+    valor_diario_vt = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        verbose_name='Valor Diário VT (Ida+Volta)',
+    )
+
+    # Dados bancários
+    banco = models.CharField(max_length=100, verbose_name='Nome do Banco')
+    agencia = models.CharField(max_length=20, verbose_name='Agência')
+    conta = models.CharField(max_length=30, verbose_name='Nº da Conta')
+    tipo_conta = models.CharField(max_length=20, choices=TIPO_CONTA_CHOICES, default='CORRENTE', verbose_name='Tipo de Conta')
+    chave_pix = models.CharField(max_length=100, blank=True, null=True, verbose_name='Chave Pix')
 
     @property
     def nome_completo(self):
@@ -63,8 +69,8 @@ class Funcionario(models.Model):
         return self.user.username
 
     def __str__(self):
-        return f"{self.nome_completo} - {self.cargo}"
+        return f'{self.nome_completo} - {self.cargo}'
 
     class Meta:
-        verbose_name = "Cadastro Funcional"
-        verbose_name_plural = "Cadastros Funcionais"
+        verbose_name = 'Cadastro Funcional'
+        verbose_name_plural = 'Cadastros Funcionais'

@@ -48,6 +48,17 @@ def dashboard_rh(request):
     else:
         mes, ano = _resolve_mes_ano(request.GET)
 
+    # Sempre garante a existência das folhas na referência selecionada.
+    for func in funcionarios:
+        folha, _ = FolhaPagamento.objects.get_or_create(
+            funcionario=func,
+            mes=mes,
+            ano=ano,
+            defaults={'salario_base': func.salario_base},
+        )
+        if request.method != 'POST' and not folha.fechada:
+            folha.calcular_folha()
+
     folhas_mes = (
         FolhaPagamento.objects.filter(mes=mes, ano=ano)
         .select_related('funcionario', 'funcionario__user')
@@ -88,7 +99,7 @@ def dashboard_rh(request):
                         count_pagas += 1
                 messages.success(request, f"{count_pagas} folhas marcadas como pagas para {mes:02d}/{ano}.")
 
-            else:
+            elif acao == 'atualizar_mes':
                 count = 0
                 for func in funcionarios:
                     folha, _ = FolhaPagamento.objects.get_or_create(
@@ -102,10 +113,16 @@ def dashboard_rh(request):
                     f"{count} folhas recalculadas para {mes:02d}/{ano} "
                     "(incluindo fechadas, sem alterar status)."
                 )
+            else:
+                messages.info(request, "Ação inválida.")
 
             return redirect(f"{reverse('rh_dashboard')}?mes={mes}&ano={ano}")
     else:
         form_folha = ProcessarFolhaForm(initial={'mes': mes, 'ano': ano})
+
+    referencia_atual = date(ano, mes, 1)
+    mes_anterior = referencia_atual - relativedelta(months=1)
+    mes_proximo = referencia_atual + relativedelta(months=1)
 
     return render(request, 'folha_pagamento/dashboard_rh.html', {
         'funcionarios': funcionarios,
@@ -116,6 +133,10 @@ def dashboard_rh(request):
         'total_folhas': folhas_mes.count(),
         'total_fechadas': folhas_mes.filter(fechada=True).count(),
         'total_pagas': folhas_mes.filter(pago=True).count(),
+        'nav_anterior_mes': mes_anterior.month,
+        'nav_anterior_ano': mes_anterior.year,
+        'nav_proximo_mes': mes_proximo.month,
+        'nav_proximo_ano': mes_proximo.year,
     })
 
 @login_required
@@ -370,6 +391,8 @@ def detalhe_folha(request, pk):
             'data_venda': venda.data_venda,
             'cliente_nome': venda.cliente_nome,
             'tipo_produto': venda.get_tipo_produto_display(),
+            'veiculo': f"{(venda.marca_veiculo or '').strip()} {(venda.modelo_veiculo or '').strip()}".strip() or '-',
+            'placa': venda.placa or '-',
             'papel': meu_papel,
             'minha_comissao': minha_comissao or Decimal('0.00'),
             'comissao_outro': comissao_outro or Decimal('0.00'),

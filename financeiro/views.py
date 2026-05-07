@@ -177,8 +177,17 @@ class RelatorioDREView(AcessoAdminMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         hoje = timezone.now()
-        mes = int(self.request.GET.get("mes", hoje.month))
-        ano = int(self.request.GET.get("ano", hoje.year))
+        try:
+            mes = int(self.request.GET.get("mes", hoje.month))
+        except (TypeError, ValueError):
+            mes = hoje.month
+        try:
+            ano = int(self.request.GET.get("ano", hoje.year))
+        except (TypeError, ValueError):
+            ano = hoje.year
+
+        if mes < 1 or mes > 12:
+            mes = hoje.month
 
         context["relatorio"] = gerar_relatorio_DRE_mensal(mes, ano)
         context["mes_atual"] = mes

@@ -18,6 +18,29 @@ from .forms import VendaProdutoForm, ParametrosComissaoForm
 
 User = get_user_model()
 
+TIPOS_CUSTO_ADMIN = {'VENDA_VEICULO', 'VENDA_MOTO', 'CONSIGNACAO', 'COMPRA'}
+
+def _nivel_acesso(user):
+    try:
+        return getattr(user.profile, 'nivel_acesso', '')
+    except Exception:
+        return ''
+
+def _is_admin_financeiro(user):
+    return user.is_superuser or _nivel_acesso(user) == 'ADMIN'
+
+def _is_gestor_financeiro(user):
+    return user.is_superuser or _nivel_acesso(user) in ['ADMIN', 'GERENTE']
+
+def _parse_decimal_br(valor_str):
+    if not valor_str:
+        return None
+    limpo = valor_str.replace('R$', '').replace('.', '').replace(',', '.').strip()
+    try:
+        return Decimal(limpo)
+    except Exception:
+        return None
+
 # --- NOVA VIEW: CONFIGURAÇÃO DE COMISSÃO (ADMIN ONLY) ---
 class ConfiguracaoComissaoView(LoginRequiredMixin, UpdateView):
     model = ParametrosComissao
@@ -29,7 +52,7 @@ class ConfiguracaoComissaoView(LoginRequiredMixin, UpdateView):
         return ParametrosComissao.get_solo()
 
     def dispatch(self, request, *args, **kwargs):
-        if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
+        if not _is_admin_financeiro(request.user):
             messages.error(request, "Acesso restrito ao Administrador.")
             return redirect('venda_produto_list')
         return super().dispatch(request, *args, **kwargs)
@@ -66,7 +89,7 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
         qs = VendaProduto.objects.all().select_related('vendedor', 'gerente', 'vendedor_ajudante')
         data_inicio, data_fim = self.get_periodo()
         qs = qs.filter(data_venda__range=[data_inicio, data_fim])
-        is_gestor = user.is_superuser or getattr(user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
+        is_gestor = _is_gestor_financeiro(user)
         if not is_gestor:
             qs = qs.filter(Q(vendedor=user) | Q(vendedor_ajudante=user))
         return qs.order_by('-data_venda', '-id')
@@ -84,8 +107,8 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
         context['periodo_inicio'] = data_inicio
         context['periodo_fim'] = data_fim
 
-        is_admin = user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN'
-        is_gerente = getattr(user.profile, 'nivel_acesso', '') == 'GERENTE'
+        is_admin = _is_admin_financeiro(user)
+        is_gerente = _nivel_acesso(user) == 'GERENTE'
         is_gestor = is_admin or is_gerente
 
         if is_gestor:
@@ -126,6 +149,12 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         main_venda = form.instance
+        is_admin = _is_admin_financeiro(self.request.user)
+
+        # Blindagem financeira: somente ADMIN pode definir custo de veículo.
+        if (not is_admin) and main_venda.tipo_produto in TIPOS_CUSTO_ADMIN:
+            main_venda.custo_base = Decimal('0.00')
+
         if not main_venda.vendedor_id:
             main_venda.vendedor = self.request.user
 
@@ -199,14 +228,21 @@ class VendaProdutoUpdateView(LoginRequiredMixin, UpdateView):
 
     def dispatch(self, request, *args, **kwargs):
         venda = self.get_object()
-        is_gestor = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
+        is_gestor = _is_gestor_financeiro(request.user)
         if venda.status == 'APROVADO' and not is_gestor:
             messages.error(request, "Vendas aprovadas não podem ser alteradas.")
             return redirect('venda_produto_list')
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        is_gestor = self.request.user.is_superuser or getattr(self.request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
+        is_gestor = _is_gestor_financeiro(self.request.user)
+        is_admin = _is_admin_financeiro(self.request.user)
+        venda_original = self.get_object()
+
+        # Blindagem financeira: gerente/vendedor não alteram custo de veículo.
+        if (not is_admin) and form.instance.tipo_produto in TIPOS_CUSTO_ADMIN:
+            form.instance.custo_base = venda_original.custo_base
+
         if not is_gestor:
             form.instance.status = 'PENDENTE'
             form.instance.gerente = None
@@ -221,7 +257,7 @@ class VendaProdutoDeleteView(LoginRequiredMixin, DeleteView):
 
     def dispatch(self, request, *args, **kwargs):
         venda = self.get_object()
-        is_gestor = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
+        is_gestor = _is_gestor_financeiro(request.user)
         if venda.vendedor != request.user and not is_gestor:
             messages.error(request, "Permissão negada.")
             return redirect('venda_produto_list')
@@ -287,7 +323,7 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
     template_name = 'vendas_produtos/relatorio.html'
     
     def dispatch(self, request, *args, **kwargs):
-        if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
+        if not _is_admin_financeiro(request.user):
             messages.error(request, "Acesso restrito ao Administrador.")
             return redirect('venda_produto_list')
         return super().dispatch(request, *args, **kwargs)
@@ -349,7 +385,7 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
         
         # Adiciona o próprio usuário logado se ele for admin/gerente e não tiver vendas
         if not vendedor_id_filter:
-            if self.request.user.id not in ids_para_processar and (self.request.user.is_superuser or getattr(self.request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']):
+            if self.request.user.id not in ids_para_processar and _is_gestor_financeiro(self.request.user):
                 ids_para_processar.append(self.request.user.id)
 
         relatorio_vendedores = []
@@ -455,7 +491,8 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
 @login_required
 @require_POST
 def aprovar_venda_produto(request, pk):
-    is_gestor = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
+    is_gestor = _is_gestor_financeiro(request.user)
+    is_admin = _is_admin_financeiro(request.user)
     if not is_gestor:
         messages.error(request, "Permissão negada.")
         return redirect('venda_produto_list')
@@ -466,12 +503,30 @@ def aprovar_venda_produto(request, pk):
         numero_apolice = request.POST.get('numero_apolice')
         arquivo_apolice = request.FILES.get('arquivo_apolice')
         
-        for campo in ['custo_base', 'valor_venda']:
-            valor_str = request.POST.get(campo)
-            if valor_str:
-                limpo = valor_str.replace('R$', '').replace('.', '').replace(',', '.').strip()
-                try: setattr(venda, campo, Decimal(limpo))
-                except: pass
+        valor_venda = _parse_decimal_br(request.POST.get('valor_venda'))
+        if valor_venda is not None:
+            venda.valor_venda = valor_venda
+
+        custo_post = _parse_decimal_br(request.POST.get('custo_base'))
+        if custo_post is not None and venda.tipo_produto in TIPOS_CUSTO_ADMIN:
+            if is_admin:
+                venda.custo_base = custo_post
+            else:
+                messages.warning(
+                    request,
+                    "Somente ADMIN pode alterar o custo do veículo. Aprovação mantida com o custo atual."
+                )
+
+        if venda.tipo_produto in ['VENDA_VEICULO', 'VENDA_MOTO'] and (venda.valor_venda or Decimal('0.00')) <= 0:
+            messages.error(request, "Valor de venda inválido. Informe um valor maior que zero para aprovar.")
+            return redirect('venda_produto_list')
+
+        if venda.tipo_produto in TIPOS_CUSTO_ADMIN and (venda.custo_base or Decimal('0.00')) <= 0:
+            if is_admin:
+                messages.error(request, "Custo do veículo é obrigatório para aprovação.")
+            else:
+                messages.error(request, "Custo do veículo está pendente. Solicite ajuste ao ADMIN antes de aprovar.")
+            return redirect('venda_produto_list')
 
         if venda.tipo_produto == 'GARANTIA':
             if not numero_apolice:
@@ -493,10 +548,38 @@ def aprovar_venda_produto(request, pk):
         messages.success(request, "Venda APROVADA.")
     return redirect(f"{reverse('venda_produto_minuta', kwargs={'pk': venda.pk})}?auto_print=1")
 
+
+@login_required
+@require_POST
+def ajustar_custo_veiculo(request, pk):
+    if not _is_admin_financeiro(request.user):
+        messages.error(request, "Somente ADMIN pode ajustar custo de veículo.")
+        return redirect('venda_produto_list')
+
+    venda = get_object_or_404(VendaProduto, pk=pk)
+    if venda.tipo_produto not in TIPOS_CUSTO_ADMIN:
+        messages.error(request, "Este tipo de lançamento não permite ajuste de custo de veículo.")
+        return redirect('venda_produto_list')
+
+    novo_custo = _parse_decimal_br(request.POST.get('custo_base'))
+    if novo_custo is None or novo_custo <= 0:
+        messages.error(request, "Informe um custo válido maior que zero.")
+        return redirect('venda_produto_list')
+
+    custo_anterior = venda.custo_base or Decimal('0.00')
+    venda.custo_base = novo_custo
+    venda.save()
+
+    messages.success(
+        request,
+        f"Custo ajustado com sucesso: de R$ {custo_anterior:.2f} para R$ {novo_custo:.2f}."
+    )
+    return redirect('venda_produto_list')
+
 @login_required
 @require_POST
 def rejeitar_venda_produto(request, pk):
-    is_gestor = request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') in ['ADMIN', 'GERENTE']
+    is_gestor = _is_gestor_financeiro(request.user)
     if not is_gestor:
         messages.error(request, "Permissão negada.")
         return redirect('venda_produto_list')
@@ -514,7 +597,7 @@ def rejeitar_venda_produto(request, pk):
 @login_required
 @require_POST
 def toggle_fechamento_mes(request):
-    if not (request.user.is_superuser or getattr(request.user.profile, 'nivel_acesso', '') == 'ADMIN'):
+    if not _is_admin_financeiro(request.user):
         messages.error(request, "Permissão negada.")
         return redirect('venda_produto_list')
 

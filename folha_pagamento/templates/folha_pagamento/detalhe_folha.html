@@ -126,16 +126,22 @@
             </div>
         </div>
 
-        <div class="row mt-4 secao-conferencia no-print-holerite">
+        <div class="row mt-4 no-print">
             <div class="col-12">
+                <button class="btn btn-outline-secondary btn-sm mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#conferenciaComissoes" aria-expanded="false" aria-controls="conferenciaComissoes">
+                    <i class="fa fa-search-dollar me-1"></i> Ver Conferencia de Comissoes
+                </button>
+                <div id="conferenciaComissoes" class="collapse">
                 <h6 class="fw-bold mb-2">Conferencia de Comissoes (Titular/Ajudante)</h6>
-                <div class="table-responsive">
+                <div class="table-responsive secao-conferencia">
                     <table class="table table-sm table-bordered align-middle">
                         <thead class="table-light">
                             <tr>
                                 <th>Data</th>
                                 <th>Cliente</th>
                                 <th>Tipo</th>
+                                <th>Veiculo</th>
+                                <th>Placa</th>
                                 <th>Papel</th>
                                 <th>Minha Comissao</th>
                                 <th>Outro 50%</th>
@@ -148,6 +154,8 @@
                                 <td>{{ item.data_venda|date:"d/m/Y" }}</td>
                                 <td>{{ item.cliente_nome }}</td>
                                 <td>{{ item.tipo_produto }}</td>
+                                <td>{{ item.veiculo }}</td>
+                                <td>{{ item.placa }}</td>
                                 <td>{{ item.papel }}</td>
                                 <td class="text-success fw-bold">R$ {{ item.minha_comissao|floatformat:2 }}</td>
                                 <td class="text-primary fw-bold">R$ {{ item.comissao_outro|floatformat:2 }}</td>
@@ -155,19 +163,20 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="7" class="text-center text-muted">Sem operacoes com comissao no periodo.</td>
+                                <td colspan="9" class="text-center text-muted">Sem operacoes com comissao no periodo.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                         <tfoot>
                             <tr class="table-light fw-bold">
-                                <td colspan="4" class="text-end">Totais de conferencia</td>
+                                <td colspan="6" class="text-end">Totais de conferencia</td>
                                 <td class="text-success">R$ {{ total_conferencia_minha|floatformat:2 }}</td>
                                 <td class="text-primary">R$ {{ total_conferencia_outro|floatformat:2 }}</td>
                                 <td>-</td>
                             </tr>
                         </tfoot>
                     </table>
+                </div>
                 </div>
             </div>
         </div>
@@ -221,6 +230,10 @@
         }
         .no-print-holerite {
             display: none !important;
+        }
+        .secao-conferencia, .secao-conferencia * {
+            display: none !important;
+            visibility: hidden !important;
         }
         .container.py-4 {
             padding: 0 !important;

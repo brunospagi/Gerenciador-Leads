@@ -67,6 +67,14 @@
                 <td class="text-end">R$ {{ folha.salario_base|add:folha.total_creditos_manuais }}</td>
             </tr>
             {% endfor %}
+            <tr>
+                <td colspan="2" class="text-end">Comissão RH (não embutida no lucro):</td>
+                <td class="text-end">R$ {{ relatorio.custo_comissao_adicional_rh|floatformat:2 }}</td>
+            </tr>
+            <tr>
+                <td colspan="2" class="text-end">VT Líquido (crédito - desconto):</td>
+                <td class="text-end">R$ {{ relatorio.custo_vt_liquido|floatformat:2 }}</td>
+            </tr>
             <tr class="fw-bold"><td colspan="2" class="text-end">TOTAL RH:</td><td class="text-end">R$ {{ relatorio.custo_rh|floatformat:2 }}</td></tr>
             
             <tr class="section-title fs-5"><td colspan="2" class="text-end">SOMA DAS SAÍDAS:</td><td class="text-end">R$ {{ relatorio.total_saidas|floatformat:2 }}</td></tr>

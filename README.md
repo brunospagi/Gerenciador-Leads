@@ -121,6 +121,8 @@ Variaveis principais:
 - `DJANGO_DEBUG`
 - `DJANGO_ALLOWED_HOSTS`
 - `DJANGO_CSRF_TRUSTED_ORIGINS`
+- `APP_BUILD_NUMBER` (numero da build exibido no rodape)
+- `APP_BUILD_SHA` (hash curto/commit exibido no rodape)
 - `DB_ENGINE` (`postgres` ou `sqlite`)
 - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` (quando `DB_ENGINE=postgres`)
 - `SQLITE_PATH` (quando `DB_ENGINE=sqlite`)
@@ -134,6 +136,7 @@ Observacoes importantes:
 
 - `.env.example` foi sanitizado com valores ficticios (somente modelo)
 - `DJANGO_DEBUG` agora e interpretado corretamente como booleano (`True`/`False`)
+- o rodape exibe build via `APP_BUILD_NUMBER` e `APP_BUILD_SHA` (ou `GITHUB_SHA`/`RENDER_GIT_COMMIT` como fallback)
 
 ## 8. Rodando Localmente
 

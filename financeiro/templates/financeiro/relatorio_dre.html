@@ -116,7 +116,13 @@
                             <tr><td colspan="3" class="text-center text-muted">Nenhuma folha gerada.</td></tr>
                             {% endfor %}
                         </tbody>
-                        <tfoot class="table-light fw-bold"><tr><td>TOTAL RH</td><td>R$ {{ relatorio.custo_salario|floatformat:2 }}</td><td class="text-end text-danger">R$ {{ relatorio.custo_bonus|floatformat:2 }}</td></tr></tfoot>
+                        <tfoot class="table-light">
+                            <tr class="fw-bold"><td>Salário Base</td><td colspan="2" class="text-end text-danger">R$ {{ relatorio.custo_salario|floatformat:2 }}</td></tr>
+                            <tr class="fw-bold"><td>Créditos Manuais</td><td colspan="2" class="text-end text-danger">R$ {{ relatorio.custo_bonus|floatformat:2 }}</td></tr>
+                            <tr class="fw-bold"><td>Comissão RH (não embutida no lucro)</td><td colspan="2" class="text-end text-danger">R$ {{ relatorio.custo_comissao_adicional_rh|floatformat:2 }}</td></tr>
+                            <tr class="fw-bold"><td>VT Líquido (crédito - desconto)</td><td colspan="2" class="text-end text-danger">R$ {{ relatorio.custo_vt_liquido|floatformat:2 }}</td></tr>
+                            <tr class="fw-bold border-top"><td>TOTAL RH</td><td colspan="2" class="text-end text-danger">R$ {{ relatorio.custo_rh|floatformat:2 }}</td></tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>

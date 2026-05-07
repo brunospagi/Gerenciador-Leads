@@ -159,6 +159,13 @@ def gerar_relatorio_DRE_mensal(mes, ano):
     # 1. Receitas de Vendas (Detalhado)
     vendas = VendaProduto.objects.filter(data_venda__month=mes, data_venda__year=ano, status='APROVADO').order_by('data_venda')
     lucro_vendas = vendas.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
+    tipos_comissao_embutida = ['VENDA_VEICULO', 'VENDA_MOTO', 'TRANSFERENCIA', 'REFINANCIAMENTO']
+    vendas_com_embutida = vendas.filter(tipo_produto__in=tipos_comissao_embutida)
+    agregado_embutido = vendas_com_embutida.aggregate(
+        total_vendedor=Sum('comissao_vendedor'),
+        total_ajudante=Sum('comissao_ajudante')
+    )
+    comissao_embutida_lucro = (agregado_embutido['total_vendedor'] or 0) + (agregado_embutido['total_ajudante'] or 0)
 
     # 2. Receitas Extras (Detalhado)
     receitas_list = TransacaoFinanceira.objects.filter(
@@ -178,11 +185,23 @@ def gerar_relatorio_DRE_mensal(mes, ano):
     folhas_list = FolhaPagamento.objects.filter(mes=mes, ano=ano).select_related('funcionario')
     agregado_rh = folhas_list.aggregate(
         total_base=Sum('salario_base'),
-        total_bonus=Sum('total_creditos_manuais')
+        total_bonus=Sum('total_creditos_manuais'),
+        total_comissoes=Sum('total_comissoes'),
+        total_credito_vt=Sum('credito_vt'),
+        total_desconto_vt=Sum('desconto_vt')
     )
     custo_salario = agregado_rh['total_base'] or 0
     custo_bonus = agregado_rh['total_bonus'] or 0
-    custo_rh = custo_salario + custo_bonus
+    total_comissoes_folha = agregado_rh['total_comissoes'] or 0
+    total_credito_vt = agregado_rh['total_credito_vt'] or 0
+    total_desconto_vt = agregado_rh['total_desconto_vt'] or 0
+    custo_comissao_adicional_rh = total_comissoes_folha - comissao_embutida_lucro
+    if custo_comissao_adicional_rh < 0:
+        custo_comissao_adicional_rh = 0
+    custo_vt_liquido = total_credito_vt - total_desconto_vt
+    if custo_vt_liquido < 0:
+        custo_vt_liquido = 0
+    custo_rh = custo_salario + custo_bonus + custo_comissao_adicional_rh + custo_vt_liquido
 
     total_saidas = despesas_loja + custo_rh
 
@@ -198,6 +217,12 @@ def gerar_relatorio_DRE_mensal(mes, ano):
         'folhas_list': folhas_list,
         'custo_salario': custo_salario,
         'custo_bonus': custo_bonus,
+        'total_comissoes_folha': total_comissoes_folha,
+        'comissao_embutida_lucro': comissao_embutida_lucro,
+        'custo_comissao_adicional_rh': custo_comissao_adicional_rh,
+        'total_credito_vt': total_credito_vt,
+        'total_desconto_vt': total_desconto_vt,
+        'custo_vt_liquido': custo_vt_liquido,
         'custo_rh': custo_rh,
         'total_saidas': total_saidas,
         'saldo_liquido': total_entradas - total_saidas
