@@ -265,6 +265,7 @@ Execute este roteiro antes de cada deploy:
 2. Ponto
 - Registrar entrada dentro da tolerancia.
 - Registrar entrada com atraso e justificativa.
+- Validar que a foto capturada no ponto atualiza automaticamente o avatar do usuario.
 - Homologar ocorrencia (aceitar/recusar) em `Ocorrencias de Ponto`.
 - Validar `Espelho de Ponto Mensal` e `Relatorio de Entradas`.
 - Validar impressao A4 (portrait/landscape conforme tela).

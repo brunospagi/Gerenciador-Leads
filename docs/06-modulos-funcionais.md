@@ -32,6 +32,7 @@
 
 - cadastro de equipe
 - ponto com auditoria
+- sincronizacao automatica da foto do ponto com o avatar do usuario
 - folha com creditos/descontos
 
 ## Apoio (`documentos`, `autorizacoes`, `avaliacoes`, `credenciais`, `notificacoes`)

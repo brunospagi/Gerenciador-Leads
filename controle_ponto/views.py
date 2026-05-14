@@ -1,5 +1,7 @@
 ﻿import json
 import threading
+import base64
+import logging
 from datetime import datetime
 import secrets
 
@@ -14,6 +16,7 @@ from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.views.generic import DeleteView, UpdateView
+from django.core.files.base import ContentFile
 
 from funcionarios.models import Funcionario
 
@@ -22,6 +25,7 @@ from .models import ConfiguracaoPonto, RegistroPonto
 
 TOKEN_PONTO_TTL_SECONDS = 120
 GEO_CHECK_TTL_SECONDS = 120
+logger = logging.getLogger(__name__)
 
 
 def _safe_int(value, default, min_value=None, max_value=None):
@@ -57,6 +61,40 @@ def _calcular_atraso_minutos(data_ref, horario_real, horario_escala):
     atraso = int(delta.total_seconds() // 60)
     return atraso if atraso > 0 else 0
 
+
+def _atualizar_avatar_com_foto_ponto(user, foto_base64):
+    profile = getattr(user, 'profile', None)
+    if not profile or not foto_base64:
+        return
+
+    if ';base64,' not in foto_base64:
+        return
+
+    header, encoded = foto_base64.split(';base64,', 1)
+    if not header.startswith('data:image/'):
+        return
+
+    mime = header.replace('data:image/', '').lower()
+    extensao = {
+        'jpeg': 'jpg',
+        'jpg': 'jpg',
+        'png': 'png',
+        'webp': 'webp',
+    }.get(mime, 'jpg')
+
+    try:
+        imagem_bytes = base64.b64decode(encoded)
+    except Exception:
+        logger.warning('Falha ao decodificar foto_base64 do ponto para avatar.', exc_info=True)
+        return
+
+    nome_arquivo = f"ponto_avatar_{user.id}_{timezone.now().strftime('%Y%m%d_%H%M%S')}.{extensao}"
+
+    try:
+        profile.avatar.save(nome_arquivo, ContentFile(imagem_bytes), save=True)
+    except Exception:
+        logger.exception('Falha ao salvar avatar do usuário a partir da foto do ponto.')
+        return
 
 @login_required
 def relogio_ponto(request):
@@ -193,8 +231,8 @@ def relogio_ponto(request):
         if lat and lng:
             ponto.latitude = lat
             ponto.longitude = lng
-
         ponto.save()
+        _atualizar_avatar_com_foto_ponto(request.user, foto_base64)
 
         def disparar_webhook(dados_webhook):
             try:
@@ -507,5 +545,4 @@ def detalhe_ponto(request, pk):
 
     ponto = get_object_or_404(RegistroPonto, pk=pk)
     return render(request, 'controle_ponto/detalhe_ponto.html', {'ponto': ponto})
-
 
