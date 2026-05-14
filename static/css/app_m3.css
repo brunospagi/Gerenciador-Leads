@@ -96,6 +96,24 @@ body {
   background: linear-gradient(180deg, #fff, #f9fbff) !important;
 }
 
+/* Padronizacao visual: texto preto dentro dos cards */
+.card,
+.card .card-header,
+.card .card-body,
+.card .card-footer {
+  color: #111 !important;
+}
+
+.card :where(h1, h2, h3, h4, h5, h6, p, span, small, strong, em, li, dt, dd, label, th, td, a) {
+  color: #111 !important;
+}
+
+.card .text-white,
+.card .text-white-50,
+.card .text-light {
+  color: #111 !important;
+}
+
 .btn {
   border-radius: var(--m3-radius-sm);
   font-weight: 600;
