@@ -1,4 +1,4 @@
-﻿from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation
 
 from django import forms
 from django.contrib.auth.models import User
@@ -60,7 +60,7 @@ class FuncionarioForm(forms.ModelForm):
             'chave_pix': forms.TextInput(attrs={'class': 'form-control'}),
             'ativo': forms.CheckboxInput(attrs={'class': 'form-check-input', 'checked': True}),
             'opta_vt': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'valor_diario_vt': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'valor_diario_vt': forms.TextInput(attrs={'class': 'form-control money-mask', 'placeholder': '0,00'}),
             'foto_biometria': forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
 
@@ -89,3 +89,15 @@ class FuncionarioForm(forms.ModelForm):
             return Decimal(valor_str)
         except (InvalidOperation, ValueError):
             raise forms.ValidationError('Informe um salário válido.')
+
+    def clean_valor_diario_vt(self):
+        valor = self.cleaned_data.get('valor_diario_vt')
+        if isinstance(valor, Decimal):
+            return valor
+        if valor in (None, ''):
+            return Decimal('0.00')
+        valor_str = str(valor).replace('R$', '').replace('.', '').replace(',', '.').strip()
+        try:
+            return Decimal(valor_str)
+        except (InvalidOperation, ValueError):
+            raise forms.ValidationError('Informe um valor diário de VT válido.')

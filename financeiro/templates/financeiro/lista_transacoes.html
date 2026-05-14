@@ -1,236 +1,223 @@
 {% extends 'base_portal.html' %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-        <div>
-            <h2 class="mb-1">Gestao Financeira</h2>
-            <p class="text-muted mb-0">Controle de receitas, despesas e conciliacao em lote.</p>
-        </div>
-        <div class="d-flex flex-wrap gap-2">
-            {% if is_admin_financeiro %}
-            <a href="{% url 'financeiro:relatorio_dre' %}" class="btn btn-info">
-                <i class="fas fa-chart-line me-1"></i> Relatorio DRE
-            </a>
-            {% endif %}
-            <a href="{% url 'financeiro:nova_transacao' %}" class="btn btn-primary">
-                <i class="fas fa-plus me-1"></i> Novo Lancamento
-            </a>
-        </div>
+<div class="container mt-4 m3-module-shell">
+  <section class="m3-page-header">
+    <div>
+      <h1 class="m3-page-title"><i class="fas fa-wallet me-2"></i>Gestão Financeira</h1>
+      <p class="m3-page-subtitle">Controle operacional de receitas, despesas e conciliação do caixa.</p>
     </div>
-
-    {% if messages %}
-    <div class="mb-3">
-        {% for message in messages %}
-        <div class="alert alert-{{ message.tags|default:'info' }} mb-2">{{ message }}</div>
-        {% endfor %}
+    <div class="m3-toolbar">
+      {% if is_admin_financeiro %}
+      <a href="{% url 'financeiro:relatorio_dre' %}" class="btn btn-info">
+        <i class="fas fa-chart-line me-1"></i>Relatório DRE
+      </a>
+      {% endif %}
+      <a href="{% url 'financeiro:nova_transacao' %}" class="btn btn-primary">
+        <i class="fas fa-plus me-1"></i>Novo lançamento
+      </a>
     </div>
-    {% endif %}
+  </section>
 
-    {% if user.profile.nivel_acesso != 'ADMIN' and not user.is_superuser %}
-    <div class="alert alert-info shadow-sm">
-        <i class="fas fa-info-circle me-1"></i>
-        Voce visualiza apenas lancamentos criados por voce.
+  {% if messages %}
+  <section>
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} mb-2">{{ message }}</div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if user.profile.nivel_acesso != 'ADMIN' and not user.is_superuser %}
+  <section class="m3-soft-note">
+    <i class="fas fa-info-circle me-1"></i>Você visualiza somente lançamentos criados por você.
+  </section>
+  {% endif %}
+
+  <section class="m3-kpi-grid">
+    <article class="m3-kpi-card">
+      <div class="m3-kpi-label">Total de lançamentos</div>
+      <div class="m3-kpi-value">{{ total_transacoes }}</div>
+      <div class="m3-kpi-help">Volume total no período filtrado.</div>
+    </article>
+    <article class="m3-kpi-card">
+      <div class="m3-kpi-label">Pendentes</div>
+      <div class="m3-kpi-value text-warning">{{ total_pendentes }}</div>
+      <div class="m3-kpi-help">R$ {{ soma_pendente|floatformat:2 }}</div>
+    </article>
+    <article class="m3-kpi-card">
+      <div class="m3-kpi-label">Efetivadas</div>
+      <div class="m3-kpi-value text-success">{{ total_efetivadas }}</div>
+      <div class="m3-kpi-help">R$ {{ soma_efetivada|floatformat:2 }}</div>
+    </article>
+    <article class="m3-kpi-card">
+      <div class="m3-kpi-label">Saldo do período</div>
+      <div class="m3-kpi-value">R$ {{ saldo_geral|floatformat:2 }}</div>
+      <div class="m3-kpi-help">Efetivado menos pendente.</div>
+    </article>
+  </section>
+
+  <section class="card m3-filter-card">
+    <div class="card-body">
+      <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label for="mesRefInput" class="form-label">Referência mensal</label>
+          <input type="month" id="mesRefInput" name="mes_ref" value="{{ mes_ref }}" class="form-control">
+        </div>
+        <div class="col-md-8 d-flex flex-wrap gap-2">
+          <button type="submit" class="btn btn-outline-primary"><i class="fas fa-filter me-1"></i>Filtrar</button>
+          <a href="{% url 'financeiro:lista_transacoes' %}" class="btn btn-outline-secondary">Mês atual</a>
+        </div>
+      </form>
     </div>
-    {% endif %}
+  </section>
 
-    <div class="row g-3 mb-4">
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="text-muted small">Total de Lancamentos</div>
-                    <div class="fs-4 fw-bold">{{ total_transacoes }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="text-muted small">Pendentes</div>
-                    <div class="fs-4 fw-bold text-warning">{{ total_pendentes }}</div>
-                    <div class="small text-muted">R$ {{ soma_pendente|floatformat:2 }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="text-muted small">Efetivadas</div>
-                    <div class="fs-4 fw-bold text-success">{{ total_efetivadas }}</div>
-                    <div class="small text-muted">R$ {{ soma_efetivada|floatformat:2 }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="text-muted small">Saldo (Efetivado - Pendente)</div>
-                    <div class="fs-4 fw-bold">R$ {{ saldo_geral|floatformat:2 }}</div>
-                </div>
-            </div>
-        </div>
-    </div>
+  <form method="post" id="bulkForm">
+    {% csrf_token %}
+    <input type="hidden" name="mes_ref" value="{{ mes_ref }}">
 
-    <div class="card shadow-sm border-0 mb-3">
-        <div class="card-body">
-            <form method="get" class="d-flex flex-wrap align-items-end gap-2">
-                <div>
-                    <label for="mesRefInput" class="form-label mb-1">Mostrar somente o mes</label>
-                    <input type="month" id="mesRefInput" name="mes_ref" value="{{ mes_ref }}" class="form-control">
-                </div>
-                <button type="submit" class="btn btn-outline-primary">
-                    <i class="fas fa-filter me-1"></i> Filtrar
-                </button>
-                <a href="{% url 'financeiro:lista_transacoes' %}" class="btn btn-outline-secondary">Mes atual</a>
-            </form>
+    <section class="card m3-filter-card">
+      <div class="card-body d-flex flex-wrap align-items-center gap-2">
+        <div class="form-check me-1">
+          <input class="form-check-input" type="checkbox" id="checkAllRows">
+          <label class="form-check-label fw-semibold" for="checkAllRows">Selecionar todos</label>
         </div>
-    </div>
+        <select name="bulk_action" id="bulkAction" class="form-select" style="max-width: 260px;">
+          <option value="">Ação em lote</option>
+          <option value="marcar_efetivado">Marcar como efetivado</option>
+          <option value="marcar_pendente">Marcar como pendente</option>
+          {% if is_admin_financeiro %}
+          <option value="excluir">Excluir selecionados</option>
+          {% endif %}
+        </select>
+        <button type="submit" class="btn btn-dark" id="applyBulkBtn"><i class="fas fa-layer-group me-1"></i>Aplicar em lote</button>
+        <span class="ms-auto m3-pill"><span id="selectedCount">0</span> selecionado(s)</span>
+      </div>
+    </section>
 
-    <form method="post" id="bulkForm">
-        {% csrf_token %}
-        <input type="hidden" name="mes_ref" value="{{ mes_ref }}">
-        <div class="card shadow-sm border-0 mb-3">
-            <div class="card-body d-flex flex-wrap align-items-center gap-2">
-                <div class="form-check me-2">
-                    <input class="form-check-input" type="checkbox" id="checkAllRows">
-                    <label class="form-check-label fw-semibold" for="checkAllRows">Selecionar todos</label>
-                </div>
-
-                <select name="bulk_action" id="bulkAction" class="form-select" style="max-width: 260px;">
-                    <option value="">Acao em lote</option>
-                    <option value="marcar_efetivado">Marcar como efetivado</option>
-                    <option value="marcar_pendente">Marcar como pendente</option>
-                    {% if is_admin_financeiro %}
-                    <option value="excluir">Excluir selecionados</option>
-                    {% endif %}
-                </select>
-
-                <button type="submit" class="btn btn-dark" id="applyBulkBtn">
-                    <i class="fas fa-layer-group me-1"></i> Aplicar em lote
-                </button>
-
-                <span class="ms-auto text-muted small">
-                    <span id="selectedCount">0</span> selecionado(s)
-                </span>
-            </div>
+    <section class="card">
+      <div class="m3-table-head">
+        <h2 class="m3-section-title mb-0">Lançamentos</h2>
+        <span class="m3-pill">Visão operacional</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width:44px;"></th>
+                <th>Vencimento</th>
+                <th>Tipo</th>
+                <th>Categoria</th>
+                <th>Descrição</th>
+                <th>Valor (R$)</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for transacao in transacoes %}
+              <tr>
+                <td><input class="form-check-input row-check" type="checkbox" name="transacoes" value="{{ transacao.id }}"></td>
+                <td>{{ transacao.data_vencimento|date:"d/m/Y" }}</td>
+                <td>
+                  {% if transacao.tipo == 'RECEITA' %}
+                  <span class="m3-badge m3-badge-success">Receita</span>
+                  {% else %}
+                  <span class="m3-badge m3-badge-danger">Despesa</span>
+                  {% endif %}
+                </td>
+                <td>{{ transacao.get_categoria_display }}</td>
+                <td>
+                  <div class="fw-semibold">{{ transacao.descricao }}</div>
+                  {% if transacao.categoria == 'VEICULO' %}
+                  <small class="text-muted">{{ transacao.placa }} - {{ transacao.modelo_veiculo }}</small>
+                  {% endif %}
+                  {% if is_admin_financeiro and transacao.criado_por %}
+                  <div><small class="text-primary">Lançado por: {{ transacao.criado_por.first_name|default:transacao.criado_por.username }}</small></div>
+                  {% endif %}
+                </td>
+                <td class="fw-bold">R$ {{ transacao.valor|floatformat:2 }}</td>
+                <td>
+                  {% if transacao.efetivado %}
+                  <span class="m3-badge m3-badge-success">Efetivado</span>
+                  {% else %}
+                  <span class="m3-badge m3-badge-warning">Pendente</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if is_admin_financeiro %}
+                  <a href="{% url 'financeiro:editar_transacao' transacao.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fas fa-edit"></i></a>
+                  <a href="{% url 'financeiro:apagar_transacao' transacao.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></a>
+                  {% else %}
+                  <span class="text-muted small">Sem permissão</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="8" class="m3-empty">
+                  <i class="fas fa-inbox"></i>
+                  <div class="fw-semibold">Nenhum lançamento encontrado</div>
+                  <div>Inclua transações para acompanhar o fluxo financeiro.</div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
-
-        <div class="card shadow border-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th style="width: 44px;"></th>
-                            <th>Vencimento</th>
-                            <th>Tipo</th>
-                            <th>Categoria</th>
-                            <th>Descricao</th>
-                            <th>Valor (R$)</th>
-                            <th>Status</th>
-                            <th>Acoes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for transacao in transacoes %}
-                        <tr>
-                            <td>
-                                <input class="form-check-input row-check" type="checkbox" name="transacoes" value="{{ transacao.id }}">
-                            </td>
-                            <td>{{ transacao.data_vencimento|date:"d/m/Y" }}</td>
-                            <td>
-                                {% if transacao.tipo == 'RECEITA' %}
-                                <span class="badge bg-success">Receita</span>
-                                {% else %}
-                                <span class="badge bg-danger">Despesa</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ transacao.get_categoria_display }}</td>
-                            <td>
-                                <div class="fw-semibold">{{ transacao.descricao }}</div>
-                                {% if transacao.categoria == 'VEICULO' %}
-                                <small class="text-muted">{{ transacao.placa }} - {{ transacao.modelo_veiculo }}</small>
-                                {% endif %}
-                                {% if is_admin_financeiro and transacao.criado_por %}
-                                <div><small class="text-primary">Lancado por: {{ transacao.criado_por.first_name|default:transacao.criado_por.username }}</small></div>
-                                {% endif %}
-                            </td>
-                            <td class="fw-bold">R$ {{ transacao.valor|floatformat:2 }}</td>
-                            <td>
-                                {% if transacao.efetivado %}
-                                <span class="badge bg-success">Efetivado</span>
-                                {% else %}
-                                <span class="badge bg-warning text-dark">Pendente</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if is_admin_financeiro %}
-                                <a href="{% url 'financeiro:editar_transacao' transacao.pk %}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
-                                <a href="{% url 'financeiro:apagar_transacao' transacao.pk %}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>
-                                {% else %}
-                                <span class="text-muted small">Sem permissao</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="8" class="text-center py-4 text-muted">Nenhum lancamento registrado ate o momento.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </form>
+      </div>
+    </section>
+  </form>
 </div>
 
 <script>
-    (function () {
-        const checkAll = document.getElementById('checkAllRows');
-        const rowChecks = Array.from(document.querySelectorAll('.row-check'));
-        const selectedCount = document.getElementById('selectedCount');
-        const bulkForm = document.getElementById('bulkForm');
-        const bulkAction = document.getElementById('bulkAction');
+  (function () {
+    const checkAll = document.getElementById('checkAllRows');
+    const rowChecks = Array.from(document.querySelectorAll('.row-check'));
+    const selectedCount = document.getElementById('selectedCount');
+    const bulkForm = document.getElementById('bulkForm');
+    const bulkAction = document.getElementById('bulkAction');
 
-        function refreshCounter() {
-            const selected = rowChecks.filter((item) => item.checked).length;
-            selectedCount.textContent = String(selected);
-            if (checkAll) {
-                checkAll.checked = selected > 0 && selected === rowChecks.length;
-                checkAll.indeterminate = selected > 0 && selected < rowChecks.length;
-            }
-        }
+    function refreshCounter() {
+      const selected = rowChecks.filter((item) => item.checked).length;
+      selectedCount.textContent = String(selected);
+      if (checkAll) {
+        checkAll.checked = selected > 0 && selected === rowChecks.length;
+        checkAll.indeterminate = selected > 0 && selected < rowChecks.length;
+      }
+    }
 
-        if (checkAll) {
-            checkAll.addEventListener('change', function () {
-                rowChecks.forEach((checkbox) => { checkbox.checked = checkAll.checked; });
-                refreshCounter();
-            });
-        }
-
-        rowChecks.forEach((checkbox) => {
-            checkbox.addEventListener('change', refreshCounter);
-        });
-
-        if (bulkForm) {
-            bulkForm.addEventListener('submit', function (event) {
-                const selected = rowChecks.filter((item) => item.checked).length;
-                if (!bulkAction.value) {
-                    event.preventDefault();
-                    alert('Selecione uma acao em lote.');
-                    return;
-                }
-                if (selected === 0) {
-                    event.preventDefault();
-                    alert('Selecione pelo menos um lancamento.');
-                    return;
-                }
-                if (bulkAction.value === 'excluir' && !confirm('Tem certeza que deseja excluir os lancamentos selecionados?')) {
-                    event.preventDefault();
-                }
-            });
-        }
-
+    if (checkAll) {
+      checkAll.addEventListener('change', function () {
+        rowChecks.forEach((checkbox) => { checkbox.checked = checkAll.checked; });
         refreshCounter();
-    })();
+      });
+    }
+
+    rowChecks.forEach((checkbox) => {
+      checkbox.addEventListener('change', refreshCounter);
+    });
+
+    if (bulkForm) {
+      bulkForm.addEventListener('submit', function (event) {
+        const selected = rowChecks.filter((item) => item.checked).length;
+        if (!bulkAction.value) {
+          event.preventDefault();
+          alert('Selecione uma ação em lote.');
+          return;
+        }
+        if (selected === 0) {
+          event.preventDefault();
+          alert('Selecione pelo menos um lançamento.');
+          return;
+        }
+        if (bulkAction.value === 'excluir' && !confirm('Tem certeza que deseja excluir os lançamentos selecionados?')) {
+          event.preventDefault();
+        }
+      });
+    }
+
+    refreshCounter();
+  })();
 </script>
 {% endblock %}

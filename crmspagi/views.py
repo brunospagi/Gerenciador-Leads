@@ -12,7 +12,8 @@ from controle_ponto.models import RegistroPonto
 @login_required
 def admin_dashboard(request):
     # Trava de Segurança: Apenas Admin ou Gerente
-    nivel = getattr(request.user.profile, 'nivel_acesso', '')
+    profile = getattr(request.user, 'profile', None)
+    nivel = getattr(profile, 'nivel_acesso', '')
     if not request.user.is_superuser and nivel not in ['ADMIN', 'GERENTE']:
         messages.error(request, "Acesso negado. Esta área é restrita à diretoria.")
         return redirect('portal') # Redireciona para o portal inicial comum

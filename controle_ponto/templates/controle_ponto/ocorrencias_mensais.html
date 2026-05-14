@@ -1,20 +1,62 @@
 {% extends 'base_portal.html' %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="fw-bold text-dark"><i class="fas fa-exclamation-triangle text-warning"></i> Ocorrências Mensais de Ponto</h3>
+<div class="container-fluid py-4 ponto-page">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
-            <a href="{% url 'controle_ponto:relatorio_mensal' %}" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left"></i> Espelho Mensal</a>
-            <button onclick="window.print()" class="btn btn-secondary"><i class="fas fa-print"></i> Imprimir</button>
+            <h3 class="fw-bold mb-1"><i class="fas fa-exclamation-triangle text-warning me-2"></i>Ocorrências de Ponto</h3>
+            <small class="text-muted">Gestão de atrasos com homologação e histórico mensal.</small>
+        </div>
+        <div class="d-flex flex-wrap gap-2 d-print-none">
+            <a href="{% url 'controle_ponto:relatorio_mensal' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Espelho
+            </a>
+            <button type="button" onclick="window.print()" class="btn btn-secondary">
+                <i class="fas fa-print me-1"></i>Imprimir
+            </button>
         </div>
     </div>
 
-    <div class="card shadow-sm border-0 mb-4 rounded-4 d-print-none">
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card h-100 border-0">
+                <div class="card-body">
+                    <small class="text-muted d-block">Ocorrências</small>
+                    <div class="display-6 fw-bold">{{ total_ocorrencias }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card h-100 border-0">
+                <div class="card-body">
+                    <small class="text-muted d-block">Pendentes</small>
+                    <div class="display-6 fw-bold text-warning">{{ total_pendentes }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card h-100 border-0">
+                <div class="card-body">
+                    <small class="text-muted d-block">Aceitas</small>
+                    <div class="display-6 fw-bold text-success">{{ total_aceitas }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card h-100 border-0">
+                <div class="card-body">
+                    <small class="text-muted d-block">Recusadas</small>
+                    <div class="display-6 fw-bold text-danger">{{ total_recusadas }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 mb-4 d-print-none">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label fw-bold small text-muted">Funcionário</label>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small text-muted">Funcionário</label>
                     <select name="funcionario" class="form-select">
                         <option value="">Todos</option>
                         {% for f in funcionarios %}
@@ -23,7 +65,7 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label fw-bold small text-muted">Status</label>
+                    <label class="form-label fw-semibold small text-muted">Status</label>
                     <select name="status" class="form-select">
                         <option value="">Todos</option>
                         {% for value, label in status_choices %}
@@ -32,7 +74,7 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label fw-bold small text-muted">Mês</label>
+                    <label class="form-label fw-semibold small text-muted">Mês</label>
                     <select name="mes" class="form-select">
                         {% for m in meses %}
                         <option value="{{ m }}" {% if mes_atual == m %}selected{% endif %}>{{ m|stringformat:"02d" }}</option>
@@ -40,25 +82,28 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label fw-bold small text-muted">Ano</label>
+                    <label class="form-label fw-semibold small text-muted">Ano</label>
                     <select name="ano" class="form-select">
                         {% for a in anos %}
                         <option value="{{ a }}" {% if ano_atual == a %}selected{% endif %}>{{ a }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Filtrar</button>
+                <div class="col-md-1 d-grid">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i></button>
+                </div>
+                <div class="col-md-1 d-grid">
+                    <a href="{% url 'controle_ponto:ocorrencias_mensais' %}" class="btn btn-outline-secondary">X</a>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="card shadow rounded-4 border-0">
+    <div class="card border-0">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
-                    <thead class="table-dark">
+                    <thead>
                         <tr>
                             <th>Data</th>
                             <th>Funcionário</th>
@@ -68,45 +113,61 @@
                             <th>Justificativa</th>
                             <th>Status</th>
                             <th>Homologado por</th>
-                            <th class="d-print-none">Ações</th>
+                            <th class="d-print-none">Ação</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for p in ocorrencias %}
                         <tr>
                             <td>{{ p.data|date:"d/m/Y" }}</td>
-                            <td>{{ p.funcionario.nome_completo }}</td>
+                            <td>
+                                <div class="fw-semibold">{{ p.funcionario.nome_completo }}</div>
+                                <small class="text-muted">{{ p.funcionario.cargo|default:"-" }}</small>
+                            </td>
                             <td>{{ p.entrada|time:"H:i"|default:"--" }}</td>
                             <td>{{ p.horario_escala_entrada|time:"H:i"|default:"--" }}</td>
-                            <td><span class="badge bg-warning text-dark">{{ p.atraso_minutos }} min</span></td>
-                            <td style="max-width:300px;">{{ p.justificativa_atraso|default:"-" }}</td>
+                            <td><span class="m3-badge m3-badge-warning">{{ p.atraso_minutos }} min</span></td>
+                            <td class="text-break">{{ p.justificativa_atraso|default:"-" }}</td>
                             <td>
-                                {% if p.status_homologacao == 'PENDENTE' %}<span class="badge bg-warning text-dark">Pendente</span>
-                                {% elif p.status_homologacao == 'ACEITO' %}<span class="badge bg-success">Aceito</span>
-                                {% elif p.status_homologacao == 'RECUSADO' %}<span class="badge bg-danger">Recusado</span>
-                                {% else %}<span class="badge bg-secondary">N/A</span>{% endif %}
+                                {% if p.status_homologacao == 'PENDENTE' %}
+                                <span class="m3-badge m3-badge-warning">Pendente</span>
+                                {% elif p.status_homologacao == 'ACEITO' %}
+                                <span class="m3-badge m3-badge-success">Aceito</span>
+                                {% elif p.status_homologacao == 'RECUSADO' %}
+                                <span class="m3-badge m3-badge-danger">Recusado</span>
+                                {% else %}
+                                <span class="m3-badge m3-badge-neutral">N/A</span>
+                                {% endif %}
                             </td>
-                            <td>{% if p.homologado_por %}{{ p.homologado_por.get_full_name|default:p.homologado_por.username }}{% else %}--{% endif %}</td>
-                            <td class="d-print-none">
-                                <div class="mb-2">
-                                    <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-primary w-100">
-                                        <i class="fas fa-camera me-1"></i> Ver Fotos
+                            <td>{% if p.homologado_por %}{{ p.homologado_por.get_full_name|default:p.homologado_por.username }}{% else %}-{% endif %}</td>
+                            <td class="d-print-none" style="min-width: 380px;">
+                                <div class="d-flex flex-column gap-2">
+                                    <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-camera me-1"></i>Auditoria visual
                                     </a>
+                                    <form method="post" action="{% url 'controle_ponto:homologar_ocorrencia' p.id %}" class="row g-2 align-items-center">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="mes" value="{{ mes_atual }}">
+                                        <input type="hidden" name="ano" value="{{ ano_atual }}">
+                                        <input type="hidden" name="funcionario" value="{{ funcionario_selecionado }}">
+                                        <input type="hidden" name="status" value="{{ status_selecionado }}">
+                                        <div class="col-12">
+                                            <input type="text" name="observacao" class="form-control form-control-sm" placeholder="Observação da homologação">
+                                        </div>
+                                        <div class="col-6 d-grid">
+                                            <button type="submit" name="acao" value="aceitar" class="btn btn-sm btn-success">Aceitar</button>
+                                        </div>
+                                        <div class="col-6 d-grid">
+                                            <button type="submit" name="acao" value="recusar" class="btn btn-sm btn-danger">Recusar</button>
+                                        </div>
+                                    </form>
                                 </div>
-                                <form method="post" action="{% url 'controle_ponto:homologar_ocorrencia' p.id %}" class="d-flex gap-2">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="mes" value="{{ mes_atual }}">
-                                    <input type="hidden" name="ano" value="{{ ano_atual }}">
-                                    <input type="hidden" name="funcionario" value="{{ funcionario_selecionado }}">
-                                    <input type="hidden" name="status" value="{{ status_selecionado }}">
-                                    <input type="text" name="observacao" class="form-control form-control-sm" placeholder="Observação da homologação">
-                                    <button type="submit" name="acao" value="aceitar" class="btn btn-sm btn-success">Aceitar</button>
-                                    <button type="submit" name="acao" value="recusar" class="btn btn-sm btn-danger">Recusar</button>
-                                </form>
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="9" class="text-center py-4 text-muted">Nenhuma ocorrência encontrada.</td></tr>
+                        <tr>
+                            <td colspan="9" class="text-center py-5 text-muted">Nenhuma ocorrência encontrada para os filtros informados.</td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -114,17 +175,55 @@
         </div>
     </div>
 </div>
+
 <style>
-    @page { size: A4 portrait; margin: 10mm; }
+    .ponto-page .card {
+        border-radius: 16px !important;
+    }
+
+    @page {
+        size: A4 portrait;
+        margin: 8mm;
+    }
 
     @media print {
-        .d-print-none, header, nav, #sidebar { display: none !important; }
-        #content-wrapper { margin-left: 0 !important; width: 100% !important; }
-        body { background: white; padding: 0; margin: 0; font-size: 11px; }
-        .container-fluid { padding: 0 !important; }
-        .card { box-shadow: none !important; border: 1px solid #ccc !important; }
-        .table { width: 100% !important; font-size: 10px; }
-        .badge { border: none !important; background: transparent !important; color: black !important; font-weight: bold; }
+        .d-print-none,
+        header,
+        nav,
+        #sidebar {
+            display: none !important;
+        }
+
+        body {
+            background: #fff !important;
+            font-size: 10px;
+        }
+
+        #content-wrapper {
+            width: 100% !important;
+            margin-left: 0 !important;
+        }
+
+        .container-fluid {
+            padding: 0 !important;
+        }
+
+        .card {
+            border: 1px solid #dcdcdc !important;
+            box-shadow: none !important;
+        }
+
+        .table td,
+        .table th {
+            padding: 0.45rem 0.35rem !important;
+        }
+
+        .badge,
+        .m3-badge {
+            border: 1px solid #bbb !important;
+            color: #111 !important;
+            background: #fff !important;
+        }
     }
 </style>
 {% endblock %}

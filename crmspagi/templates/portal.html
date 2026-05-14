@@ -58,7 +58,7 @@
     <div class="card welcome-card mb-4 shadow-sm">
         <div class="card-body p-4 d-flex align-items-center justify-content-between">
             <div>
-                <h3 class="fw-bold mb-1">Ola, {{ user.get_full_name|default:user.username }}!</h3>
+                <h3 class="fw-bold mb-1">Olá, {{ user.get_full_name|default:user.username }}!</h3>
                 <p class="mb-0 opacity-75">Bem-vindo ao CRM Spagi.</p>
             </div>
             <div class="d-none d-md-block opacity-50"><i class="fas fa-layer-group fa-4x"></i></div>
@@ -72,7 +72,7 @@
             <a href="{% url 'controle_ponto:relogio' %}" class="system-item" style="--item-color: #10b981; --icon-bg: #d1fae5; border: 2px solid #10b981;">
                 <div>
                     <span class="system-name fw-bold text-success">Bater Ponto Agora</span>
-                    <span class="system-desc">Registro de presenca com IA e GPS</span>
+                    <span class="system-desc">Registro de presença com IA e GPS</span>
                 </div>
                 <div class="system-icon-wrapper text-success"><i class="fas fa-fingerprint fa-lg"></i></div>
             </a>
@@ -82,7 +82,7 @@
 
     {% if module_access.distribuicao %}
     <div class="mb-5">
-        <h4 class="section-title-dashboard"><i class="fas fa-bullhorn text-info"></i> Central de Distribuicao</h4>
+        <h4 class="section-title-dashboard"><i class="fas fa-bullhorn text-info"></i> Central de Distribuição</h4>
         <div class="system-grid">
             <a href="{% url 'painel-distribuicao' %}" class="system-item" style="--item-color: #0dcaf0; --icon-bg: #cff4fc;">
                 <div><span class="system-name">Entrada de Leads</span><span class="system-desc">Cadastrar e distribuir</span></div>
@@ -90,7 +90,7 @@
             </a>
             {% if module_access.relatorios %}
             <a href="{% url 'relatorio-distribuicao' %}" class="system-item" style="--item-color: #0dcaf0; --icon-bg: #cff4fc;">
-                <div><span class="system-name">Relatorio Leads</span><span class="system-desc">Metricas de entrada</span></div>
+                <div><span class="system-name">Relatório Leads</span><span class="system-desc">Métricas de entrada</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-chart-line"></i></div>
             </a>
             {% endif %}
@@ -106,18 +106,18 @@
 
     {% if module_access.clientes %}
     <div class="mb-5">
-        <h4 class="section-title-dashboard"><i class="fas fa-users text-primary"></i> Gestao de Clientes</h4>
+        <h4 class="section-title-dashboard"><i class="fas fa-users text-primary"></i> Gestão de Clientes</h4>
         <div class="system-grid">
             <a href="{% url 'cliente_list' %}" class="system-item" style="--item-color: #3b82f6; --icon-bg: #eff6ff;">
-                <div><span class="system-name">Painel de Clientes</span><span class="system-desc">Gestao completa de leads</span></div>
+                <div><span class="system-name">Painel de Clientes</span><span class="system-desc">Gestão completa de leads</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-address-book"></i></div>
             </a>
             <a href="{% url 'cliente_atrasados_list' %}" class="system-item" style="--item-color: #f59e0b; --icon-bg: #fef3c7;">
-                <div><span class="system-name">Pendencias</span><span class="system-desc">Clientes atrasados</span></div>
+                <div><span class="system-name">Pendências</span><span class="system-desc">Clientes atrasados</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-clock"></i></div>
             </a>
             <a href="{% url 'cliente_create' %}" class="system-item" style="--item-color: #10b981; --icon-bg: #d1fae5;">
-                <div><span class="system-name">Novo Cadastro</span><span class="system-desc">Adicionar lead rapido</span></div>
+                <div><span class="system-name">Novo Cadastro</span><span class="system-desc">Adicionar lead rápido</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-user-plus"></i></div>
             </a>
         </div>
@@ -126,15 +126,15 @@
 
     {% if module_access.financeiro %}
     <div class="mb-5">
-        <h4 class="section-title-dashboard"><i class="fas fa-money-bill-wave text-success"></i> Gestao Financeira</h4>
+        <h4 class="section-title-dashboard"><i class="fas fa-money-bill-wave text-success"></i> Gestão Financeira</h4>
         <div class="system-grid">
             <a href="{% url 'financeiro:lista_transacoes' %}" class="system-item" style="--item-color: #10b981; --icon-bg: #d1fae5;">
-                <div><span class="system-name">Contas e Despesas</span><span class="system-desc">Lancamento e fluxo</span></div>
+                <div><span class="system-name">Contas e Despesas</span><span class="system-desc">Lançamento e fluxo</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-wallet"></i></div>
             </a>
             {% if module_access.relatorios and user.profile.nivel_acesso == 'ADMIN' or module_access.relatorios and user.is_superuser %}
             <a href="{% url 'financeiro:relatorio_dre' %}" class="system-item" style="--item-color: #0ea5e9; --icon-bg: #e0f2fe;">
-                <div><span class="system-name">Relatorio DRE</span><span class="system-desc">Balanco e lucro do mes</span></div>
+                <div><span class="system-name">Relatório DRE</span><span class="system-desc">Balanço e lucro do mês</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-chart-pie"></i></div>
             </a>
             {% endif %}
@@ -144,7 +144,7 @@
 
     {% if module_access.vendas or module_access.financiamentos or module_access.documentos or module_access.autorizacoes or module_access.clientes or module_access.avaliacoes or module_access.usuarios_admin or module_access.credenciais %}
     <div class="mb-5">
-        <h4 class="section-title-dashboard"><i class="fas fa-tools text-secondary"></i> Ferramentas e Utilitarios</h4>
+        <h4 class="section-title-dashboard"><i class="fas fa-tools text-secondary"></i> Ferramentas e Utilitários</h4>
         <div class="system-grid">
             {% if module_access.credenciais %}
             <a href="{% url 'credencial_list' %}" class="system-item" style="--item-color: #ec4899; --icon-bg: #fce7f3;">
@@ -160,37 +160,37 @@
             {% endif %}
             {% if module_access.financiamentos %}
             <a href="{% url 'financiamentos_kanban' %}" class="system-item" style="--item-color: #6366f1; --icon-bg: #e0e7ff;">
-                <div><span class="system-name">Mesa de Financiamento</span><span class="system-desc">Gestao de fichas</span></div>
+                <div><span class="system-name">Mesa de Financiamento</span><span class="system-desc">Gestão de fichas</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-university"></i></div>
             </a>
             {% endif %}
             {% if module_access.documentos %}
             <a href="{% url 'procuracao_list' %}" class="system-item" style="--item-color: #8b5cf6; --icon-bg: #ede9fe;">
-                <div><span class="system-name">Documentos</span><span class="system-desc">Gerador de procuracoes</span></div>
+                <div><span class="system-name">Documentos</span><span class="system-desc">Gerador de procurações</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-file-contract"></i></div>
             </a>
             {% endif %}
             {% if module_access.autorizacoes %}
             <a href="{% url 'autorizacao_list' %}" class="system-item" style="--item-color: #8b5cf6; --icon-bg: #ede9fe;">
-                <div><span class="system-name">Autorizacoes</span><span class="system-desc">Concessoes e reparos</span></div>
+                <div><span class="system-name">Autorizações</span><span class="system-desc">Concessões e reparos</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-file-signature"></i></div>
             </a>
             {% endif %}
             {% if module_access.clientes %}
             <a href="{% url 'calendario' %}" class="system-item" style="--item-color: #334155; --icon-bg: #f1f5f9;">
-                <div><span class="system-name">Calendario</span><span class="system-desc">Agenda de contatos</span></div>
+                <div><span class="system-name">Calendário</span><span class="system-desc">Agenda de contatos</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-calendar-alt"></i></div>
             </a>
             {% endif %}
             {% if module_access.avaliacoes %}
             <a href="{% url 'gerador_anuncio' %}" class="system-item" style="--item-color: #06b6d4; --icon-bg: #cffafe;">
-                <div><span class="system-name">Gerador IA</span><span class="system-desc">Criar anuncios de venda</span></div>
+                <div><span class="system-name">Gerador IA</span><span class="system-desc">Criar anúncios de venda</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-robot"></i></div>
             </a>
             {% endif %}
             {% if module_access.relatorios and module_access.vendas and user.is_superuser or module_access.relatorios and module_access.vendas and user.profile.nivel_acesso == 'ADMIN' %}
             <a href="{% url 'venda_produto_relatorio' %}" class="system-item" style="--item-color: #ef4444; --icon-bg: #fee2e2;">
-                <div><span class="system-name">Relatorios de Vendas</span><span class="system-desc">Metricas de vendas extras</span></div>
+                <div><span class="system-name">Relatórios de Vendas</span><span class="system-desc">Métricas de vendas extras</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-chart-line"></i></div>
             </a>
             {% endif %}
@@ -213,7 +213,7 @@
             </a>
             {% endif %}
             <a href="{% if user.profile.nivel_acesso == 'ADMIN' or user.is_superuser %}{% url 'rh_dashboard' %}{% else %}{% url 'lista_funcionarios' %}{% endif %}" class="system-item" style="--item-color: #3b82f6; --icon-bg: #eff6ff;">
-                <div><span class="system-name">Gestao de Equipe</span><span class="system-desc">Cadastro de colaboradores</span></div>
+                <div><span class="system-name">Gestão de Equipe</span><span class="system-desc">Cadastro de colaboradores</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-users"></i></div>
             </a>
         </div>
@@ -222,13 +222,13 @@
 
     {% if user.is_superuser and module_access.relatorios or user.is_superuser and module_access.usuarios_admin or user.profile.nivel_acesso == 'ADMIN' and module_access.relatorios or user.profile.nivel_acesso == 'ADMIN' and module_access.usuarios_admin %}
     <div class="mb-5">
-        <h4 class="section-title-dashboard"><i class="fas fa-shield-alt text-danger"></i> Administracao</h4>
+        <h4 class="section-title-dashboard"><i class="fas fa-shield-alt text-danger"></i> Administração</h4>
         <div class="system-grid">
             {% if module_access.relatorios %}
             <a href="{% url 'admin_dashboard' %}" class="system-item" style="--item-color: #f59e0b; --icon-bg: #fef3c7; border: 2px solid #f59e0b;">
                 <div>
                     <span class="system-name fw-bold text-dark">Dashboard Executivo</span>
-                    <span class="system-desc">Metricas, lucros e despesas</span>
+                    <span class="system-desc">Métricas, lucros e despesas</span>
                 </div>
                 <div class="system-icon-wrapper text-warning"><i class="fas fa-tachometer-alt fa-lg"></i></div>
             </a>
@@ -241,21 +241,21 @@
             </a>
 
             <a href="{% url 'user_list' %}" class="system-item" style="--item-color: #ef4444; --icon-bg: #fee2e2;">
-                <div><span class="system-name">Usuarios</span><span class="system-desc">Gerenciar acessos</span></div>
+                <div><span class="system-name">Usuários</span><span class="system-desc">Gerenciar acessos</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-users-cog"></i></div>
             </a>
             {% endif %}
 
             {% if user.is_superuser %}
             <a href="{% url 'user_module_permissions' %}" class="system-item" style="--item-color: #dc2626; --icon-bg: #fee2e2;">
-                <div><span class="system-name">Permissoes por Modulo</span><span class="system-desc">Controle de acesso por area</span></div>
+                <div><span class="system-name">Permissões por Módulo</span><span class="system-desc">Controle de acesso por área</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-user-shield"></i></div>
             </a>
             {% endif %}
 
             {% if module_access.relatorios and module_access.clientes %}
             <a href="{% url 'relatorio_atrasados' %}" class="system-item" style="--item-color: #ef4444; --icon-bg: #fee2e2;">
-                <div><span class="system-name">Relatorio Atrasados</span><span class="system-desc">Auditoria de equipe</span></div>
+                <div><span class="system-name">Relatório Atrasados</span><span class="system-desc">Auditoria de equipe</span></div>
                 <div class="system-icon-wrapper"><i class="fas fa-exclamation-triangle"></i></div>
             </a>
             {% endif %}

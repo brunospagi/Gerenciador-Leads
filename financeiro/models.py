@@ -159,6 +159,13 @@ def gerar_relatorio_DRE_mensal(mes, ano):
     # 1. Receitas de Vendas (Detalhado)
     vendas = VendaProduto.objects.filter(data_venda__month=mes, data_venda__year=ano, status='APROVADO').order_by('data_venda')
     lucro_vendas = vendas.aggregate(Sum('lucro_loja'))['lucro_loja__sum'] or 0
+    agregado_comissoes_vendas = vendas.aggregate(
+        total_vendedor=Sum('comissao_vendedor'),
+        total_ajudante=Sum('comissao_ajudante'),
+    )
+    comissao_total_vendas = (agregado_comissoes_vendas['total_vendedor'] or 0) + (
+        agregado_comissoes_vendas['total_ajudante'] or 0
+    )
     tipos_comissao_embutida = ['VENDA_VEICULO', 'VENDA_MOTO', 'TRANSFERENCIA', 'REFINANCIAMENTO']
     vendas_com_embutida = vendas.filter(tipo_produto__in=tipos_comissao_embutida)
     agregado_embutido = vendas_com_embutida.aggregate(
@@ -166,6 +173,7 @@ def gerar_relatorio_DRE_mensal(mes, ano):
         total_ajudante=Sum('comissao_ajudante')
     )
     comissao_embutida_lucro = (agregado_embutido['total_vendedor'] or 0) + (agregado_embutido['total_ajudante'] or 0)
+    lucro_vendas_antes_comissao = lucro_vendas + comissao_embutida_lucro
 
     # 2. Receitas Extras (Detalhado)
     receitas_list = TransacaoFinanceira.objects.filter(
@@ -173,7 +181,7 @@ def gerar_relatorio_DRE_mensal(mes, ano):
     ).order_by('data_pagamento')
     receitas_extras = receitas_list.aggregate(Sum('valor'))['valor__sum'] or 0
 
-    total_entradas = lucro_vendas + receitas_extras
+    total_entradas = lucro_vendas_antes_comissao + receitas_extras
 
     # 3. Despesas da Loja (Detalhado)
     despesas_list = TransacaoFinanceira.objects.filter(
@@ -195,13 +203,17 @@ def gerar_relatorio_DRE_mensal(mes, ano):
     total_comissoes_folha = agregado_rh['total_comissoes'] or 0
     total_credito_vt = agregado_rh['total_credito_vt'] or 0
     total_desconto_vt = agregado_rh['total_desconto_vt'] or 0
-    custo_comissao_adicional_rh = total_comissoes_folha - comissao_embutida_lucro
-    if custo_comissao_adicional_rh < 0:
-        custo_comissao_adicional_rh = 0
+    # Comissao passa a ser tratada integralmente como custo.
+    # Parte dela ja vinha "embutida" no lucro das vendas; por isso
+    # adicionamos essa parte de volta em entradas e exibimos o custo total aqui.
+    custo_comissao_gerencial = total_comissoes_folha - comissao_total_vendas
+    if custo_comissao_gerencial < 0:
+        custo_comissao_gerencial = 0
+    custo_comissao_rh = comissao_total_vendas + custo_comissao_gerencial
     custo_vt_liquido = total_credito_vt - total_desconto_vt
     if custo_vt_liquido < 0:
         custo_vt_liquido = 0
-    custo_rh = custo_salario + custo_bonus + custo_comissao_adicional_rh + custo_vt_liquido
+    custo_rh = custo_salario + custo_bonus + custo_comissao_rh + custo_vt_liquido
 
     total_saidas = despesas_loja + custo_rh
 
@@ -209,6 +221,7 @@ def gerar_relatorio_DRE_mensal(mes, ano):
         'mes': mes, 'ano': ano,
         'vendas_list': vendas,
         'lucro_vendas': lucro_vendas,
+        'lucro_vendas_antes_comissao': lucro_vendas_antes_comissao,
         'receitas_list': receitas_list,
         'receitas_extras': receitas_extras,
         'total_entradas': total_entradas,
@@ -218,8 +231,12 @@ def gerar_relatorio_DRE_mensal(mes, ano):
         'custo_salario': custo_salario,
         'custo_bonus': custo_bonus,
         'total_comissoes_folha': total_comissoes_folha,
+        'comissao_total_vendas': comissao_total_vendas,
         'comissao_embutida_lucro': comissao_embutida_lucro,
-        'custo_comissao_adicional_rh': custo_comissao_adicional_rh,
+        'custo_comissao_gerencial': custo_comissao_gerencial,
+        'custo_comissao_rh': custo_comissao_rh,
+        # Compatibilidade com templates legados
+        'custo_comissao_adicional_rh': custo_comissao_rh,
         'total_credito_vt': total_credito_vt,
         'total_desconto_vt': total_desconto_vt,
         'custo_vt_liquido': custo_vt_liquido,

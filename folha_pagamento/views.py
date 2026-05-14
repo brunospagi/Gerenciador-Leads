@@ -16,8 +16,9 @@ from .forms import LancarDescontoForm, LancarCreditoForm, ProcessarFolhaForm
 
 def is_admin_financeiro(user):
     # Retorna True se for Superuser ou se tiver perfil ADMIN
-    if user.is_superuser: return True
-    return getattr(user.profile, 'nivel_acesso', '') == 'ADMIN'
+    if user.is_superuser:
+        return True
+    return getattr(getattr(user, 'profile', None), 'nivel_acesso', '') == 'ADMIN'
 
 def _recalcular_folhas_abertas_por_parcelas(funcionario, parcelas):
     referencias = set((p.mes_referencia, p.ano_referencia) for p in parcelas)

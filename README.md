@@ -121,6 +121,12 @@ Variaveis principais:
 - `DJANGO_DEBUG`
 - `DJANGO_ALLOWED_HOSTS`
 - `DJANGO_CSRF_TRUSTED_ORIGINS`
+- `DJANGO_SECURE_SSL_REDIRECT`
+- `DJANGO_USE_X_FORWARDED_HOST`
+- `DJANGO_SECURE_HSTS_SECONDS`
+- `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS`
+- `DJANGO_SECURE_HSTS_PRELOAD`
+- `DJANGO_CONTENT_SECURITY_POLICY` (opcional para override)
 - `APP_BUILD_NUMBER` (numero da build exibido no rodape)
 - `APP_BUILD_SHA` (hash curto/commit exibido no rodape)
 - `DB_ENGINE` (`postgres` ou `sqlite`)
@@ -137,6 +143,8 @@ Observacoes importantes:
 - `.env.example` foi sanitizado com valores ficticios (somente modelo)
 - `DJANGO_DEBUG` agora e interpretado corretamente como booleano (`True`/`False`)
 - o rodape exibe build via `APP_BUILD_NUMBER` e `APP_BUILD_SHA` (ou `GITHUB_SHA`/`RENDER_GIT_COMMIT` como fallback)
+- headers de seguranca foram reforcados (CSP, Referrer-Policy, nosniff e Permissions-Policy)
+- endpoints webpush usam CSRF normal com envio automatico de `X-CSRFToken` no frontend
 
 ## 8. Rodando Localmente
 
@@ -217,6 +225,74 @@ O `entrypoint.sh` faz:
 - Criar dashboards de conversao por origem do lead
 - Adicionar exportacao CSV/XLS para relatorios principais
 - Padronizar auditoria de alteracoes em entidades criticas
+
+## 15. Design System (M3)
+
+Foi padronizado um design system inspirado em Material 3 para toda a aplicacao:
+
+- CSS global em `static/css/app_m3.css`
+- UX global em `static/js/app_ux.js`
+- Bases principais atualizadas:
+  - `crmspagi/templates/base_portal.html`
+  - `clientes/templates/base.html`
+  - `avaliacoes/templates/base.html`
+
+Recursos ativos globalmente:
+
+- Barra de progresso e mascara de carregamento em navegacao e requisicoes `fetch`
+- Feedback de envio de formularios com botao em estado `Enviando...`
+- Validacao visual de campos obrigatorios e invalidos
+- Auto-dismiss de alertas
+- Mascaras utilitarias (`money-mask`, `cpf-mask`, `cep-mask`, `phone-mask`)
+
+Observacao sobre NPM/Docker:
+
+- Nesta etapa nao foi necessario pipeline npm para aplicar o M3 (assets servidos via `static` do Django).
+- O Docker atual continua valido sem alteracao obrigatoria para frontend build.
+
+## 16. QA Funcional (Fluxos Criticos)
+
+Execute este roteiro antes de cada deploy:
+
+1. Vendas
+- Criar venda com e sem adicionais.
+- Editar venda pendente.
+- Aprovar venda como GERENTE (sem alterar custo) e como ADMIN (alterando custo).
+- Reprovar venda com motivo.
+- Validar impressao de comprovante e minuta.
+- Validar ajuste de custo apos aprovacao (somente ADMIN).
+
+2. Ponto
+- Registrar entrada dentro da tolerancia.
+- Registrar entrada com atraso e justificativa.
+- Homologar ocorrencia (aceitar/recusar) em `Ocorrencias de Ponto`.
+- Validar `Espelho de Ponto Mensal` e `Relatorio de Entradas`.
+- Validar impressao A4 (portrait/landscape conforme tela).
+
+3. RH/Folha
+- Atualizar referencia do mes.
+- Fechar mes e marcar pagamento do mes.
+- Abrir detalhe da folha e validar conferencia de comissoes.
+- Validar permissao: ADMIN x colaborador.
+
+4. Financeiro
+- Criar lancamento receita/despesa.
+- Executar acao em lote (pendente/efetivado).
+- Validar DRE por mes.
+- Garantir que nao-admin so veja seus proprios lancamentos.
+
+## 17. Checklist de Deploy e Seguranca
+
+1. `python manage.py migrate`
+2. `python manage.py collectstatic --noinput`
+3. `python manage.py check`
+4. Validar login e menu por perfil (ADMIN, GERENTE, VENDEDOR, RH)
+5. Validar cookies/headers de seguranca (`CSP`, `Referrer-Policy`, `nosniff`)
+6. Validar CSRF em formularios e `fetch` com `X-CSRFToken`
+7. Validar build no rodape (`APP_BUILD_NUMBER` / `APP_BUILD_SHA`)
+8. Validar impressao A4 dos relatorios operacionais
+9. Revisar logs de erro apos subir
+10. Confirmar backup do banco antes de release critica
 
 ---
 

@@ -25,7 +25,7 @@
         <h2 class="header-title">Demonstração de Resultados (DRE Analítico) - Mês {{ mes_atual }}/{{ ano_atual }}</h2>
         
         <table class="table table-bordered table-sm">
-            <tr class="section-title"><td colspan="3">1. RECEITAS DE VENDAS (LUCRO LOJA)</td></tr>
+            <tr class="section-title"><td colspan="3">1. VENDAS (RESULTADO OPERACIONAL)</td></tr>
             {% for venda in relatorio.vendas_list %}
             <tr>
                 <td width="15%">{{ venda.data_venda|date:"d/m/Y" }}</td>
@@ -33,7 +33,7 @@
                 <td width="20%" class="text-end">R$ {{ venda.lucro_loja }}</td>
             </tr>
             {% endfor %}
-            <tr class="fw-bold"><td colspan="2" class="text-end">TOTAL VENDAS:</td><td class="text-end">R$ {{ relatorio.lucro_vendas|floatformat:2 }}</td></tr>
+            <tr class="fw-bold"><td colspan="2" class="text-end">TOTAL RESULTADO VENDAS:</td><td class="text-end">R$ {{ relatorio.lucro_vendas|floatformat:2 }}</td></tr>
 
             <tr class="section-title"><td colspan="3">2. RECEITAS EXTRAS (FINANCIAMENTOS, BÔNUS)</td></tr>
             {% for receita in relatorio.receitas_list %}
@@ -68,8 +68,8 @@
             </tr>
             {% endfor %}
             <tr>
-                <td colspan="2" class="text-end">Comissão RH (não embutida no lucro):</td>
-                <td class="text-end">R$ {{ relatorio.custo_comissao_adicional_rh|floatformat:2 }}</td>
+                <td colspan="2" class="text-end">Comissão RH (custo total):</td>
+                <td class="text-end">R$ {{ relatorio.custo_comissao_rh|floatformat:2 }}</td>
             </tr>
             <tr>
                 <td colspan="2" class="text-end">VT Líquido (crédito - desconto):</td>

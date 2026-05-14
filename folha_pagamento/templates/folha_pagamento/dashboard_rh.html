@@ -2,134 +2,164 @@
 {% load static %}
 
 {% block content %}
-<div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="fw-bold text-primary"><i class="fa fa-users me-2"></i> Gestao de RH e Folha</h3>
-
-        <div class="btn-group">
-            <a href="{% url 'rh_lancar_desconto' %}" class="btn btn-outline-danger shadow-sm">
-                <i class="fa fa-minus-circle me-2"></i> Lancar Desconto
-            </a>
-            <a href="{% url 'rh_lancar_credito' %}" class="btn btn-outline-success shadow-sm">
-                <i class="fa fa-plus-circle me-2"></i> Lancar Bonus/Credito
-            </a>
-            <a href="{% url 'rh_lista_lancamentos' %}" class="btn btn-outline-primary shadow-sm">
-                <i class="fa fa-list-alt me-2"></i> Ver Lista de Lancamentos
-            </a>
-        </div>
+<div class="container py-4 m3-module-shell">
+  <section class="m3-page-header">
+    <div>
+      <h1 class="m3-page-title"><i class="fa fa-users me-2"></i>Gestão de RH e Folha</h1>
+      <p class="m3-page-subtitle">Fechamento mensal, controle de créditos e governança de pagamentos.</p>
     </div>
-
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header bg-dark text-white">Processar Folha Mensal</div>
-        <div class="card-body">
-            <form method="post" class="row g-3 align-items-end">
-                {% csrf_token %}
-                <div class="col-md-4">
-                    <label class="form-label">Mes</label>
-                    {{ form_folha.mes }}
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Ano</label>
-                    {{ form_folha.ano }}
-                </div>
-                <div class="col-md-4">
-                    <div class="d-grid gap-2">
-                        <button type="submit" name="acao" value="atualizar_mes" class="btn btn-primary fw-bold">
-                            <i class="fa fa-sync me-2"></i> Atualizar Referencia
-                        </button>
-                        <button type="submit" name="acao" value="fechar_mes" class="btn btn-warning fw-bold"
-                                onclick="return confirm('Deseja fechar todas as folhas da referencia selecionada?');">
-                            <i class="fa fa-lock me-2"></i> Fechar Mes
-                        </button>
-                        <button type="submit" name="acao" value="pagar_mes" class="btn btn-success fw-bold"
-                                onclick="return confirm('Deseja marcar como pago o total da referencia selecionada?');">
-                            <i class="fa fa-check-circle me-2"></i> Lancar como Pago (Mes)
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
+    <div class="m3-toolbar">
+      <a href="{% url 'rh_lancar_desconto' %}" class="btn btn-outline-danger"><i class="fa fa-minus-circle me-1"></i>Desconto</a>
+      <a href="{% url 'rh_lancar_credito' %}" class="btn btn-outline-success"><i class="fa fa-plus-circle me-1"></i>Crédito</a>
+      <a href="{% url 'rh_lista_lancamentos' %}" class="btn btn-outline-primary"><i class="fa fa-list-alt me-1"></i>Lançamentos</a>
     </div>
+  </section>
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <a href="{% url 'rh_dashboard' %}?mes={{ nav_anterior_mes }}&ano={{ nav_anterior_ano }}" class="btn btn-outline-secondary btn-sm">
-            <i class="fa fa-chevron-left me-1"></i> Mes anterior
-        </a>
-        <span class="fw-bold text-muted">Referencia: {{ mes_referencia|stringformat:"02d" }}/{{ ano_referencia }}</span>
-        <a href="{% url 'rh_dashboard' %}?mes={{ nav_proximo_mes }}&ano={{ nav_proximo_ano }}" class="btn btn-outline-secondary btn-sm">
-            Proximo mes <i class="fa fa-chevron-right ms-1"></i>
-        </a>
+  <section class="m3-kpi-grid">
+    <article class="m3-kpi-card">
+      <div class="m3-kpi-label">Folhas na referência</div>
+      <div class="m3-kpi-value">{{ total_folhas }}</div>
+      <div class="m3-kpi-help">Total de colaboradores processados no mês.</div>
+    </article>
+    <article class="m3-kpi-card">
+      <div class="m3-kpi-label">Folhas fechadas</div>
+      <div class="m3-kpi-value">{{ total_fechadas }}</div>
+      <div class="m3-kpi-help">Prontas para homologação e pagamento.</div>
+    </article>
+    <article class="m3-kpi-card">
+      <div class="m3-kpi-label">Folhas pagas</div>
+      <div class="m3-kpi-value">{{ total_pagas }}</div>
+      <div class="m3-kpi-help">Pagamentos concluídos na referência.</div>
+    </article>
+    <article class="m3-kpi-card">
+      <div class="m3-kpi-label">Referência ativa</div>
+      <div class="m3-kpi-value">{{ mes_referencia|stringformat:"02d" }}/{{ ano_referencia }}</div>
+      <div class="m3-kpi-help">Use a navegação para avançar ou retroceder.</div>
+    </article>
+  </section>
+
+  <section class="m3-soft-note">
+    Fluxo recomendado: 1) Atualize a referência mensal, 2) valide lançamentos, 3) feche o mês, 4) marque como pago.
+  </section>
+
+  <section class="card m3-filter-card">
+    <div class="card-header">
+      <h2 class="m3-section-title mb-0">Processamento mensal</h2>
     </div>
-
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white py-3 fw-bold d-flex justify-content-between align-items-center">
-            <span>Folhas da Referencia {{ mes_referencia|stringformat:"02d" }}/{{ ano_referencia }}</span>
-            <div class="d-flex gap-2">
-                <span class="badge bg-secondary">Total: {{ total_folhas }}</span>
-                <span class="badge bg-warning text-dark">Fechadas: {{ total_fechadas }}</span>
-                <span class="badge bg-success">Pagas: {{ total_pagas }}</span>
-            </div>
+    <div class="card-body">
+      <form method="post" class="row g-3 align-items-end">
+        {% csrf_token %}
+        <div class="col-md-3">
+          <label class="form-label">Mês</label>
+          {{ form_folha.mes }}
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr>
-                            <th>Colaborador</th>
-                            <th>Mes/Ano</th>
-                            <th>Salário Base</th>
-                            <th>Comissões</th>
-                            <th>Outros Créditos</th>
-                            <th>Crédito VT</th>
-                            <th>Descontos</th>
-                            <th>Líquido</th>
-                            <th>Status</th>
-                            <th>Pagamento</th>
-                            <th>Acoes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for folha in folhas %}
-                        <tr>
-                            <td class="fw-bold">
-                                {{ folha.funcionario.nome_completo }}
-                                <small class="text-muted d-block">{{ folha.funcionario.cargo }}</small>
-                            </td>
-
-                            <td>{{ folha.mes|stringformat:"02d" }}/{{ folha.ano }}</td>
-                            <td>R$ {{ folha.salario_base|floatformat:2 }}</td>
-                            <td class="text-success fw-bold">+ {{ folha.total_comissoes|floatformat:2 }}</td>
-                            <td class="text-success fw-bold">+ {{ folha.total_creditos_manuais|floatformat:2 }}</td>
-                            <td class="text-success fw-bold">+ {{ folha.credito_vt|floatformat:2 }}</td>
-                            <td class="text-danger fw-bold">- {{ folha.total_descontos|floatformat:2 }}</td>
-                            <td class="fw-bold fs-6">R$ {{ folha.salario_liquido|floatformat:2 }}</td>
-                            <td>
-                                {% if folha.fechada %}
-                                    <span class="badge bg-success">Fechada</span>
-                                {% else %}
-                                    <span class="badge bg-warning text-dark">Aberta</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if folha.pago %}
-                                    <span class="badge bg-success">Pago</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">Pendente</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <a href="{% url 'rh_detalhe_folha' folha.pk %}" class="btn btn-sm btn-outline-secondary" title="Ver Detalhes">
-                                    <i class="fa fa-eye"></i>
-                                </a>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr><td colspan="11" class="text-center p-4 text-muted">Nenhuma folha gerada para esta referência.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+        <div class="col-md-3">
+          <label class="form-label">Ano</label>
+          {{ form_folha.ano }}
         </div>
+        <div class="col-md-6">
+          <div class="d-flex flex-wrap gap-2">
+            <button type="submit" name="acao" value="atualizar_mes" class="btn btn-primary">
+              <i class="fa fa-sync me-1"></i>Atualizar referência
+            </button>
+            <button type="submit" name="acao" value="fechar_mes" class="btn btn-warning"
+                    onclick="return confirm('Deseja fechar todas as folhas da referência selecionada?');">
+              <i class="fa fa-lock me-1"></i>Fechar mês
+            </button>
+            <button type="submit" name="acao" value="pagar_mes" class="btn btn-success"
+                    onclick="return confirm('Deseja marcar como pago o total da referência selecionada?');">
+              <i class="fa fa-check-circle me-1"></i>Marcar pagamento do mês
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
+  </section>
+
+  <section class="d-flex justify-content-between align-items-center">
+    <a href="{% url 'rh_dashboard' %}?mes={{ nav_anterior_mes }}&ano={{ nav_anterior_ano }}" class="btn btn-outline-secondary btn-sm">
+      <i class="fa fa-chevron-left me-1"></i>Mês anterior
+    </a>
+    <span class="m3-pill">Referência {{ mes_referencia|stringformat:"02d" }}/{{ ano_referencia }}</span>
+    <a href="{% url 'rh_dashboard' %}?mes={{ nav_proximo_mes }}&ano={{ nav_proximo_ano }}" class="btn btn-outline-secondary btn-sm">
+      Próximo mês <i class="fa fa-chevron-right ms-1"></i>
+    </a>
+  </section>
+
+  <section class="card">
+    <div class="m3-table-head">
+      <h2 class="m3-section-title mb-0">Folhas geradas</h2>
+      <div class="d-flex gap-2">
+        <span class="m3-badge m3-badge-neutral">Total: {{ total_folhas }}</span>
+        <span class="m3-badge m3-badge-warning">Fechadas: {{ total_fechadas }}</span>
+        <span class="m3-badge m3-badge-success">Pagas: {{ total_pagas }}</span>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Colaborador</th>
+              <th>Mês/Ano</th>
+              <th>Salário base</th>
+              <th>Comissões</th>
+              <th>Outros créditos</th>
+              <th>Crédito VT</th>
+              <th>Descontos</th>
+              <th>Líquido</th>
+              <th>Status</th>
+              <th>Pagamento</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for folha in folhas %}
+            <tr>
+              <td class="fw-bold">
+                {{ folha.funcionario.nome_completo }}
+                <small class="text-muted d-block">{{ folha.funcionario.cargo }}</small>
+              </td>
+              <td>{{ folha.mes|stringformat:"02d" }}/{{ folha.ano }}</td>
+              <td>R$ {{ folha.salario_base|floatformat:2 }}</td>
+              <td class="text-success fw-bold">+ {{ folha.total_comissoes|floatformat:2 }}</td>
+              <td class="text-success fw-bold">+ {{ folha.total_creditos_manuais|floatformat:2 }}</td>
+              <td class="text-success fw-bold">+ {{ folha.credito_vt|floatformat:2 }}</td>
+              <td class="text-danger fw-bold">- {{ folha.total_descontos|floatformat:2 }}</td>
+              <td class="fw-bold fs-6">R$ {{ folha.salario_liquido|floatformat:2 }}</td>
+              <td>
+                {% if folha.fechada %}
+                <span class="m3-badge m3-badge-success">Fechada</span>
+                {% else %}
+                <span class="m3-badge m3-badge-warning">Aberta</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if folha.pago %}
+                <span class="m3-badge m3-badge-success">Pago</span>
+                {% else %}
+                <span class="m3-badge m3-badge-warning">Pendente</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{% url 'rh_detalhe_folha' folha.pk %}" class="btn btn-sm btn-outline-secondary" title="Ver detalhes">
+                  <i class="fa fa-eye"></i>
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="11" class="m3-empty">
+                <i class="fa fa-folder-open"></i>
+                <div class="fw-semibold">Nenhuma folha gerada nesta referência</div>
+                <div>Atualize a referência e processe o mês para carregar os dados.</div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 </div>
 {% endblock %}

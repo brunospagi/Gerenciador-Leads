@@ -129,10 +129,10 @@
         <div class="row mt-4 no-print">
             <div class="col-12">
                 <button class="btn btn-outline-secondary btn-sm mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#conferenciaComissoes" aria-expanded="false" aria-controls="conferenciaComissoes">
-                    <i class="fa fa-search-dollar me-1"></i> Ver Conferencia de Comissoes
+                    <i class="fa fa-search-dollar me-1"></i> Ver Conferência de Comissões
                 </button>
                 <div id="conferenciaComissoes" class="collapse">
-                <h6 class="fw-bold mb-2">Conferencia de Comissoes (Titular/Ajudante)</h6>
+                <h6 class="fw-bold mb-2">Conferência de Comissões (Titular/Ajudante)</h6>
                 <div class="table-responsive secao-conferencia">
                     <table class="table table-sm table-bordered align-middle">
                         <thead class="table-light">
@@ -140,10 +140,10 @@
                                 <th>Data</th>
                                 <th>Cliente</th>
                                 <th>Tipo</th>
-                                <th>Veiculo</th>
+                                <th>Veículo</th>
                                 <th>Placa</th>
                                 <th>Papel</th>
-                                <th>Minha Comissao</th>
+                                <th>Minha Comissão</th>
                                 <th>Outro 50%</th>
                                 <th>Outro Vendedor</th>
                             </tr>
@@ -163,13 +163,13 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="9" class="text-center text-muted">Sem operacoes com comissao no periodo.</td>
+                                <td colspan="9" class="text-center text-muted">Sem operações com comissão no período.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                         <tfoot>
                             <tr class="table-light fw-bold">
-                                <td colspan="6" class="text-end">Totais de conferencia</td>
+                                <td colspan="6" class="text-end">Totais de conferência</td>
                                 <td class="text-success">R$ {{ total_conferencia_minha|floatformat:2 }}</td>
                                 <td class="text-primary">R$ {{ total_conferencia_outro|floatformat:2 }}</td>
                                 <td>-</td>

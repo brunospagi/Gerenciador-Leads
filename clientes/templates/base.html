@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -8,6 +9,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/app_m3.css' %}">
 
     <style>
         :root {
@@ -25,7 +27,7 @@
             overflow-x: hidden;
         }
         
-        #wrapper { display: flex; width: 100%; min-height: 100vh; }
+        #wrapper { display: flex; width: 100%; min-height: 100dvh; }
 
         /* --- SIDEBAR PREMIUM --- */
         #sidebar {
@@ -93,7 +95,7 @@
         }
 
         /* --- CONTEÚDO PRINCIPAL --- */
-        #content-wrapper { width: 100%; display: flex; flex-direction: column; transition: all 0.3s; height: 100vh; overflow-y: auto;}
+        #content-wrapper { width: 100%; display: flex; flex-direction: column; transition: all 0.3s; min-height: 100dvh; height: auto; overflow: visible; }
 
         .top-navbar {
             background: #fff;
@@ -113,15 +115,26 @@
         .user-profile-nav { display: flex; align-items: center; gap: 10px; cursor: pointer; }
         .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 1.2rem; }
 
-        .main-content { padding: 30px; flex-grow: 1; }
-        .card { border: none; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
-        .card-header { background: transparent; border-bottom: 1px solid #f1f5f9; padding: 20px; font-weight: 600; }
+        .main-content { padding: 30px; flex: 1 0 auto; min-height: 0; }
+        .card {
+            border: 1px solid var(--m3-outline) !important;
+            border-radius: var(--m3-radius-md) !important;
+            box-shadow: var(--m3-shadow-sm) !important;
+            background: var(--m3-surface-2);
+        }
+        .card-header {
+            background: linear-gradient(180deg, #fff, #f9fbff);
+            border-bottom: 1px solid #e8eef6;
+            padding: 20px;
+            font-weight: 600;
+        }
         .app-footer {
             border-top: 1px solid #e2e8f0;
             background: #fff;
             color: #64748b;
             font-size: 0.82rem;
             padding: 10px 30px;
+            margin-top: auto;
         }
         .app-footer .build-tag {
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -136,7 +149,7 @@
         }
     </style>
 </head>
-<body>
+<body class="m3-app-shell">
 
     <div id="wrapper">
         <nav id="sidebar">
@@ -154,7 +167,7 @@
                     {% endif %}
                     
                     {% if module_access.vendas %}
-                    <li><a href="{% url 'venda_produto_list' %}"><i class="fas fa-tags"></i> Vendas e Servicos</a></li>
+                    <li><a href="{% url 'venda_produto_list' %}"><i class="fas fa-tags"></i> Vendas e Serviços</a></li>
                     {% endif %}
 
                     {% if module_access.ponto %}
@@ -166,16 +179,16 @@
                     {% endif %}
 
                     {% if module_access.distribuicao %}
-                    <li><a href="{% url 'painel-distribuicao' %}"><i class="fas fa-random"></i> Distribuicao de Leads</a></li>
+                    <li><a href="{% url 'painel-distribuicao' %}"><i class="fas fa-random"></i> Distribuição de Leads</a></li>
                     {% endif %}
 
                     {% if module_access.financeiro %}
-                    <li class="menu-header mt-3">Caixa e Financas</li>
-                    <li><a href="{% url 'financeiro:lista_transacoes' %}"><i class="fas fa-wallet" style="color:#10b981;"></i> Gestao Financeira</a></li>
+                    <li class="menu-header mt-3">Caixa e Finanças</li>
+                    <li><a href="{% url 'financeiro:lista_transacoes' %}"><i class="fas fa-wallet" style="color:#10b981;"></i> Gestão Financeira</a></li>
                     {% endif %}
 
                     {% if module_access.relatorios and user.is_superuser or module_access.relatorios and user.profile.nivel_acesso == 'ADMIN' or module_access.relatorios and user.profile.nivel_acesso == 'GERENTE' or module_access.rh or module_access.usuarios_admin %}
-                    <li class="menu-header mt-3">Administracao</li>
+                    <li class="menu-header mt-3">Administração</li>
                     {% endif %}
 
                     {% if module_access.relatorios and user.is_superuser or module_access.relatorios and user.profile.nivel_acesso == 'ADMIN' or module_access.relatorios and user.profile.nivel_acesso == 'GERENTE' %}
@@ -191,15 +204,19 @@
                     <li><a href="{% url 'user_list' %}"><i class="fas fa-user-shield"></i> Acessos e Perfis</a></li>
                     {% endif %}
 
+                    {% if module_access.credenciais %}
+                    <li><a href="{% url 'credencial_list' %}"><i class="fas fa-key"></i> Senhas e Credenciais</a></li>
+                    {% endif %}
+
                     {% if user.is_superuser %}
-                    <li><a href="{% url 'user_module_permissions' %}"><i class="fas fa-shield-alt"></i> Permissoes por Modulo</a></li>
+                    <li><a href="{% url 'user_module_permissions' %}"><i class="fas fa-shield-alt"></i> Permissões por Módulo</a></li>
                     {% endif %}
                 </ul>
             </div>
         </nav>
 
         <div id="content-wrapper">
-            <header class="top-navbar">
+            <header class="top-navbar m3-topbar">
                 <button class="btn-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
                 
                 <div class="dropdown">
@@ -208,8 +225,12 @@
                             <h6 class="mb-0 text-dark fw-bold" style="font-size: 0.9rem;">{{ user.get_full_name|default:user.username }}</h6>
                             <small class="text-muted">{{ user.profile.get_nivel_acesso_display|default:"Colaborador" }}</small>
                         </div>
-                        <div class="user-avatar shadow-sm">
-                            {{ user.username|make_list|first|upper }}
+                        <div class="user-avatar shadow-sm" {% if user.profile.avatar %}style="background: transparent; padding: 0; overflow: hidden;"{% endif %}>
+                            {% if user.profile.avatar %}
+                                <img src="{{ user.profile.get_avatar_url }}" alt="Foto de Perfil" style="width: 100%; height: 100%; object-fit: cover;">
+                            {% else %}
+                                {{ user.username|make_list|first|upper }}
+                            {% endif %}
                         </div>
                     </div>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
@@ -229,7 +250,7 @@
             <main class="main-content">
                 {% if messages %}
                     {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show border-0 shadow-sm rounded-3" role="alert">
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show border-0 shadow-sm rounded-3 m3-alert" role="alert">
                             {{ message }}
                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
@@ -252,6 +273,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/app_ux.js' %}"></script>
     <script>
         document.getElementById('sidebarToggle').addEventListener('click', function() {
             document.getElementById('sidebar').classList.toggle('active');

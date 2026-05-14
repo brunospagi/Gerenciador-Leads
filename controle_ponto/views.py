@@ -1,4 +1,4 @@
-import json
+﻿import json
 import threading
 from datetime import datetime
 import secrets
@@ -22,6 +22,18 @@ from .models import ConfiguracaoPonto, RegistroPonto
 
 TOKEN_PONTO_TTL_SECONDS = 120
 GEO_CHECK_TTL_SECONDS = 120
+
+
+def _safe_int(value, default, min_value=None, max_value=None):
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    if min_value is not None and parsed < min_value:
+        return default
+    if max_value is not None and parsed > max_value:
+        return default
+    return parsed
 
 
 def obter_ip_cliente(request):
@@ -276,8 +288,8 @@ def relatorio_mensal(request):
         return redirect('/')
 
     hoje = timezone.now().date()
-    mes = int(request.GET.get('mes', hoje.month))
-    ano = int(request.GET.get('ano', hoje.year))
+    mes = _safe_int(request.GET.get('mes'), hoje.month, min_value=1, max_value=12)
+    ano = _safe_int(request.GET.get('ano'), hoje.year, min_value=hoje.year - 5, max_value=hoje.year + 5)
     funcionario_id = request.GET.get('funcionario')
 
     pontos = (
@@ -289,12 +301,22 @@ def relatorio_mensal(request):
         pontos = pontos.filter(funcionario_id=funcionario_id)
 
     funcionarios_list = Funcionario.objects.filter(ativo=True).order_by('user__first_name')
+    total_registros = pontos.count()
+    total_com_atraso = pontos.filter(atraso_minutos__gt=0).count()
+    total_pendentes = pontos.filter(status_homologacao=RegistroPonto.StatusHomologacao.PENDENTE).count()
+    total_homologados = pontos.filter(
+        status_homologacao__in=[RegistroPonto.StatusHomologacao.ACEITO, RegistroPonto.StatusHomologacao.RECUSADO]
+    ).count()
     context = {
         'pontos': pontos,
         'mes_atual': mes,
         'ano_atual': ano,
         'funcionario_selecionado': int(funcionario_id) if funcionario_id else '',
         'funcionarios': funcionarios_list,
+        'total_registros': total_registros,
+        'total_com_atraso': total_com_atraso,
+        'total_pendentes': total_pendentes,
+        'total_homologados': total_homologados,
         'meses': range(1, 13),
         'anos': range(hoje.year - 2, hoje.year + 2),
     }
@@ -308,8 +330,8 @@ def ocorrencias_mensais(request):
         return redirect('/')
 
     hoje = timezone.now().date()
-    mes = int(request.GET.get('mes', hoje.month))
-    ano = int(request.GET.get('ano', hoje.year))
+    mes = _safe_int(request.GET.get('mes'), hoje.month, min_value=1, max_value=12)
+    ano = _safe_int(request.GET.get('ano'), hoje.year, min_value=hoje.year - 5, max_value=hoje.year + 5)
     funcionario_id = request.GET.get('funcionario')
     status = request.GET.get('status', RegistroPonto.StatusHomologacao.PENDENTE)
 
@@ -324,6 +346,10 @@ def ocorrencias_mensais(request):
         ocorrencias = ocorrencias.filter(status_homologacao=status)
 
     funcionarios_list = Funcionario.objects.filter(ativo=True).order_by('user__first_name')
+    total_ocorrencias = ocorrencias.count()
+    total_pendentes = ocorrencias.filter(status_homologacao=RegistroPonto.StatusHomologacao.PENDENTE).count()
+    total_aceitas = ocorrencias.filter(status_homologacao=RegistroPonto.StatusHomologacao.ACEITO).count()
+    total_recusadas = ocorrencias.filter(status_homologacao=RegistroPonto.StatusHomologacao.RECUSADO).count()
     context = {
         'ocorrencias': ocorrencias,
         'mes_atual': mes,
@@ -331,6 +357,10 @@ def ocorrencias_mensais(request):
         'funcionario_selecionado': int(funcionario_id) if funcionario_id else '',
         'status_selecionado': status,
         'funcionarios': funcionarios_list,
+        'total_ocorrencias': total_ocorrencias,
+        'total_pendentes': total_pendentes,
+        'total_aceitas': total_aceitas,
+        'total_recusadas': total_recusadas,
         'status_choices': RegistroPonto.StatusHomologacao.choices,
         'meses': range(1, 13),
         'anos': range(hoje.year - 2, hoje.year + 2),
@@ -390,8 +420,8 @@ def relatorio_entradas(request):
         return redirect('/')
 
     hoje = timezone.now().date()
-    mes = int(request.GET.get('mes', hoje.month))
-    ano = int(request.GET.get('ano', hoje.year))
+    mes = _safe_int(request.GET.get('mes'), hoje.month, min_value=1, max_value=12)
+    ano = _safe_int(request.GET.get('ano'), hoje.year, min_value=hoje.year - 5, max_value=hoje.year + 5)
     funcionario_id = request.GET.get('funcionario')
 
     entradas = (
@@ -409,6 +439,8 @@ def relatorio_entradas(request):
     )
 
     funcionarios_list = Funcionario.objects.filter(ativo=True).order_by('user__first_name')
+    total_entradas = entradas.count()
+    total_atrasos = entradas.filter(atraso_minutos__gt=0).count()
     context = {
         'entradas': entradas,
         'resumo': resumo,
@@ -416,6 +448,8 @@ def relatorio_entradas(request):
         'ano_atual': ano,
         'funcionario_selecionado': int(funcionario_id) if funcionario_id else '',
         'funcionarios': funcionarios_list,
+        'total_entradas': total_entradas,
+        'total_atrasos': total_atrasos,
         'meses': range(1, 13),
         'anos': range(hoje.year - 2, hoje.year + 2),
     }
@@ -473,4 +507,5 @@ def detalhe_ponto(request, pk):
 
     ponto = get_object_or_404(RegistroPonto, pk=pk)
     return render(request, 'controle_ponto/detalhe_ponto.html', {'ponto': ponto})
+
 

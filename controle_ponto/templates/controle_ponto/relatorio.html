@@ -1,31 +1,77 @@
 {% extends 'base_portal.html' %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="fw-bold text-dark"><i class="fas fa-calendar-check text-primary"></i> Espelho de Ponto Mensal</h3>
+<div class="container-fluid py-4 ponto-page">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
-            <a href="{% url 'controle_ponto:ocorrencias_mensais' %}" class="btn btn-warning shadow-sm me-2"><i class="fas fa-exclamation-triangle"></i> Ocorrências</a>
-            <a href="{% url 'controle_ponto:relatorio_entradas' %}" class="btn btn-outline-primary shadow-sm me-2"><i class="fas fa-user-clock"></i> Relatório Entradas</a>
-            <a href="{% url 'controle_ponto:mapa_pontos' %}" class="btn btn-danger shadow-sm me-2"><i class="fas fa-map-marker-alt"></i> Ver no Mapa</a>
-            <button onclick="window.print()" class="btn btn-secondary shadow-sm"><i class="fas fa-print"></i> Imprimir</button>
+            <h3 class="fw-bold mb-1"><i class="fas fa-calendar-check text-primary me-2"></i>Espelho de Ponto Mensal</h3>
+            <small class="text-muted">Visão consolidada de registro, atraso e homologação.</small>
+        </div>
+        <div class="d-flex flex-wrap gap-2 d-print-none">
+            <a href="{% url 'controle_ponto:ocorrencias_mensais' %}" class="btn btn-warning">
+                <i class="fas fa-exclamation-triangle me-1"></i>Ocorrências
+            </a>
+            <a href="{% url 'controle_ponto:relatorio_entradas' %}" class="btn btn-outline-primary">
+                <i class="fas fa-user-clock me-1"></i>Entradas
+            </a>
+            <a href="{% url 'controle_ponto:mapa_pontos' %}" class="btn btn-outline-danger">
+                <i class="fas fa-map-marker-alt me-1"></i>Mapa
+            </a>
+            <button type="button" onclick="window.print()" class="btn btn-secondary">
+                <i class="fas fa-print me-1"></i>Imprimir
+            </button>
         </div>
     </div>
 
-    <div class="card shadow-sm border-0 mb-4 rounded-4 d-print-none">
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card h-100 border-0">
+                <div class="card-body">
+                    <small class="text-muted d-block">Registros no período</small>
+                    <div class="display-6 fw-bold">{{ total_registros }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card h-100 border-0">
+                <div class="card-body">
+                    <small class="text-muted d-block">Com atraso</small>
+                    <div class="display-6 fw-bold text-warning">{{ total_com_atraso }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card h-100 border-0">
+                <div class="card-body">
+                    <small class="text-muted d-block">Pendentes</small>
+                    <div class="display-6 fw-bold text-danger">{{ total_pendentes }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card h-100 border-0">
+                <div class="card-body">
+                    <small class="text-muted d-block">Homologados</small>
+                    <div class="display-6 fw-bold text-success">{{ total_homologados }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 mb-4 d-print-none">
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label fw-bold small text-muted">Funcionário:</label>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small text-muted">Funcionário</label>
                     <select name="funcionario" class="form-select">
-                        <option value="">Todos os Colaboradores</option>
+                        <option value="">Todos os colaboradores</option>
                         {% for f in funcionarios %}
                         <option value="{{ f.id }}" {% if funcionario_selecionado == f.id %}selected{% endif %}>{{ f.nome_completo }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label fw-bold small text-muted">Mês:</label>
+                    <label class="form-label fw-semibold small text-muted">Mês</label>
                     <select name="mes" class="form-select">
                         {% for m in meses %}
                         <option value="{{ m }}" {% if mes_atual == m %}selected{% endif %}>{{ m|stringformat:"02d" }}</option>
@@ -33,71 +79,90 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label fw-bold small text-muted">Ano:</label>
+                    <label class="form-label fw-semibold small text-muted">Ano</label>
                     <select name="ano" class="form-select">
                         {% for a in anos %}
                         <option value="{{ a }}" {% if ano_atual == a %}selected{% endif %}>{{ a }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Filtrar</button>
+                <div class="col-md-2 d-grid">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-search me-1"></i>Filtrar</button>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <a href="{% url 'controle_ponto:relatorio_mensal' %}" class="btn btn-outline-secondary">Limpar</a>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="card shadow rounded-4 border-0">
+    <div class="card border-0">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover table-striped mb-0 text-center align-middle" style="font-size: 0.9rem;">
-                    <thead class="table-dark">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
                         <tr>
-                            <th class="text-start ps-4">Data</th>
-                            <th class="text-start">Colaborador</th>
+                            <th>Data</th>
+                            <th>Colaborador</th>
                             <th>Entrada</th>
-                            <th>Saída Almoço</th>
-                            <th>Retorno Almoço</th>
-                            <th>Saída Final</th>
+                            <th>Saída almoço</th>
+                            <th>Retorno almoço</th>
+                            <th>Saída final</th>
                             <th>Escala</th>
-                            <th>Atraso (min)</th>
+                            <th>Atraso</th>
                             <th>Justificativa</th>
-                            <th>Homologação</th>
-                            <th>IP Registrado</th>
+                            <th>Status</th>
+                            <th>IP</th>
                             <th class="d-print-none">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for p in pontos %}
                         <tr>
-                            <td class="text-start ps-4 fw-bold">{{ p.data|date:"d/m/Y" }}<br><small class="text-muted">{{ p.data|date:"l" }}</small></td>
-                            <td class="text-start">
-                                <span class="fw-bold">{{ p.funcionario.nome_completo }}</span><br>
-                                <small class="text-muted">{{ p.funcionario.cargo }}</small>
-                            </td>
-                            <td><span class="badge bg-success bg-opacity-10 text-success border border-success px-2 py-1">{{ p.entrada|time:"H:i"|default:"--" }}</span></td>
-                            <td><span class="badge bg-warning bg-opacity-10 text-warning border border-warning px-2 py-1">{{ p.saida_almoco|time:"H:i"|default:"--" }}</span></td>
-                            <td><span class="badge bg-info bg-opacity-10 text-info border border-info px-2 py-1">{{ p.retorno_almoco|time:"H:i"|default:"--" }}</span></td>
-                            <td><span class="badge bg-danger bg-opacity-10 text-danger border border-danger px-2 py-1">{{ p.saida|time:"H:i"|default:"--" }}</span></td>
-                            <td>{{ p.horario_escala_entrada|time:"H:i"|default:"--" }}</td>
-                            <td>{% if p.atraso_minutos > 0 %}<span class="badge bg-warning text-dark">{{ p.atraso_minutos }}</span>{% else %}--{% endif %}</td>
-                            <td class="text-start" style="max-width:220px;">{{ p.justificativa_atraso|default:"-" }}</td>
                             <td>
-                                {% if p.status_homologacao == 'PENDENTE' %}<span class="badge bg-warning text-dark">Pendente</span>
-                                {% elif p.status_homologacao == 'ACEITO' %}<span class="badge bg-success">Aceito</span>
-                                {% elif p.status_homologacao == 'RECUSADO' %}<span class="badge bg-danger">Recusado</span>
-                                {% else %}<span class="badge bg-secondary">N/A</span>{% endif %}
+                                <div class="fw-semibold">{{ p.data|date:"d/m/Y" }}</div>
+                                <small class="text-muted">{{ p.data|date:"l" }}</small>
                             </td>
-                            <td class="text-muted small">{{ p.ip_registrado|default:"-" }}</td>
-                            <td class="d-print-none text-nowrap">
-                                <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-info shadow-sm rounded-3 me-1" title="Ver Fotos e Localização"><i class="fas fa-eye"></i></a>
-                                <a href="{% url 'controle_ponto:editar_ponto' p.id %}" class="btn btn-sm btn-outline-primary shadow-sm rounded-3 me-1" title="Corrigir Horários"><i class="fas fa-edit"></i></a>
-                                <a href="{% url 'controle_ponto:excluir_ponto' p.id %}" class="btn btn-sm btn-outline-danger shadow-sm rounded-3" title="Excluir Registro"><i class="fas fa-trash"></i></a>
+                            <td>
+                                <div class="fw-semibold">{{ p.funcionario.nome_completo }}</div>
+                                <small class="text-muted">{{ p.funcionario.cargo|default:"-" }}</small>
+                            </td>
+                            <td><span class="m3-badge m3-badge-success">{{ p.entrada|time:"H:i"|default:"--" }}</span></td>
+                            <td><span class="m3-badge m3-badge-warning">{{ p.saida_almoco|time:"H:i"|default:"--" }}</span></td>
+                            <td><span class="m3-badge m3-badge-info">{{ p.retorno_almoco|time:"H:i"|default:"--" }}</span></td>
+                            <td><span class="m3-badge m3-badge-danger">{{ p.saida|time:"H:i"|default:"--" }}</span></td>
+                            <td>{{ p.horario_escala_entrada|time:"H:i"|default:"--" }}</td>
+                            <td>
+                                {% if p.atraso_minutos > 0 %}
+                                <span class="m3-badge m3-badge-warning">{{ p.atraso_minutos }} min</span>
+                                {% else %}
+                                <span class="text-muted">0</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-break">{{ p.justificativa_atraso|default:"-" }}</td>
+                            <td>
+                                {% if p.status_homologacao == 'PENDENTE' %}
+                                <span class="m3-badge m3-badge-warning">Pendente</span>
+                                {% elif p.status_homologacao == 'ACEITO' %}
+                                <span class="m3-badge m3-badge-success">Aceito</span>
+                                {% elif p.status_homologacao == 'RECUSADO' %}
+                                <span class="m3-badge m3-badge-danger">Recusado</span>
+                                {% else %}
+                                <span class="m3-badge m3-badge-neutral">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td><small class="text-muted">{{ p.ip_registrado|default:"-" }}</small></td>
+                            <td class="d-print-none">
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-info" title="Auditoria"><i class="fas fa-eye"></i></a>
+                                    <a href="{% url 'controle_ponto:editar_ponto' p.id %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fas fa-edit"></i></a>
+                                    <a href="{% url 'controle_ponto:excluir_ponto' p.id %}" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></a>
+                                </div>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="12" class="py-5 text-muted">Nenhum ponto registrado no período selecionado.</td>
+                            <td colspan="12" class="text-center py-5 text-muted">Nenhum registro encontrado para os filtros selecionados.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -108,17 +173,57 @@
 </div>
 
 <style>
-    @page { size: A4 landscape; margin: 10mm; }
+    .ponto-page .card {
+        border-radius: 16px !important;
+    }
+
+    @page {
+        size: A4 landscape;
+        margin: 8mm;
+    }
 
     @media print {
-        .d-print-none, header, nav, #sidebar { display: none !important; }
-        #content-wrapper { margin-left: 0 !important; width: 100% !important; }
-        body { background: white; padding: 0; margin: 0; font-size: 11px; }
-        .card { box-shadow: none !important; border: 1px solid #ccc !important; }
-        .container-fluid { padding: 0 !important; }
-        .table { width: 100% !important; font-size: 10px; }
-        .table-dark { background-color: #f8f9fa !important; color: black !important; -webkit-print-color-adjust: exact; }
-        .badge { border: none !important; background: transparent !important; color: black !important; font-weight: bold; font-size: 1rem; }
+        .d-print-none,
+        header,
+        nav,
+        #sidebar {
+            display: none !important;
+        }
+
+        body {
+            background: #fff !important;
+            font-size: 10px;
+        }
+
+        #content-wrapper {
+            width: 100% !important;
+            margin-left: 0 !important;
+        }
+
+        .container-fluid {
+            padding: 0 !important;
+        }
+
+        .card {
+            box-shadow: none !important;
+            border: 1px solid #dcdcdc !important;
+        }
+
+        .table thead th {
+            font-size: 9px;
+        }
+
+        .table td,
+        .table th {
+            padding: 0.45rem 0.35rem !important;
+        }
+
+        .badge,
+        .m3-badge {
+            border: 1px solid #bbb !important;
+            color: #111 !important;
+            background: #fff !important;
+        }
     }
 </style>
 {% endblock %}

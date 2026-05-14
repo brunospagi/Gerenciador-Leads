@@ -9,10 +9,11 @@
     const RAIO_PERMITIDO_METROS = {{ config.raio_permitido|safe|default:"100" }};
 </script>
 
-<div class="container mt-4 mb-5 text-center" style="max-width: 600px;">
-    <h3 class="fw-bold mb-4 text-dark">
-        <i class="fas fa-map-marker-alt text-danger"></i> Ponto Seguro (GPS + IA)
+<div class="container mt-4 mb-5 text-center ponto-relogio-wrap" style="max-width: 760px;">
+    <h3 class="fw-bold mb-2 text-dark">
+        <i class="fas fa-map-marker-alt text-danger me-2"></i>Ponto Seguro
     </h3>
+    <p class="text-muted mb-3">Registro com validação de localização e biometria facial.</p>
     <div id="relogio-tempo-real" class="text-primary fw-bold mb-4 fs-5"></div>
 
     <div id="ai-status" class="alert alert-warning shadow-sm">
@@ -20,9 +21,9 @@
     </div>
 
     <div class="alert alert-info shadow-sm text-start">
-        <div><strong>Escala de Entrada:</strong> {{ config.horario_escala_entrada|time:"H:i" }}</div>
-        <div><strong>TolerÃ¢ncia:</strong> {{ config.tolerancia_atraso_minutos }} minuto(s)</div>
-        <small>Se a entrada passar da tolerância, a justificativa é obrigatória e vai para homologação.</small>
+        <div><strong>Escala de entrada:</strong> {{ config.horario_escala_entrada|time:"H:i" }}</div>
+        <div><strong>Tolerância:</strong> {{ config.tolerancia_atraso_minutos }} minuto(s)</div>
+        <small>Atraso acima da tolerância exige justificativa e segue para homologação.</small>
     </div>
 
     {% if not foto_url %}
@@ -36,7 +37,7 @@
         <div class="card-body p-4">
 
             <p class="text-muted small mb-3">
-                IP Atual: <strong>{{ ip_atual }}</strong> | <span id="distanciaText" class="text-success fw-bold"></span>
+                IP atual: <strong>{{ ip_atual }}</strong> | <span id="distanciaText" class="text-success fw-bold"></span>
             </p>
 
             {% if foto_url %}
@@ -44,23 +45,23 @@
             {% endif %}
 
             <div id="liveCameraSection">
-                <div class="position-relative bg-dark rounded-4 overflow-hidden mb-4 shadow-sm" style="height: 350px; border: 4px solid #f8f9fa;">
+                <div class="position-relative bg-dark rounded-4 overflow-hidden mb-4 shadow-sm camera-frame" style="height: 350px; border: 4px solid #f8f9fa;">
                     <video id="videoElement" autoplay playsinline style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);"></video>
                     <div class="position-absolute top-50 start-50 translate-middle" style="width:200px;height:260px;border:3px dashed rgba(255,255,255,0.7); border-radius:50%;"></div>
                 </div>
 
                 <div class="d-grid gap-2">
-                    <button id="btnEntrada" class="btn btn-lg fw-bold text-white btn-success" onclick="tirarFoto('entrada','Entrada')" disabled>
+                    <button id="btnEntrada" class="btn btn-lg fw-bold text-white btn-success py-3" onclick="tirarFoto('entrada','Entrada')" disabled>
                         Entrada {% if ponto.entrada %}({{ ponto.entrada|time:"H:i" }}){% endif %}
                     </button>
-                    <button id="btnSaidaAlmoco" class="btn btn-lg fw-bold text-white btn-warning" onclick="tirarFoto('saida_almoco','SaÃ­da AlmoÃ§o')" disabled>
-                        SaÃ­da AlmoÃ§o {% if ponto.saida_almoco %}({{ ponto.saida_almoco|time:"H:i" }}){% endif %}
+                    <button id="btnSaidaAlmoco" class="btn btn-lg fw-bold text-white btn-warning py-3" onclick="tirarFoto('saida_almoco','Saída Almoço')" disabled>
+                        Saída Almoço {% if ponto.saida_almoco %}({{ ponto.saida_almoco|time:"H:i" }}){% endif %}
                     </button>
-                    <button id="btnRetornoAlmoco" class="btn btn-lg fw-bold text-white btn-info" onclick="tirarFoto('retorno_almoco','Retorno AlmoÃ§o')" disabled>
-                        Retorno AlmoÃ§o {% if ponto.retorno_almoco %}({{ ponto.retorno_almoco|time:"H:i" }}){% endif %}
+                    <button id="btnRetornoAlmoco" class="btn btn-lg fw-bold text-white btn-info py-3" onclick="tirarFoto('retorno_almoco','Retorno Almoço')" disabled>
+                        Retorno Almoço {% if ponto.retorno_almoco %}({{ ponto.retorno_almoco|time:"H:i" }}){% endif %}
                     </button>
-                    <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger" onclick="tirarFoto('saida','SaÃ­da Final')" disabled>
-                        SaÃ­da Final {% if ponto.saida %}({{ ponto.saida|time:"H:i" }}){% endif %}
+                    <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger py-3" onclick="tirarFoto('saida','Saída Final')" disabled>
+                        Saída Final {% if ponto.saida %}({{ ponto.saida|time:"H:i" }}){% endif %}
                     </button>
                 </div>
             </div>
@@ -126,7 +127,7 @@ function tokenExpirado() {
 
 function validarTokenOuAtualizar() {
     if (!tokenExpirado()) return true;
-    alert('Sua sessão para bater ponto expirou (mais de 2 minutos). A página será atualizada para gerar novo token.');
+        alert('Sua sessão para bater ponto expirou (mais de 2 minutos). A página será atualizada para gerar um novo token.');
     window.location.reload();
     return false;
 }
@@ -353,5 +354,15 @@ setInterval(() => {
 atualizarRelogio();
 window.onload = validarGeolocalizacao;
 </script>
+
+<style>
+    .ponto-relogio-wrap .card {
+        border-radius: 20px !important;
+    }
+
+    .ponto-relogio-wrap .camera-frame {
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 20px rgba(15, 23, 42, 0.22);
+    }
+</style>
 {% endblock %}
 

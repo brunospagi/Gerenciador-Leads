@@ -2,57 +2,69 @@
 {% load static %}
 
 {% block content %}
-<div class="container-fluid mt-3">
+<div class="container-fluid mt-3 m3-module-shell">
     
-    {# --- BARRA DE NAVEGAÇÃO DE DATA --- #}
-    <div class="alert alert-light border shadow-sm d-flex justify-content-between align-items-center mb-4">
-        <div class="d-flex align-items-center">
-            <a href="?data_inicio={{ nav_anterior_inicio }}" class="btn btn-outline-secondary btn-sm me-2" title="Mês Anterior">
-                <i class="fa fa-chevron-left"></i>
-            </a>
-            
-            <div class="text-center px-3">
-                <div class="fw-bold text-uppercase text-dark" style="letter-spacing: 1px;">
-                    <i class="fa fa-calendar-alt text-primary me-2"></i>{{ periodo_inicio|date:"F Y" }}
-                </div>
-                <small class="text-muted" style="font-size: 0.8rem;">
-                    {{ periodo_inicio|date:"d/m" }} a {{ periodo_fim|date:"d/m" }}
-                </small>
-            </div>
-
-            <a href="?data_inicio={{ nav_proximo_inicio }}" class="btn btn-outline-secondary btn-sm ms-2" title="Próximo Mês">
-                <i class="fa fa-chevron-right"></i>
-            </a>
-        </div>
-        
-        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+    <section class="m3-page-header">
         <div>
-            <a href="{% url 'configuracao_comissao' %}" class="btn btn-outline-dark btn-sm me-2">
+            <h1 class="m3-page-title"><i class="fa fa-chart-line me-2"></i>Gestão de Vendas e Comissões</h1>
+            <p class="m3-page-subtitle">Acompanhe aprovações, margens e performance comercial do período.</p>
+        </div>
+        <div class="m3-toolbar">
+            <a href="{% url 'venda_produto_create' %}" class="btn btn-success btn-sm"><i class="fa fa-plus"></i> Nova Venda</a>
+            {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
+            <a href="{% url 'configuracao_comissao' %}" class="btn btn-outline-dark btn-sm">
                 <i class="fa fa-cogs me-2"></i> Configurações
             </a>
             <a href="{% url 'venda_produto_relatorio' %}?data_inicio={{ periodo_inicio|date:'Y-m-d' }}" class="btn btn-dark btn-sm">
                 <i class="fa fa-file-invoice-dollar me-2"></i> Relatório
             </a>
+            {% endif %}
         </div>
-        {% endif %}
-    </div>
+    </section>
 
-    <div class="row mb-4">
-        <div class="col-md-3 mb-3"><div class="card bg-primary text-white h-100 shadow-sm border-0"><div class="card-body"><h6>Minha Comissão</h6><h3 class="fw-bold">R$ {{ minha_comissao|floatformat:2 }}</h3></div></div></div>
+    {# --- BARRA DE NAVEGAÇÃO DE DATA --- #}
+    <section class="card m3-filter-card">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="d-flex align-items-center">
+                <a href="?data_inicio={{ nav_anterior_inicio }}" class="btn btn-outline-secondary btn-sm me-2" title="Mês Anterior">
+                    <i class="fa fa-chevron-left"></i>
+                </a>
+                <div class="text-center px-3">
+                    <div class="fw-bold text-uppercase text-dark" style="letter-spacing: 1px;">
+                        <i class="fa fa-calendar-alt text-primary me-2"></i>{{ periodo_inicio|date:"F Y" }}
+                    </div>
+                    <small class="text-muted" style="font-size: 0.8rem;">
+                        {{ periodo_inicio|date:"d/m" }} a {{ periodo_fim|date:"d/m" }}
+                    </small>
+                </div>
+                <a href="?data_inicio={{ nav_proximo_inicio }}" class="btn btn-outline-secondary btn-sm ms-2" title="Próximo Mês">
+                    <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+            <span class="m3-pill">Fechamento mensal</span>
+        </div>
+    </section>
+
+    <section class="m3-soft-note">
+        Fluxo profissional: registrar venda, validar comprovante, aprovar/reprovar e acompanhar comissão e lucro em tempo real.
+    </section>
+
+    <div class="row mb-2">
+        <div class="col-md-3 mb-3"><div class="card h-100"><div class="card-body"><h6 class="m3-kpi-label">Minha comissão</h6><h3 class="m3-kpi-value">R$ {{ minha_comissao|floatformat:2 }}</h3></div></div></div>
         {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
-        <div class="col-md-3 mb-3"><div class="card bg-info text-dark h-100 shadow-sm border-0"><div class="card-body"><h6>Total Equipe</h6><h3 class="fw-bold">R$ {{ total_comissao_equipe|floatformat:2 }}</h3></div></div></div>
+        <div class="col-md-3 mb-3"><div class="card h-100"><div class="card-body"><h6 class="m3-kpi-label">Total da equipe</h6><h3 class="m3-kpi-value">R$ {{ total_comissao_equipe|floatformat:2 }}</h3></div></div></div>
         {% endif %}
         {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-        <div class="col-md-3 mb-3"><div class="card bg-success text-white h-100 shadow-sm border-0"><div class="card-body"><h6>Lucro Loja</h6><h3 class="fw-bold">R$ {{ total_loja|floatformat:2 }}</h3></div></div></div>
+        <div class="col-md-3 mb-3"><div class="card h-100"><div class="card-body"><h6 class="m3-kpi-label">Lucro loja</h6><h3 class="m3-kpi-value">R$ {{ total_loja|floatformat:2 }}</h3></div></div></div>
         {% endif %}
         {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' or user.profile.nivel_acesso == 'CONSIGNADOR' %}
         <div class="col-md-3 mb-3">
             <a href="{% url 'venda_produto_create' %}?tipo=CONSIGNACAO" class="text-decoration-none">
-                <div class="card bg-warning text-dark h-100 shadow-sm border-0 element-hover">
+                <div class="card h-100 element-hover">
                     <div class="card-body d-flex flex-column justify-content-center">
                         <div class="d-flex justify-content-between align-items-center">
-                            <div><h6 class="fw-bold mb-1"><i class="fa fa-handshake me-1"></i> Consignação</h6><small class="text-dark opacity-75">Captura / Compra</small></div>
-                            <div class="text-end"><span class="badge bg-dark text-warning">R$ 350,00</span><div class="mt-1 small fw-bold">NOVO <i class="fa fa-plus-circle"></i></div></div>
+                            <div><h6 class="fw-bold mb-1"><i class="fa fa-handshake me-1"></i> Consignação</h6><small class="text-muted">Captura / Compra</small></div>
+                            <div class="text-end"><span class="m3-badge m3-badge-neutral">R$ 350,00</span><div class="mt-1 small fw-bold text-primary">NOVO <i class="fa fa-plus-circle"></i></div></div>
                         </div>
                     </div>
                 </div>
@@ -62,9 +74,9 @@
     </div>
 
     <div class="card shadow-sm border-0">
-        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 text-secondary"><i class="fa fa-list me-2"></i>Vendas Registradas</h5>
-            <a href="{% url 'venda_produto_create' %}" class="btn btn-success btn-sm"><i class="fa fa-plus"></i> Nova Venda</a>
+        <div class="m3-table-head">
+            <h5 class="mb-0 text-secondary"><i class="fa fa-list me-2"></i>Vendas registradas</h5>
+            <span class="m3-pill">Operação comercial</span>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -104,7 +116,7 @@
                                         <span class="fw-bold text-dark">{{ item.modelo_veiculo }}</span>
                                         <span class="text-muted small mx-1">|</span> 
                                         <span class="text-muted small">{{ item.ano }}</span>
-                                        <div class="badge bg-light text-primary border mt-1" style="font-size: 0.75em;">
+                                        <div class="m3-badge m3-badge-primary mt-1" style="font-size: 0.75em;">
                                             {{ item.placa }}
                                         </div>
                                     </div>
@@ -113,9 +125,9 @@
 
                                 <div class="mt-2">
                                 {% if item.tipo_produto != 'CONSIGNACAO' and item.tipo_produto != 'COMPRA' %}
-                                    <span class="badge bg-light text-dark border">{{ item.resumo_pagamento|truncatechars:30 }}</span>
+                                    <span class="m3-badge m3-badge-neutral">{{ item.resumo_pagamento|truncatechars:30 }}</span>
                                 {% else %}
-                                    <span class="badge bg-warning text-dark border">Processo Interno</span>
+                                    <span class="m3-badge m3-badge-warning">Processo interno</span>
                                 {% endif %}
                                 </div>
                                 
@@ -139,7 +151,7 @@
                                 {% if item.vendedor_ajudante_id == user.id %}
                                     {# Sou o Ajudante: Mostra Minha Comissão #}
                                     <strong class="text-primary">Com: {{ item.comissao_ajudante }}</strong>
-                                    <span class="badge bg-info text-dark ms-1" style="font-size: 0.6em;">AJUDA</span>
+                                    <span class="m3-badge m3-badge-info ms-1" style="font-size: 0.6em;">AJUDA</span>
                                 {% else %}
                                     {# Sou o Titular ou Gestor: Mostra Comissão do Vendedor #}
                                     <strong class="text-success">Com: {{ item.comissao_vendedor }}</strong>
@@ -147,9 +159,9 @@
                             </td>
 
                             <td>
-                                {% if item.status == 'APROVADO' %}<span class="badge bg-success"><i class="fa fa-check"></i> Aprovado</span>
-                                {% elif item.status == 'REJEITADO' %}<span class="badge bg-danger"><i class="fa fa-times"></i> Rejeitado</span>
-                                {% else %}<span class="badge bg-warning text-dark"><i class="fa fa-clock"></i> Pendente</span>{% endif %}
+                                {% if item.status == 'APROVADO' %}<span class="m3-badge m3-badge-success"><i class="fa fa-check"></i> Aprovado</span>
+                                {% elif item.status == 'REJEITADO' %}<span class="m3-badge m3-badge-danger"><i class="fa fa-times"></i> Rejeitado</span>
+                                {% else %}<span class="m3-badge m3-badge-warning"><i class="fa fa-clock"></i> Pendente</span>{% endif %}
                             </td>
                             <td class="text-end">
                                 {% if item.comprovante %}<button class="btn btn-sm btn-info text-white" data-bs-toggle="modal" data-bs-target="#modalComprovante{{ item.pk }}" title="Ver Comprovante"><i class="fa fa-eye"></i></button>{% endif %}
@@ -258,7 +270,7 @@
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="8" class="text-center py-5 text-muted">Nenhum registro encontrado.</td></tr>
+                        <tr><td colspan="8" class="m3-empty"><i class="fa fa-inbox"></i><div class="fw-semibold">Nenhum registro encontrado</div><div>Crie uma nova venda para iniciar o acompanhamento.</div></td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -266,7 +278,11 @@
         </div>
     </div>
 </div>
-<style>.element-hover { transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; } .element-hover:hover { transform: translateY(-3px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; }</style>
+<style>
+  .element-hover { transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
+  .element-hover:hover { transform: translateY(-3px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; }
+  .table td .btn.btn-sm { margin-bottom: 0.25rem; }
+</style>
 <script>document.addEventListener("DOMContentLoaded", function() { if (typeof $ !== 'undefined' && $.fn.mask) { $('.money-mask').mask('000.000.000.000.000,00', {reverse: true}); } });</script>
 {% endblock %}
 

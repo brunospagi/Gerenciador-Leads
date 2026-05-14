@@ -42,7 +42,8 @@ class TransacaoListView(AcessoFinanceiroMixin, ListView):
     context_object_name = "transacoes"
 
     def _is_admin(self):
-        return self.request.user.is_superuser or self.request.user.profile.nivel_acesso == "ADMIN"
+        profile = getattr(self.request.user, "profile", None)
+        return self.request.user.is_superuser or (profile and profile.nivel_acesso == "ADMIN")
 
     def _get_mes_ref(self):
         raw = (self.request.GET.get("mes_ref") or "").strip()

@@ -1,4 +1,4 @@
-from django.views.generic import ListView, CreateView, DetailView, UpdateView, TemplateView, DeleteView
+﻿from django.views.generic import ListView, CreateView, DetailView, UpdateView, TemplateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404, redirect
@@ -31,6 +31,12 @@ def _is_admin_financeiro(user):
 
 def _is_gestor_financeiro(user):
     return user.is_superuser or _nivel_acesso(user) in ['ADMIN', 'GERENTE']
+
+
+def _vendas_acessiveis(user):
+    if _is_gestor_financeiro(user):
+        return VendaProduto.objects.all()
+    return VendaProduto.objects.filter(Q(vendedor=user) | Q(vendedor_ajudante=user))
 
 def _parse_decimal_br(valor_str):
     if not valor_str:
@@ -221,6 +227,9 @@ class VendaProdutoUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'vendas_produtos/form.html'
     success_url = reverse_lazy('venda_produto_list')
 
+    def get_queryset(self):
+        return _vendas_acessiveis(self.request.user)
+
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
@@ -255,6 +264,9 @@ class VendaProdutoDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'vendas_produtos/delete_confirm.html'
     success_url = reverse_lazy('venda_produto_list')
 
+    def get_queryset(self):
+        return _vendas_acessiveis(self.request.user)
+
     def dispatch(self, request, *args, **kwargs):
         venda = self.get_object()
         is_gestor = _is_gestor_financeiro(request.user)
@@ -275,10 +287,16 @@ class VendaProdutoPrintView(LoginRequiredMixin, DetailView):
     template_name = 'vendas_produtos/comprovante.html'
     context_object_name = 'venda'
 
+    def get_queryset(self):
+        return _vendas_acessiveis(self.request.user)
+
 class VendaProdutoMinutaPrintView(LoginRequiredMixin, DetailView):
     model = VendaProduto
     template_name = 'vendas_produtos/minuta.html'
     context_object_name = 'venda'
+
+    def get_queryset(self):
+        return _vendas_acessiveis(self.request.user)
 
     def _formas_pagamento_extenso(self, venda):
         formas = []
@@ -619,3 +637,5 @@ def toggle_fechamento_mes(request):
         return redirect(url)
     except:
         return redirect('venda_produto_list')
+
+
