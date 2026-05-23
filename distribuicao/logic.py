@@ -12,18 +12,23 @@ def definir_proximo_vendedor():
     Retorna o User do próximo vendedor e atualiza o timestamp dele.
     Lógica:
     1. Filtra apenas ATIVOS.
+    2. Filtra apenas quem bateu ponto de ENTRADA no dia.
     2. Ordena colocando quem tem data NULL (nunca recebeu) no topo.
     3. Depois ordena por quem recebeu há mais tempo.
     """
-    proximo = VendedorRodizio.objects.filter(ativo=True).order_by(
+    hoje = timezone.localdate()
+    proximo = VendedorRodizio.objects.filter(
+        ativo=True,
+        vendedor__dados_funcionais__ativo=True,
+        vendedor__dados_funcionais__pontos__data=hoje,
+        vendedor__dados_funcionais__pontos__entrada__isnull=False,
+    ).order_by(
         F('ultima_atribuicao').asc(nulls_first=True), 
         'ordem'
-    ).first()
+    ).distinct().first()
     
     if not proximo:
-        # Fallback de segurança: Tenta pegar um superusuário se ninguém estiver no rodízio
-        from django.contrib.auth.models import User
-        return User.objects.filter(is_superuser=True).first()
+        return None
 
     # Atualiza o horário para o momento atual (fim da fila)
     proximo.ultima_atribuicao = timezone.now()
