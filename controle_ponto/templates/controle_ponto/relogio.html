@@ -54,6 +54,7 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
                 <button type="button" class="btn btn-primary btn-lg fw-bold ft-main-cta" onclick="iniciarFluxoFacial()">
                     <i class="fas fa-play me-1"></i> Estou pronto
                 </button>
+                <div class="ft-screen-brand">Spagi<span>ID</span></div>
             </div>
 
             <div id="detecaoSection" style="display:none;">
@@ -134,13 +135,14 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
                 </div>
 
                 <div class="d-grid gap-2">
-                    <button id="btnValidarIdentidade" type="button" class="btn btn-primary btn-lg fw-bold" onclick="validarIdentidadeInicial()">
-                        <i class="fas fa-face-smile-beam me-1"></i> Captura automatica em andamento...
-                    </button>
+                    <div class="alert alert-info mb-0">
+                        A captura sera feita automaticamente apos 5 segundos com o rosto centralizado.
+                    </div>
                     <button type="button" class="btn btn-outline-secondary fw-semibold" onclick="voltarParaInicio()">
                         Voltar
                     </button>
                 </div>
+                <div class="ft-screen-brand">Spagi<span>ID</span></div>
             </div>
             </div>
 
@@ -150,6 +152,7 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
                     <h5 class="fw-bold mb-2" id="processamentoTitulo">Enviando selfie criptografada</h5>
                     <p class="text-muted mb-0" id="processamentoSubtitulo">Aguarde alguns segundos...</p>
                 </div>
+                <div class="ft-screen-brand">Spagi<span>ID</span></div>
             </div>
 
             <div id="resultadoSection" style="display:none;" class="text-start">
@@ -171,6 +174,14 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
                         Continuar para batida
                     </button>
                 </div>
+                <div id="manualFallbackBox" class="alert alert-warning mt-3 d-none">
+                    <div class="fw-bold mb-1">Validacao biometrica nao reconhecida 3 vezes</div>
+                    <div class="small mb-2">Voce pode seguir com validacao manual por foto estatica.</div>
+                    <button type="button" class="btn btn-warning fw-bold" onclick="ativarFluxoManual()">
+                        Usar validacao manual
+                    </button>
+                </div>
+                <div class="ft-screen-brand">Spagi<span>ID</span></div>
             </div>
 
             <div id="batidaSection" style="display:none;">
@@ -191,6 +202,7 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
                         Saida Final {% if ponto.saida %}({{ ponto.saida|time:"H:i" }}){% endif %}
                     </button>
                 </div>
+                <div class="ft-screen-brand">Spagi<span>ID</span></div>
             </div>
 
             <div id="confirmationSection" style="display:none;">
@@ -209,6 +221,7 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
                     <div class="col-6"><button type="button" id="btnCancelar" class="btn btn-lg btn-outline-danger w-100 fw-bold" onclick="cancelarFoto()">Cancelar</button></div>
                     <div class="col-6"><button type="button" id="btnConfirmar" class="btn btn-lg btn-success w-100 fw-bold" onclick="confirmarPonto()">Sim, sou eu!</button></div>
                 </div>
+                <div class="ft-screen-brand">Spagi<span>ID</span></div>
             </div>
 
             <form id="pontoForm" method="POST">
@@ -216,6 +229,7 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
                 <input type="hidden" name="ponto_token" id="pontoTokenInput" value="{{ ponto_token }}">
                 <input type="hidden" name="tipo_batida" id="tipoBatidaInput">
                 <input type="hidden" name="foto_base64" id="fotoBase64Input">
+                <input type="hidden" name="modo_validacao" id="modoValidacaoInput" value="biometria">
                 <input type="hidden" name="latitude" id="latInput">
                 <input type="hidden" name="longitude" id="lngInput">
                 <input type="hidden" name="geo_checked_at" id="geoCheckedAtInput">
@@ -258,6 +272,8 @@ let livenessFrameCount = 0;
 let rafId = null;
 let biometriaChallengeToken = '';
 let autoValidationInFlight = false;
+let falhasBiometriaConsecutivas = 0;
+let validacaoManualLiberada = false;
 
 function setChip(id, status, label) {
     const chip = document.getElementById(id);
@@ -331,7 +347,7 @@ async function mostrarEtapaProcessamento(tipo) {
         atualizarHint('Enviando selfie criptografada...', 'warn');
         setChip('chipLiveness', 'warn', 'Captura: enviando');
         setProgress(78);
-        await esperar(450);
+        await esperar(3000);
         return;
     }
     if (tipo === 'process') {
@@ -340,14 +356,14 @@ async function mostrarEtapaProcessamento(tipo) {
         atualizarHint('Processando validacao de identidade...', 'warn');
         setChip('chipMatch', 'warn', 'Face Match: processando');
         setProgress(88);
-        await esperar(600);
+        await esperar(3000);
         return;
     }
     if (tipo === 'done') {
         if (titulo) titulo.innerText = 'Validacao concluida';
         if (subtitulo) subtitulo.innerText = 'Identidade verificada com sucesso.';
         atualizarHint('Validacao concluida', 'ok');
-        await esperar(220);
+        await esperar(1200);
     }
 }
 
@@ -529,6 +545,7 @@ function iniciarFluxoFacial() {
     document.getElementById('batidaSection').style.display = 'none';
     const just = document.getElementById('justificativaWrapper');
     if (just) just.style.display = 'none';
+    atualizarFallbackManualUI();
     if (iaInicializada) ligarCamera();
 }
 
@@ -541,7 +558,7 @@ function voltarParaInicio() {
 }
 
 function abrirBatidaSection() {
-    if (!identidadeValidada) {
+    if (!identidadeValidada && !validacaoManualLiberada) {
         alert('Valide sua identidade antes de bater o ponto.');
         return;
     }
@@ -550,6 +567,29 @@ function abrirBatidaSection() {
     document.getElementById('batidaSection').style.display = 'block';
     const just = document.getElementById('justificativaWrapper');
     if (just) just.style.display = 'block';
+}
+
+function atualizarFallbackManualUI() {
+    const box = document.getElementById('manualFallbackBox');
+    if (!box) return;
+    if (falhasBiometriaConsecutivas >= 3) {
+        validacaoManualLiberada = true;
+        box.classList.remove('d-none');
+    } else {
+        box.classList.add('d-none');
+    }
+}
+
+function ativarFluxoManual() {
+    validacaoManualLiberada = true;
+    identidadeValidada = true;
+    const modoInput = document.getElementById('modoValidacaoInput');
+    if (modoInput) modoInput.value = 'manual_foto_estatica';
+    mostrarResultadoValidacao(
+        true,
+        'Validacao manual liberada.',
+        'Capture a foto estatica na etapa final e conclua a batida.'
+    );
 }
 
 function reiniciarValidacao() {
@@ -564,6 +604,7 @@ function reiniciarValidacao() {
     document.getElementById('processamentoSection').style.display = 'none';
     document.getElementById('batidaSection').style.display = 'none';
     document.getElementById('detecaoSection').style.display = 'block';
+    atualizarFallbackManualUI();
 }
 
 function mostrarResultadoValidacao(aprovado, mensagem, detalhe = '') {
@@ -608,13 +649,9 @@ async function validarIdentidadeInicial(autoMode = false) {
     }
     autoValidationInFlight = true;
 
-    const btn = document.getElementById('btnValidarIdentidade');
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Capturando...';
-    }
-
     try {
+        const modoInput = document.getElementById('modoValidacaoInput');
+        if (modoInput) modoInput.value = 'biometria';
         setStep(1, 'active');
         setStep(2, 'active');
         setStep(3, 'idle');
@@ -633,6 +670,8 @@ async function validarIdentidadeInicial(autoMode = false) {
             setStep(3, 'err');
             setProgress(0);
             mostrarResultadoValidacao(false, 'Nao foi possivel capturar seu rosto.', 'Centralize o rosto no oval e tente novamente.');
+            falhasBiometriaConsecutivas += 1;
+            atualizarFallbackManualUI();
             return;
         }
 
@@ -663,10 +702,13 @@ async function validarIdentidadeInicial(autoMode = false) {
                 feedback.message || 'Comparacao facial reprovada.',
                 `Distancia: ${Number(feedback.distance || distance).toFixed(3)} | Limite: ${Number(feedback.threshold || DISTANCE_THRESHOLD).toFixed(3)}`
             );
+            falhasBiometriaConsecutivas += 1;
+            atualizarFallbackManualUI();
             return;
         }
 
         identidadeValidada = true;
+        falhasBiometriaConsecutivas = 0;
         setChip('chipMatch', 'ok', `Face Match: aprovado (${Number(feedback.distance || distance).toFixed(3)})`);
         setStep(4, 'ok');
         setProgress(100);
@@ -677,8 +719,10 @@ async function validarIdentidadeInicial(autoMode = false) {
             feedback.message || 'validacao concluida. Voce ja pode registrar a batida.',
             `Distancia: ${Number(feedback.distance || distance).toFixed(3)} | Limite: ${Number(feedback.threshold || DISTANCE_THRESHOLD).toFixed(3)}`
         );
+        atualizarFallbackManualUI();
     } catch (error) {
         identidadeValidada = false;
+        falhasBiometriaConsecutivas += 1;
         const msgErro = (error && error.message) ? String(error.message) : 'Tente novamente.';
         if (msgErro.toLowerCase().includes('liveness')) {
             setChip('chipLiveness', 'err', 'Captura: erro tecnico');
@@ -688,12 +732,9 @@ async function validarIdentidadeInicial(autoMode = false) {
             setStep(4, 'err');
         }
         mostrarResultadoValidacao(false, 'Erro tecnico durante validacao.', msgErro);
+        atualizarFallbackManualUI();
     } finally {
         autoValidationInFlight = false;
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-face-smile-beam me-1"></i> Captura automatica em andamento...';
-        }
     }
 }
 
@@ -844,13 +885,17 @@ async function prepararChallengeBiometria() {
 }
 
 async function aguardarRostoValidoECapturar() {
-    const tentativasMax = 90;
+    const tentativasMax = 180;
+    let inicioEstavel = null;
+    const estabilidadeMs = 5000;
     for (let i = 0; i < tentativasMax; i += 1) {
         const detection = await faceapi
             .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
             .withFaceLandmarks()
             .withFaceDescriptor();
         if (!detection) {
+            inicioEstavel = null;
+            atualizarHint('Enquadre seu rosto no oval', 'warn');
             await esperar(90);
             continue;
         }
@@ -860,12 +905,22 @@ async function aguardarRostoValidoECapturar() {
         const cy = (box.y + box.height / 2) / video.videoHeight;
         const centralizado = Math.abs(cx - 0.5) < 0.16 && Math.abs(cy - 0.5) < 0.20;
         if (faceArea > 0.12 && centralizado) {
+            if (!inicioEstavel) inicioEstavel = Date.now();
+            const decorrido = Date.now() - inicioEstavel;
+            const restante = Math.max(0, Math.ceil((estabilidadeMs - decorrido) / 1000));
+            atualizarHint(`Rosto localizado. Capturando em ${restante}s...`, 'ok');
+            if (decorrido < estabilidadeMs) {
+                await esperar(90);
+                continue;
+            }
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
             const base64 = canvas.toDataURL('image/jpeg', 0.92);
             return { detection, base64 };
         }
+        inicioEstavel = null;
+        atualizarHint('Aproxime e centralize o rosto no oval', 'warn');
         await esperar(90);
     }
     return null;
@@ -1083,6 +1138,7 @@ window.onload = validarGeolocalizacao;
     }
 
     .ponto-relogio-wrap .ft-sequence-box {
+        display: none !important;
         border-radius: 14px;
         background: #fbfdff;
     }
@@ -1203,6 +1259,21 @@ window.onload = validarGeolocalizacao;
 
     .ponto-relogio-wrap .ft-logo-watermark span {
         color: #8dd0ff;
+    }
+
+    .ponto-relogio-wrap .ft-screen-brand {
+        margin-top: 14px;
+        text-align: center;
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #2d5e8f;
+        letter-spacing: .4px;
+        opacity: .95;
+        user-select: none;
+    }
+
+    .ponto-relogio-wrap .ft-screen-brand span {
+        color: #0d6efd;
     }
 
     .ponto-relogio-wrap .liveness-steps {
