@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.views.generic import DeleteView, UpdateView
 from django.core.files.base import ContentFile
+from django.http import JsonResponse
 
 from funcionarios.models import Funcionario
 
@@ -38,6 +39,14 @@ def _safe_int(value, default, min_value=None, max_value=None):
     if max_value is not None and parsed > max_value:
         return default
     return parsed
+
+
+def _safe_bool(value, default=False):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    return str(value).strip().lower() in {'1', 'true', 't', 'yes', 'y', 'on'}
 
 
 def obter_ip_cliente(request):
@@ -641,4 +650,66 @@ def detalhe_ponto(request, pk):
 
     ponto = get_object_or_404(RegistroPonto, pk=pk)
     return render(request, 'controle_ponto/detalhe_ponto.html', {'ponto': ponto})
+
+
+@login_required
+@require_POST
+def validar_face_feedback(request):
+    if not getattr(request.user, 'dados_funcionais', None):
+        return JsonResponse({'ok': False, 'approved': False, 'message': 'Funcionário não vinculado ao usuário.'}, status=403)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        payload = {}
+
+    distance = payload.get('distance')
+    face_present = _safe_bool(payload.get('face_present'), default=False)
+    liveness_ok = _safe_bool(payload.get('liveness_ok'), default=False)
+    geo_ok = _safe_bool(payload.get('geo_ok'), default=False)
+    token_ok = _safe_bool(payload.get('token_ok'), default=False)
+
+    threshold = float(getattr(settings, 'FACE_MATCH_THRESHOLD', 0.50))
+    try:
+        distance_value = float(distance)
+    except (TypeError, ValueError):
+        return JsonResponse(
+            {'ok': True, 'approved': False, 'message': 'Score facial inválido. Tente novamente.'},
+            status=200,
+        )
+
+    reasons = []
+    if not token_ok:
+        reasons.append('Sessão de segurança expirada')
+    if not geo_ok:
+        reasons.append('Localização não validada')
+    if not face_present:
+        reasons.append('Rosto não detectado')
+    if not liveness_ok:
+        reasons.append('Prova de vida não concluída')
+    if distance_value >= threshold:
+        reasons.append('Rosto divergente da foto de cadastro')
+
+    if reasons:
+        return JsonResponse(
+            {
+                'ok': True,
+                'approved': False,
+                'distance': round(distance_value, 4),
+                'threshold': threshold,
+                'message': '; '.join(reasons),
+            },
+            status=200,
+        )
+
+    return JsonResponse(
+        {
+            'ok': True,
+            'approved': True,
+            'distance': round(distance_value, 4),
+            'threshold': threshold,
+            'message': 'Identidade validada com sucesso.',
+        },
+        status=200,
+    )
 
