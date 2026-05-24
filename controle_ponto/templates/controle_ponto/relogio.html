@@ -1,4 +1,5 @@
 ﻿{% extends 'base_portal.html' %}
+{% load static %}
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
@@ -36,16 +37,50 @@
     <div class="card shadow-sm rounded-4 border-0" id="mainCard" style="display:none; {% if not foto_url %}opacity:0.5;pointer-events:none;{% endif %}">
         <div class="card-body p-4">
             <div id="introSection" class="text-start mb-4">
-                <h5 class="fw-bold mb-2"><i class="fas fa-user-check text-primary me-1"></i> Verificação de identidade</h5>
-                <p class="text-muted mb-3">Antes de bater o ponto, valide presença facial com prova de vida e comparação com a foto de cadastro.</p>
-                <button type="button" class="btn btn-primary btn-lg fw-bold" onclick="iniciarFluxoFacial()">
+                <div class="ft-intro">
+                    <img src="{% static 'images/facetec/FaceTec_Logo.png' %}" alt="FaceTec" class="ft-intro-logo">
+                    <h5 class="fw-bold mb-2"><i class="fas fa-user-check text-primary me-1"></i> Verificação de identidade</h5>
+                    <p class="text-muted mb-3">Fluxo em etapas: detectar rosto, validar prova de vida e comparar com foto do cadastro funcional.</p>
+                    <div class="ft-intro-checks mb-3">
+                        <div class="ft-check-pill"><i class="fas fa-check-circle"></i> Usuário presente</div>
+                        <div class="ft-check-pill"><i class="fas fa-check-circle"></i> 3D Face Map</div>
+                        <div class="ft-check-pill"><i class="fas fa-check-circle"></i> Identity Verified</div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-lg fw-bold ft-main-cta" onclick="iniciarFluxoFacial()">
                     <i class="fas fa-play me-1"></i> Iniciar validação facial
                 </button>
             </div>
 
             <div id="detecaoSection" style="display:none;">
-                <div class="alert alert-light border text-start mb-3">
-                    <div class="fw-semibold mb-2"><i class="fas fa-shield-alt text-primary me-1"></i> Validação Facial (Liveness + Match)</div>
+                <div class="alert alert-light border text-start mb-3 ft-sequence-box">
+                    <div class="fw-semibold mb-2"><i class="fas fa-shield-alt text-primary me-1"></i> Sequência de validação</div>
+                    <div class="ft-sequence-list">
+                        <div class="ft-sequence-item" id="flowPresenca">
+                            <img src="{% static 'images/facetec/FaceTec_camera.png' %}" alt="" class="ft-sequence-icon">
+                            <div class="ft-sequence-text">
+                                <strong>Detectar rosto</strong>
+                                <small id="flowPresencaText">Aguardando enquadramento</small>
+                            </div>
+                            <span class="ft-sequence-state pending" id="flowPresencaState"><i class="far fa-circle"></i></span>
+                        </div>
+                        <div class="ft-sequence-item" id="flowLiveness">
+                            <img src="{% static 'images/facetec/FaceTec_ideal.png' %}" alt="" class="ft-sequence-icon">
+                            <div class="ft-sequence-text">
+                                <strong>Prova de vida</strong>
+                                <small id="flowLivenessText">Aguardando movimento guiado</small>
+                            </div>
+                            <span class="ft-sequence-state pending" id="flowLivenessState"><i class="far fa-circle"></i></span>
+                        </div>
+                        <div class="ft-sequence-item" id="flowMatch">
+                            <img src="{% static 'images/facetec/FaceTec_review.png' %}" alt="" class="ft-sequence-icon">
+                            <div class="ft-sequence-text">
+                                <strong>Comparar com cadastro</strong>
+                                <small id="flowMatchText">Aguardando score facial</small>
+                            </div>
+                            <span class="ft-sequence-state pending" id="flowMatchState"><i class="far fa-circle"></i></span>
+                        </div>
+                    </div>
                     <div class="d-flex flex-wrap gap-2">
                         <span id="chipPresenca" class="badge rounded-pill bg-secondary-subtle text-secondary">Presença: aguardando</span>
                         <span id="chipLiveness" class="badge rounded-pill bg-secondary-subtle text-secondary">Liveness: aguardando</span>
@@ -104,6 +139,11 @@
                     <h5 class="fw-bold mb-2"><i class="fas fa-check-circle me-1"></i> Identidade validada</h5>
                     <p id="resultadoMensagem" class="mb-2">Validação concluída.</p>
                     <small id="resultadoDetalhe" class="text-muted"></small>
+                </div>
+                <div class="ft-result-checks mb-3" id="resultChecks">
+                    <div class="ft-result-item"><i class="fas fa-check-circle"></i> Usuário presente</div>
+                    <div class="ft-result-item"><i class="fas fa-check-circle"></i> 3D Face Map</div>
+                    <div class="ft-result-item"><i class="fas fa-check-circle"></i> Identity Verified</div>
                 </div>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-outline-secondary fw-semibold" onclick="reiniciarValidacao()">
@@ -221,6 +261,35 @@ function setChip(id, status, label) {
     } else {
         chip.className += 'bg-secondary-subtle text-secondary';
     }
+    updateFlowStateFromChip(id, status, label);
+}
+
+function updateFlowStateFromChip(chipId, status, label) {
+    const map = {
+        chipPresenca: ['flowPresencaState', 'flowPresencaText'],
+        chipLiveness: ['flowLivenessState', 'flowLivenessText'],
+        chipMatch: ['flowMatchState', 'flowMatchText'],
+    };
+    const pair = map[chipId];
+    if (!pair) return;
+    const stateEl = document.getElementById(pair[0]);
+    const textEl = document.getElementById(pair[1]);
+    if (textEl && label) textEl.innerText = label.replace(/^[^:]+:\s*/i, '');
+    if (!stateEl) return;
+
+    let iconClass = 'far fa-circle';
+    stateEl.className = 'ft-sequence-state pending';
+    if (status === 'ok') {
+        stateEl.className = 'ft-sequence-state ok';
+        iconClass = 'fas fa-check-circle';
+    } else if (status === 'warn') {
+        stateEl.className = 'ft-sequence-state warn';
+        iconClass = 'fas fa-hourglass-half';
+    } else if (status === 'err') {
+        stateEl.className = 'ft-sequence-state err';
+        iconClass = 'fas fa-times-circle';
+    }
+    stateEl.innerHTML = `<i class="${iconClass}"></i>`;
 }
 
 function atualizarHint(texto, tipo = 'normal') {
@@ -443,6 +512,7 @@ function mostrarResultadoValidacao(aprovado, mensagem, detalhe = '') {
     const card = document.getElementById('resultadoCard');
     const msg = document.getElementById('resultadoMensagem');
     const det = document.getElementById('resultadoDetalhe');
+    const checks = document.getElementById('resultChecks');
     if (msg) msg.innerText = mensagem || '';
     if (det) det.innerText = detalhe || '';
     if (card) {
@@ -450,6 +520,12 @@ function mostrarResultadoValidacao(aprovado, mensagem, detalhe = '') {
         card.querySelector('h5').innerHTML = aprovado
             ? '<i class="fas fa-check-circle me-1"></i> Identidade validada'
             : '<i class="fas fa-times-circle me-1"></i> Falha na validação';
+    }
+    if (checks) {
+        checks.classList.toggle('is-failed', !aprovado);
+        checks.querySelectorAll('.ft-result-item i').forEach((icon) => {
+            icon.className = aprovado ? 'fas fa-check-circle' : 'fas fa-times-circle';
+        });
     }
     document.getElementById('detecaoSection').style.display = 'none';
     document.getElementById('resultadoSection').style.display = 'block';
@@ -801,8 +877,154 @@ window.onload = validarGeolocalizacao;
 </script>
 
 <style>
+    .ponto-relogio-wrap {
+        font-family: "Roboto", "Segoe UI", sans-serif;
+    }
+
     .ponto-relogio-wrap .card {
         border-radius: 20px !important;
+        border: 2px solid #417fb2 !important;
+        overflow: hidden;
+        background: #ffffff;
+        box-shadow: 0 18px 34px rgba(23, 42, 67, 0.14) !important;
+    }
+
+    .ponto-relogio-wrap .card-body {
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .ponto-relogio-wrap .ft-main-cta {
+        width: 100%;
+        max-width: 360px;
+        margin: 0 auto;
+        display: block;
+        border-radius: 10px;
+        background: #417fb2;
+        border-color: #417fb2;
+    }
+
+    .ponto-relogio-wrap .ft-intro {
+        text-align: center;
+        padding: 4px 6px 2px;
+    }
+
+    .ponto-relogio-wrap .ft-intro-logo {
+        width: auto;
+        height: 36px;
+        margin-bottom: 10px;
+    }
+
+    .ponto-relogio-wrap .ft-intro-checks {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .ponto-relogio-wrap .ft-check-pill {
+        background: #f3f6fb;
+        border: 1px solid #dce7f5;
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 0.9rem;
+        color: #1b2c45;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .ponto-relogio-wrap .ft-check-pill i {
+        color: #17a76a;
+    }
+
+    .ponto-relogio-wrap .ft-sequence-box {
+        border-radius: 14px;
+        background: #fbfdff;
+    }
+
+    .ponto-relogio-wrap .ft-sequence-list {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+
+    .ponto-relogio-wrap .ft-sequence-item {
+        display: grid;
+        grid-template-columns: 32px 1fr 24px;
+        align-items: center;
+        gap: 10px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 8px 10px;
+    }
+
+    .ponto-relogio-wrap .ft-sequence-icon {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+        opacity: 0.88;
+    }
+
+    .ponto-relogio-wrap .ft-sequence-text {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .ponto-relogio-wrap .ft-sequence-text strong {
+        font-size: 0.9rem;
+        line-height: 1.1rem;
+        color: #12263f;
+    }
+
+    .ponto-relogio-wrap .ft-sequence-text small {
+        color: #64748b;
+        font-size: 0.78rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .ponto-relogio-wrap .ft-sequence-state {
+        font-size: 1rem;
+        color: #94a3b8;
+    }
+
+    .ponto-relogio-wrap .ft-sequence-state.ok { color: #16a34a; }
+    .ponto-relogio-wrap .ft-sequence-state.warn { color: #d97706; }
+    .ponto-relogio-wrap .ft-sequence-state.err { color: #dc2626; }
+
+    .ponto-relogio-wrap .ft-result-checks {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .ponto-relogio-wrap .ft-result-item {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 10px;
+        padding: 9px 12px;
+        color: #14532d;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+    }
+
+    .ponto-relogio-wrap .ft-result-item i {
+        color: #16a34a;
+    }
+
+    .ponto-relogio-wrap .ft-result-checks.is-failed .ft-result-item {
+        background: #fff1f2;
+        border-color: #fecdd3;
+        color: #881337;
+    }
+
+    .ponto-relogio-wrap .ft-result-checks.is-failed .ft-result-item i {
+        color: #dc2626;
     }
 
     .ponto-relogio-wrap .camera-frame {
@@ -896,6 +1118,13 @@ window.onload = validarGeolocalizacao;
         from { opacity: 1; transform: translateY(0); }
         to { opacity: 0; transform: translateY(-4px); }
     }
+
+    @media (min-width: 768px) {
+        .ponto-relogio-wrap .ft-intro-checks {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
 </style>
 {% endblock %}
+
 

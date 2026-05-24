@@ -21,3 +21,6 @@ bin/
 lib/
 pyvenv.cfg
 lib64
+.tmp_facetec_sdk/
+.tmp_facetec_spagi_sdk/
+
