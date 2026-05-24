@@ -494,6 +494,95 @@ def relatorio_entradas(request):
     return render(request, 'controle_ponto/relatorio_entradas.html', context)
 
 
+@login_required
+def relatorio_mensal_rh(request):
+    if not _is_gestor(request.user):
+        messages.error(request, 'Acesso negado ao relatório mensal de RH.')
+        return redirect('/')
+
+    hoje = timezone.now().date()
+    mes = _safe_int(request.GET.get('mes'), hoje.month, min_value=1, max_value=12)
+    ano = _safe_int(request.GET.get('ano'), hoje.year, min_value=hoje.year - 5, max_value=hoje.year + 5)
+    funcionario_id = request.GET.get('funcionario')
+
+    pontos = (
+        RegistroPonto.objects.filter(data__month=mes, data__year=ano)
+        .select_related('funcionario')
+        .order_by('funcionario__user__first_name', 'data')
+    )
+    if funcionario_id:
+        pontos = pontos.filter(funcionario_id=funcionario_id)
+
+    funcionarios_list = Funcionario.objects.filter(ativo=True).order_by('user__first_name')
+
+    total_registros = pontos.count()
+    total_atrasos = pontos.filter(atraso_minutos__gt=0).count()
+    total_pendentes = pontos.filter(status_homologacao=RegistroPonto.StatusHomologacao.PENDENTE).count()
+    total_aceitos = pontos.filter(status_homologacao=RegistroPonto.StatusHomologacao.ACEITO).count()
+    total_recusados = pontos.filter(status_homologacao=RegistroPonto.StatusHomologacao.RECUSADO).count()
+    total_incompletos = pontos.filter(
+        Q(entrada__isnull=True) | Q(saida_almoco__isnull=True) | Q(retorno_almoco__isnull=True) | Q(saida__isnull=True)
+    ).count()
+
+    media_atraso = pontos.filter(atraso_minutos__gt=0).aggregate(media=Avg('atraso_minutos')).get('media') or 0
+    indice_pontualidade = 0
+    if total_registros > 0:
+        indice_pontualidade = round(((total_registros - total_atrasos) / total_registros) * 100, 1)
+
+    resumo_funcionarios = (
+        pontos.values(
+            'funcionario_id',
+            'funcionario__user__first_name',
+            'funcionario__user__last_name',
+            'funcionario__cargo',
+        )
+        .annotate(
+            total_dias=Count('id'),
+            dias_com_atraso=Count('id', filter=Q(atraso_minutos__gt=0)),
+            media_atraso=Avg('atraso_minutos', filter=Q(atraso_minutos__gt=0)),
+            pendencias=Count('id', filter=Q(status_homologacao=RegistroPonto.StatusHomologacao.PENDENTE)),
+            incompletos=Count(
+                'id',
+                filter=Q(entrada__isnull=True)
+                | Q(saida_almoco__isnull=True)
+                | Q(retorno_almoco__isnull=True)
+                | Q(saida__isnull=True),
+            ),
+        )
+        .order_by('-dias_com_atraso', 'funcionario__user__first_name')
+    )
+
+    contexto_alertas = []
+    if total_pendentes > 0:
+        contexto_alertas.append(f'{total_pendentes} ocorrência(s) aguardando homologação.')
+    if total_incompletos > 0:
+        contexto_alertas.append(f'{total_incompletos} registro(s) com batidas incompletas.')
+    if total_atrasos > 0 and media_atraso >= 15:
+        contexto_alertas.append(f'Média de atraso elevada ({media_atraso:.1f} min).')
+    if not contexto_alertas:
+        contexto_alertas.append('Sem alertas críticos no período selecionado.')
+
+    context = {
+        'mes_atual': mes,
+        'ano_atual': ano,
+        'funcionario_selecionado': int(funcionario_id) if funcionario_id else '',
+        'funcionarios': funcionarios_list,
+        'meses': range(1, 13),
+        'anos': range(hoje.year - 2, hoje.year + 2),
+        'total_registros': total_registros,
+        'total_atrasos': total_atrasos,
+        'total_pendentes': total_pendentes,
+        'total_aceitos': total_aceitos,
+        'total_recusados': total_recusados,
+        'total_incompletos': total_incompletos,
+        'media_atraso': media_atraso,
+        'indice_pontualidade': indice_pontualidade,
+        'resumo_funcionarios': resumo_funcionarios,
+        'contexto_alertas': contexto_alertas,
+    }
+    return render(request, 'controle_ponto/relatorio_mensal_rh.html', context)
+
+
 class RegistroPontoUpdateView(LoginRequiredMixin, UpdateView):
     model = RegistroPonto
     form_class = RegistroPontoForm

@@ -35,6 +35,14 @@
 
     <div class="card shadow-sm rounded-4 border-0" id="mainCard" style="display:none; {% if not foto_url %}opacity:0.5;pointer-events:none;{% endif %}">
         <div class="card-body p-4">
+            <div class="alert alert-light border text-start mb-3">
+                <div class="fw-semibold mb-2"><i class="fas fa-shield-alt text-primary me-1"></i> Validação Facial</div>
+                <div class="d-flex flex-wrap gap-2">
+                    <span id="chipPresenca" class="badge rounded-pill bg-secondary-subtle text-secondary">Presença: aguardando</span>
+                    <span id="chipLiveness" class="badge rounded-pill bg-secondary-subtle text-secondary">Liveness: aguardando</span>
+                    <span id="chipMatch" class="badge rounded-pill bg-secondary-subtle text-secondary">Face Match: aguardando</span>
+                </div>
+            </div>
 
             <p class="text-muted small mb-3">
                 IP atual: <strong>{{ ip_atual }}</strong> | <span id="distanciaText" class="text-success fw-bold"></span>
@@ -47,7 +55,10 @@
             <div id="liveCameraSection">
                 <div class="position-relative bg-dark rounded-4 overflow-hidden mb-4 shadow-sm camera-frame" style="height: 350px; border: 4px solid #f8f9fa;">
                     <video id="videoElement" autoplay playsinline style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);"></video>
-                    <div class="position-absolute top-50 start-50 translate-middle" style="width:200px;height:260px;border:3px dashed rgba(255,255,255,0.7); border-radius:50%;"></div>
+                    <div id="faceGuide" class="position-absolute top-50 start-50 translate-middle" style="width:200px;height:260px;border:3px dashed rgba(255,255,255,0.7); border-radius:50%;"></div>
+                    <div class="position-absolute top-0 start-50 translate-middle-x mt-3 px-3 py-2 rounded-3 bg-white fw-bold" id="uxHint">
+                        Enquadre seu rosto na moldura
+                    </div>
                 </div>
 
                 <div class="d-grid gap-2">
@@ -70,6 +81,10 @@
                 <div class="alert alert-primary mb-3">
                     <h5 class="fw-bold mb-0">Confirme sua Identidade</h5>
                     <small id="lblTipoBatida" class="fw-bold"></small>
+                </div>
+                <div class="alert alert-light border text-start mb-3">
+                    <div class="fw-semibold mb-1">Prova de vida rápida</div>
+                    <small id="livenessInstruction" class="text-muted">Olhe para a câmera e mantenha o rosto centralizado.</small>
                 </div>
                 <div class="rounded-4 overflow-hidden mb-4 shadow" style="height:350px;border:4px solid #0d6efd;">
                     <img id="photoPreview" style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);">
@@ -105,6 +120,8 @@ const statusDiv = document.getElementById('ai-status');
 const refImage = document.getElementById('refImage');
 let referenceDescriptor = null;
 const DISTANCE_THRESHOLD = 0.50;
+const LIVENESS_CENTER_TOLERANCE = 0.12;
+const LIVENESS_SIDE_TOLERANCE = 0.18;
 
 const temEntrada = {% if ponto.entrada %}true{% else %}false{% endif %};
 const temSaidaAlmoco = {% if ponto.saida_almoco %}true{% else %}false{% endif %};
@@ -118,6 +135,33 @@ let geoCheckedAt = 0;
 let geoAprovado = false;
 let iaInicializada = false;
 let cameraLigada = false;
+let livenessState = 'idle';
+let livenessSawLeft = false;
+let livenessSawRight = false;
+let livenessFrameCount = 0;
+let rafId = null;
+
+function setChip(id, status, label) {
+    const chip = document.getElementById(id);
+    if (!chip) return;
+    chip.innerText = label;
+    chip.className = 'badge rounded-pill ';
+    if (status === 'ok') chip.className += 'bg-success text-white';
+    else if (status === 'warn') chip.className += 'bg-warning text-dark';
+    else if (status === 'err') chip.className += 'bg-danger text-white';
+    else chip.className += 'bg-secondary-subtle text-secondary';
+}
+
+function atualizarHint(texto, tipo = 'normal') {
+    const hint = document.getElementById('uxHint');
+    if (!hint) return;
+    hint.innerText = texto;
+    hint.className = 'position-absolute top-0 start-50 translate-middle-x mt-3 px-3 py-2 rounded-3 fw-bold ';
+    if (tipo === 'ok') hint.className += 'bg-success text-white';
+    else if (tipo === 'warn') hint.className += 'bg-warning text-dark';
+    else if (tipo === 'err') hint.className += 'bg-danger text-white';
+    else hint.className += 'bg-white text-dark';
+}
 
 function tokenExpirado() {
     if (!TOKEN_ISSUED_AT) return true;
@@ -223,6 +267,7 @@ async function iniciarIA() {
                 statusDiv.className = 'alert alert-success shadow-sm';
                 statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Localização e biometria aprovadas!';
                 document.getElementById('mainCard').style.display = 'block';
+                setChip('chipMatch', 'warn', 'Face Match: referência carregada');
                 ligarCamera();
             } else {
                 statusDiv.className = 'alert alert-danger';
@@ -241,12 +286,45 @@ function ligarCamera() {
         .then(stream => {
             video.srcObject = stream;
             cameraLigada = true;
+            iniciarMonitorPresenca();
             liberarBotoes();
         })
         .catch(() => {
             statusDiv.className = 'alert alert-danger';
             statusDiv.innerHTML = 'Permita o acesso à câmera.';
         });
+}
+
+function iniciarMonitorPresenca() {
+    if (rafId) cancelAnimationFrame(rafId);
+    const loop = async () => {
+        if (!cameraLigada || !iaInicializada || video.readyState < 2) {
+            rafId = requestAnimationFrame(loop);
+            return;
+        }
+        try {
+            const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
+            if (detection) {
+                const box = detection.detection.box;
+                const faceArea = (box.width * box.height) / (video.videoWidth * video.videoHeight);
+                const cx = (box.x + box.width / 2) / video.videoWidth;
+                const cy = (box.y + box.height / 2) / video.videoHeight;
+                const centralizado = Math.abs(cx - 0.5) < 0.16 && Math.abs(cy - 0.5) < 0.20;
+                if (faceArea > 0.12 && centralizado) {
+                    setChip('chipPresenca', 'ok', 'Presença: usuário presente');
+                    atualizarHint('Rosto detectado. Pode seguir.', 'ok');
+                } else {
+                    setChip('chipPresenca', 'warn', 'Presença: ajuste enquadramento');
+                    atualizarHint('Aproxime e centralize o rosto na moldura.', 'warn');
+                }
+            } else {
+                setChip('chipPresenca', 'err', 'Presença: sem rosto detectado');
+                atualizarHint('Enquadre seu rosto na moldura', 'warn');
+            }
+        } catch (_) {}
+        rafId = requestAnimationFrame(loop);
+    };
+    rafId = requestAnimationFrame(loop);
 }
 
 function liberarBotoes() {
@@ -289,6 +367,7 @@ async function confirmarPonto() {
 
     if (!detection) {
         alert('Nenhum rosto detectado na foto!');
+        setChip('chipLiveness', 'err', 'Liveness: falhou');
         resetarBotoes(btnConfirmar, btnCancelar);
         return;
     }
@@ -298,20 +377,83 @@ async function confirmarPonto() {
     if (proporcaoRosto < 15) {
         alert(`FRAUDE DETECTADA!\nO rosto está pequeno demais (${proporcaoRosto.toFixed(1)}%).\nAproxime seu rosto da câmera.`);
         cancelarFoto();
+        setChip('chipLiveness', 'err', 'Liveness: rosto distante');
         resetarBotoes(btnConfirmar, btnCancelar);
         return;
     }
 
+    const livenessOk = await validarLivenessRapido();
+    if (!livenessOk) {
+        alert('Liveness não concluído. Siga os passos: centro, esquerda e direita.');
+        setChip('chipLiveness', 'err', 'Liveness: não concluído');
+        resetarBotoes(btnConfirmar, btnCancelar);
+        return;
+    }
+    setChip('chipLiveness', 'ok', 'Liveness: aprovado');
+
     const distance = faceapi.euclideanDistance(referenceDescriptor, detection.descriptor);
     if (distance < DISTANCE_THRESHOLD) {
+        setChip('chipMatch', 'ok', `Face Match: aprovado (${distance.toFixed(3)})`);
         btnConfirmar.innerHTML = '<i class="fas fa-check-double"></i> Aprovado!';
         btnConfirmar.className = 'btn btn-lg btn-success w-100 fw-bold';
         document.getElementById('pontoForm').submit();
     } else {
+        setChip('chipMatch', 'err', `Face Match: reprovado (${distance.toFixed(3)})`);
         alert('Acesso negado! Rosto incompatível com a foto do sistema.');
         cancelarFoto();
         resetarBotoes(btnConfirmar, btnCancelar);
     }
+}
+
+async function validarLivenessRapido() {
+    livenessState = 'center';
+    livenessSawLeft = false;
+    livenessSawRight = false;
+    livenessFrameCount = 0;
+    const instr = document.getElementById('livenessInstruction');
+    if (instr) instr.innerText = 'Passo 1/3: mantenha o rosto centralizado.';
+    atualizarHint('Validação de presença em andamento...', 'warn');
+
+    const limiteFrames = 120;
+    while (livenessFrameCount < limiteFrames) {
+        livenessFrameCount += 1;
+        const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
+        if (!det) {
+            await esperar(80);
+            continue;
+        }
+        const nose = det.landmarks.getNose();
+        const avgNoseX = nose.reduce((s, p) => s + p.x, 0) / nose.length;
+        const xNorm = (avgNoseX / video.videoWidth) - 0.5;
+
+        if (livenessState === 'center') {
+            if (Math.abs(xNorm) < LIVENESS_CENTER_TOLERANCE) {
+                livenessState = 'left';
+                if (instr) instr.innerText = 'Passo 2/3: vire levemente para sua esquerda.';
+            }
+        } else if (livenessState === 'left') {
+            if (xNorm < -LIVENESS_SIDE_TOLERANCE) {
+                livenessSawLeft = true;
+                livenessState = 'right';
+                if (instr) instr.innerText = 'Passo 3/3: agora vire levemente para sua direita.';
+            }
+        } else if (livenessState === 'right') {
+            if (xNorm > LIVENESS_SIDE_TOLERANCE) {
+                livenessSawRight = true;
+                atualizarHint('Liveness aprovado!', 'ok');
+                if (instr) instr.innerText = 'Prova de vida concluída com sucesso.';
+                return true;
+            }
+        }
+        await esperar(80);
+    }
+    if (instr) instr.innerText = 'Não foi possível concluir. Tente novamente com boa iluminação.';
+    atualizarHint('Liveness não concluído', 'err');
+    return livenessSawLeft && livenessSawRight;
+}
+
+function esperar(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function cancelarFoto() {

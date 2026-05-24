@@ -1,0 +1,184 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container-fluid py-4 ponto-page">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="fas fa-users text-primary me-2"></i>Relatório Mensal de Ponto (RH)</h3>
+            <small class="text-muted">Análise gerencial de assiduidade, atrasos e pendências de homologação.</small>
+        </div>
+        <div class="d-flex flex-wrap gap-2 d-print-none">
+            <a href="{% url 'controle_ponto:relatorio_mensal' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Espelho
+            </a>
+            <button type="button" onclick="window.print()" class="btn btn-secondary">
+                <i class="fas fa-print me-1"></i>Imprimir
+            </button>
+        </div>
+    </div>
+
+    <div class="card border-0 mb-4 d-print-none">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small text-muted">Funcionário</label>
+                    <select name="funcionario" class="form-select">
+                        <option value="">Todos os colaboradores</option>
+                        {% for f in funcionarios %}
+                        <option value="{{ f.id }}" {% if funcionario_selecionado == f.id %}selected{% endif %}>{{ f.nome_completo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold small text-muted">Mês</label>
+                    <select name="mes" class="form-select">
+                        {% for m in meses %}
+                        <option value="{{ m }}" {% if mes_atual == m %}selected{% endif %}>{{ m|stringformat:"02d" }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold small text-muted">Ano</label>
+                    <select name="ano" class="form-select">
+                        {% for a in anos %}
+                        <option value="{{ a }}" {% if ano_atual == a %}selected{% endif %}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-search me-1"></i>Filtrar</button>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <a href="{% url 'controle_ponto:relatorio_mensal_rh' %}" class="btn btn-outline-secondary">Limpar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card h-100 border-0">
+                <div class="card-body">
+                    <small class="text-muted d-block">Registros</small>
+                    <div class="display-6 fw-bold">{{ total_registros }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card h-100 border-0">
+                <div class="card-body">
+                    <small class="text-muted d-block">Pontualidade</small>
+                    <div class="display-6 fw-bold text-success">{{ indice_pontualidade }}%</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card h-100 border-0">
+                <div class="card-body">
+                    <small class="text-muted d-block">Atrasos</small>
+                    <div class="display-6 fw-bold text-warning">{{ total_atrasos }}</div>
+                    <small class="text-muted">Média: {{ media_atraso|floatformat:1 }} min</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card h-100 border-0">
+                <div class="card-body">
+                    <small class="text-muted d-block">Incompletos</small>
+                    <div class="display-6 fw-bold text-danger">{{ total_incompletos }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 mb-4">
+        <div class="card-body">
+            <h5 class="fw-bold mb-3"><i class="fas fa-clipboard-check me-2 text-info"></i>Pontos importantes para análise do RH</h5>
+            <ul class="mb-0">
+                <li>Ocorrências pendentes de homologação: <strong>{{ total_pendentes }}</strong></li>
+                <li>Ocorrências aceitas/recusadas: <strong>{{ total_aceitos }}</strong> aceitas e <strong>{{ total_recusados }}</strong> recusadas</li>
+                <li>Registros com possível inconsistência de jornada (batidas faltantes): <strong>{{ total_incompletos }}</strong></li>
+                {% for alerta in contexto_alertas %}
+                <li>{{ alerta }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <div class="card border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Colaborador</th>
+                            <th>Cargo</th>
+                            <th>Dias com ponto</th>
+                            <th>Dias com atraso</th>
+                            <th>Média atraso</th>
+                            <th>Pendências</th>
+                            <th>Incompletos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in resumo_funcionarios %}
+                        <tr>
+                            <td class="fw-semibold">{{ r.funcionario__user__first_name }} {{ r.funcionario__user__last_name }}</td>
+                            <td>{{ r.funcionario__cargo|default:"-" }}</td>
+                            <td>{{ r.total_dias }}</td>
+                            <td><span class="m3-badge m3-badge-warning">{{ r.dias_com_atraso }}</span></td>
+                            <td>{{ r.media_atraso|default:0|floatformat:1 }} min</td>
+                            <td><span class="m3-badge m3-badge-danger">{{ r.pendencias }}</span></td>
+                            <td><span class="m3-badge m3-badge-neutral">{{ r.incompletos }}</span></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">Sem registros para os filtros selecionados.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .ponto-page .card {
+        border-radius: 16px !important;
+    }
+
+    @page {
+        size: A4 portrait;
+        margin: 10mm;
+    }
+
+    @media print {
+        .d-print-none,
+        header,
+        nav,
+        #sidebar {
+            display: none !important;
+        }
+
+        body {
+            background: #fff !important;
+            font-size: 11px;
+        }
+
+        #content-wrapper {
+            width: 100% !important;
+            margin-left: 0 !important;
+        }
+
+        .container-fluid {
+            padding: 0 !important;
+        }
+
+        .card {
+            box-shadow: none !important;
+            border: 1px solid #dcdcdc !important;
+        }
+    }
+</style>
+{% endblock %}
