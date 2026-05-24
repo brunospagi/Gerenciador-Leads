@@ -1,12 +1,15 @@
-﻿{% extends 'base_portal.html' %}
+{% extends 'base_portal.html' %}
+{% load static %}
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+<script src="{% static 'vendor/facetec/FaceTecSDK.js/FaceTecSDK.js' %}"></script>
 
 <script>
     const LOJA_LATITUDE = {{ config.latitude_loja|safe|default:"0" }};
     const LOJA_LONGITUDE = {{ config.longitude_loja|safe|default:"0" }};
     const RAIO_PERMITIDO_METROS = {{ config.raio_permitido|safe|default:"100" }};
+    const FACETEC_CFG = JSON.parse('{{ facetec_cfg_json|default:"{}"|escapejs }}');
 </script>
 
 <div class="container mt-4 mb-5 text-center ponto-relogio-wrap" style="max-width: 760px;">
@@ -241,6 +244,8 @@ let livenessSawLeft = false;
 let livenessSawRight = false;
 let livenessFrameCount = 0;
 let rafId = null;
+let faceTecReady = false;
+let faceTecInitTried = false;
 
 function setChip(id, status, label) {
     const chip = document.getElementById(id);
@@ -337,6 +342,45 @@ function resetSteps() {
     setStep(3, 'idle');
     setStep(4, 'idle');
     setProgress(0);
+}
+
+function isFaceTecEnabled() {
+    return !!(FACETEC_CFG && FACETEC_CFG.enabled);
+}
+
+async function initFaceTecIfNeeded() {
+    if (!isFaceTecEnabled()) return false;
+    if (faceTecReady) return true;
+    if (faceTecInitTried) return false;
+    faceTecInitTried = true;
+    try {
+        if (!window.FaceTecSDK) throw new Error('FaceTecSDK indisponível');
+        FaceTecSDK.setResourceDirectory("{% static 'vendor/facetec/FaceTecSDK.js/resources' %}");
+        FaceTecSDK.setImagesDirectory("{% static 'vendor/facetec/FaceTec_images' %}");
+        const ok = await new Promise((resolve) => {
+            const callback = (initializedSuccessfully) => resolve(!!initializedSuccessfully);
+            if (FACETEC_CFG.modo_producao && FACETEC_CFG.production_key) {
+                FaceTecSDK.initializeInProductionMode(
+                    FACETEC_CFG.production_key,
+                    FACETEC_CFG.device_key_identifier,
+                    FACETEC_CFG.public_face_scan_encryption_key,
+                    callback
+                );
+            } else {
+                FaceTecSDK.initializeInDevelopmentMode(
+                    FACETEC_CFG.device_key_identifier,
+                    FACETEC_CFG.public_face_scan_encryption_key,
+                    callback
+                );
+            }
+        });
+        faceTecReady = ok;
+        return ok;
+    } catch (e) {
+        console.error('Erro ao inicializar FaceTec:', e);
+        faceTecReady = false;
+        return false;
+    }
 }
 
 function tokenExpirado() {
@@ -446,6 +490,15 @@ async function iniciarIA() {
                 setChip('chipMatch', 'warn', 'Face Match: referência carregada');
                 setStep(4, 'active');
                 setProgress(20);
+                if (isFaceTecEnabled()) {
+                    initFaceTecIfNeeded().then((ok) => {
+                        if (ok) {
+                            setChip('chipLiveness', 'warn', 'Liveness: FaceTec pronto');
+                        } else {
+                            setChip('chipLiveness', 'warn', 'Liveness: fallback local');
+                        }
+                    });
+                }
                 if (fluxoFacialIniciado) ligarCamera();
             } else {
                 statusDiv.className = 'alert alert-danger';
@@ -562,7 +615,7 @@ async function validarIdentidadeInicial() {
         setProgress(8);
         atualizarHint('Detectando rosto...', 'warn');
 
-        const detection = await faceapi
+        let detection = await faceapi
             .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
             .withFaceLandmarks()
             .withFaceDescriptor();
@@ -598,7 +651,20 @@ async function validarIdentidadeInicial() {
         atualizarHint('Presença validada. Iniciando prova de vida...', 'ok');
 
         setStep(3, 'active');
-        const livenessOk = await validarLivenessRapido();
+        let livenessOk = false;
+        let facetecSessionResult = null;
+        if (isFaceTecEnabled()) {
+            atualizarHint('Iniciando validação FaceTec...', 'warn');
+            const ftResult = await runFaceTecLiveness();
+            livenessOk = !!(ftResult && ftResult.ok);
+            facetecSessionResult = ftResult ? ftResult.sessionResult : null;
+            if (livenessOk && !cameraLigada) {
+                ligarCamera();
+                await esperar(450);
+            }
+        } else {
+            livenessOk = await validarLivenessRapido();
+        }
         if (!livenessOk) {
             identidadeValidada = false;
             setChip('chipLiveness', 'err', 'Liveness: não concluído');
@@ -614,6 +680,19 @@ async function validarIdentidadeInicial() {
 
         setStep(4, 'active');
         atualizarHint('Comparando com foto do cadastro...', 'warn');
+        if (isFaceTecEnabled() && facetecSessionResult) {
+            const facetecDetection = await getDescriptorFromFaceTecSession(facetecSessionResult);
+            if (facetecDetection) {
+                detection = facetecDetection;
+            } else {
+                identidadeValidada = false;
+                setChip('chipMatch', 'err', 'Face Match: audit trail inválido');
+                setStep(4, 'err');
+                setProgress(72);
+                mostrarResultadoValidacao(false, 'Não foi possível validar a similaridade facial.', 'Audit trail do FaceTec sem rosto utilizável para comparação.');
+                return;
+            }
+        }
         const distance = faceapi.euclideanDistance(referenceDescriptor, detection.descriptor);
         const feedback = await validarFeedbackBackend(distance);
         if (!feedback.approved) {
@@ -641,9 +720,15 @@ async function validarIdentidadeInicial() {
         );
     } catch (error) {
         identidadeValidada = false;
-        setChip('chipMatch', 'err', 'Face Match: erro técnico');
-        setStep(4, 'err');
-        mostrarResultadoValidacao(false, 'Erro técnico durante validação.', (error && error.message) ? error.message : 'Tente novamente.');
+        const msgErro = (error && error.message) ? String(error.message) : 'Tente novamente.';
+        if (msgErro.toLowerCase().includes('liveness') || msgErro.toLowerCase().includes('facetec')) {
+            setChip('chipLiveness', 'err', 'Liveness: erro técnico');
+            setStep(3, 'err');
+        } else {
+            setChip('chipMatch', 'err', 'Face Match: erro técnico');
+            setStep(4, 'err');
+        }
+        mostrarResultadoValidacao(false, 'Erro técnico durante validação.', msgErro);
     } finally {
         if (btn) {
             btn.disabled = false;
@@ -736,6 +821,111 @@ async function confirmarPonto() {
     btnConfirmar.disabled = true;
     btnCancelar.disabled = true;
     document.getElementById('pontoForm').submit();
+}
+
+async function getFaceTecSessionToken() {
+    const resp = await fetch("{% url 'controle_ponto:facetec_session_token_proxy' %}", {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCsrfToken(),
+            'X-User-Agent': (window.FaceTecSDK && FaceTecSDK.createFaceTecAPIUserAgentString)
+                ? FaceTecSDK.createFaceTecAPIUserAgentString('')
+                : navigator.userAgent,
+        },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.sessionToken) {
+        throw new Error(data.message || 'Não foi possível obter sessão FaceTec.');
+    }
+    return data.sessionToken;
+}
+
+async function runFaceTecLiveness() {
+    const initialized = await initFaceTecIfNeeded();
+    if (!initialized) {
+        throw new Error('FaceTec não inicializado. Verifique configuração no admin.');
+    }
+    const sessionToken = await getFaceTecSessionToken();
+    return new Promise((resolve, reject) => {
+        let done = false;
+        const resolveOnce = (value) => { if (!done) { done = true; resolve(value); } };
+        const rejectOnce = (err) => { if (!done) { done = true; reject(err); } };
+
+        const processor = {
+            latestSessionResult: null,
+            processSessionResultWhileFaceTecSDKWaits: async function (sessionResult, faceScanResultCallback) {
+                this.latestSessionResult = sessionResult;
+                if (sessionResult.status !== FaceTecSDK.FaceTecSessionStatus.SessionCompletedSuccessfully) {
+                    faceScanResultCallback.cancel();
+                    return;
+                }
+                const payload = {
+                    faceScan: sessionResult.faceScan,
+                    auditTrailImage: sessionResult.auditTrail && sessionResult.auditTrail[0] ? sessionResult.auditTrail[0] : '',
+                    lowQualityAuditTrailImage: sessionResult.lowQualityAuditTrail && sessionResult.lowQualityAuditTrail[0] ? sessionResult.lowQualityAuditTrail[0] : '',
+                    sessionId: sessionResult.sessionId,
+                };
+                try {
+                    const resp = await fetch("{% url 'controle_ponto:facetec_liveness_proxy' %}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCsrfToken(),
+                            'X-User-Agent': FaceTecSDK.createFaceTecAPIUserAgentString(sessionResult.sessionId || ''),
+                        },
+                        body: JSON.stringify(payload),
+                    });
+                    const data = await resp.json().catch(() => ({}));
+                    if (resp.ok && data && data.wasProcessed === true && data.error === false && data.scanResultBlob) {
+                        faceScanResultCallback.proceedToNextStep(data.scanResultBlob);
+                        return;
+                    }
+                    faceScanResultCallback.cancel();
+                } catch (_e) {
+                    faceScanResultCallback.cancel();
+                }
+            },
+            onFaceTecSDKCompletelyDone: function () {
+                const success = !!(this.latestSessionResult && this.latestSessionResult.isCompletelyDone);
+                if (success) resolveOnce({ ok: true, sessionResult: this.latestSessionResult });
+                else rejectOnce(new Error('Liveness FaceTec não concluído.'));
+            },
+        };
+
+        try {
+            new FaceTecSDK.FaceTecSession(processor, sessionToken);
+        } catch (e) {
+            rejectOnce(e);
+        }
+    });
+}
+
+async function getDescriptorFromImageSource(src) {
+    if (!src) return null;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const loaded = await new Promise((resolve) => {
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = src;
+    });
+    if (!loaded) return null;
+    const det = await faceapi
+        .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+    return det || null;
+}
+
+async function getDescriptorFromFaceTecSession(sessionResult) {
+    try {
+        const audit = sessionResult && sessionResult.auditTrail && sessionResult.auditTrail[0] ? sessionResult.auditTrail[0] : '';
+        if (!audit) return null;
+        const src = audit.startsWith('data:') ? audit : `data:image/jpeg;base64,${audit}`;
+        return await getDescriptorFromImageSource(src);
+    } catch (_e) {
+        return null;
+    }
 }
 
 async function validarLivenessRapido() {

@@ -1,10 +1,10 @@
-from django.db import models
+﻿from django.db import models
 from django.contrib.auth.models import User
 from funcionarios.models import Funcionario
 
 
 class ConfiguracaoPonto(models.Model):
-    """Tabela de configuração única para as regras do Ponto Eletrônico."""
+    """Tabela de configuraÃ§Ã£o Ãºnica para as regras do Ponto EletrÃ´nico."""
     ip_permitido = models.CharField(
         max_length=50,
         default='*',
@@ -16,17 +16,41 @@ class ConfiguracaoPonto(models.Model):
     raio_permitido = models.IntegerField(
         default=100,
         verbose_name="Raio Permitido (em metros)",
-        help_text="Distância máxima que o funcionário pode estar da loja para bater o ponto.",
+        help_text="DistÃ¢ncia mÃ¡xima que o funcionÃ¡rio pode estar da loja para bater o ponto.",
     )
-    horario_escala_entrada = models.TimeField(default='08:00', verbose_name="Horário Escala de Entrada")
-    tolerancia_atraso_minutos = models.PositiveIntegerField(default=5, verbose_name="Tolerância de Atraso (min)")
-
+    horario_escala_entrada = models.TimeField(default='08:00', verbose_name="HorÃ¡rio Escala de Entrada")
+    tolerancia_atraso_minutos = models.PositiveIntegerField(default=5, verbose_name="TolerÃ¢ncia de Atraso (min)")
+    facetec_habilitado = models.BooleanField(default=False, verbose_name="Habilitar validação FaceTec")
+    facetec_base_url = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name="FaceTec Base URL",
+        help_text="Ex.: https://api.facetec.com/api/v3.1/biometrics",
+    )
+    facetec_device_key_identifier = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name="FaceTec Device Key Identifier",
+    )
+    facetec_public_face_scan_encryption_key = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="FaceTec Public FaceScan Encryption Key",
+    )
+    facetec_production_key = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="FaceTec Production Key (opcional)",
+    )
+    facetec_modo_producao = models.BooleanField(default=False, verbose_name="FaceTec em modo produção")
     class Meta:
-        verbose_name = "Configuração do Ponto"
-        verbose_name_plural = "Configurações do Ponto"
+        verbose_name = "ConfiguraÃ§Ã£o do Ponto"
+        verbose_name_plural = "ConfiguraÃ§Ãµes do Ponto"
 
     def save(self, *args, **kwargs):
-        # Garante que só existe 1 linha nesta tabela (ID = 1)
+        # Garante que sÃ³ existe 1 linha nesta tabela (ID = 1)
         self.pk = 1
         super().save(*args, **kwargs)
 
@@ -36,13 +60,13 @@ class ConfiguracaoPonto(models.Model):
         return obj
 
     def __str__(self):
-        return "Regras de Segurança de Ponto"
+        return "Regras de SeguranÃ§a de Ponto"
 
 
 class RegistroPonto(models.Model):
     class StatusHomologacao(models.TextChoices):
-        NAO_APLICA = 'NAO_APLICA', 'Não se aplica'
-        PENDENTE = 'PENDENTE', 'Pendente de Homologação'
+        NAO_APLICA = 'NAO_APLICA', 'NÃ£o se aplica'
+        PENDENTE = 'PENDENTE', 'Pendente de HomologaÃ§Ã£o'
         ACEITO = 'ACEITO', 'Aceito'
         RECUSADO = 'RECUSADO', 'Recusado'
 
@@ -52,30 +76,30 @@ class RegistroPonto(models.Model):
     entrada = models.TimeField(null=True, blank=True, verbose_name="Entrada")
     foto_entrada = models.TextField(null=True, blank=True, verbose_name="Foto Entrada (Base64)")
 
-    saida_almoco = models.TimeField(null=True, blank=True, verbose_name="Saída Almoço")
-    foto_saida_almoco = models.TextField(null=True, blank=True, verbose_name="Foto Saída Almoço")
+    saida_almoco = models.TimeField(null=True, blank=True, verbose_name="SaÃ­da AlmoÃ§o")
+    foto_saida_almoco = models.TextField(null=True, blank=True, verbose_name="Foto SaÃ­da AlmoÃ§o")
 
-    retorno_almoco = models.TimeField(null=True, blank=True, verbose_name="Retorno Almoço")
-    foto_retorno_almoco = models.TextField(null=True, blank=True, verbose_name="Foto Retorno Almoço")
+    retorno_almoco = models.TimeField(null=True, blank=True, verbose_name="Retorno AlmoÃ§o")
+    foto_retorno_almoco = models.TextField(null=True, blank=True, verbose_name="Foto Retorno AlmoÃ§o")
 
-    saida = models.TimeField(null=True, blank=True, verbose_name="Saída")
-    foto_saida = models.TextField(null=True, blank=True, verbose_name="Foto Saída")
+    saida = models.TimeField(null=True, blank=True, verbose_name="SaÃ­da")
+    foto_saida = models.TextField(null=True, blank=True, verbose_name="Foto SaÃ­da")
 
-    # Dados de segurança e localização
-    ip_registrado = models.GenericIPAddressField(null=True, blank=True, verbose_name="IP da Máquina")
+    # Dados de seguranÃ§a e localizaÃ§Ã£o
+    ip_registrado = models.GenericIPAddressField(null=True, blank=True, verbose_name="IP da MÃ¡quina")
     latitude = models.CharField(max_length=50, null=True, blank=True, verbose_name="Latitude")
     longitude = models.CharField(max_length=50, null=True, blank=True, verbose_name="Longitude")
 
-    # Regras e ocorrências de entrada
+    # Regras e ocorrÃªncias de entrada
     horario_escala_entrada = models.TimeField(null=True, blank=True, verbose_name="Escala de Entrada (dia)")
-    tolerancia_entrada_minutos = models.PositiveIntegerField(default=5, verbose_name="Tolerância aplicada (min)")
+    tolerancia_entrada_minutos = models.PositiveIntegerField(default=5, verbose_name="TolerÃ¢ncia aplicada (min)")
     atraso_minutos = models.PositiveIntegerField(default=0, verbose_name="Atraso na Entrada (min)")
     justificativa_atraso = models.TextField(blank=True, null=True, verbose_name="Justificativa do Atraso")
     status_homologacao = models.CharField(
         max_length=12,
         choices=StatusHomologacao.choices,
         default=StatusHomologacao.NAO_APLICA,
-        verbose_name="Status da Homologação",
+        verbose_name="Status da HomologaÃ§Ã£o",
     )
     homologado_por = models.ForeignKey(
         User,
@@ -85,8 +109,8 @@ class RegistroPonto(models.Model):
         related_name='homologacoes_ponto',
         verbose_name="Homologado por",
     )
-    homologado_em = models.DateTimeField(null=True, blank=True, verbose_name="Data da Homologação")
-    observacao_homologacao = models.TextField(blank=True, null=True, verbose_name="Observação da Homologação")
+    homologado_em = models.DateTimeField(null=True, blank=True, verbose_name="Data da HomologaÃ§Ã£o")
+    observacao_homologacao = models.TextField(blank=True, null=True, verbose_name="ObservaÃ§Ã£o da HomologaÃ§Ã£o")
 
     class Meta:
         verbose_name = "Registro de Ponto"
@@ -95,3 +119,4 @@ class RegistroPonto(models.Model):
 
     def __str__(self):
         return f"Ponto: {self.funcionario.nome_completo} - {self.data.strftime('%d/%m/%Y')}"
+

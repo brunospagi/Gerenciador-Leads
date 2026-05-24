@@ -49,6 +49,40 @@ def _safe_bool(value, default=False):
     return str(value).strip().lower() in {'1', 'true', 't', 'yes', 'y', 'on'}
 
 
+def _facetec_config_payload(config):
+    base_url = (
+        (getattr(config, 'facetec_base_url', '') or '')
+        or getattr(settings, 'FACETEC_BASE_URL', '')
+    ).strip().rstrip('/')
+    device_key = (
+        (getattr(config, 'facetec_device_key_identifier', '') or '')
+        or getattr(settings, 'FACETEC_DEVICE_KEY_IDENTIFIER', '')
+    ).strip()
+    public_key = (
+        (getattr(config, 'facetec_public_face_scan_encryption_key', '') or '')
+        or getattr(settings, 'FACETEC_PUBLIC_FACE_SCAN_ENCRYPTION_KEY', '')
+    ).strip()
+    production_key = (
+        (getattr(config, 'facetec_production_key', '') or '')
+        or getattr(settings, 'FACETEC_PRODUCTION_KEY', '')
+    ).strip()
+    mode_prod = bool(getattr(config, 'facetec_modo_producao', False) or getattr(settings, 'FACETEC_MODO_PRODUCAO', False))
+    enabled = bool(
+        getattr(config, 'facetec_habilitado', False)
+        and base_url
+        and device_key
+        and public_key
+    )
+    return {
+        'enabled': enabled,
+        'base_url': base_url,
+        'device_key_identifier': device_key,
+        'public_face_scan_encryption_key': public_key,
+        'production_key': production_key,
+        'modo_producao': mode_prod,
+    }
+
+
 def obter_ip_cliente(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
@@ -277,6 +311,7 @@ def relogio_ponto(request):
         return redirect('controle_ponto:relogio')
 
     foto_url = funcionario.foto_biometria.url if funcionario.foto_biometria else None
+    facetec_cfg = _facetec_config_payload(config)
     ponto_token = secrets.token_urlsafe(24)
     request.session['ponto_token'] = ponto_token
     request.session['ponto_token_issued_at'] = int(timezone.now().timestamp())
@@ -291,6 +326,7 @@ def relogio_ponto(request):
             'ponto_token': ponto_token,
             'ponto_token_ttl_seconds': TOKEN_PONTO_TTL_SECONDS,
             'ponto_token_issued_at': request.session.get('ponto_token_issued_at'),
+            'facetec_cfg_json': json.dumps(facetec_cfg),
         },
     )
 
@@ -712,4 +748,61 @@ def validar_face_feedback(request):
         },
         status=200,
     )
+
+
+@login_required
+def facetec_session_token_proxy(request):
+    if request.method != 'GET':
+        return JsonResponse({'ok': False, 'message': 'Método não permitido.'}, status=405)
+    config = ConfiguracaoPonto.load()
+    cfg = _facetec_config_payload(config)
+    if not cfg['enabled']:
+        return JsonResponse({'ok': False, 'message': 'FaceTec desabilitado ou incompleto.'}, status=400)
+    try:
+        headers = {
+            'X-Device-Key': cfg['device_key_identifier'],
+            'X-User-Agent': request.headers.get('X-User-Agent', ''),
+        }
+        resp = requests.get(f"{cfg['base_url']}/session-token", headers=headers, timeout=20)
+        data = resp.json() if resp.content else {}
+    except Exception:
+        logger.exception('Falha ao obter session-token do FaceTec.')
+        return JsonResponse({'ok': False, 'message': 'Erro ao obter session token.'}, status=502)
+    if resp.status_code >= 400:
+        return JsonResponse({'ok': False, 'message': data.get('error') or 'Erro FaceTec session-token.'}, status=resp.status_code)
+    if not isinstance(data, dict) or not data.get('sessionToken'):
+        return JsonResponse({'ok': False, 'message': 'Resposta inválida do FaceTec session-token.'}, status=502)
+    return JsonResponse({'ok': True, 'sessionToken': data.get('sessionToken')})
+
+
+@login_required
+@require_POST
+def facetec_liveness_proxy(request):
+    config = ConfiguracaoPonto.load()
+    cfg = _facetec_config_payload(config)
+    if not cfg['enabled']:
+        return JsonResponse({'ok': False, 'message': 'FaceTec desabilitado ou incompleto.'}, status=400)
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        payload = {}
+    try:
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Device-Key': cfg['device_key_identifier'],
+            'X-User-Agent': request.headers.get('X-User-Agent', ''),
+        }
+        resp = requests.post(
+            f"{cfg['base_url']}/liveness-3d",
+            headers=headers,
+            json=payload,
+            timeout=40,
+        )
+        data = resp.json() if resp.content else {}
+    except Exception:
+        logger.exception('Falha ao enviar liveness-3d ao FaceTec.')
+        return JsonResponse({'ok': False, 'message': 'Erro ao validar liveness no FaceTec.'}, status=502)
+    if not isinstance(data, dict):
+        data = {'ok': False, 'message': 'Resposta inválida do FaceTec liveness.'}
+    return JsonResponse(data, status=resp.status_code)
 

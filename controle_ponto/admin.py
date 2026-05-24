@@ -9,6 +9,7 @@ class ConfiguracaoPontoAdmin(admin.ModelAdmin):
         'raio_permitido',
         'horario_escala_entrada',
         'tolerancia_atraso_minutos',
+        'facetec_habilitado',
         'latitude_loja',
         'longitude_loja',
     )
@@ -34,6 +35,16 @@ class ConfiguracaoPontoAdmin(admin.ModelAdmin):
             'fields': (
                 'horario_escala_entrada',
                 'tolerancia_atraso_minutos',
+            )
+        }),
+        ('FaceTec SDK', {
+            'fields': (
+                'facetec_habilitado',
+                'facetec_modo_producao',
+                'facetec_base_url',
+                'facetec_device_key_identifier',
+                'facetec_public_face_scan_encryption_key',
+                'facetec_production_key',
             )
         }),
     )
