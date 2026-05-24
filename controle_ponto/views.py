@@ -26,6 +26,7 @@ from .models import ConfiguracaoPonto, RegistroPonto
 
 TOKEN_PONTO_TTL_SECONDS = 120
 GEO_CHECK_TTL_SECONDS = 120
+BIOMETRIA_CHALLENGE_TTL_SECONDS = 120
 logger = logging.getLogger(__name__)
 
 
@@ -47,6 +48,49 @@ def _safe_bool(value, default=False):
     if value is None:
         return default
     return str(value).strip().lower() in {'1', 'true', 't', 'yes', 'y', 'on'}
+
+
+def _avaliar_feedback_biometrico(distance, face_present, liveness_ok, geo_ok, token_ok):
+    threshold = float(getattr(settings, 'FACE_MATCH_THRESHOLD', 0.50))
+    try:
+        distance_value = float(distance)
+    except (TypeError, ValueError):
+        return {
+            'ok': True,
+            'approved': False,
+            'message': 'Score facial inválido. Tente novamente.',
+            'distance': None,
+            'threshold': threshold,
+        }
+
+    reasons = []
+    if not token_ok:
+        reasons.append('Sessão de segurança expirada')
+    if not geo_ok:
+        reasons.append('Localização não validada')
+    if not face_present:
+        reasons.append('Rosto não detectado')
+    if not liveness_ok:
+        reasons.append('Prova de vida não concluída')
+    if distance_value >= threshold:
+        reasons.append('Rosto divergente da foto de cadastro')
+
+    if reasons:
+        return {
+            'ok': True,
+            'approved': False,
+            'distance': round(distance_value, 4),
+            'threshold': threshold,
+            'message': '; '.join(reasons),
+        }
+
+    return {
+        'ok': True,
+        'approved': True,
+        'distance': round(distance_value, 4),
+        'threshold': threshold,
+        'message': 'Identidade validada com sucesso.',
+    }
 
 
 def _facetec_config_payload(config):
@@ -705,49 +749,87 @@ def validar_face_feedback(request):
     geo_ok = _safe_bool(payload.get('geo_ok'), default=False)
     token_ok = _safe_bool(payload.get('token_ok'), default=False)
 
-    threshold = float(getattr(settings, 'FACE_MATCH_THRESHOLD', 0.50))
-    try:
-        distance_value = float(distance)
-    except (TypeError, ValueError):
-        return JsonResponse(
-            {'ok': True, 'approved': False, 'message': 'Score facial inválido. Tente novamente.'},
-            status=200,
-        )
+    resultado = _avaliar_feedback_biometrico(
+        distance=distance,
+        face_present=face_present,
+        liveness_ok=liveness_ok,
+        geo_ok=geo_ok,
+        token_ok=token_ok,
+    )
+    return JsonResponse(resultado, status=200)
 
-    reasons = []
-    if not token_ok:
-        reasons.append('Sessão de segurança expirada')
-    if not geo_ok:
-        reasons.append('Localização não validada')
-    if not face_present:
-        reasons.append('Rosto não detectado')
-    if not liveness_ok:
-        reasons.append('Prova de vida não concluída')
-    if distance_value >= threshold:
-        reasons.append('Rosto divergente da foto de cadastro')
 
-    if reasons:
-        return JsonResponse(
-            {
-                'ok': True,
-                'approved': False,
-                'distance': round(distance_value, 4),
-                'threshold': threshold,
-                'message': '; '.join(reasons),
-            },
-            status=200,
-        )
-
+@login_required
+def biometria_open_source_challenge(request):
+    if request.method != 'GET':
+        return JsonResponse({'ok': False, 'message': 'Método não permitido.'}, status=405)
+    challenge_token = secrets.token_urlsafe(20)
+    issued_at = int(timezone.now().timestamp())
+    request.session['biometria_challenge_token'] = challenge_token
+    request.session['biometria_challenge_issued_at'] = issued_at
     return JsonResponse(
         {
             'ok': True,
-            'approved': True,
-            'distance': round(distance_value, 4),
-            'threshold': threshold,
-            'message': 'Identidade validada com sucesso.',
+            'challenge_token': challenge_token,
+            'ttl_seconds': BIOMETRIA_CHALLENGE_TTL_SECONDS,
+            'challenge_steps': ['center', 'left', 'right'],
         },
         status=200,
     )
+
+
+@login_required
+@require_POST
+def biometria_open_source_validar(request):
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        payload = {}
+
+    token = (payload.get('challenge_token') or '').strip()
+    token_sessao = (request.session.get('biometria_challenge_token') or '').strip()
+    issued_at = request.session.get('biometria_challenge_issued_at')
+    agora_epoch = int(timezone.now().timestamp())
+    expirado = True
+    if issued_at:
+        try:
+            expirado = (agora_epoch - int(issued_at)) > BIOMETRIA_CHALLENGE_TTL_SECONDS
+        except Exception:
+            expirado = True
+
+    liveness_steps_ok = _safe_bool(payload.get('liveness_steps_ok'), default=False)
+    distance = payload.get('distance')
+    face_present = _safe_bool(payload.get('face_present'), default=False)
+    geo_ok = _safe_bool(payload.get('geo_ok'), default=False)
+    selfie_capture_base64 = (payload.get('selfie_capture_base64') or '').strip()
+    token_ok = _safe_bool(payload.get('token_ok'), default=False) and (token and token == token_sessao and not expirado)
+
+    selfie_ok = False
+    if selfie_capture_base64.startswith('data:image/') and ';base64,' in selfie_capture_base64:
+        try:
+            _, encoded = selfie_capture_base64.split(';base64,', 1)
+            decoded = base64.b64decode(encoded, validate=True)
+            selfie_ok = len(decoded) > 2048
+        except Exception:
+            selfie_ok = False
+
+    resultado = _avaliar_feedback_biometrico(
+        distance=distance,
+        face_present=face_present,
+        liveness_ok=liveness_steps_ok,
+        geo_ok=geo_ok,
+        token_ok=token_ok,
+    )
+    if not selfie_ok:
+        resultado['approved'] = False
+        msg = resultado.get('message') or ''
+        extra = 'Selfie inválida ou ausente.'
+        resultado['message'] = f'{msg}; {extra}'.strip('; ')
+    if not token_ok:
+        msg = resultado.get('message', '')
+        if 'Challenge' not in msg:
+            resultado['message'] = f"{msg}; Challenge biométrico expirado ou inválido.".strip('; ')
+    return JsonResponse(resultado, status=200)
 
 
 @login_required

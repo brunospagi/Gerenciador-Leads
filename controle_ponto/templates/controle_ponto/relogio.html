@@ -1,38 +1,36 @@
-{% extends 'base_portal.html' %}
+﻿{% extends 'base_portal.html' %}
 {% load static %}
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
-<script src="{% static 'vendor/facetec/FaceTecSDK.js/FaceTecSDK.js' %}"></script>
 
 <script>
     const LOJA_LATITUDE = {{ config.latitude_loja|safe|default:"0" }};
     const LOJA_LONGITUDE = {{ config.longitude_loja|safe|default:"0" }};
     const RAIO_PERMITIDO_METROS = {{ config.raio_permitido|safe|default:"100" }};
-    const FACETEC_CFG = JSON.parse('{{ facetec_cfg_json|default:"{}"|escapejs }}');
 </script>
 
 <div class="container mt-4 mb-5 text-center ponto-relogio-wrap" style="max-width: 760px;">
     <h3 class="fw-bold mb-2 text-dark">
         <i class="fas fa-map-marker-alt text-danger me-2"></i>Ponto Seguro
     </h3>
-    <p class="text-muted mb-3">Registro com validação de localização e biometria facial.</p>
+    <p class="text-muted mb-3">Registro com validaÃ§Ã£o de localizaÃ§Ã£o e biometria facial.</p>
     <div id="relogio-tempo-real" class="text-primary fw-bold mb-4 fs-5"></div>
 
     <div id="ai-status" class="alert alert-warning shadow-sm">
-        <i class="fas fa-spinner fa-spin"></i> Solicitando localização GPS...
+        <i class="fas fa-spinner fa-spin"></i> Solicitando localizaÃ§Ã£o GPS...
     </div>
 
     <div class="alert alert-info shadow-sm text-start">
         <div><strong>Escala de entrada:</strong> {{ config.horario_escala_entrada|time:"H:i" }}</div>
-        <div><strong>Tolerância:</strong> {{ config.tolerancia_atraso_minutos }} minuto(s)</div>
-        <small>Atraso acima da tolerância exige justificativa e segue para homologação.</small>
+        <div><strong>TolerÃ¢ncia:</strong> {{ config.tolerancia_atraso_minutos }} minuto(s)</div>
+        <small>Atraso acima da tolerÃ¢ncia exige justificativa e segue para homologaÃ§Ã£o.</small>
     </div>
 
     {% if not foto_url %}
     <div class="alert alert-danger shadow-sm">
         <i class="fas fa-exclamation-triangle"></i>
-        <strong>Acesso Bloqueado:</strong> Você não possui foto cadastrada no RH.
+        <strong>Acesso Bloqueado:</strong> VocÃª nÃ£o possui foto cadastrada no RH.
     </div>
     {% endif %}
 
@@ -43,22 +41,22 @@
                     <div class="ft-intro-logo">
                         <i class="fas fa-user-shield"></i> SPAGI ID
                     </div>
-                    <h5 class="fw-bold mb-2"><i class="fas fa-user-check text-primary me-1"></i> Verificação de identidade</h5>
-                    <p class="text-muted mb-3">Fluxo em etapas: detectar rosto, validar prova de vida e comparar com foto do cadastro funcional.</p>
+                    <h5 class="fw-bold mb-2"><i class="fas fa-user-check text-primary me-1"></i> VerificaÃ§Ã£o de identidade</h5>
+                    <p class="text-muted mb-3">Enquadre o rosto no oval. Quando estiver pronto, toque em "Estou pronto".</p>
                     <div class="ft-intro-checks mb-3">
-                        <div class="ft-check-pill"><i class="fas fa-check-circle"></i> Usuário presente</div>
-                        <div class="ft-check-pill"><i class="fas fa-check-circle"></i> 3D Face Map</div>
-                        <div class="ft-check-pill"><i class="fas fa-check-circle"></i> Identity Verified</div>
+                        <div class="ft-check-pill"><i class="fas fa-check-circle"></i> UsuÃ¡rio presente</div>
+                        <div class="ft-check-pill"><i class="fas fa-check-circle"></i> Captura automatica</div>
+                        <div class="ft-check-pill"><i class="fas fa-check-circle"></i> Identidade verificada</div>
                     </div>
                 </div>
                 <button type="button" class="btn btn-primary btn-lg fw-bold ft-main-cta" onclick="iniciarFluxoFacial()">
-                    <i class="fas fa-play me-1"></i> Iniciar validação facial
+                    <i class="fas fa-play me-1"></i> Estou pronto
                 </button>
             </div>
 
             <div id="detecaoSection" style="display:none;">
                 <div class="alert alert-light border text-start mb-3 ft-sequence-box">
-                    <div class="fw-semibold mb-2"><i class="fas fa-shield-alt text-primary me-1"></i> Sequência de validação</div>
+                    <div class="fw-semibold mb-2"><i class="fas fa-shield-alt text-primary me-1"></i> SequÃªncia de validaÃ§Ã£o</div>
                     <div class="ft-sequence-list">
                         <div class="ft-sequence-item" id="flowPresenca">
                             <span class="ft-sequence-icon"><i class="fas fa-camera"></i></span>
@@ -71,8 +69,8 @@
                         <div class="ft-sequence-item" id="flowLiveness">
                             <span class="ft-sequence-icon"><i class="fas fa-face-smile"></i></span>
                             <div class="ft-sequence-text">
-                                <strong>Prova de vida</strong>
-                                <small id="flowLivenessText">Aguardando movimento guiado</small>
+                                <strong>Captura automatica</strong>
+                                <small id="flowLivenessText">Aguardando rosto alinhado</small>
                             </div>
                             <span class="ft-sequence-state pending" id="flowLivenessState"><i class="far fa-circle"></i></span>
                         </div>
@@ -80,32 +78,32 @@
                             <span class="ft-sequence-icon"><i class="fas fa-id-card"></i></span>
                             <div class="ft-sequence-text">
                                 <strong>Comparar com cadastro</strong>
-                                <small id="flowMatchText">Aguardando score facial</small>
+                                <small id="flowMatchText">Aguardando comparacao facial</small>
                             </div>
                             <span class="ft-sequence-state pending" id="flowMatchState"><i class="far fa-circle"></i></span>
                         </div>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                        <span id="chipPresenca" class="badge rounded-pill bg-secondary-subtle text-secondary">Presença: aguardando</span>
-                        <span id="chipLiveness" class="badge rounded-pill bg-secondary-subtle text-secondary">Liveness: aguardando</span>
+                        <span id="chipPresenca" class="badge rounded-pill bg-secondary-subtle text-secondary">PresenÃ§a: aguardando</span>
+                        <span id="chipLiveness" class="badge rounded-pill bg-secondary-subtle text-secondary">Captura: aguardando</span>
                         <span id="chipMatch" class="badge rounded-pill bg-secondary-subtle text-secondary">Face Match: aguardando</span>
                     </div>
                     <div class="small text-muted mt-2">
-                        Etapas: 1) Presença 2) Prova de vida 3) Comparação com foto do cadastro.
+                        Etapas: Presenca, Captura, Upload, Processamento e Resultado.
                     </div>
                     <div class="mt-3">
                         <div class="d-flex justify-content-between small text-muted mb-1">
-                            <span>Progresso da validação</span>
+                            <span>Progresso da validaÃ§Ã£o</span>
                             <span id="progressLabel">0%</span>
                         </div>
-                        <div class="progress" role="progressbar" aria-label="Progresso validação facial" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress" role="progressbar" aria-label="Progresso validaÃ§Ã£o facial" aria-valuemin="0" aria-valuemax="100">
                             <div id="validationProgressBar" class="progress-bar bg-primary" style="width: 0%"></div>
                         </div>
                     </div>
                     <div class="mt-3 liveness-steps">
                         <div id="step1" class="step-item"><i class="far fa-circle me-1"></i>Detectar rosto</div>
                         <div id="step2" class="step-item"><i class="far fa-circle me-1"></i>Centralizar rosto</div>
-                        <div id="step3" class="step-item"><i class="far fa-circle me-1"></i>Virar esquerda/direita</div>
+                        <div id="step3" class="step-item"><i class="far fa-circle me-1"></i>Capturar selfie</div>
                         <div id="step4" class="step-item"><i class="far fa-circle me-1"></i>Comparar com cadastro</div>
                     </div>
                 </div>
@@ -122,8 +120,14 @@
                 <div class="position-relative bg-dark rounded-4 overflow-hidden mb-4 shadow-sm camera-frame" style="height: 350px; border: 4px solid #f8f9fa;">
                     <video id="videoElement" autoplay playsinline style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);"></video>
                     <div id="faceGuide" class="position-absolute top-50 start-50 translate-middle face-guide"></div>
-                    <div class="position-absolute top-0 start-50 translate-middle-x mt-3 px-3 py-2 rounded-3 bg-white fw-bold" id="uxHint">
-                        Enquadre seu rosto na moldura
+                    <button type="button" class="position-absolute top-0 start-0 mt-3 ms-3 btn btn-link text-white p-0" onclick="voltarParaInicio()">
+                        <i class="fas fa-times fs-4"></i>
+                    </button>
+                    <div class="position-absolute top-0 start-50 translate-middle-x mt-3 px-3 py-2 rounded-2 bg-primary text-white fw-bold" id="uxHint">
+                        Enquadre seu rosto no oval
+                    </div>
+                    <div class="position-absolute bottom-0 start-50 translate-middle-x mb-3 fw-bold text-white ft-logo-watermark">
+                        spagi<span>ID</span>
                     </div>
                 </div>
 
@@ -141,13 +145,13 @@
             <div id="resultadoSection" style="display:none;" class="text-start">
                 <div id="resultadoCard" class="alert alert-success border shadow-sm">
                     <h5 class="fw-bold mb-2"><i class="fas fa-check-circle me-1"></i> Identidade validada</h5>
-                    <p id="resultadoMensagem" class="mb-2">Validação concluída.</p>
+                    <p id="resultadoMensagem" class="mb-2">ValidaÃ§Ã£o concluÃ­da.</p>
                     <small id="resultadoDetalhe" class="text-muted"></small>
                 </div>
                 <div class="ft-result-checks mb-3" id="resultChecks">
-                    <div class="ft-result-item"><i class="fas fa-check-circle"></i> Usuário presente</div>
-                    <div class="ft-result-item"><i class="fas fa-check-circle"></i> 3D Face Map</div>
-                    <div class="ft-result-item"><i class="fas fa-check-circle"></i> Identity Verified</div>
+                    <div class="ft-result-item"><i class="fas fa-check-circle"></i> UsuÃ¡rio presente</div>
+                    <div class="ft-result-item"><i class="fas fa-check-circle"></i> Captura automatica</div>
+                    <div class="ft-result-item"><i class="fas fa-check-circle"></i> Identidade verificada</div>
                 </div>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-outline-secondary fw-semibold" onclick="reiniciarValidacao()">
@@ -167,14 +171,14 @@
                     <button id="btnEntrada" class="btn btn-lg fw-bold text-white btn-success py-3" onclick="tirarFoto('entrada','Entrada')" disabled>
                         Entrada {% if ponto.entrada %}({{ ponto.entrada|time:"H:i" }}){% endif %}
                     </button>
-                    <button id="btnSaidaAlmoco" class="btn btn-lg fw-bold text-white btn-warning py-3" onclick="tirarFoto('saida_almoco','Saída Almoço')" disabled>
-                        Saída Almoço {% if ponto.saida_almoco %}({{ ponto.saida_almoco|time:"H:i" }}){% endif %}
+                    <button id="btnSaidaAlmoco" class="btn btn-lg fw-bold text-white btn-warning py-3" onclick="tirarFoto('saida_almoco','SaÃ­da AlmoÃ§o')" disabled>
+                        SaÃ­da AlmoÃ§o {% if ponto.saida_almoco %}({{ ponto.saida_almoco|time:"H:i" }}){% endif %}
                     </button>
-                    <button id="btnRetornoAlmoco" class="btn btn-lg fw-bold text-white btn-info py-3" onclick="tirarFoto('retorno_almoco','Retorno Almoço')" disabled>
-                        Retorno Almoço {% if ponto.retorno_almoco %}({{ ponto.retorno_almoco|time:"H:i" }}){% endif %}
+                    <button id="btnRetornoAlmoco" class="btn btn-lg fw-bold text-white btn-info py-3" onclick="tirarFoto('retorno_almoco','Retorno AlmoÃ§o')" disabled>
+                        Retorno AlmoÃ§o {% if ponto.retorno_almoco %}({{ ponto.retorno_almoco|time:"H:i" }}){% endif %}
                     </button>
-                    <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger py-3" onclick="tirarFoto('saida','Saída Final')" disabled>
-                        Saída Final {% if ponto.saida %}({{ ponto.saida|time:"H:i" }}){% endif %}
+                    <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger py-3" onclick="tirarFoto('saida','SaÃ­da Final')" disabled>
+                        SaÃ­da Final {% if ponto.saida %}({{ ponto.saida|time:"H:i" }}){% endif %}
                     </button>
                 </div>
             </div>
@@ -185,8 +189,8 @@
                     <small id="lblTipoBatida" class="fw-bold"></small>
                 </div>
                 <div class="alert alert-light border text-start mb-3">
-                    <div class="fw-semibold mb-1">Prova de vida rápida</div>
-                    <small id="livenessInstruction" class="text-muted">Olhe para a câmera e mantenha o rosto centralizado.</small>
+                    <div class="fw-semibold mb-1">Prova de vida rÃ¡pida</div>
+                    <small id="livenessInstruction" class="text-muted">Olhe para a cÃ¢mera e mantenha o rosto centralizado.</small>
                 </div>
                 <div class="rounded-4 overflow-hidden mb-4 shadow" style="height:350px;border:4px solid #0d6efd;">
                     <img id="photoPreview" style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);">
@@ -207,7 +211,7 @@
                 <input type="hidden" name="geo_checked_at" id="geoCheckedAtInput">
                 <div class="mt-3 text-start">
                     <label for="justificativaAtraso" class="form-label fw-bold">Justificativa de atraso (se houver):</label>
-                    <textarea name="justificativa_atraso" id="justificativaAtraso" rows="3" class="form-control" placeholder="Ex.: trânsito, consulta médica, ocorrência no trajeto."></textarea>
+                    <textarea name="justificativa_atraso" id="justificativaAtraso" rows="3" class="form-control" placeholder="Ex.: trÃ¢nsito, consulta mÃ©dica, ocorrÃªncia no trajeto."></textarea>
                 </div>
             </form>
             <canvas id="canvasElement" style="display:none;"></canvas>
@@ -222,8 +226,6 @@ const statusDiv = document.getElementById('ai-status');
 const refImage = document.getElementById('refImage');
 let referenceDescriptor = null;
 const DISTANCE_THRESHOLD = 0.50;
-const LIVENESS_CENTER_TOLERANCE = 0.12;
-const LIVENESS_SIDE_TOLERANCE = 0.18;
 
 const temEntrada = {% if ponto.entrada %}true{% else %}false{% endif %};
 const temSaidaAlmoco = {% if ponto.saida_almoco %}true{% else %}false{% endif %};
@@ -244,8 +246,7 @@ let livenessSawLeft = false;
 let livenessSawRight = false;
 let livenessFrameCount = 0;
 let rafId = null;
-let faceTecReady = false;
-let faceTecInitTried = false;
+let biometriaChallengeToken = '';
 
 function setChip(id, status, label) {
     const chip = document.getElementById(id);
@@ -310,6 +311,27 @@ function atualizarHint(texto, tipo = 'normal') {
     hint.style.transition = 'all .25s ease';
 }
 
+async function mostrarEtapaProcessamento(tipo) {
+    if (tipo === 'upload') {
+        atualizarHint('Enviando selfie criptografada...', 'warn');
+        setChip('chipLiveness', 'warn', 'Captura: enviando');
+        setProgress(78);
+        await esperar(450);
+        return;
+    }
+    if (tipo === 'process') {
+        atualizarHint('Processando validacao de identidade...', 'warn');
+        setChip('chipMatch', 'warn', 'Face Match: processando');
+        setProgress(88);
+        await esperar(600);
+        return;
+    }
+    if (tipo === 'done') {
+        atualizarHint('Validacao concluida', 'ok');
+        await esperar(220);
+    }
+}
+
 function setProgress(percent) {
     const bar = document.getElementById('validationProgressBar');
     const label = document.getElementById('progressLabel');
@@ -344,45 +366,6 @@ function resetSteps() {
     setProgress(0);
 }
 
-function isFaceTecEnabled() {
-    return !!(FACETEC_CFG && FACETEC_CFG.enabled);
-}
-
-async function initFaceTecIfNeeded() {
-    if (!isFaceTecEnabled()) return false;
-    if (faceTecReady) return true;
-    if (faceTecInitTried) return false;
-    faceTecInitTried = true;
-    try {
-        if (!window.FaceTecSDK) throw new Error('FaceTecSDK indisponível');
-        FaceTecSDK.setResourceDirectory("{% static 'vendor/facetec/FaceTecSDK.js/resources' %}");
-        FaceTecSDK.setImagesDirectory("{% static 'vendor/facetec/FaceTec_images' %}");
-        const ok = await new Promise((resolve) => {
-            const callback = (initializedSuccessfully) => resolve(!!initializedSuccessfully);
-            if (FACETEC_CFG.modo_producao && FACETEC_CFG.production_key) {
-                FaceTecSDK.initializeInProductionMode(
-                    FACETEC_CFG.production_key,
-                    FACETEC_CFG.device_key_identifier,
-                    FACETEC_CFG.public_face_scan_encryption_key,
-                    callback
-                );
-            } else {
-                FaceTecSDK.initializeInDevelopmentMode(
-                    FACETEC_CFG.device_key_identifier,
-                    FACETEC_CFG.public_face_scan_encryption_key,
-                    callback
-                );
-            }
-        });
-        faceTecReady = ok;
-        return ok;
-    } catch (e) {
-        console.error('Erro ao inicializar FaceTec:', e);
-        faceTecReady = false;
-        return false;
-    }
-}
-
 function tokenExpirado() {
     if (!TOKEN_ISSUED_AT) return true;
     const agoraEpoch = Math.floor(Date.now() / 1000);
@@ -391,7 +374,7 @@ function tokenExpirado() {
 
 function validarTokenOuAtualizar() {
     if (!tokenExpirado()) return true;
-        alert('Sua sessão para bater ponto expirou (mais de 2 minutos). A página será atualizada para gerar um novo token.');
+        alert('Sua sessÃ£o para bater ponto expirou (mais de 2 minutos). A pÃ¡gina serÃ¡ atualizada para gerar um novo token.');
     window.location.reload();
     return false;
 }
@@ -404,7 +387,7 @@ function geoExpirado() {
 
 function validarGeoOuAtualizar() {
     if (geoAprovado && !geoExpirado()) return true;
-    alert('Localização expirada (mais de 2 minutos). Vamos atualizar o GPS antes de continuar.');
+    alert('LocalizaÃ§Ã£o expirada (mais de 2 minutos). Vamos atualizar o GPS antes de continuar.');
     validarGeolocalizacao();
     return false;
 }
@@ -424,7 +407,7 @@ function validarGeolocalizacao() {
     if (!navigator.geolocation) {
         geoAprovado = false;
         statusDiv.className = 'alert alert-danger';
-        statusDiv.innerHTML = 'Navegador não suporta Geolocalização.';
+        statusDiv.innerHTML = 'Navegador nÃ£o suporta GeolocalizaÃ§Ã£o.';
         return;
     }
 
@@ -444,16 +427,16 @@ function validarGeolocalizacao() {
             if (distanciaMetros > RAIO_PERMITIDO_METROS) {
                 geoAprovado = false;
                 statusDiv.className = 'alert alert-danger shadow-sm';
-                statusDiv.innerHTML = `🚫 <strong>FORA DA ÁREA:</strong> Você está a ${distanciaMetros.toFixed(0)}m da loja. Raio permitido: ${RAIO_PERMITIDO_METROS}m.`;
+                statusDiv.innerHTML = `ðŸš« <strong>FORA DA ÃREA:</strong> VocÃª estÃ¡ a ${distanciaMetros.toFixed(0)}m da loja. Raio permitido: ${RAIO_PERMITIDO_METROS}m.`;
                 document.getElementById('mainCard').style.display = 'none';
             } else {
                 geoAprovado = true;
-                document.getElementById('distanciaText').innerText = `Distância: ${distanciaMetros.toFixed(0)}m da Loja`;
+                document.getElementById('distanciaText').innerText = `DistÃ¢ncia: ${distanciaMetros.toFixed(0)}m da Loja`;
                 if (!iaInicializada) {
                     iniciarIA();
                 } else {
                     statusDiv.className = 'alert alert-success shadow-sm';
-                    statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Localização revalidada com sucesso.';
+                    statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> LocalizaÃ§Ã£o revalidada com sucesso.';
                     document.getElementById('mainCard').style.display = 'block';
                 }
             }
@@ -461,14 +444,14 @@ function validarGeolocalizacao() {
         () => {
             geoAprovado = false;
             statusDiv.className = 'alert alert-danger';
-            statusDiv.innerHTML = '🚫 <strong>Permissão de GPS Negada:</strong> Libere a localização do navegador para liberar o ponto.';
+            statusDiv.innerHTML = 'ðŸš« <strong>PermissÃ£o de GPS Negada:</strong> Libere a localizaÃ§Ã£o do navegador para liberar o ponto.';
         },
         { enableHighAccuracy: true }
     );
 }
 
 async function iniciarIA() {
-    statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando validação biométrica...';
+    statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando validaÃ§Ã£o biomÃ©trica...';
     try {
         const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
         await Promise.all([
@@ -485,29 +468,20 @@ async function iniciarIA() {
                 referenceDescriptor = detection.descriptor;
                 iaInicializada = true;
                 statusDiv.className = 'alert alert-success shadow-sm';
-                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Localização e biometria aprovadas!';
+                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> LocalizaÃ§Ã£o e biometria aprovadas!';
                 document.getElementById('mainCard').style.display = 'block';
-                setChip('chipMatch', 'warn', 'Face Match: referência carregada');
+                setChip('chipMatch', 'warn', 'Face Match: referÃªncia carregada');
                 setStep(4, 'active');
                 setProgress(20);
-                if (isFaceTecEnabled()) {
-                    initFaceTecIfNeeded().then((ok) => {
-                        if (ok) {
-                            setChip('chipLiveness', 'warn', 'Liveness: FaceTec pronto');
-                        } else {
-                            setChip('chipLiveness', 'warn', 'Liveness: fallback local');
-                        }
-                    });
-                }
                 if (fluxoFacialIniciado) ligarCamera();
             } else {
                 statusDiv.className = 'alert alert-danger';
-                statusDiv.innerHTML = 'Erro: rosto não identificado na foto do RH.';
+                statusDiv.innerHTML = 'Erro: rosto nÃ£o identificado na foto do RH.';
             }
         }
     } catch (e) {
         statusDiv.className = 'alert alert-danger';
-        statusDiv.innerHTML = 'Erro técnico na IA: ' + e.message;
+        statusDiv.innerHTML = 'Erro tÃ©cnico na IA: ' + e.message;
     }
 }
 
@@ -522,7 +496,7 @@ function ligarCamera() {
         })
         .catch(() => {
             statusDiv.className = 'alert alert-danger';
-            statusDiv.innerHTML = 'Permita o acesso à câmera.';
+            statusDiv.innerHTML = 'Permita o acesso Ã  cÃ¢mera.';
         });
 }
 
@@ -552,8 +526,8 @@ function abrirBatidaSection() {
 
 function reiniciarValidacao() {
     identidadeValidada = false;
-    setChip('chipLiveness', 'idle', 'Liveness: aguardando');
-    setChip('chipMatch', 'warn', 'Face Match: referência carregada');
+    setChip('chipLiveness', 'idle', 'Captura: aguardando');
+    setChip('chipMatch', 'warn', 'Face Match: referÃªncia carregada');
     setProgress(30);
     setStep(3, 'idle');
     setStep(4, 'active');
@@ -573,7 +547,7 @@ function mostrarResultadoValidacao(aprovado, mensagem, detalhe = '') {
         card.className = aprovado ? 'alert alert-success border shadow-sm' : 'alert alert-danger border shadow-sm';
         card.querySelector('h5').innerHTML = aprovado
             ? '<i class="fas fa-check-circle me-1"></i> Identidade validada'
-            : '<i class="fas fa-times-circle me-1"></i> Falha na validação';
+            : '<i class="fas fa-times-circle me-1"></i> Falha na validaÃ§Ã£o';
     }
     if (checks) {
         checks.classList.toggle('is-failed', !aprovado);
@@ -589,14 +563,14 @@ async function validarIdentidadeInicial() {
     if (!validarTokenOuAtualizar()) return;
     if (!validarGeoOuAtualizar()) return;
     if (!iaInicializada || !referenceDescriptor) {
-        alert('A validação biométrica ainda está carregando. Aguarde alguns segundos e tente novamente.');
+        alert('A validaÃ§Ã£o biomÃ©trica ainda estÃ¡ carregando. Aguarde alguns segundos e tente novamente.');
         return;
     }
     if (!cameraLigada) {
         ligarCamera();
         await esperar(500);
         if (!cameraLigada) {
-            alert('Não foi possível acessar a câmera.');
+            alert('NÃ£o foi possÃ­vel acessar a cÃ¢mera.');
             return;
         }
     }
@@ -609,92 +583,41 @@ async function validarIdentidadeInicial() {
 
     try {
         setStep(1, 'active');
-        setStep(2, 'idle');
+        setStep(2, 'active');
         setStep(3, 'idle');
         setStep(4, 'idle');
-        setProgress(8);
-        atualizarHint('Detectando rosto...', 'warn');
+        setProgress(10);
+        atualizarHint('Aguardando rosto vÃ¡lido para capturar...', 'warn');
 
-        let detection = await faceapi
-            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-            .withFaceLandmarks()
-            .withFaceDescriptor();
-
-        if (!detection) {
+        await prepararChallengeBiometria();
+        const capturado = await aguardarRostoValidoECapturar();
+        if (!capturado || !capturado.detection || !capturado.base64) {
             identidadeValidada = false;
-            setChip('chipPresenca', 'err', 'Presença: sem rosto detectado');
+            setChip('chipPresenca', 'err', 'PresenÃ§a: nÃ£o validada');
+            setChip('chipLiveness', 'err', 'Captura: nÃ£o concluÃ­da');
             setStep(1, 'err');
-            setProgress(0);
-            mostrarResultadoValidacao(false, 'Não foi possível detectar seu rosto.', 'Aproxime o rosto, centralize na moldura e tente novamente.');
-            return;
-        }
-
-        setStep(1, 'ok');
-        const box = detection.detection.box;
-        const faceArea = (box.width * box.height) / (video.videoWidth * video.videoHeight);
-        const cx = (box.x + box.width / 2) / video.videoWidth;
-        const cy = (box.y + box.height / 2) / video.videoHeight;
-        const centralizado = Math.abs(cx - 0.5) < 0.16 && Math.abs(cy - 0.5) < 0.20;
-        setStep(2, 'active');
-        if (faceArea <= 0.12 || !centralizado) {
-            identidadeValidada = false;
-            setChip('chipPresenca', 'warn', 'Presença: ajuste enquadramento');
             setStep(2, 'err');
-            setProgress(16);
-            mostrarResultadoValidacao(false, 'Rosto fora do enquadramento ideal.', 'Aproxime e centralize o rosto dentro da moldura.');
-            return;
-        }
-
-        setChip('chipPresenca', 'ok', 'Presença: usuário presente');
-        setStep(2, 'ok');
-        setProgress(35);
-        atualizarHint('Presença validada. Iniciando prova de vida...', 'ok');
-
-        setStep(3, 'active');
-        let livenessOk = false;
-        let facetecSessionResult = null;
-        if (isFaceTecEnabled()) {
-            atualizarHint('Iniciando validação FaceTec...', 'warn');
-            const ftResult = await runFaceTecLiveness();
-            livenessOk = !!(ftResult && ftResult.ok);
-            facetecSessionResult = ftResult ? ftResult.sessionResult : null;
-            if (livenessOk && !cameraLigada) {
-                ligarCamera();
-                await esperar(450);
-            }
-        } else {
-            livenessOk = await validarLivenessRapido();
-        }
-        if (!livenessOk) {
-            identidadeValidada = false;
-            setChip('chipLiveness', 'err', 'Liveness: não concluído');
             setStep(3, 'err');
-            setProgress(40);
-            mostrarResultadoValidacao(false, 'Prova de vida não concluída.', 'Siga os passos de movimento (centro, esquerda e direita).');
+            setProgress(0);
+            mostrarResultadoValidacao(false, 'NÃ£o foi possÃ­vel capturar seu rosto.', 'Centralize o rosto no oval e tente novamente.');
             return;
         }
 
-        setChip('chipLiveness', 'ok', 'Liveness: aprovado');
+        const detection = capturado.detection;
+        setChip('chipPresenca', 'ok', 'PresenÃ§a: usuÃ¡rio presente');
+        setChip('chipLiveness', 'ok', 'Captura: concluÃ­da');
+        setStep(1, 'ok');
+        setStep(2, 'ok');
         setStep(3, 'ok');
         setProgress(68);
+        atualizarHint('Foto capturada. Validando similaridade...', 'ok');
 
+        await mostrarEtapaProcessamento('upload');
         setStep(4, 'active');
+        await mostrarEtapaProcessamento('process');
         atualizarHint('Comparando com foto do cadastro...', 'warn');
-        if (isFaceTecEnabled() && facetecSessionResult) {
-            const facetecDetection = await getDescriptorFromFaceTecSession(facetecSessionResult);
-            if (facetecDetection) {
-                detection = facetecDetection;
-            } else {
-                identidadeValidada = false;
-                setChip('chipMatch', 'err', 'Face Match: audit trail inválido');
-                setStep(4, 'err');
-                setProgress(72);
-                mostrarResultadoValidacao(false, 'Não foi possível validar a similaridade facial.', 'Audit trail do FaceTec sem rosto utilizável para comparação.');
-                return;
-            }
-        }
         const distance = faceapi.euclideanDistance(referenceDescriptor, detection.descriptor);
-        const feedback = await validarFeedbackBackend(distance);
+        const feedback = await validarBiometriaOpenSource(distance, capturado.base64);
         if (!feedback.approved) {
             identidadeValidada = false;
             setChip('chipMatch', 'err', `Face Match: reprovado (${distance.toFixed(3)})`);
@@ -702,8 +625,8 @@ async function validarIdentidadeInicial() {
             setProgress(72);
             mostrarResultadoValidacao(
                 false,
-                feedback.message || 'Comparação facial reprovada.',
-                `Distância: ${Number(feedback.distance || distance).toFixed(3)} | Limite: ${Number(feedback.threshold || DISTANCE_THRESHOLD).toFixed(3)}`
+                feedback.message || 'ComparaÃ§Ã£o facial reprovada.',
+                `DistÃ¢ncia: ${Number(feedback.distance || distance).toFixed(3)} | Limite: ${Number(feedback.threshold || DISTANCE_THRESHOLD).toFixed(3)}`
             );
             return;
         }
@@ -712,23 +635,24 @@ async function validarIdentidadeInicial() {
         setChip('chipMatch', 'ok', `Face Match: aprovado (${Number(feedback.distance || distance).toFixed(3)})`);
         setStep(4, 'ok');
         setProgress(100);
+        await mostrarEtapaProcessamento('done');
         atualizarHint('Identidade validada com sucesso!', 'ok');
         mostrarResultadoValidacao(
             true,
-            feedback.message || 'Validação concluída. Você já pode registrar a batida.',
-            `Distância: ${Number(feedback.distance || distance).toFixed(3)} | Limite: ${Number(feedback.threshold || DISTANCE_THRESHOLD).toFixed(3)}`
+            feedback.message || 'ValidaÃ§Ã£o concluÃ­da. VocÃª jÃ¡ pode registrar a batida.',
+            `DistÃ¢ncia: ${Number(feedback.distance || distance).toFixed(3)} | Limite: ${Number(feedback.threshold || DISTANCE_THRESHOLD).toFixed(3)}`
         );
     } catch (error) {
         identidadeValidada = false;
         const msgErro = (error && error.message) ? String(error.message) : 'Tente novamente.';
-        if (msgErro.toLowerCase().includes('liveness') || msgErro.toLowerCase().includes('facetec')) {
-            setChip('chipLiveness', 'err', 'Liveness: erro técnico');
+        if (msgErro.toLowerCase().includes('liveness')) {
+            setChip('chipLiveness', 'err', 'Captura: erro tÃ©cnico');
             setStep(3, 'err');
         } else {
-            setChip('chipMatch', 'err', 'Face Match: erro técnico');
+            setChip('chipMatch', 'err', 'Face Match: erro tÃ©cnico');
             setStep(4, 'err');
         }
-        mostrarResultadoValidacao(false, 'Erro técnico durante validação.', msgErro);
+        mostrarResultadoValidacao(false, 'Erro tÃ©cnico durante validaÃ§Ã£o.', msgErro);
     } finally {
         if (btn) {
             btn.disabled = false;
@@ -754,18 +678,18 @@ function iniciarMonitorPresenca() {
                 const cy = (box.y + box.height / 2) / video.videoHeight;
                 const centralizado = Math.abs(cx - 0.5) < 0.16 && Math.abs(cy - 0.5) < 0.20;
                 if (faceArea > 0.12 && centralizado) {
-                    setChip('chipPresenca', 'ok', 'Presença: usuário presente');
+                    setChip('chipPresenca', 'ok', 'PresenÃ§a: usuÃ¡rio presente');
                     atualizarHint('Rosto detectado. Pode seguir.', 'ok');
                     setStep(2, 'ok');
                     setProgress(40);
                 } else {
-                    setChip('chipPresenca', 'warn', 'Presença: ajuste enquadramento');
+                    setChip('chipPresenca', 'warn', 'PresenÃ§a: ajuste enquadramento');
                     atualizarHint('Aproxime e centralize o rosto na moldura.', 'warn');
                     setStep(2, 'active');
                     setProgress(28);
                 }
             } else {
-                setChip('chipPresenca', 'err', 'Presença: sem rosto detectado');
+                setChip('chipPresenca', 'err', 'PresenÃ§a: sem rosto detectado');
                 atualizarHint('Enquadre seu rosto na moldura', 'warn');
                 setStep(1, 'active');
                 setStep(2, 'idle');
@@ -810,7 +734,7 @@ async function confirmarPonto() {
     if (!validarTokenOuAtualizar()) return;
     if (!validarGeoOuAtualizar()) return;
     if (!identidadeValidada) {
-        alert('Sua validação de identidade não está ativa. Faça a validação novamente.');
+        alert('Sua validaÃ§Ã£o de identidade nÃ£o estÃ¡ ativa. FaÃ§a a validaÃ§Ã£o novamente.');
         animateSectionTransition('confirmationSection', 'detecaoSection');
         return;
     }
@@ -823,109 +747,67 @@ async function confirmarPonto() {
     document.getElementById('pontoForm').submit();
 }
 
-async function getFaceTecSessionToken() {
-    const resp = await fetch("{% url 'controle_ponto:facetec_session_token_proxy' %}", {
+async function prepararChallengeBiometria() {
+    const resp = await fetch("{% url 'controle_ponto:biometria_open_source_challenge' %}", {
         method: 'GET',
-        headers: {
-            'X-CSRFToken': getCsrfToken(),
-            'X-User-Agent': (window.FaceTecSDK && FaceTecSDK.createFaceTecAPIUserAgentString)
-                ? FaceTecSDK.createFaceTecAPIUserAgentString('')
-                : navigator.userAgent,
-        },
+        headers: { 'X-CSRFToken': getCsrfToken() },
     });
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data.sessionToken) {
-        throw new Error(data.message || 'Não foi possível obter sessão FaceTec.');
+    if (!resp.ok || !data.challenge_token) {
+        throw new Error(data.message || 'Falha ao iniciar challenge biomÃ©trico.');
     }
-    return data.sessionToken;
+    biometriaChallengeToken = data.challenge_token;
 }
 
-async function runFaceTecLiveness() {
-    const initialized = await initFaceTecIfNeeded();
-    if (!initialized) {
-        throw new Error('FaceTec não inicializado. Verifique configuração no admin.');
-    }
-    const sessionToken = await getFaceTecSessionToken();
-    return new Promise((resolve, reject) => {
-        let done = false;
-        const resolveOnce = (value) => { if (!done) { done = true; resolve(value); } };
-        const rejectOnce = (err) => { if (!done) { done = true; reject(err); } };
-
-        const processor = {
-            latestSessionResult: null,
-            processSessionResultWhileFaceTecSDKWaits: async function (sessionResult, faceScanResultCallback) {
-                this.latestSessionResult = sessionResult;
-                if (sessionResult.status !== FaceTecSDK.FaceTecSessionStatus.SessionCompletedSuccessfully) {
-                    faceScanResultCallback.cancel();
-                    return;
-                }
-                const payload = {
-                    faceScan: sessionResult.faceScan,
-                    auditTrailImage: sessionResult.auditTrail && sessionResult.auditTrail[0] ? sessionResult.auditTrail[0] : '',
-                    lowQualityAuditTrailImage: sessionResult.lowQualityAuditTrail && sessionResult.lowQualityAuditTrail[0] ? sessionResult.lowQualityAuditTrail[0] : '',
-                    sessionId: sessionResult.sessionId,
-                };
-                try {
-                    const resp = await fetch("{% url 'controle_ponto:facetec_liveness_proxy' %}", {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': getCsrfToken(),
-                            'X-User-Agent': FaceTecSDK.createFaceTecAPIUserAgentString(sessionResult.sessionId || ''),
-                        },
-                        body: JSON.stringify(payload),
-                    });
-                    const data = await resp.json().catch(() => ({}));
-                    if (resp.ok && data && data.wasProcessed === true && data.error === false && data.scanResultBlob) {
-                        faceScanResultCallback.proceedToNextStep(data.scanResultBlob);
-                        return;
-                    }
-                    faceScanResultCallback.cancel();
-                } catch (_e) {
-                    faceScanResultCallback.cancel();
-                }
-            },
-            onFaceTecSDKCompletelyDone: function () {
-                const success = !!(this.latestSessionResult && this.latestSessionResult.isCompletelyDone);
-                if (success) resolveOnce({ ok: true, sessionResult: this.latestSessionResult });
-                else rejectOnce(new Error('Liveness FaceTec não concluído.'));
-            },
-        };
-
-        try {
-            new FaceTecSDK.FaceTecSession(processor, sessionToken);
-        } catch (e) {
-            rejectOnce(e);
+async function aguardarRostoValidoECapturar() {
+    const tentativasMax = 90;
+    for (let i = 0; i < tentativasMax; i += 1) {
+        const detection = await faceapi
+            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+        if (!detection) {
+            await esperar(90);
+            continue;
         }
-    });
-}
-
-async function getDescriptorFromImageSource(src) {
-    if (!src) return null;
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    const loaded = await new Promise((resolve) => {
-        img.onload = () => resolve(true);
-        img.onerror = () => resolve(false);
-        img.src = src;
-    });
-    if (!loaded) return null;
-    const det = await faceapi
-        .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks()
-        .withFaceDescriptor();
-    return det || null;
-}
-
-async function getDescriptorFromFaceTecSession(sessionResult) {
-    try {
-        const audit = sessionResult && sessionResult.auditTrail && sessionResult.auditTrail[0] ? sessionResult.auditTrail[0] : '';
-        if (!audit) return null;
-        const src = audit.startsWith('data:') ? audit : `data:image/jpeg;base64,${audit}`;
-        return await getDescriptorFromImageSource(src);
-    } catch (_e) {
-        return null;
+        const box = detection.detection.box;
+        const faceArea = (box.width * box.height) / (video.videoWidth * video.videoHeight);
+        const cx = (box.x + box.width / 2) / video.videoWidth;
+        const cy = (box.y + box.height / 2) / video.videoHeight;
+        const centralizado = Math.abs(cx - 0.5) < 0.16 && Math.abs(cy - 0.5) < 0.20;
+        if (faceArea > 0.12 && centralizado) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+            const base64 = canvas.toDataURL('image/jpeg', 0.92);
+            return { detection, base64 };
+        }
+        await esperar(90);
     }
+    return null;
+}
+
+async function validarBiometriaOpenSource(distance, selfieCaptureBase64) {
+    const resp = await fetch("{% url 'controle_ponto:biometria_open_source_validar' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken(),
+        },
+        body: JSON.stringify({
+            challenge_token: biometriaChallengeToken,
+            distance,
+            face_present: true,
+            liveness_steps_ok: true,
+            selfie_capture_base64: selfieCaptureBase64 || '',
+            geo_ok: (geoAprovado && !geoExpirado()),
+            token_ok: !tokenExpirado(),
+        }),
+    });
+    if (!resp.ok) {
+        return { ok: false, approved: false, message: 'Falha de comunicaÃ§Ã£o com a biometria interna.' };
+    }
+    return await resp.json();
 }
 
 async function validarLivenessRapido() {
@@ -935,7 +817,7 @@ async function validarLivenessRapido() {
     livenessFrameCount = 0;
     const instr = document.getElementById('livenessInstruction');
     if (instr) instr.innerText = 'Passo 1/3: mantenha o rosto centralizado.';
-    atualizarHint('Validação de presença em andamento...', 'warn');
+    atualizarHint('ValidaÃ§Ã£o de presenÃ§a em andamento...', 'warn');
 
     const limiteFrames = 120;
     while (livenessFrameCount < limiteFrames) {
@@ -964,14 +846,14 @@ async function validarLivenessRapido() {
             if (xNorm > LIVENESS_SIDE_TOLERANCE) {
                 livenessSawRight = true;
                 atualizarHint('Liveness aprovado!', 'ok');
-                if (instr) instr.innerText = 'Prova de vida concluída com sucesso.';
+                if (instr) instr.innerText = 'Prova de vida concluÃ­da com sucesso.';
                 return true;
             }
         }
         await esperar(80);
     }
-    if (instr) instr.innerText = 'Não foi possível concluir. Tente novamente com boa iluminação.';
-    atualizarHint('Liveness não concluído', 'err');
+    if (instr) instr.innerText = 'NÃ£o foi possÃ­vel concluir. Tente novamente com boa iluminaÃ§Ã£o.';
+    atualizarHint('Liveness nÃ£o concluÃ­do', 'err');
     return livenessSawLeft && livenessSawRight;
 }
 
@@ -984,34 +866,13 @@ function getCsrfToken() {
     return input ? input.value : '';
 }
 
-async function validarFeedbackBackend(distance) {
-    const resp = await fetch("{% url 'controle_ponto:validar_face_feedback' %}", {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCsrfToken(),
-        },
-        body: JSON.stringify({
-            distance,
-            face_present: true,
-            liveness_ok: true,
-            geo_ok: (geoAprovado && !geoExpirado()),
-            token_ok: !tokenExpirado(),
-        }),
-    });
-    if (!resp.ok) {
-        return { ok: false, approved: false, message: 'Falha de comunicação com a validação.' };
-    }
-    return await resp.json();
-}
-
 function cancelarFoto() {
     document.getElementById('fotoBase64Input').value = '';
     animateSectionTransition('confirmationSection', 'liveCameraSection');
     const instr = document.getElementById('livenessInstruction');
-    if (instr) instr.innerText = 'Olhe para a câmera e mantenha o rosto centralizado.';
-    setChip('chipLiveness', 'idle', 'Liveness: aguardando');
-    setChip('chipMatch', 'warn', 'Face Match: referência carregada');
+    if (instr) instr.innerText = 'Olhe para a cÃ¢mera e mantenha o rosto centralizado.';
+    setChip('chipLiveness', 'idle', 'Captura: aguardando');
+    setChip('chipMatch', 'warn', 'Face Match: referÃªncia carregada');
     setStep(3, 'idle');
     setStep(4, 'active');
     setProgress(40);
@@ -1048,7 +909,7 @@ setInterval(atualizarRelogio, 1000);
 setInterval(() => {
     if (tokenExpirado()) {
         statusDiv.className = 'alert alert-warning shadow-sm';
-        statusDiv.innerHTML = '<i class="fas fa-sync-alt"></i> Sessão de ponto expirada. Atualize a página para gerar novo token.';
+        statusDiv.innerHTML = '<i class="fas fa-sync-alt"></i> SessÃ£o de ponto expirada. Atualize a pÃ¡gina para gerar novo token.';
     }
 }, 10000);
 setInterval(() => {
@@ -1058,7 +919,7 @@ setInterval(() => {
     if (geoExpirado()) {
         geoAprovado = false;
         statusDiv.className = 'alert alert-warning shadow-sm';
-        statusDiv.innerHTML = '<i class="fas fa-map-marker-alt"></i> Localização expirada. Aguardando nova validação de GPS.';
+        statusDiv.innerHTML = '<i class="fas fa-map-marker-alt"></i> LocalizaÃ§Ã£o expirada. Aguardando nova validaÃ§Ã£o de GPS.';
     }
 }, 10000);
 
@@ -1235,15 +1096,29 @@ window.onload = validarGeolocalizacao;
     .ponto-relogio-wrap .camera-frame {
         box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 20px rgba(15, 23, 42, 0.22);
         backdrop-filter: blur(2px);
+        border-radius: 18px !important;
+        border: 2px solid #9ec6e8 !important;
+        background: #17324a;
     }
 
     .ponto-relogio-wrap .face-guide {
         width: 200px;
         height: 260px;
-        border: 3px dashed rgba(255, 255, 255, 0.75);
+        border: 5px solid rgba(54, 134, 201, 0.95);
         border-radius: 50%;
         box-shadow: 0 0 0 0 rgba(45, 119, 255, 0.6);
         animation: faceGuidePulse 1.8s ease-in-out infinite;
+    }
+
+    .ponto-relogio-wrap .ft-logo-watermark {
+        letter-spacing: 0.4px;
+        font-size: 1.1rem;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, .45);
+        opacity: .95;
+    }
+
+    .ponto-relogio-wrap .ft-logo-watermark span {
+        color: #8dd0ff;
     }
 
     .ponto-relogio-wrap .liveness-steps {
@@ -1331,5 +1206,6 @@ window.onload = validarGeolocalizacao;
     }
 </style>
 {% endblock %}
+
 
 
