@@ -5,32 +5,34 @@
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
 
 <script>
-    const LOJA_LATITUDE = {{ config.latitude_loja|safe|default:"0" }};
-    const LOJA_LONGITUDE = {{ config.longitude_loja|safe|default:"0" }};
-    const RAIO_PERMITIDO_METROS = {{ config.raio_permitido|safe|default:"100" }};
+const LOJA_LATITUDE = {{ config.latitude_loja|safe|default:"0" }};
+const LOJA_LONGITUDE = {{ config.longitude_loja|safe|default:"0" }};
+const RAIO_PERMITIDO_METROS = {{ config.raio_permitido|safe|default:"100" }};
+const ESCALA_ENTRADA_STR = '{{ config.horario_escala_entrada|time:"H:i"|default:"08:00" }}';
+const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|default:"5" }}');
 </script>
 
 <div class="container mt-4 mb-5 text-center ponto-relogio-wrap" style="max-width: 760px;">
     <h3 class="fw-bold mb-2 text-dark">
         <i class="fas fa-map-marker-alt text-danger me-2"></i>Ponto Seguro
     </h3>
-    <p class="text-muted mb-3">Registro com validaÃ§Ã£o de localizaÃ§Ã£o e biometria facial.</p>
+    <p class="text-muted mb-3">Registro com validacao de localizacao e biometria facial.</p>
     <div id="relogio-tempo-real" class="text-primary fw-bold mb-4 fs-5"></div>
 
     <div id="ai-status" class="alert alert-warning shadow-sm">
-        <i class="fas fa-spinner fa-spin"></i> Solicitando localizaÃ§Ã£o GPS...
+        <i class="fas fa-spinner fa-spin"></i> Solicitando localizacao GPS...
     </div>
 
     <div class="alert alert-info shadow-sm text-start">
         <div><strong>Escala de entrada:</strong> {{ config.horario_escala_entrada|time:"H:i" }}</div>
-        <div><strong>TolerÃ¢ncia:</strong> {{ config.tolerancia_atraso_minutos }} minuto(s)</div>
-        <small>Atraso acima da tolerÃ¢ncia exige justificativa e segue para homologaÃ§Ã£o.</small>
+        <div><strong>Tolerancia:</strong> {{ config.tolerancia_atraso_minutos }} minuto(s)</div>
+        <small>Atraso acima da Tolerancia exige justificativa e segue para homologacao.</small>
     </div>
 
     {% if not foto_url %}
     <div class="alert alert-danger shadow-sm">
         <i class="fas fa-exclamation-triangle"></i>
-        <strong>Acesso Bloqueado:</strong> VocÃª nÃ£o possui foto cadastrada no RH.
+        <strong>Acesso Bloqueado:</strong> Voce Nao possui foto cadastrada no RH.
     </div>
     {% endif %}
 
@@ -41,10 +43,10 @@
                     <div class="ft-intro-logo">
                         <i class="fas fa-user-shield"></i> SPAGI ID
                     </div>
-                    <h5 class="fw-bold mb-2"><i class="fas fa-user-check text-primary me-1"></i> VerificaÃ§Ã£o de identidade</h5>
+                    <h5 class="fw-bold mb-2"><i class="fas fa-user-check text-primary me-1"></i> Verificacao de identidade</h5>
                     <p class="text-muted mb-3">Enquadre o rosto no oval. Quando estiver pronto, toque em "Estou pronto".</p>
                     <div class="ft-intro-checks mb-3">
-                        <div class="ft-check-pill"><i class="fas fa-check-circle"></i> UsuÃ¡rio presente</div>
+                        <div class="ft-check-pill"><i class="fas fa-check-circle"></i> usuario presente</div>
                         <div class="ft-check-pill"><i class="fas fa-check-circle"></i> Captura automatica</div>
                         <div class="ft-check-pill"><i class="fas fa-check-circle"></i> Identidade verificada</div>
                     </div>
@@ -56,7 +58,7 @@
 
             <div id="detecaoSection" style="display:none;">
                 <div class="alert alert-light border text-start mb-3 ft-sequence-box">
-                    <div class="fw-semibold mb-2"><i class="fas fa-shield-alt text-primary me-1"></i> SequÃªncia de validaÃ§Ã£o</div>
+                    <div class="fw-semibold mb-2"><i class="fas fa-shield-alt text-primary me-1"></i> Sequencia de validacao</div>
                     <div class="ft-sequence-list">
                         <div class="ft-sequence-item" id="flowPresenca">
                             <span class="ft-sequence-icon"><i class="fas fa-camera"></i></span>
@@ -84,7 +86,7 @@
                         </div>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                        <span id="chipPresenca" class="badge rounded-pill bg-secondary-subtle text-secondary">PresenÃ§a: aguardando</span>
+                        <span id="chipPresenca" class="badge rounded-pill bg-secondary-subtle text-secondary">Presenca: aguardando</span>
                         <span id="chipLiveness" class="badge rounded-pill bg-secondary-subtle text-secondary">Captura: aguardando</span>
                         <span id="chipMatch" class="badge rounded-pill bg-secondary-subtle text-secondary">Face Match: aguardando</span>
                     </div>
@@ -93,10 +95,10 @@
                     </div>
                     <div class="mt-3">
                         <div class="d-flex justify-content-between small text-muted mb-1">
-                            <span>Progresso da validaÃ§Ã£o</span>
+                            <span>Progresso da validacao</span>
                             <span id="progressLabel">0%</span>
                         </div>
-                        <div class="progress" role="progressbar" aria-label="Progresso validaÃ§Ã£o facial" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress" role="progressbar" aria-label="Progresso validacao facial" aria-valuemin="0" aria-valuemax="100">
                             <div id="validationProgressBar" class="progress-bar bg-primary" style="width: 0%"></div>
                         </div>
                     </div>
@@ -133,7 +135,7 @@
 
                 <div class="d-grid gap-2">
                     <button id="btnValidarIdentidade" type="button" class="btn btn-primary btn-lg fw-bold" onclick="validarIdentidadeInicial()">
-                        <i class="fas fa-face-smile-beam me-1"></i> Validar identidade agora
+                        <i class="fas fa-face-smile-beam me-1"></i> Captura automatica em andamento...
                     </button>
                     <button type="button" class="btn btn-outline-secondary fw-semibold" onclick="voltarParaInicio()">
                         Voltar
@@ -142,14 +144,22 @@
             </div>
             </div>
 
+            <div id="processamentoSection" style="display:none;" class="text-center">
+                <div class="alert alert-light border shadow-sm py-5">
+                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <h5 class="fw-bold mb-2" id="processamentoTitulo">Enviando selfie criptografada</h5>
+                    <p class="text-muted mb-0" id="processamentoSubtitulo">Aguarde alguns segundos...</p>
+                </div>
+            </div>
+
             <div id="resultadoSection" style="display:none;" class="text-start">
                 <div id="resultadoCard" class="alert alert-success border shadow-sm">
                     <h5 class="fw-bold mb-2"><i class="fas fa-check-circle me-1"></i> Identidade validada</h5>
-                    <p id="resultadoMensagem" class="mb-2">ValidaÃ§Ã£o concluÃ­da.</p>
+                    <p id="resultadoMensagem" class="mb-2">validacao concluida.</p>
                     <small id="resultadoDetalhe" class="text-muted"></small>
                 </div>
                 <div class="ft-result-checks mb-3" id="resultChecks">
-                    <div class="ft-result-item"><i class="fas fa-check-circle"></i> UsuÃ¡rio presente</div>
+                    <div class="ft-result-item"><i class="fas fa-check-circle"></i> usuario presente</div>
                     <div class="ft-result-item"><i class="fas fa-check-circle"></i> Captura automatica</div>
                     <div class="ft-result-item"><i class="fas fa-check-circle"></i> Identidade verificada</div>
                 </div>
@@ -171,14 +181,14 @@
                     <button id="btnEntrada" class="btn btn-lg fw-bold text-white btn-success py-3" onclick="tirarFoto('entrada','Entrada')" disabled>
                         Entrada {% if ponto.entrada %}({{ ponto.entrada|time:"H:i" }}){% endif %}
                     </button>
-                    <button id="btnSaidaAlmoco" class="btn btn-lg fw-bold text-white btn-warning py-3" onclick="tirarFoto('saida_almoco','SaÃ­da AlmoÃ§o')" disabled>
-                        SaÃ­da AlmoÃ§o {% if ponto.saida_almoco %}({{ ponto.saida_almoco|time:"H:i" }}){% endif %}
+                    <button id="btnSaidaAlmoco" class="btn btn-lg fw-bold text-white btn-warning py-3" onclick="tirarFoto('saida_almoco','Saida Almoco')" disabled>
+                        Saida Almoco {% if ponto.saida_almoco %}({{ ponto.saida_almoco|time:"H:i" }}){% endif %}
                     </button>
-                    <button id="btnRetornoAlmoco" class="btn btn-lg fw-bold text-white btn-info py-3" onclick="tirarFoto('retorno_almoco','Retorno AlmoÃ§o')" disabled>
-                        Retorno AlmoÃ§o {% if ponto.retorno_almoco %}({{ ponto.retorno_almoco|time:"H:i" }}){% endif %}
+                    <button id="btnRetornoAlmoco" class="btn btn-lg fw-bold text-white btn-info py-3" onclick="tirarFoto('retorno_almoco','Retorno Almoco')" disabled>
+                        Retorno Almoco {% if ponto.retorno_almoco %}({{ ponto.retorno_almoco|time:"H:i" }}){% endif %}
                     </button>
-                    <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger py-3" onclick="tirarFoto('saida','SaÃ­da Final')" disabled>
-                        SaÃ­da Final {% if ponto.saida %}({{ ponto.saida|time:"H:i" }}){% endif %}
+                    <button id="btnSaida" class="btn btn-lg fw-bold text-white btn-danger py-3" onclick="tirarFoto('saida','Saida Final')" disabled>
+                        Saida Final {% if ponto.saida %}({{ ponto.saida|time:"H:i" }}){% endif %}
                     </button>
                 </div>
             </div>
@@ -189,8 +199,8 @@
                     <small id="lblTipoBatida" class="fw-bold"></small>
                 </div>
                 <div class="alert alert-light border text-start mb-3">
-                    <div class="fw-semibold mb-1">Prova de vida rÃ¡pida</div>
-                    <small id="livenessInstruction" class="text-muted">Olhe para a cÃ¢mera e mantenha o rosto centralizado.</small>
+                    <div class="fw-semibold mb-1">Prova de vida rapida</div>
+                    <small id="livenessInstruction" class="text-muted">Olhe para a camera e mantenha o rosto centralizado.</small>
                 </div>
                 <div class="rounded-4 overflow-hidden mb-4 shadow" style="height:350px;border:4px solid #0d6efd;">
                     <img id="photoPreview" style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);">
@@ -209,9 +219,9 @@
                 <input type="hidden" name="latitude" id="latInput">
                 <input type="hidden" name="longitude" id="lngInput">
                 <input type="hidden" name="geo_checked_at" id="geoCheckedAtInput">
-                <div class="mt-3 text-start">
+                <div class="mt-3 text-start" id="justificativaWrapper" style="display:none;">
                     <label for="justificativaAtraso" class="form-label fw-bold">Justificativa de atraso (se houver):</label>
-                    <textarea name="justificativa_atraso" id="justificativaAtraso" rows="3" class="form-control" placeholder="Ex.: trÃ¢nsito, consulta mÃ©dica, ocorrÃªncia no trajeto."></textarea>
+                    <textarea name="justificativa_atraso" id="justificativaAtraso" rows="3" class="form-control" placeholder="Ex.: transito, consulta medica, ocorrencia no trajeto."></textarea>
                 </div>
             </form>
             <canvas id="canvasElement" style="display:none;"></canvas>
@@ -247,6 +257,7 @@ let livenessSawRight = false;
 let livenessFrameCount = 0;
 let rafId = null;
 let biometriaChallengeToken = '';
+let autoValidationInFlight = false;
 
 function setChip(id, status, label) {
     const chip = document.getElementById(id);
@@ -312,7 +323,11 @@ function atualizarHint(texto, tipo = 'normal') {
 }
 
 async function mostrarEtapaProcessamento(tipo) {
+    const titulo = document.getElementById('processamentoTitulo');
+    const subtitulo = document.getElementById('processamentoSubtitulo');
     if (tipo === 'upload') {
+        if (titulo) titulo.innerText = 'Enviando selfie criptografada';
+        if (subtitulo) subtitulo.innerText = 'Protegendo e enviando os dados...';
         atualizarHint('Enviando selfie criptografada...', 'warn');
         setChip('chipLiveness', 'warn', 'Captura: enviando');
         setProgress(78);
@@ -320,6 +335,8 @@ async function mostrarEtapaProcessamento(tipo) {
         return;
     }
     if (tipo === 'process') {
+        if (titulo) titulo.innerText = 'Processando identidade';
+        if (subtitulo) subtitulo.innerText = 'Comparando com foto de cadastro...';
         atualizarHint('Processando validacao de identidade...', 'warn');
         setChip('chipMatch', 'warn', 'Face Match: processando');
         setProgress(88);
@@ -327,6 +344,8 @@ async function mostrarEtapaProcessamento(tipo) {
         return;
     }
     if (tipo === 'done') {
+        if (titulo) titulo.innerText = 'Validacao concluida';
+        if (subtitulo) subtitulo.innerText = 'Identidade verificada com sucesso.';
         atualizarHint('Validacao concluida', 'ok');
         await esperar(220);
     }
@@ -374,7 +393,7 @@ function tokenExpirado() {
 
 function validarTokenOuAtualizar() {
     if (!tokenExpirado()) return true;
-        alert('Sua sessÃ£o para bater ponto expirou (mais de 2 minutos). A pÃ¡gina serÃ¡ atualizada para gerar um novo token.');
+        alert('Sua sessao para bater ponto expirou (mais de 2 minutos). A pagina sera atualizada para gerar um novo token.');
     window.location.reload();
     return false;
 }
@@ -387,7 +406,7 @@ function geoExpirado() {
 
 function validarGeoOuAtualizar() {
     if (geoAprovado && !geoExpirado()) return true;
-    alert('LocalizaÃ§Ã£o expirada (mais de 2 minutos). Vamos atualizar o GPS antes de continuar.');
+    alert('localizacao expirada (mais de 2 minutos). Vamos atualizar o GPS antes de continuar.');
     validarGeolocalizacao();
     return false;
 }
@@ -407,7 +426,7 @@ function validarGeolocalizacao() {
     if (!navigator.geolocation) {
         geoAprovado = false;
         statusDiv.className = 'alert alert-danger';
-        statusDiv.innerHTML = 'Navegador nÃ£o suporta GeolocalizaÃ§Ã£o.';
+        statusDiv.innerHTML = 'Navegador Nao suporta Geolocalizacao.';
         return;
     }
 
@@ -427,16 +446,16 @@ function validarGeolocalizacao() {
             if (distanciaMetros > RAIO_PERMITIDO_METROS) {
                 geoAprovado = false;
                 statusDiv.className = 'alert alert-danger shadow-sm';
-                statusDiv.innerHTML = `ðŸš« <strong>FORA DA ÃREA:</strong> VocÃª estÃ¡ a ${distanciaMetros.toFixed(0)}m da loja. Raio permitido: ${RAIO_PERMITIDO_METROS}m.`;
+                statusDiv.innerHTML = `<strong>FORA DA AREA:</strong> Voce esta a ${distanciaMetros.toFixed(0)}m da loja. Raio permitido: ${RAIO_PERMITIDO_METROS}m.`;
                 document.getElementById('mainCard').style.display = 'none';
             } else {
                 geoAprovado = true;
-                document.getElementById('distanciaText').innerText = `DistÃ¢ncia: ${distanciaMetros.toFixed(0)}m da Loja`;
+                document.getElementById('distanciaText').innerText = `Distancia: ${distanciaMetros.toFixed(0)}m da Loja`;
                 if (!iaInicializada) {
                     iniciarIA();
                 } else {
                     statusDiv.className = 'alert alert-success shadow-sm';
-                    statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> LocalizaÃ§Ã£o revalidada com sucesso.';
+                    statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> localizacao revalidada com sucesso.';
                     document.getElementById('mainCard').style.display = 'block';
                 }
             }
@@ -444,14 +463,14 @@ function validarGeolocalizacao() {
         () => {
             geoAprovado = false;
             statusDiv.className = 'alert alert-danger';
-            statusDiv.innerHTML = 'ðŸš« <strong>PermissÃ£o de GPS Negada:</strong> Libere a localizaÃ§Ã£o do navegador para liberar o ponto.';
+            statusDiv.innerHTML = '<strong>Permissao de GPS negada:</strong> Libere a localizacao do navegador para liberar o ponto.';
         },
         { enableHighAccuracy: true }
     );
 }
 
 async function iniciarIA() {
-    statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando validaÃ§Ã£o biomÃ©trica...';
+    statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Carregando validacao biometrica...';
     try {
         const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
         await Promise.all([
@@ -468,20 +487,20 @@ async function iniciarIA() {
                 referenceDescriptor = detection.descriptor;
                 iaInicializada = true;
                 statusDiv.className = 'alert alert-success shadow-sm';
-                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> LocalizaÃ§Ã£o e biometria aprovadas!';
+                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> localizacao e biometria aprovadas!';
                 document.getElementById('mainCard').style.display = 'block';
-                setChip('chipMatch', 'warn', 'Face Match: referÃªncia carregada');
+                setChip('chipMatch', 'warn', 'Face Match: referencia carregada');
                 setStep(4, 'active');
                 setProgress(20);
                 if (fluxoFacialIniciado) ligarCamera();
             } else {
                 statusDiv.className = 'alert alert-danger';
-                statusDiv.innerHTML = 'Erro: rosto nÃ£o identificado na foto do RH.';
+                statusDiv.innerHTML = 'Erro: rosto Nao identificado na foto do RH.';
             }
         }
     } catch (e) {
         statusDiv.className = 'alert alert-danger';
-        statusDiv.innerHTML = 'Erro tÃ©cnico na IA: ' + e.message;
+        statusDiv.innerHTML = 'Erro tecnico na IA: ' + e.message;
     }
 }
 
@@ -496,7 +515,7 @@ function ligarCamera() {
         })
         .catch(() => {
             statusDiv.className = 'alert alert-danger';
-            statusDiv.innerHTML = 'Permita o acesso Ã  cÃ¢mera.';
+            statusDiv.innerHTML = 'Permita o acesso a camera.';
         });
 }
 
@@ -506,13 +525,19 @@ function iniciarFluxoFacial() {
     fluxoFacialIniciado = true;
     animateSectionTransition('introSection', 'detecaoSection');
     document.getElementById('resultadoSection').style.display = 'none';
+    document.getElementById('processamentoSection').style.display = 'none';
     document.getElementById('batidaSection').style.display = 'none';
+    const just = document.getElementById('justificativaWrapper');
+    if (just) just.style.display = 'none';
     if (iaInicializada) ligarCamera();
 }
 
 function voltarParaInicio() {
     fluxoFacialIniciado = false;
+    autoValidationInFlight = false;
     animateSectionTransition('detecaoSection', 'introSection');
+    const just = document.getElementById('justificativaWrapper');
+    if (just) just.style.display = 'none';
 }
 
 function abrirBatidaSection() {
@@ -521,17 +546,22 @@ function abrirBatidaSection() {
         return;
     }
     document.getElementById('resultadoSection').style.display = 'none';
+    document.getElementById('processamentoSection').style.display = 'none';
     document.getElementById('batidaSection').style.display = 'block';
+    const just = document.getElementById('justificativaWrapper');
+    if (just) just.style.display = 'block';
 }
 
 function reiniciarValidacao() {
     identidadeValidada = false;
+    autoValidationInFlight = false;
     setChip('chipLiveness', 'idle', 'Captura: aguardando');
-    setChip('chipMatch', 'warn', 'Face Match: referÃªncia carregada');
+    setChip('chipMatch', 'warn', 'Face Match: referencia carregada');
     setProgress(30);
     setStep(3, 'idle');
     setStep(4, 'active');
     document.getElementById('resultadoSection').style.display = 'none';
+    document.getElementById('processamentoSection').style.display = 'none';
     document.getElementById('batidaSection').style.display = 'none';
     document.getElementById('detecaoSection').style.display = 'block';
 }
@@ -547,7 +577,7 @@ function mostrarResultadoValidacao(aprovado, mensagem, detalhe = '') {
         card.className = aprovado ? 'alert alert-success border shadow-sm' : 'alert alert-danger border shadow-sm';
         card.querySelector('h5').innerHTML = aprovado
             ? '<i class="fas fa-check-circle me-1"></i> Identidade validada'
-            : '<i class="fas fa-times-circle me-1"></i> Falha na validaÃ§Ã£o';
+            : '<i class="fas fa-times-circle me-1"></i> Falha na validacao';
     }
     if (checks) {
         checks.classList.toggle('is-failed', !aprovado);
@@ -556,29 +586,32 @@ function mostrarResultadoValidacao(aprovado, mensagem, detalhe = '') {
         });
     }
     document.getElementById('detecaoSection').style.display = 'none';
+    document.getElementById('processamentoSection').style.display = 'none';
     document.getElementById('resultadoSection').style.display = 'block';
 }
 
-async function validarIdentidadeInicial() {
+async function validarIdentidadeInicial(autoMode = false) {
+    if (autoValidationInFlight) return;
     if (!validarTokenOuAtualizar()) return;
     if (!validarGeoOuAtualizar()) return;
     if (!iaInicializada || !referenceDescriptor) {
-        alert('A validaÃ§Ã£o biomÃ©trica ainda estÃ¡ carregando. Aguarde alguns segundos e tente novamente.');
+        alert('A validacao biometrica ainda esta carregando. Aguarde alguns segundos e tente novamente.');
         return;
     }
     if (!cameraLigada) {
         ligarCamera();
         await esperar(500);
         if (!cameraLigada) {
-            alert('NÃ£o foi possÃ­vel acessar a cÃ¢mera.');
+            alert('Nao foi possivel acessar a camera.');
             return;
         }
     }
+    autoValidationInFlight = true;
 
     const btn = document.getElementById('btnValidarIdentidade');
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Validando...';
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Capturando...';
     }
 
     try {
@@ -587,31 +620,33 @@ async function validarIdentidadeInicial() {
         setStep(3, 'idle');
         setStep(4, 'idle');
         setProgress(10);
-        atualizarHint('Aguardando rosto vÃ¡lido para capturar...', 'warn');
+        atualizarHint('Aguardando rosto valido para capturar...', 'warn');
 
         await prepararChallengeBiometria();
         const capturado = await aguardarRostoValidoECapturar();
         if (!capturado || !capturado.detection || !capturado.base64) {
             identidadeValidada = false;
-            setChip('chipPresenca', 'err', 'PresenÃ§a: nÃ£o validada');
-            setChip('chipLiveness', 'err', 'Captura: nÃ£o concluÃ­da');
+            setChip('chipPresenca', 'err', 'Presenca: Nao validada');
+            setChip('chipLiveness', 'err', 'Captura: Nao concluida');
             setStep(1, 'err');
             setStep(2, 'err');
             setStep(3, 'err');
             setProgress(0);
-            mostrarResultadoValidacao(false, 'NÃ£o foi possÃ­vel capturar seu rosto.', 'Centralize o rosto no oval e tente novamente.');
+            mostrarResultadoValidacao(false, 'Nao foi possivel capturar seu rosto.', 'Centralize o rosto no oval e tente novamente.');
             return;
         }
 
         const detection = capturado.detection;
-        setChip('chipPresenca', 'ok', 'PresenÃ§a: usuÃ¡rio presente');
-        setChip('chipLiveness', 'ok', 'Captura: concluÃ­da');
+        setChip('chipPresenca', 'ok', 'Presenca: usuario presente');
+        setChip('chipLiveness', 'ok', 'Captura: concluida');
         setStep(1, 'ok');
         setStep(2, 'ok');
         setStep(3, 'ok');
         setProgress(68);
         atualizarHint('Foto capturada. Validando similaridade...', 'ok');
 
+        document.getElementById('detecaoSection').style.display = 'none';
+        document.getElementById('processamentoSection').style.display = 'block';
         await mostrarEtapaProcessamento('upload');
         setStep(4, 'active');
         await mostrarEtapaProcessamento('process');
@@ -625,8 +660,8 @@ async function validarIdentidadeInicial() {
             setProgress(72);
             mostrarResultadoValidacao(
                 false,
-                feedback.message || 'ComparaÃ§Ã£o facial reprovada.',
-                `DistÃ¢ncia: ${Number(feedback.distance || distance).toFixed(3)} | Limite: ${Number(feedback.threshold || DISTANCE_THRESHOLD).toFixed(3)}`
+                feedback.message || 'Comparacao facial reprovada.',
+                `Distancia: ${Number(feedback.distance || distance).toFixed(3)} | Limite: ${Number(feedback.threshold || DISTANCE_THRESHOLD).toFixed(3)}`
             );
             return;
         }
@@ -639,24 +674,25 @@ async function validarIdentidadeInicial() {
         atualizarHint('Identidade validada com sucesso!', 'ok');
         mostrarResultadoValidacao(
             true,
-            feedback.message || 'ValidaÃ§Ã£o concluÃ­da. VocÃª jÃ¡ pode registrar a batida.',
-            `DistÃ¢ncia: ${Number(feedback.distance || distance).toFixed(3)} | Limite: ${Number(feedback.threshold || DISTANCE_THRESHOLD).toFixed(3)}`
+            feedback.message || 'validacao concluida. Voce ja pode registrar a batida.',
+            `Distancia: ${Number(feedback.distance || distance).toFixed(3)} | Limite: ${Number(feedback.threshold || DISTANCE_THRESHOLD).toFixed(3)}`
         );
     } catch (error) {
         identidadeValidada = false;
         const msgErro = (error && error.message) ? String(error.message) : 'Tente novamente.';
         if (msgErro.toLowerCase().includes('liveness')) {
-            setChip('chipLiveness', 'err', 'Captura: erro tÃ©cnico');
+            setChip('chipLiveness', 'err', 'Captura: erro tecnico');
             setStep(3, 'err');
         } else {
-            setChip('chipMatch', 'err', 'Face Match: erro tÃ©cnico');
+            setChip('chipMatch', 'err', 'Face Match: erro tecnico');
             setStep(4, 'err');
         }
-        mostrarResultadoValidacao(false, 'Erro tÃ©cnico durante validaÃ§Ã£o.', msgErro);
+        mostrarResultadoValidacao(false, 'Erro tecnico durante validacao.', msgErro);
     } finally {
+        autoValidationInFlight = false;
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-face-smile-beam me-1"></i> Validar identidade agora';
+            btn.innerHTML = '<i class="fas fa-face-smile-beam me-1"></i> Captura automatica em andamento...';
         }
     }
 }
@@ -678,18 +714,23 @@ function iniciarMonitorPresenca() {
                 const cy = (box.y + box.height / 2) / video.videoHeight;
                 const centralizado = Math.abs(cx - 0.5) < 0.16 && Math.abs(cy - 0.5) < 0.20;
                 if (faceArea > 0.12 && centralizado) {
-                    setChip('chipPresenca', 'ok', 'PresenÃ§a: usuÃ¡rio presente');
+                    setChip('chipPresenca', 'ok', 'Presenca: usuario presente');
                     atualizarHint('Rosto detectado. Pode seguir.', 'ok');
                     setStep(2, 'ok');
                     setProgress(40);
+                    if (fluxoFacialIniciado && !identidadeValidada && !autoValidationInFlight) {
+                        setTimeout(() => {
+                            if (!identidadeValidada && !autoValidationInFlight) validarIdentidadeInicial(true);
+                        }, 250);
+                    }
                 } else {
-                    setChip('chipPresenca', 'warn', 'PresenÃ§a: ajuste enquadramento');
+                    setChip('chipPresenca', 'warn', 'Presenca: ajuste enquadramento');
                     atualizarHint('Aproxime e centralize o rosto na moldura.', 'warn');
                     setStep(2, 'active');
                     setProgress(28);
                 }
             } else {
-                setChip('chipPresenca', 'err', 'PresenÃ§a: sem rosto detectado');
+                setChip('chipPresenca', 'err', 'Presenca: sem rosto detectado');
                 atualizarHint('Enquadre seu rosto na moldura', 'warn');
                 setStep(1, 'active');
                 setStep(2, 'idle');
@@ -726,16 +767,59 @@ function tirarFoto(tipoInterno, nomeAmigavel) {
     document.getElementById('fotoBase64Input').value = dataURL;
     document.getElementById('tipoBatidaInput').value = tipoInterno;
     document.getElementById('lblTipoBatida').innerText = nomeAmigavel;
+    atualizarObrigatoriedadeJustificativa(tipoInterno);
 
     animateSectionTransition('liveCameraSection', 'confirmationSection');
+}
+
+function minutosDoDia(hhmm) {
+    if (!hhmm || typeof hhmm !== 'string' || hhmm.indexOf(':') < 0) return null;
+    const [h, m] = hhmm.split(':').map(v => Number(v));
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    return (h * 60) + m;
+}
+
+function isEntradaComAtraso() {
+    const now = new Date();
+    const agoraMin = (now.getHours() * 60) + now.getMinutes();
+    const escalaMin = minutosDoDia(ESCALA_ENTRADA_STR);
+    if (escalaMin === null) return false;
+    const atraso = agoraMin - escalaMin;
+    return atraso >= TOLERANCIA_ATRASO_MIN;
+}
+
+function atualizarObrigatoriedadeJustificativa(tipoBatida) {
+    const wrapper = document.getElementById('justificativaWrapper');
+    const textarea = document.getElementById('justificativaAtraso');
+    const label = document.querySelector('label[for="justificativaAtraso"]');
+    if (!wrapper || !textarea) return;
+
+    const obrigatoria = tipoBatida === 'entrada' && isEntradaComAtraso();
+    wrapper.style.display = 'block';
+    textarea.required = obrigatoria;
+    textarea.placeholder = obrigatoria
+        ? 'Obrigatoria para atraso de entrada. Descreva o motivo.'
+        : 'Opcional. Ex.: transito, consulta medica, ocorrencia no trajeto.';
+    if (label) {
+        label.innerText = obrigatoria
+            ? 'Justificativa de atraso (obrigatoria):'
+            : 'Justificativa de atraso (se houver):';
+    }
 }
 
 async function confirmarPonto() {
     if (!validarTokenOuAtualizar()) return;
     if (!validarGeoOuAtualizar()) return;
     if (!identidadeValidada) {
-        alert('Sua validaÃ§Ã£o de identidade nÃ£o estÃ¡ ativa. FaÃ§a a validaÃ§Ã£o novamente.');
+        alert('Sua validacao de identidade nao esta ativa. Faca a validacao novamente.');
         animateSectionTransition('confirmationSection', 'detecaoSection');
+        return;
+    }
+    const tipoBatida = document.getElementById('tipoBatidaInput').value;
+    const justificativa = (document.getElementById('justificativaAtraso').value || '').trim();
+    if (tipoBatida === 'entrada' && isEntradaComAtraso() && !justificativa) {
+        alert('Entrada com atraso detectada. Informe a justificativa para continuar.');
+        document.getElementById('justificativaAtraso').focus();
         return;
     }
 
@@ -754,7 +838,7 @@ async function prepararChallengeBiometria() {
     });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok || !data.challenge_token) {
-        throw new Error(data.message || 'Falha ao iniciar challenge biomÃ©trico.');
+        throw new Error(data.message || 'Falha ao iniciar challenge biometrico.');
     }
     biometriaChallengeToken = data.challenge_token;
 }
@@ -805,7 +889,7 @@ async function validarBiometriaOpenSource(distance, selfieCaptureBase64) {
         }),
     });
     if (!resp.ok) {
-        return { ok: false, approved: false, message: 'Falha de comunicaÃ§Ã£o com a biometria interna.' };
+        return { ok: false, approved: false, message: 'Falha de comunicacao com a biometria interna.' };
     }
     return await resp.json();
 }
@@ -817,7 +901,7 @@ async function validarLivenessRapido() {
     livenessFrameCount = 0;
     const instr = document.getElementById('livenessInstruction');
     if (instr) instr.innerText = 'Passo 1/3: mantenha o rosto centralizado.';
-    atualizarHint('ValidaÃ§Ã£o de presenÃ§a em andamento...', 'warn');
+    atualizarHint('validacao de Presenca em andamento...', 'warn');
 
     const limiteFrames = 120;
     while (livenessFrameCount < limiteFrames) {
@@ -846,14 +930,14 @@ async function validarLivenessRapido() {
             if (xNorm > LIVENESS_SIDE_TOLERANCE) {
                 livenessSawRight = true;
                 atualizarHint('Liveness aprovado!', 'ok');
-                if (instr) instr.innerText = 'Prova de vida concluÃ­da com sucesso.';
+                if (instr) instr.innerText = 'Prova de vida concluida com sucesso.';
                 return true;
             }
         }
         await esperar(80);
     }
-    if (instr) instr.innerText = 'NÃ£o foi possÃ­vel concluir. Tente novamente com boa iluminaÃ§Ã£o.';
-    atualizarHint('Liveness nÃ£o concluÃ­do', 'err');
+    if (instr) instr.innerText = 'Nao foi possivel concluir. Tente novamente com boa iluminacao.';
+    atualizarHint('Liveness nao concluido', 'err');
     return livenessSawLeft && livenessSawRight;
 }
 
@@ -870,9 +954,9 @@ function cancelarFoto() {
     document.getElementById('fotoBase64Input').value = '';
     animateSectionTransition('confirmationSection', 'liveCameraSection');
     const instr = document.getElementById('livenessInstruction');
-    if (instr) instr.innerText = 'Olhe para a cÃ¢mera e mantenha o rosto centralizado.';
+    if (instr) instr.innerText = 'Olhe para a camera e mantenha o rosto centralizado.';
     setChip('chipLiveness', 'idle', 'Captura: aguardando');
-    setChip('chipMatch', 'warn', 'Face Match: referÃªncia carregada');
+    setChip('chipMatch', 'warn', 'Face Match: referencia carregada');
     setStep(3, 'idle');
     setStep(4, 'active');
     setProgress(40);
@@ -909,7 +993,7 @@ setInterval(atualizarRelogio, 1000);
 setInterval(() => {
     if (tokenExpirado()) {
         statusDiv.className = 'alert alert-warning shadow-sm';
-        statusDiv.innerHTML = '<i class="fas fa-sync-alt"></i> SessÃ£o de ponto expirada. Atualize a pÃ¡gina para gerar novo token.';
+        statusDiv.innerHTML = '<i class="fas fa-sync-alt"></i> sessao de ponto expirada. Atualize a pagina para gerar novo token.';
     }
 }, 10000);
 setInterval(() => {
@@ -919,7 +1003,7 @@ setInterval(() => {
     if (geoExpirado()) {
         geoAprovado = false;
         statusDiv.className = 'alert alert-warning shadow-sm';
-        statusDiv.innerHTML = '<i class="fas fa-map-marker-alt"></i> LocalizaÃ§Ã£o expirada. Aguardando nova validaÃ§Ã£o de GPS.';
+        statusDiv.innerHTML = '<i class="fas fa-map-marker-alt"></i> localizacao expirada. Aguardando nova validacao de GPS.';
     }
 }, 10000);
 
@@ -1206,6 +1290,7 @@ window.onload = validarGeolocalizacao;
     }
 </style>
 {% endblock %}
+
 
 
 
