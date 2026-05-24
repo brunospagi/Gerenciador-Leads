@@ -1,5 +1,4 @@
 ﻿{% extends 'base_portal.html' %}
-{% load static %}
 
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
@@ -38,7 +37,9 @@
         <div class="card-body p-4">
             <div id="introSection" class="text-start mb-4">
                 <div class="ft-intro">
-                    <img src="{% static 'images/facetec/FaceTec_Logo.png' %}" alt="FaceTec" class="ft-intro-logo">
+                    <div class="ft-intro-logo">
+                        <i class="fas fa-user-shield"></i> SPAGI ID
+                    </div>
                     <h5 class="fw-bold mb-2"><i class="fas fa-user-check text-primary me-1"></i> Verificação de identidade</h5>
                     <p class="text-muted mb-3">Fluxo em etapas: detectar rosto, validar prova de vida e comparar com foto do cadastro funcional.</p>
                     <div class="ft-intro-checks mb-3">
@@ -57,7 +58,7 @@
                     <div class="fw-semibold mb-2"><i class="fas fa-shield-alt text-primary me-1"></i> Sequência de validação</div>
                     <div class="ft-sequence-list">
                         <div class="ft-sequence-item" id="flowPresenca">
-                            <img src="{% static 'images/facetec/FaceTec_camera.png' %}" alt="" class="ft-sequence-icon">
+                            <span class="ft-sequence-icon"><i class="fas fa-camera"></i></span>
                             <div class="ft-sequence-text">
                                 <strong>Detectar rosto</strong>
                                 <small id="flowPresencaText">Aguardando enquadramento</small>
@@ -65,7 +66,7 @@
                             <span class="ft-sequence-state pending" id="flowPresencaState"><i class="far fa-circle"></i></span>
                         </div>
                         <div class="ft-sequence-item" id="flowLiveness">
-                            <img src="{% static 'images/facetec/FaceTec_ideal.png' %}" alt="" class="ft-sequence-icon">
+                            <span class="ft-sequence-icon"><i class="fas fa-face-smile"></i></span>
                             <div class="ft-sequence-text">
                                 <strong>Prova de vida</strong>
                                 <small id="flowLivenessText">Aguardando movimento guiado</small>
@@ -73,7 +74,7 @@
                             <span class="ft-sequence-state pending" id="flowLivenessState"><i class="far fa-circle"></i></span>
                         </div>
                         <div class="ft-sequence-item" id="flowMatch">
-                            <img src="{% static 'images/facetec/FaceTec_review.png' %}" alt="" class="ft-sequence-icon">
+                            <span class="ft-sequence-icon"><i class="fas fa-id-card"></i></span>
                             <div class="ft-sequence-text">
                                 <strong>Comparar com cadastro</strong>
                                 <small id="flowMatchText">Aguardando score facial</small>
@@ -909,8 +910,17 @@ window.onload = validarGeolocalizacao;
     }
 
     .ponto-relogio-wrap .ft-intro-logo {
-        width: auto;
+        width: fit-content;
         height: 36px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: #eaf2ff;
+        border: 1px solid #cfe0ff;
+        color: #1e4a86;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
         margin-bottom: 10px;
     }
 
@@ -962,8 +972,13 @@ window.onload = validarGeolocalizacao;
     .ponto-relogio-wrap .ft-sequence-icon {
         width: 28px;
         height: 28px;
-        object-fit: contain;
-        opacity: 0.88;
+        border-radius: 8px;
+        background: #eaf2ff;
+        color: #1d4f8f;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
     }
 
     .ponto-relogio-wrap .ft-sequence-text {
