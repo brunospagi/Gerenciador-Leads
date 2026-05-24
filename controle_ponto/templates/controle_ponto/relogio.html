@@ -19,23 +19,6 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
     <p class="text-muted mb-3">Registro com validacao de localizacao e biometria facial.</p>
     <div id="relogio-tempo-real" class="text-primary fw-bold mb-4 fs-5"></div>
 
-    <div id="ai-status" class="alert alert-warning shadow-sm">
-        <i class="fas fa-spinner fa-spin"></i> Solicitando localizacao GPS...
-    </div>
-
-    <div class="alert alert-info shadow-sm text-start">
-        <div><strong>Escala de entrada:</strong> {{ config.horario_escala_entrada|time:"H:i" }}</div>
-        <div><strong>Tolerancia:</strong> {{ config.tolerancia_atraso_minutos }} minuto(s)</div>
-        <small>Atraso acima da Tolerancia exige justificativa e segue para homologacao.</small>
-    </div>
-
-    {% if not foto_url %}
-    <div class="alert alert-danger shadow-sm">
-        <i class="fas fa-exclamation-triangle"></i>
-        <strong>Acesso Bloqueado:</strong> Voce Nao possui foto cadastrada no RH.
-    </div>
-    {% endif %}
-
     <div class="card shadow-sm rounded-4 border-0" id="mainCard" style="display:none; {% if not foto_url %}opacity:0.5;pointer-events:none;{% endif %}">
         <div class="card-body p-4">
             <div id="introSection" class="text-start mb-4">
@@ -133,6 +116,7 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
                         spagi<span>ID</span>
                     </div>
                 </div>
+                <div id="captureTimerBadge" class="badge bg-success-subtle text-success d-none mb-3"></div>
 
                 <div class="d-grid gap-2">
                     <div class="alert alert-info mb-0">
@@ -241,6 +225,23 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
             <canvas id="canvasElement" style="display:none;"></canvas>
         </div>
     </div>
+
+    <div id="ai-status" class="alert alert-warning shadow-sm mt-3">
+        <i class="fas fa-spinner fa-spin"></i> Solicitando localizacao GPS...
+    </div>
+
+    <div class="alert alert-info shadow-sm text-start">
+        <div><strong>Escala de entrada:</strong> {{ config.horario_escala_entrada|time:"H:i" }}</div>
+        <div><strong>Tolerancia:</strong> {{ config.tolerancia_atraso_minutos }} minuto(s)</div>
+        <small>Atraso acima da Tolerancia exige justificativa e segue para homologacao.</small>
+    </div>
+
+    {% if not foto_url %}
+    <div class="alert alert-danger shadow-sm">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>Acesso Bloqueado:</strong> Voce Nao possui foto cadastrada no RH.
+    </div>
+    {% endif %}
 </div>
 
 <script>
@@ -336,6 +337,18 @@ function atualizarHint(texto, tipo = 'normal') {
     else if (tipo === 'err') hint.className += 'bg-danger text-white';
     else hint.className += 'bg-white text-dark';
     hint.style.transition = 'all .25s ease';
+}
+
+function atualizarTimerCaptura(restanteSegundos = null) {
+    const badge = document.getElementById('captureTimerBadge');
+    if (!badge) return;
+    if (restanteSegundos === null || restanteSegundos === undefined) {
+        badge.classList.add('d-none');
+        badge.innerText = '';
+        return;
+    }
+    badge.classList.remove('d-none');
+    badge.innerText = `Captura automatica em ${restanteSegundos}s`;
 }
 
 async function mostrarEtapaProcessamento(tipo) {
@@ -539,6 +552,7 @@ function iniciarFluxoFacial() {
     if (!validarTokenOuAtualizar()) return;
     if (!validarGeoOuAtualizar()) return;
     fluxoFacialIniciado = true;
+    if (iaInicializada) ligarCamera();
     animateSectionTransition('introSection', 'detecaoSection');
     document.getElementById('resultadoSection').style.display = 'none';
     document.getElementById('processamentoSection').style.display = 'none';
@@ -546,7 +560,6 @@ function iniciarFluxoFacial() {
     const just = document.getElementById('justificativaWrapper');
     if (just) just.style.display = 'none';
     atualizarFallbackManualUI();
-    if (iaInicializada) ligarCamera();
 }
 
 function voltarParaInicio() {
@@ -604,6 +617,7 @@ function reiniciarValidacao() {
     document.getElementById('processamentoSection').style.display = 'none';
     document.getElementById('batidaSection').style.display = 'none';
     document.getElementById('detecaoSection').style.display = 'block';
+    atualizarTimerCaptura(null);
     atualizarFallbackManualUI();
 }
 
@@ -670,6 +684,7 @@ async function validarIdentidadeInicial(autoMode = false) {
             setStep(3, 'err');
             setProgress(0);
             mostrarResultadoValidacao(false, 'Nao foi possivel capturar seu rosto.', 'Centralize o rosto no oval e tente novamente.');
+            atualizarTimerCaptura(null);
             falhasBiometriaConsecutivas += 1;
             atualizarFallbackManualUI();
             return;
@@ -678,6 +693,7 @@ async function validarIdentidadeInicial(autoMode = false) {
         const detection = capturado.detection;
         setChip('chipPresenca', 'ok', 'Presenca: usuario presente');
         setChip('chipLiveness', 'ok', 'Captura: concluida');
+        atualizarTimerCaptura(null);
         setStep(1, 'ok');
         setStep(2, 'ok');
         setStep(3, 'ok');
@@ -731,6 +747,7 @@ async function validarIdentidadeInicial(autoMode = false) {
             setChip('chipMatch', 'err', 'Face Match: erro tecnico');
             setStep(4, 'err');
         }
+        atualizarTimerCaptura(null);
         mostrarResultadoValidacao(false, 'Erro tecnico durante validacao.', msgErro);
         atualizarFallbackManualUI();
     } finally {
@@ -765,12 +782,14 @@ function iniciarMonitorPresenca() {
                         }, 250);
                     }
                 } else {
+                    atualizarTimerCaptura(null);
                     setChip('chipPresenca', 'warn', 'Presenca: ajuste enquadramento');
                     atualizarHint('Aproxime e centralize o rosto na moldura.', 'warn');
                     setStep(2, 'active');
                     setProgress(28);
                 }
             } else {
+                atualizarTimerCaptura(null);
                 setChip('chipPresenca', 'err', 'Presenca: sem rosto detectado');
                 atualizarHint('Enquadre seu rosto na moldura', 'warn');
                 setStep(1, 'active');
@@ -895,6 +914,7 @@ async function aguardarRostoValidoECapturar() {
             .withFaceDescriptor();
         if (!detection) {
             inicioEstavel = null;
+            atualizarTimerCaptura(null);
             atualizarHint('Enquadre seu rosto no oval', 'warn');
             await esperar(90);
             continue;
@@ -908,6 +928,7 @@ async function aguardarRostoValidoECapturar() {
             if (!inicioEstavel) inicioEstavel = Date.now();
             const decorrido = Date.now() - inicioEstavel;
             const restante = Math.max(0, Math.ceil((estabilidadeMs - decorrido) / 1000));
+            atualizarTimerCaptura(restante);
             atualizarHint(`Rosto localizado. Capturando em ${restante}s...`, 'ok');
             if (decorrido < estabilidadeMs) {
                 await esperar(90);
@@ -917,9 +938,11 @@ async function aguardarRostoValidoECapturar() {
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
             const base64 = canvas.toDataURL('image/jpeg', 0.92);
+            atualizarTimerCaptura(null);
             return { detection, base64 };
         }
         inicioEstavel = null;
+        atualizarTimerCaptura(null);
         atualizarHint('Aproxime e centralize o rosto no oval', 'warn');
         await esperar(90);
     }
