@@ -66,6 +66,13 @@ def _atualizar_avatar_com_foto_ponto(user, foto_base64):
     profile = getattr(user, 'profile', None)
     if not profile or not foto_base64:
         return
+    # Não sobrescreve foto definida pelo usuário no perfil.
+    if getattr(profile, 'avatar', None):
+        try:
+            if profile.avatar.name:
+                return
+        except Exception:
+            return
 
     if ';base64,' not in foto_base64:
         return
