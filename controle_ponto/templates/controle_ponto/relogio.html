@@ -36,11 +36,29 @@
     <div class="card shadow-sm rounded-4 border-0" id="mainCard" style="display:none; {% if not foto_url %}opacity:0.5;pointer-events:none;{% endif %}">
         <div class="card-body p-4">
             <div class="alert alert-light border text-start mb-3">
-                <div class="fw-semibold mb-2"><i class="fas fa-shield-alt text-primary me-1"></i> Validação Facial</div>
+                <div class="fw-semibold mb-2"><i class="fas fa-shield-alt text-primary me-1"></i> Validação Facial (Liveness + Match)</div>
                 <div class="d-flex flex-wrap gap-2">
                     <span id="chipPresenca" class="badge rounded-pill bg-secondary-subtle text-secondary">Presença: aguardando</span>
                     <span id="chipLiveness" class="badge rounded-pill bg-secondary-subtle text-secondary">Liveness: aguardando</span>
                     <span id="chipMatch" class="badge rounded-pill bg-secondary-subtle text-secondary">Face Match: aguardando</span>
+                </div>
+                <div class="small text-muted mt-2">
+                    Etapas: 1) Presença 2) Prova de vida 3) Comparação com foto do cadastro.
+                </div>
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between small text-muted mb-1">
+                        <span>Progresso da validação</span>
+                        <span id="progressLabel">0%</span>
+                    </div>
+                    <div class="progress" role="progressbar" aria-label="Progresso validação facial" aria-valuemin="0" aria-valuemax="100">
+                        <div id="validationProgressBar" class="progress-bar bg-primary" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="mt-3 liveness-steps">
+                    <div id="step1" class="step-item"><i class="far fa-circle me-1"></i>Detectar rosto</div>
+                    <div id="step2" class="step-item"><i class="far fa-circle me-1"></i>Centralizar rosto</div>
+                    <div id="step3" class="step-item"><i class="far fa-circle me-1"></i>Virar esquerda/direita</div>
+                    <div id="step4" class="step-item"><i class="far fa-circle me-1"></i>Comparar com cadastro</div>
                 </div>
             </div>
 
@@ -55,7 +73,7 @@
             <div id="liveCameraSection">
                 <div class="position-relative bg-dark rounded-4 overflow-hidden mb-4 shadow-sm camera-frame" style="height: 350px; border: 4px solid #f8f9fa;">
                     <video id="videoElement" autoplay playsinline style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);"></video>
-                    <div id="faceGuide" class="position-absolute top-50 start-50 translate-middle" style="width:200px;height:260px;border:3px dashed rgba(255,255,255,0.7); border-radius:50%;"></div>
+                    <div id="faceGuide" class="position-absolute top-50 start-50 translate-middle face-guide"></div>
                     <div class="position-absolute top-0 start-50 translate-middle-x mt-3 px-3 py-2 rounded-3 bg-white fw-bold" id="uxHint">
                         Enquadre seu rosto na moldura
                     </div>
@@ -144,12 +162,23 @@ let rafId = null;
 function setChip(id, status, label) {
     const chip = document.getElementById(id);
     if (!chip) return;
-    chip.innerText = label;
+    const iconOk = '<i class="fas fa-check-circle me-1"></i>';
+    const iconWarn = '<i class="fas fa-hourglass-half me-1"></i>';
+    const iconErr = '<i class="fas fa-times-circle me-1"></i>';
+    chip.innerHTML = label;
     chip.className = 'badge rounded-pill ';
-    if (status === 'ok') chip.className += 'bg-success text-white';
-    else if (status === 'warn') chip.className += 'bg-warning text-dark';
-    else if (status === 'err') chip.className += 'bg-danger text-white';
-    else chip.className += 'bg-secondary-subtle text-secondary';
+    if (status === 'ok') {
+        chip.className += 'bg-success text-white';
+        chip.innerHTML = `${iconOk}${label}`;
+    } else if (status === 'warn') {
+        chip.className += 'bg-warning text-dark';
+        chip.innerHTML = `${iconWarn}${label}`;
+    } else if (status === 'err') {
+        chip.className += 'bg-danger text-white';
+        chip.innerHTML = `${iconErr}${label}`;
+    } else {
+        chip.className += 'bg-secondary-subtle text-secondary';
+    }
 }
 
 function atualizarHint(texto, tipo = 'normal') {
@@ -161,6 +190,41 @@ function atualizarHint(texto, tipo = 'normal') {
     else if (tipo === 'warn') hint.className += 'bg-warning text-dark';
     else if (tipo === 'err') hint.className += 'bg-danger text-white';
     else hint.className += 'bg-white text-dark';
+    hint.style.transition = 'all .25s ease';
+}
+
+function setProgress(percent) {
+    const bar = document.getElementById('validationProgressBar');
+    const label = document.getElementById('progressLabel');
+    const value = Math.max(0, Math.min(100, Math.round(percent)));
+    if (bar) {
+        bar.style.width = `${value}%`;
+        bar.classList.toggle('bg-success', value >= 100);
+        bar.classList.toggle('bg-primary', value < 100);
+    }
+    if (label) label.innerText = `${value}%`;
+}
+
+function setStep(stepNumber, status) {
+    const el = document.getElementById(`step${stepNumber}`);
+    if (!el) return;
+    const map = {
+        idle: ['far fa-circle', 'step-idle'],
+        active: ['fas fa-spinner fa-spin', 'step-active'],
+        ok: ['fas fa-check-circle', 'step-ok'],
+        err: ['fas fa-times-circle', 'step-err'],
+    };
+    const cfg = map[status] || map.idle;
+    el.className = `step-item ${cfg[1]}`;
+    el.querySelector('i').className = `${cfg[0]} me-1`;
+}
+
+function resetSteps() {
+    setStep(1, 'idle');
+    setStep(2, 'idle');
+    setStep(3, 'idle');
+    setStep(4, 'idle');
+    setProgress(0);
 }
 
 function tokenExpirado() {
@@ -268,6 +332,8 @@ async function iniciarIA() {
                 statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Localização e biometria aprovadas!';
                 document.getElementById('mainCard').style.display = 'block';
                 setChip('chipMatch', 'warn', 'Face Match: referência carregada');
+                setStep(4, 'active');
+                setProgress(20);
                 ligarCamera();
             } else {
                 statusDiv.className = 'alert alert-danger';
@@ -305,6 +371,7 @@ function iniciarMonitorPresenca() {
         try {
             const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
             if (detection) {
+                setStep(1, 'ok');
                 const box = detection.detection.box;
                 const faceArea = (box.width * box.height) / (video.videoWidth * video.videoHeight);
                 const cx = (box.x + box.width / 2) / video.videoWidth;
@@ -313,13 +380,20 @@ function iniciarMonitorPresenca() {
                 if (faceArea > 0.12 && centralizado) {
                     setChip('chipPresenca', 'ok', 'Presença: usuário presente');
                     atualizarHint('Rosto detectado. Pode seguir.', 'ok');
+                    setStep(2, 'ok');
+                    setProgress(40);
                 } else {
                     setChip('chipPresenca', 'warn', 'Presença: ajuste enquadramento');
                     atualizarHint('Aproxime e centralize o rosto na moldura.', 'warn');
+                    setStep(2, 'active');
+                    setProgress(28);
                 }
             } else {
                 setChip('chipPresenca', 'err', 'Presença: sem rosto detectado');
                 atualizarHint('Enquadre seu rosto na moldura', 'warn');
+                setStep(1, 'active');
+                setStep(2, 'idle');
+                setProgress(12);
             }
         } catch (_) {}
         rafId = requestAnimationFrame(loop);
@@ -349,8 +423,7 @@ function tirarFoto(tipoInterno, nomeAmigavel) {
     document.getElementById('tipoBatidaInput').value = tipoInterno;
     document.getElementById('lblTipoBatida').innerText = nomeAmigavel;
 
-    document.getElementById('liveCameraSection').style.display = 'none';
-    document.getElementById('confirmationSection').style.display = 'block';
+    animateSectionTransition('liveCameraSection', 'confirmationSection');
 }
 
 async function confirmarPonto() {
@@ -368,6 +441,7 @@ async function confirmarPonto() {
     if (!detection) {
         alert('Nenhum rosto detectado na foto!');
         setChip('chipLiveness', 'err', 'Liveness: falhou');
+        setStep(3, 'err');
         resetarBotoes(btnConfirmar, btnCancelar);
         return;
     }
@@ -378,27 +452,36 @@ async function confirmarPonto() {
         alert(`FRAUDE DETECTADA!\nO rosto está pequeno demais (${proporcaoRosto.toFixed(1)}%).\nAproxime seu rosto da câmera.`);
         cancelarFoto();
         setChip('chipLiveness', 'err', 'Liveness: rosto distante');
+        setStep(3, 'err');
         resetarBotoes(btnConfirmar, btnCancelar);
         return;
     }
 
+    setStep(3, 'active');
     const livenessOk = await validarLivenessRapido();
     if (!livenessOk) {
         alert('Liveness não concluído. Siga os passos: centro, esquerda e direita.');
         setChip('chipLiveness', 'err', 'Liveness: não concluído');
+        setStep(3, 'err');
         resetarBotoes(btnConfirmar, btnCancelar);
         return;
     }
     setChip('chipLiveness', 'ok', 'Liveness: aprovado');
+    setStep(3, 'ok');
+    setProgress(75);
 
     const distance = faceapi.euclideanDistance(referenceDescriptor, detection.descriptor);
+    setStep(4, 'active');
     if (distance < DISTANCE_THRESHOLD) {
         setChip('chipMatch', 'ok', `Face Match: aprovado (${distance.toFixed(3)})`);
+        setStep(4, 'ok');
+        setProgress(100);
         btnConfirmar.innerHTML = '<i class="fas fa-check-double"></i> Aprovado!';
         btnConfirmar.className = 'btn btn-lg btn-success w-100 fw-bold';
         document.getElementById('pontoForm').submit();
     } else {
         setChip('chipMatch', 'err', `Face Match: reprovado (${distance.toFixed(3)})`);
+        setStep(4, 'err');
         alert('Acesso negado! Rosto incompatível com a foto do sistema.');
         cancelarFoto();
         resetarBotoes(btnConfirmar, btnCancelar);
@@ -458,14 +541,34 @@ function esperar(ms) {
 
 function cancelarFoto() {
     document.getElementById('fotoBase64Input').value = '';
-    document.getElementById('confirmationSection').style.display = 'none';
-    document.getElementById('liveCameraSection').style.display = 'block';
+    animateSectionTransition('confirmationSection', 'liveCameraSection');
+    const instr = document.getElementById('livenessInstruction');
+    if (instr) instr.innerText = 'Olhe para a câmera e mantenha o rosto centralizado.';
+    setChip('chipLiveness', 'idle', 'Liveness: aguardando');
+    setChip('chipMatch', 'warn', 'Face Match: referência carregada');
+    setStep(3, 'idle');
+    setStep(4, 'active');
+    setProgress(40);
 }
 
 function resetarBotoes(btnC, btnX) {
     btnC.innerHTML = 'Sim, sou eu!';
     btnC.disabled = false;
     btnX.disabled = false;
+}
+
+function animateSectionTransition(fromId, toId) {
+    const fromEl = document.getElementById(fromId);
+    const toEl = document.getElementById(toId);
+    if (!fromEl || !toEl) return;
+    fromEl.classList.add('ux-fade-out');
+    setTimeout(() => {
+        fromEl.style.display = 'none';
+        fromEl.classList.remove('ux-fade-out');
+        toEl.style.display = 'block';
+        toEl.classList.add('ux-fade-in');
+        setTimeout(() => toEl.classList.remove('ux-fade-in'), 260);
+    }, 180);
 }
 
 function atualizarRelogio() {
@@ -494,6 +597,7 @@ setInterval(() => {
 }, 10000);
 
 atualizarRelogio();
+resetSteps();
 window.onload = validarGeolocalizacao;
 </script>
 
@@ -504,6 +608,94 @@ window.onload = validarGeolocalizacao;
 
     .ponto-relogio-wrap .camera-frame {
         box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 20px rgba(15, 23, 42, 0.22);
+        backdrop-filter: blur(2px);
+    }
+
+    .ponto-relogio-wrap .face-guide {
+        width: 200px;
+        height: 260px;
+        border: 3px dashed rgba(255, 255, 255, 0.75);
+        border-radius: 50%;
+        box-shadow: 0 0 0 0 rgba(45, 119, 255, 0.6);
+        animation: faceGuidePulse 1.8s ease-in-out infinite;
+    }
+
+    .ponto-relogio-wrap .liveness-steps {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .ponto-relogio-wrap .step-item {
+        font-size: 0.85rem;
+        border: 1px solid #dbe5f2;
+        background: #f8fbff;
+        border-radius: 999px;
+        padding: 6px 10px;
+        color: #64748b;
+        transition: all .22s ease;
+    }
+
+    .ponto-relogio-wrap .step-item.step-active {
+        border-color: #93c5fd;
+        color: #1d4ed8;
+        background: #eff6ff;
+    }
+
+    .ponto-relogio-wrap .step-item.step-ok {
+        border-color: #86efac;
+        color: #15803d;
+        background: #f0fdf4;
+    }
+
+    .ponto-relogio-wrap .step-item.step-err {
+        border-color: #fca5a5;
+        color: #b91c1c;
+        background: #fef2f2;
+    }
+
+    @keyframes faceGuidePulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(45, 119, 255, 0.55);
+            border-color: rgba(255, 255, 255, 0.75);
+        }
+        70% {
+            box-shadow: 0 0 0 14px rgba(45, 119, 255, 0);
+            border-color: rgba(82, 149, 255, 0.95);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(45, 119, 255, 0);
+            border-color: rgba(255, 255, 255, 0.75);
+        }
+    }
+
+    .ponto-relogio-wrap .progress {
+        height: 10px;
+        border-radius: 999px;
+        background: #eaf0fb;
+        overflow: hidden;
+    }
+
+    .ponto-relogio-wrap .progress-bar {
+        transition: width .3s ease, background-color .25s ease;
+    }
+
+    .ponto-relogio-wrap .ux-fade-in {
+        animation: uxFadeIn .24s ease;
+    }
+
+    .ponto-relogio-wrap .ux-fade-out {
+        animation: uxFadeOut .18s ease forwards;
+    }
+
+    @keyframes uxFadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes uxFadeOut {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(-4px); }
     }
 </style>
 {% endblock %}

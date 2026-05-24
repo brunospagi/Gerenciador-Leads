@@ -22,7 +22,11 @@ class SecurityHeadersMiddleware:
             response["X-Content-Type-Options"] = "nosniff"
 
         if "Permissions-Policy" not in response:
-            response["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
+            response["Permissions-Policy"] = getattr(
+                settings,
+                "PERMISSIONS_POLICY",
+                "camera=(self), microphone=(self), geolocation=(self)",
+            )
 
         csp = getattr(settings, "CONTENT_SECURITY_POLICY", "").strip()
         if csp and "Content-Security-Policy" not in response:

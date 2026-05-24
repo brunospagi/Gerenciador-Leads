@@ -91,6 +91,10 @@ SECURE_SSL_REDIRECT = _env_to_bool('DJANGO_SECURE_SSL_REDIRECT', False)
 SECURE_HSTS_SECONDS = _env_to_int('DJANGO_SECURE_HSTS_SECONDS', 0) if not DEBUG else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_to_bool('DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS', False)
 SECURE_HSTS_PRELOAD = _env_to_bool('DJANGO_SECURE_HSTS_PRELOAD', False)
+PERMISSIONS_POLICY = os.getenv(
+    'DJANGO_PERMISSIONS_POLICY',
+    "camera=(self), microphone=(self), geolocation=(self)",
+)
 
 CONTENT_SECURITY_POLICY = os.getenv(
     'DJANGO_CONTENT_SECURITY_POLICY',
@@ -111,7 +115,7 @@ CONTENT_SECURITY_POLICY = os.getenv(
 CSRF_FAILURE_VIEW = 'crmspagi.views.csrf_failure'
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # DiretÃ³rios adicionais para arquivos estÃ¡ticos
