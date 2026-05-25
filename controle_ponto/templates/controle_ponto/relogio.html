@@ -275,6 +275,8 @@ let biometriaChallengeToken = '';
 let autoValidationInFlight = false;
 let falhasBiometriaConsecutivas = 0;
 let validacaoManualLiberada = false;
+let ultimaSelfieValidacaoBase64 = '';
+let ultimaSelfieTentativaBase64 = '';
 
 function setChip(id, status, label) {
     const chip = document.getElementById(id);
@@ -594,20 +596,28 @@ function atualizarFallbackManualUI() {
 }
 
 function ativarFluxoManual() {
+    if (!ultimaSelfieTentativaBase64) {
+        alert('Ainda nao existe selfie capturada para validacao manual. Tente novamente o reconhecimento.');
+        return;
+    }
     validacaoManualLiberada = true;
     identidadeValidada = true;
+    ultimaSelfieValidacaoBase64 = ultimaSelfieTentativaBase64;
     const modoInput = document.getElementById('modoValidacaoInput');
     if (modoInput) modoInput.value = 'manual_foto_estatica';
     mostrarResultadoValidacao(
         true,
         'Validacao manual liberada.',
-        'Capture a foto estatica na etapa final e conclua a batida.'
+        'A selfie da validacao sera reutilizada ao registrar a batida.'
     );
+    abrirBatidaSection();
 }
 
 function reiniciarValidacao() {
     identidadeValidada = false;
     autoValidationInFlight = false;
+    ultimaSelfieValidacaoBase64 = '';
+    ultimaSelfieTentativaBase64 = '';
     setChip('chipLiveness', 'idle', 'Captura: aguardando');
     setChip('chipMatch', 'warn', 'Face Match: referencia carregada');
     setProgress(30);
@@ -691,6 +701,7 @@ async function validarIdentidadeInicial(autoMode = false) {
         }
 
         const detection = capturado.detection;
+        ultimaSelfieTentativaBase64 = capturado.base64;
         setChip('chipPresenca', 'ok', 'Presenca: usuario presente');
         setChip('chipLiveness', 'ok', 'Captura: concluida');
         atualizarTimerCaptura(null);
@@ -724,6 +735,7 @@ async function validarIdentidadeInicial(autoMode = false) {
         }
 
         identidadeValidada = true;
+        ultimaSelfieValidacaoBase64 = capturado.base64;
         falhasBiometriaConsecutivas = 0;
         setChip('chipMatch', 'ok', `Face Match: aprovado (${Number(feedback.distance || distance).toFixed(3)})`);
         setStep(4, 'ok');
@@ -818,18 +830,45 @@ function tirarFoto(tipoInterno, nomeAmigavel) {
         return;
     }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+    let dataURL = ultimaSelfieValidacaoBase64 || '';
+    if (!dataURL) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        dataURL = canvas.toDataURL('image/jpeg', 0.8);
+    }
     document.getElementById('photoPreview').src = dataURL;
     document.getElementById('fotoBase64Input').value = dataURL;
     document.getElementById('tipoBatidaInput').value = tipoInterno;
     document.getElementById('lblTipoBatida').innerText = nomeAmigavel;
     atualizarObrigatoriedadeJustificativa(tipoInterno);
+    confirmarPontoDireto();
+}
 
-    animateSectionTransition('liveCameraSection', 'confirmationSection');
+function confirmarPontoDireto() {
+    if (!validarTokenOuAtualizar()) return;
+    if (!validarGeoOuAtualizar()) return;
+    if (!identidadeValidada) {
+        alert('Sua validacao de identidade nao esta ativa. Faca a validacao novamente.');
+        return;
+    }
+
+    const tipoBatida = document.getElementById('tipoBatidaInput').value;
+    const justificativa = (document.getElementById('justificativaAtraso').value || '').trim();
+    if (tipoBatida === 'entrada' && isEntradaComAtraso() && !justificativa) {
+        alert('Entrada com atraso detectada. Informe a justificativa para continuar.');
+        document.getElementById('justificativaAtraso').focus();
+        return;
+    }
+
+    const botoesBatida = ['btnEntrada', 'btnSaidaAlmoco', 'btnRetornoAlmoco', 'btnSaida']
+        .map((id) => document.getElementById(id))
+        .filter(Boolean);
+    botoesBatida.forEach((btn) => {
+        btn.disabled = true;
+        btn.classList.add('disabled');
+    });
+    document.getElementById('pontoForm').submit();
 }
 
 function minutosDoDia(hhmm) {
