@@ -18,8 +18,10 @@ from django.views.decorators.http import require_POST
 from django.views.generic import DeleteView, UpdateView
 from django.core.files.base import ContentFile
 from django.http import JsonResponse
+from django.core.paginator import Paginator
 
 from funcionarios.models import Funcionario
+from vendas_produtos.models import VendaProduto
 
 from .forms import RegistroPontoForm
 from .models import ConfiguracaoPonto, FechamentoFolhaPonto, RegistroPonto
@@ -137,6 +139,11 @@ def obter_ip_cliente(request):
 def _is_gestor(user):
     nivel = getattr(getattr(user, 'profile', None), 'nivel_acesso', '')
     return bool(user.is_superuser or nivel in ['ADMIN', 'GERENTE'])
+
+
+def _is_admin_only(user):
+    nivel = getattr(getattr(user, 'profile', None), 'nivel_acesso', '')
+    return bool(user.is_superuser or nivel == 'ADMIN')
 
 
 def _calcular_atraso_minutos(data_ref, horario_real, horario_escala):
@@ -692,6 +699,99 @@ def homologacao_ponto_admin(request):
             'total_pendencias': pendencias.count(),
         },
     )
+
+
+@login_required
+def pendencias_admin_modal_api(request):
+    if not _is_admin_only(request.user):
+        return JsonResponse({'ok': False, 'message': 'Acesso negado.'}, status=403)
+
+    tipo = (request.GET.get('tipo') or 'ponto').strip().lower()
+    page = _safe_int(request.GET.get('page'), 1, min_value=1, max_value=9999)
+    hoje = timezone.localdate()
+    per_page = 10
+
+    if tipo == 'vendas':
+        qs = VendaProduto.objects.filter(
+            status='PENDENTE',
+            data_venda__year=hoje.year,
+            data_venda__month=hoje.month,
+        ).select_related('vendedor').order_by('-data_venda', '-id')
+        paginator = Paginator(qs, per_page)
+        page_obj = paginator.get_page(page)
+        items = [
+            {
+                'id': v.id,
+                'data': v.data_venda.strftime('%d/%m/%Y') if v.data_venda else '-',
+                'cliente': v.cliente_nome or '-',
+                'vendedor': (v.vendedor.get_full_name() or v.vendedor.username) if v.vendedor else '-',
+                'tipo': v.get_tipo_produto_display(),
+                'url': reverse_lazy('venda_produto_list'),
+            }
+            for v in page_obj.object_list
+        ]
+    else:
+        qs = RegistroPonto.objects.filter(
+            status_homologacao=RegistroPonto.StatusHomologacao.PENDENTE,
+            data__year=hoje.year,
+            data__month=hoje.month,
+        ).select_related('funcionario').order_by('-data', '-id')
+        paginator = Paginator(qs, per_page)
+        page_obj = paginator.get_page(page)
+        items = [
+            {
+                'id': p.id,
+                'data': p.data.strftime('%d/%m/%Y') if p.data else '-',
+                'funcionario': p.funcionario.nome_completo if p.funcionario else '-',
+                'entrada': p.entrada.strftime('%H:%M') if p.entrada else '--',
+                'atraso_minutos': int(p.atraso_minutos or 0),
+                'justificativa': p.justificativa_atraso or '-',
+                'url': reverse_lazy('controle_ponto:detalhe_ponto', kwargs={'pk': p.id}),
+            }
+            for p in page_obj.object_list
+        ]
+
+    return JsonResponse(
+        {
+            'ok': True,
+            'tipo': tipo,
+            'mes_ref': f'{hoje.month:02d}/{hoje.year}',
+            'pagination': {
+                'page': page_obj.number,
+                'num_pages': paginator.num_pages,
+                'total': paginator.count,
+                'has_next': page_obj.has_next(),
+                'has_previous': page_obj.has_previous(),
+            },
+            'items': items,
+        }
+    )
+
+
+@login_required
+@require_POST
+def pendencia_ponto_acao_modal_api(request, pk):
+    if not _is_admin_only(request.user):
+        return JsonResponse({'ok': False, 'message': 'Acesso negado.'}, status=403)
+
+    ponto = get_object_or_404(RegistroPonto, pk=pk)
+    if ponto.status_homologacao != RegistroPonto.StatusHomologacao.PENDENTE:
+        return JsonResponse({'ok': False, 'message': 'Este ponto já foi homologado.'}, status=400)
+
+    acao = (request.POST.get('acao') or '').strip().lower()
+    observacao = (request.POST.get('observacao') or '').strip()
+    if acao == 'aceitar':
+        ponto.status_homologacao = RegistroPonto.StatusHomologacao.ACEITO
+    elif acao == 'recusar':
+        ponto.status_homologacao = RegistroPonto.StatusHomologacao.RECUSADO
+    else:
+        return JsonResponse({'ok': False, 'message': 'Ação inválida.'}, status=400)
+
+    ponto.homologado_por = request.user
+    ponto.homologado_em = timezone.now()
+    ponto.observacao_homologacao = observacao
+    ponto.save(update_fields=['status_homologacao', 'homologado_por', 'homologado_em', 'observacao_homologacao'])
+    return JsonResponse({'ok': True, 'message': 'Homologação atualizada com sucesso.'})
 
 
 @login_required

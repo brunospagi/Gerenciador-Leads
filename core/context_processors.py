@@ -2,6 +2,7 @@ from django.conf import settings
 from datetime import datetime
 import subprocess
 from django.utils import timezone
+from django.utils import timezone
 
 from .models import BannerSistema
 from controle_ponto.models import RegistroPonto
@@ -17,7 +18,7 @@ def banner_context(request):
 
 
 def build_info_context(request):
-    commit_sha = getattr(settings, 'APP_BUILD_SHA_SHORT', '')
+    commit_sha = getattr(settings, 'APP_BUILD_SHA_SHORT', '') or ''
     commit_dt = ''
     build_number = str(getattr(settings, 'APP_BUILD_NUMBER', '0') or '0').strip()
     try:
@@ -51,6 +52,19 @@ def build_info_context(request):
                 build_number = '0'
     except Exception:
         pass
+
+    if build_number in {'', '0'}:
+        env_build = (
+            getattr(settings, 'APP_BUILD_SHA', '')
+            or getattr(settings, 'APP_BUILD_SHA_SHORT', '')
+            or getattr(settings, 'RENDER_GIT_COMMIT', '')
+            or ''
+        ).strip()
+        if env_build:
+            build_number = env_build[:8]
+
+    if build_number in {'', '0'}:
+        build_number = timezone.now().strftime('%Y%m%d%H%M')
 
     return {
         'app_build_number': build_number,

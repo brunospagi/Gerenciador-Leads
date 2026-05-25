@@ -294,6 +294,17 @@
                     {% if admin_tem_pendencias_vendas %}
                     <div>Vendas: <strong>{{ admin_total_pendencias_vendas }}</strong> pendência(s) aguardando aprovação.</div>
                     {% endif %}
+                    <hr>
+                    <div class="d-flex gap-2 mb-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="tabPendenciasPonto">Ponto</button>
+                        <button type="button" class="btn btn-sm btn-outline-warning" id="tabPendenciasVendas">Vendas</button>
+                    </div>
+                    <div id="pendenciasListWrap" class="border rounded p-2 bg-light" style="min-height:220px; max-height:320px; overflow:auto;"></div>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="pendPrevBtn">Anterior</button>
+                        <small class="text-muted" id="pendPageInfo">Página 1</small>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="pendNextBtn">Próxima</button>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     {% if admin_tem_pendencias_ponto %}
@@ -309,6 +320,21 @@
     </div>
     {% endif %}
     <script>
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
         document.getElementById('sidebarToggle').addEventListener('click', function() {
             document.getElementById('sidebar').classList.toggle('active');
         });
@@ -332,6 +358,85 @@
             if (pendenciasModalEl) {
                 const pendenciasModal = new bootstrap.Modal(pendenciasModalEl);
                 pendenciasModal.show();
+
+                let pendTipo = 'ponto';
+                let pendPage = 1;
+                let pendNumPages = 1;
+                const wrap = document.getElementById('pendenciasListWrap');
+                const pageInfo = document.getElementById('pendPageInfo');
+                const prevBtn = document.getElementById('pendPrevBtn');
+                const nextBtn = document.getElementById('pendNextBtn');
+                const tabPonto = document.getElementById('tabPendenciasPonto');
+                const tabVendas = document.getElementById('tabPendenciasVendas');
+
+                async function loadPendencias() {
+                    if (!wrap) return;
+                    wrap.innerHTML = '<div class="text-muted">Carregando...</div>';
+                    try {
+                        const resp = await fetch(`/ponto/pendencias/modal/?tipo=${pendTipo}&page=${pendPage}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                        const data = await resp.json();
+                        if (!resp.ok || !data.ok) {
+                            throw new Error(data.message || 'Falha ao carregar pendências.');
+                        }
+                        pendNumPages = data.pagination.num_pages || 1;
+                        pageInfo.textContent = `Página ${data.pagination.page} de ${pendNumPages} (${data.pagination.total})`;
+                        prevBtn.disabled = !data.pagination.has_previous;
+                        nextBtn.disabled = !data.pagination.has_next;
+
+                        if (!data.items.length) {
+                            wrap.innerHTML = '<div class="text-muted">Sem pendências nesta página.</div>';
+                            return;
+                        }
+
+                        if (pendTipo === 'ponto') {
+                            wrap.innerHTML = data.items.map(it => `
+                                <div class="border rounded p-2 mb-2 bg-white">
+                                    <div class="fw-semibold">${it.funcionario}</div>
+                                    <div class="small text-muted">${it.data} • Entrada ${it.entrada} • Atraso ${it.atraso_minutos} min</div>
+                                    <div class="small">${it.justificativa}</div>
+                                    <div class="mt-2 d-flex gap-1">
+                                        <button class="btn btn-sm btn-success" onclick="acaoPendPonto(${it.id}, 'aceitar')">Aceitar</button>
+                                        <button class="btn btn-sm btn-danger" onclick="acaoPendPonto(${it.id}, 'recusar')">Recusar</button>
+                                        <a class="btn btn-sm btn-outline-primary" href="${it.url}">Ver</a>
+                                    </div>
+                                </div>
+                            `).join('');
+                        } else {
+                            wrap.innerHTML = data.items.map(it => `
+                                <div class="border rounded p-2 mb-2 bg-white">
+                                    <div class="fw-semibold">${it.cliente}</div>
+                                    <div class="small text-muted">${it.data} • ${it.tipo}</div>
+                                    <div class="small">Vendedor: ${it.vendedor}</div>
+                                </div>
+                            `).join('');
+                        }
+                    } catch (e) {
+                        wrap.innerHTML = `<div class="text-danger">${e.message || 'Erro ao carregar.'}</div>`;
+                    }
+                }
+
+                window.acaoPendPonto = async function (id, acao) {
+                    try {
+                        const body = new URLSearchParams();
+                        body.append('acao', acao);
+                        const resp = await fetch(`/ponto/pendencias/modal/ponto/${id}/acao/`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': getCookie('csrftoken') || '' },
+                            body: body.toString()
+                        });
+                        const data = await resp.json();
+                        if (!resp.ok || !data.ok) throw new Error(data.message || 'Falha na homologação.');
+                        await loadPendencias();
+                    } catch (e) {
+                        alert(e.message || 'Não foi possível homologar.');
+                    }
+                };
+
+                if (tabPonto) tabPonto.addEventListener('click', () => { pendTipo = 'ponto'; pendPage = 1; loadPendencias(); });
+                if (tabVendas) tabVendas.addEventListener('click', () => { pendTipo = 'vendas'; pendPage = 1; loadPendencias(); });
+                if (prevBtn) prevBtn.addEventListener('click', () => { if (pendPage > 1) { pendPage -= 1; loadPendencias(); } });
+                if (nextBtn) nextBtn.addEventListener('click', () => { if (pendPage < pendNumPages) { pendPage += 1; loadPendencias(); } });
+                loadPendencias();
             }
             {% endif %}
         });
