@@ -464,42 +464,60 @@ function validarGeolocalizacao() {
         return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-        (position) => {
-            const userLat = position.coords.latitude;
-            const userLng = position.coords.longitude;
+    statusDiv.className = 'alert alert-warning shadow-sm';
+    statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Solicitando localizacao GPS...';
 
-            document.getElementById('latInput').value = userLat;
-            document.getElementById('lngInput').value = userLng;
-            geoCheckedAt = Math.floor(Date.now() / 1000);
-            const geoInput = document.getElementById('geoCheckedAtInput');
-            if (geoInput) geoInput.value = String(geoCheckedAt);
+    const onSuccess = (position) => {
+        const userLat = position.coords.latitude;
+        const userLng = position.coords.longitude;
 
-            const distanciaMetros = calcularDistancia(userLat, userLng, LOJA_LATITUDE, LOJA_LONGITUDE);
+        document.getElementById('latInput').value = userLat;
+        document.getElementById('lngInput').value = userLng;
+        geoCheckedAt = Math.floor(Date.now() / 1000);
+        const geoInput = document.getElementById('geoCheckedAtInput');
+        if (geoInput) geoInput.value = String(geoCheckedAt);
 
-            if (distanciaMetros > RAIO_PERMITIDO_METROS) {
-                geoAprovado = false;
-                statusDiv.className = 'alert alert-danger shadow-sm';
-                statusDiv.innerHTML = `<strong>FORA DA AREA:</strong> Voce esta a ${distanciaMetros.toFixed(0)}m da loja. Raio permitido: ${RAIO_PERMITIDO_METROS}m.`;
-                document.getElementById('mainCard').style.display = 'none';
-            } else {
-                geoAprovado = true;
-                document.getElementById('distanciaText').innerText = `Distancia: ${distanciaMetros.toFixed(0)}m da Loja`;
-                if (!iaInicializada) {
-                    iniciarIA();
-                } else {
-                    statusDiv.className = 'alert alert-success shadow-sm';
-                    statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> localizacao revalidada com sucesso.';
-                    document.getElementById('mainCard').style.display = 'block';
-                }
-            }
-        },
-        () => {
+        const distanciaMetros = calcularDistancia(userLat, userLng, LOJA_LATITUDE, LOJA_LONGITUDE);
+
+        if (distanciaMetros > RAIO_PERMITIDO_METROS) {
             geoAprovado = false;
-            statusDiv.className = 'alert alert-danger';
-            statusDiv.innerHTML = '<strong>Permissao de GPS negada:</strong> Libere a localizacao do navegador para liberar o ponto.';
+            statusDiv.className = 'alert alert-danger shadow-sm';
+            statusDiv.innerHTML = `<strong>FORA DA AREA:</strong> Voce esta a ${distanciaMetros.toFixed(0)}m da loja. Raio permitido: ${RAIO_PERMITIDO_METROS}m. <button type="button" class="btn btn-sm btn-light ms-2" onclick="validarGeolocalizacao()">Tentar novamente</button>`;
+            document.getElementById('mainCard').style.display = 'none';
+        } else {
+            geoAprovado = true;
+            document.getElementById('distanciaText').innerText = `Distancia: ${distanciaMetros.toFixed(0)}m da Loja`;
+            if (!iaInicializada) {
+                iniciarIA();
+            } else {
+                statusDiv.className = 'alert alert-success shadow-sm';
+                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Localizacao revalidada com sucesso.';
+                document.getElementById('mainCard').style.display = 'block';
+            }
+        }
+    };
+
+    const onError = (error) => {
+        geoAprovado = false;
+        statusDiv.className = 'alert alert-danger';
+        let detalhe = 'Nao foi possivel obter a localizacao.';
+        if (error && error.code === 1) detalhe = 'Permissao de GPS negada. Libere a localizacao no navegador.';
+        else if (error && error.code === 2) detalhe = 'Localizacao indisponivel no dispositivo.';
+        else if (error && error.code === 3) detalhe = 'Tempo de localizacao esgotado.';
+        statusDiv.innerHTML = `<strong>GPS:</strong> ${detalhe} <button type="button" class="btn btn-sm btn-light ms-2" onclick="validarGeolocalizacao()">Revalidar</button>`;
+    };
+
+    navigator.geolocation.getCurrentPosition(
+        onSuccess,
+        (errHigh) => {
+            // Fallback para baixa precisão quando alta precisão falha.
+            navigator.geolocation.getCurrentPosition(
+                onSuccess,
+                onError,
+                { enableHighAccuracy: false, timeout: 12000, maximumAge: 30000 }
+            );
         },
-        { enableHighAccuracy: true }
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
 }
 
@@ -1154,6 +1172,9 @@ setInterval(() => {
 atualizarRelogio();
 resetSteps();
 window.onload = validarGeolocalizacao;
+document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(validarGeolocalizacao, 250);
+});
 </script>
 
 <style>
