@@ -10,6 +10,7 @@ urlpatterns = [
     path('relatorio-rh/', views.relatorio_mensal_rh, name='relatorio_mensal_rh'),
     path('relatorio-spagiid/', views.relatorio_spagiid, name='relatorio_spagiid'),
     path('ocorrencias/', views.ocorrencias_mensais, name='ocorrencias_mensais'),
+    path('homologacao/', views.homologacao_ponto_admin, name='homologacao_admin'),
     path('ocorrencias/<int:pk>/homologar/', views.homologar_ocorrencia, name='homologar_ocorrencia'),
     path('relatorio-entradas/', views.relatorio_entradas, name='relatorio_entradas'),
     path('validar-face-feedback/', views.validar_face_feedback, name='validar_face_feedback'),

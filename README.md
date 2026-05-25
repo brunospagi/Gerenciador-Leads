@@ -219,6 +219,30 @@ O `entrypoint.sh` faz:
 4. Testar cadastro de venda com `origem_cliente`
 5. Testar impressao do relatorio de distribuicao
 
+## 14. Controle de Ponto (Novas Rotinas)
+
+- Nova tela de homologacao por colaborador:
+  - URL: `/ponto/homologacao/`
+  - Permite aprovacao manual por registro
+  - Permite aprovacao/recusa em lote (selecionados)
+  - Filtro por colaborador, mes e ano
+- Fechamento da folha ponto por colaborador e mes:
+  - Acao via modal dentro da homologacao
+  - Bloqueia novas batidas no relogio para o mes fechado
+  - Reabertura manual pelo administrador/gerente
+- Pendencias automaticas para homologacao:
+  - Entradas com atraso acima da tolerancia ficam pendentes
+  - Entradas com validacao manual (`manual_*`) ficam pendentes
+- Alerta para administracao:
+  - Ao entrar no sistema, admin/gerente recebe modal se houver pendencias
+  - Link direto para a tela de homologacao
+
+## 15. UX de Suporte (WhatsApp)
+
+- Botao flutuante de suporte no canto inferior quando estiver em rotas com `whatsapp`:
+  - Telefone: `+55 41 99924-8121`
+  - Link: `https://wa.me/5541999248121`
+
 ## 14. Melhorias Recomendadas
 
 - Adicionar testes automatizados para regras de permissao por modulo

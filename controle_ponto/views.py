@@ -22,7 +22,7 @@ from django.http import JsonResponse
 from funcionarios.models import Funcionario
 
 from .forms import RegistroPontoForm
-from .models import ConfiguracaoPonto, RegistroPonto
+from .models import ConfiguracaoPonto, FechamentoFolhaPonto, RegistroPonto
 
 TOKEN_PONTO_TTL_SECONDS = 120
 GEO_CHECK_TTL_SECONDS = 120
@@ -210,6 +210,19 @@ def relogio_ponto(request):
     agora = momento_atual.time().replace(second=0, microsecond=0)
 
     ponto, _ = RegistroPonto.objects.get_or_create(funcionario=funcionario, data=hoje)
+    fechamento_mes = FechamentoFolhaPonto.objects.filter(
+        funcionario=funcionario,
+        mes=hoje.month,
+        ano=hoje.year,
+        fechada=True,
+    ).first()
+
+    if fechamento_mes:
+        messages.error(
+            request,
+            f'Folha de ponto de {hoje.month:02d}/{hoje.year} está fechada para você. Procure o administrador para reabrir.',
+        )
+        return redirect('/')
 
     if request.method == 'POST':
         token_form = (request.POST.get('ponto_token') or '').strip()
@@ -289,12 +302,19 @@ def relogio_ponto(request):
             ponto.atraso_minutos = atraso_minutos
             ponto.justificativa_atraso = justificativa_atraso if atraso_minutos > 0 else ''
 
-            if atraso_minutos >= ponto.tolerancia_entrada_minutos:
+            validacao_manual = bool((ponto.modo_validacao or modo_validacao or '').startswith('manual_'))
+            if atraso_minutos >= ponto.tolerancia_entrada_minutos or validacao_manual:
                 ponto.status_homologacao = RegistroPonto.StatusHomologacao.PENDENTE
                 ponto.homologado_por = None
                 ponto.homologado_em = None
                 ponto.observacao_homologacao = ''
-                messages.warning(request, f'Entrada registrada às {agora.strftime("%H:%M")}. Ocorrência enviada para homologação.')
+                if validacao_manual:
+                    messages.warning(
+                        request,
+                        f'Entrada registrada às {agora.strftime("%H:%M")} com validação manual. Ocorrência enviada para homologação.',
+                    )
+                else:
+                    messages.warning(request, f'Entrada registrada às {agora.strftime("%H:%M")}. Ocorrência enviada para homologação.')
             else:
                 ponto.status_homologacao = RegistroPonto.StatusHomologacao.NAO_APLICA
                 ponto.homologado_por = None
@@ -567,6 +587,111 @@ def homologar_ocorrencia(request, pk):
     if params:
         return redirect(f'{base_url}?{"&".join(params)}')
     return redirect(base_url)
+
+
+@login_required
+def homologacao_ponto_admin(request):
+    if not _is_gestor(request.user):
+        messages.error(request, 'Acesso negado à homologação de ponto.')
+        return redirect('/')
+
+    hoje = timezone.now().date()
+    mes = _safe_int(request.GET.get('mes') or request.POST.get('mes'), hoje.month, min_value=1, max_value=12)
+    ano = _safe_int(request.GET.get('ano') or request.POST.get('ano'), hoje.year, min_value=hoje.year - 5, max_value=hoje.year + 5)
+    funcionario_id = (request.GET.get('funcionario') or request.POST.get('funcionario') or '').strip()
+
+    funcionario = None
+    if funcionario_id:
+        funcionario = Funcionario.objects.filter(pk=funcionario_id, ativo=True).first()
+
+    if request.method == 'POST':
+        acao = (request.POST.get('acao') or '').strip().lower()
+        observacao = (request.POST.get('observacao') or '').strip()
+
+        if not funcionario:
+            messages.error(request, 'Selecione um colaborador para executar esta ação.')
+            return redirect(f"{reverse_lazy('controle_ponto:homologacao_admin')}?mes={mes}&ano={ano}")
+
+        if acao == 'fechar_folha':
+            fechamento, _ = FechamentoFolhaPonto.objects.get_or_create(
+                funcionario=funcionario,
+                mes=mes,
+                ano=ano,
+                defaults={'fechada': True, 'fechado_por': request.user, 'fechado_em': timezone.now(), 'observacao': observacao},
+            )
+            if not fechamento.fechada:
+                fechamento.fechada = True
+                fechamento.fechado_por = request.user
+                fechamento.fechado_em = timezone.now()
+                fechamento.observacao = observacao
+                fechamento.save(update_fields=['fechada', 'fechado_por', 'fechado_em', 'observacao'])
+            messages.success(request, f'Folha ponto fechada para {funcionario.nome_completo} ({mes:02d}/{ano}).')
+        elif acao == 'reabrir_folha':
+            fechamento = FechamentoFolhaPonto.objects.filter(funcionario=funcionario, mes=mes, ano=ano).first()
+            if fechamento and fechamento.fechada:
+                fechamento.fechada = False
+                fechamento.save(update_fields=['fechada'])
+                messages.success(request, f'Folha ponto reaberta para {funcionario.nome_completo} ({mes:02d}/{ano}).')
+            else:
+                messages.info(request, 'Esta folha ponto já estava aberta.')
+        else:
+            if acao in {'aprovar_um', 'recusar_um'}:
+                ids = [request.POST.get('ponto_id')]
+            else:
+                ids = request.POST.getlist('pontos')
+            ids = [i for i in ids if i]
+            if not ids:
+                messages.error(request, 'Selecione ao menos um registro para homologar.')
+                return redirect(f"{reverse_lazy('controle_ponto:homologacao_admin')}?mes={mes}&ano={ano}&funcionario={funcionario.id}")
+
+            qs = RegistroPonto.objects.filter(
+                id__in=ids,
+                funcionario=funcionario,
+                data__month=mes,
+                data__year=ano,
+            )
+            if acao in {'aprovar_um', 'aprovar_lote'}:
+                status = RegistroPonto.StatusHomologacao.ACEITO
+                texto = 'aceitos'
+            else:
+                status = RegistroPonto.StatusHomologacao.RECUSADO
+                texto = 'recusados'
+            updated = qs.update(
+                status_homologacao=status,
+                homologado_por=request.user,
+                homologado_em=timezone.now(),
+                observacao_homologacao=observacao,
+            )
+            messages.success(request, f'{updated} ocorrência(s) {texto} com sucesso.')
+
+        return redirect(f"{reverse_lazy('controle_ponto:homologacao_admin')}?mes={mes}&ano={ano}&funcionario={funcionario.id}")
+
+    pendencias = RegistroPonto.objects.none()
+    fechamento = None
+    if funcionario:
+        fechamento = FechamentoFolhaPonto.objects.filter(funcionario=funcionario, mes=mes, ano=ano).first()
+        pendencias = RegistroPonto.objects.filter(
+            funcionario=funcionario,
+            data__month=mes,
+            data__year=ano,
+            status_homologacao=RegistroPonto.StatusHomologacao.PENDENTE,
+        ).order_by('-data', '-entrada')
+
+    return render(
+        request,
+        'controle_ponto/homologacao_admin.html',
+        {
+            'mes_atual': mes,
+            'ano_atual': ano,
+            'funcionario_selecionado': int(funcionario_id) if funcionario_id.isdigit() else '',
+            'funcionarios': Funcionario.objects.filter(ativo=True).order_by('nome_completo'),
+            'pendencias': pendencias,
+            'fechamento': fechamento,
+            'meses': range(1, 13),
+            'anos': range(hoje.year - 2, hoje.year + 2),
+            'total_pendencias': pendencias.count(),
+        },
+    )
 
 
 @login_required

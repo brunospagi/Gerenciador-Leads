@@ -5,17 +5,20 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
             <h3 class="fw-bold mb-1"><i class="fas fa-calendar-check text-primary me-2"></i>Espelho de Ponto Mensal</h3>
-            <small class="text-muted">VisÃ£o consolidada de registro, atraso e homologaÃ§Ã£o.</small>
+            <small class="text-muted">Visão consolidada de registro, atraso e homologação.</small>
         </div>
         <div class="d-flex flex-wrap gap-2 d-print-none">
             <a href="{% url 'controle_ponto:ocorrencias_mensais' %}" class="btn btn-warning">
-                <i class="fas fa-exclamation-triangle me-1"></i>OcorrÃªncias
+                <i class="fas fa-exclamation-triangle me-1"></i>Ocorrências
+            </a>
+            <a href="{% url 'controle_ponto:homologacao_admin' %}" class="btn btn-outline-warning">
+                <i class="fas fa-user-check me-1"></i>Homologação
             </a>
             <a href="{% url 'controle_ponto:relatorio_entradas' %}" class="btn btn-outline-primary">
                 <i class="fas fa-user-clock me-1"></i>Entradas
             </a>
             <a href="{% url 'controle_ponto:relatorio_mensal_rh' %}" class="btn btn-outline-dark">
-                <i class="fas fa-users-cog me-1"></i>RelatÃ³rio RH
+                <i class="fas fa-users-cog me-1"></i>Relatório RH
             </a>
             <a href="{% url 'controle_ponto:relatorio_spagiid' %}" class="btn btn-outline-success">
                 <i class="fas fa-user-shield me-1"></i>SpagiID
@@ -33,7 +36,7 @@
         <div class="col-12 col-md-6 col-xl-3">
             <div class="card h-100 border-0">
                 <div class="card-body">
-                    <small class="text-muted d-block">Registros no perÃ­odo</small>
+                    <small class="text-muted d-block">Registros no período</small>
                     <div class="display-6 fw-bold">{{ total_registros }}</div>
                 </div>
             </div>
@@ -68,7 +71,7 @@
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 <div class="col-md-4">
-                    <label class="form-label fw-semibold small text-muted">FuncionÃ¡rio</label>
+                    <label class="form-label fw-semibold small text-muted">Funcionário</label>
                     <select name="funcionario" class="form-select">
                         <option value="">Todos os colaboradores</option>
                         {% for f in funcionarios %}
@@ -77,7 +80,7 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label class="form-label fw-semibold small text-muted">MÃªs</label>
+                    <label class="form-label fw-semibold small text-muted">Mês</label>
                     <select name="mes" class="form-select">
                         {% for m in meses %}
                         <option value="{{ m }}" {% if mes_atual == m %}selected{% endif %}>{{ m|stringformat:"02d" }}</option>
@@ -111,15 +114,15 @@
                             <th>Data</th>
                             <th>Colaborador</th>
                             <th>Entrada</th>
-                            <th>SaÃ­da almoÃ§o</th>
-                            <th>Retorno almoÃ§o</th>
-                            <th>SaÃ­da final</th>
+                            <th>Saída almoço</th>
+                            <th>Retorno almoço</th>
+                            <th>Saída final</th>
                             <th>Escala</th>
                             <th>Atraso</th>
                             <th>Justificativa</th>
                             <th>Status</th>
                             <th>IP</th>
-                            <th class="d-print-none">AÃ§Ãµes</th>
+                            <th class="d-print-none">Ações</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -233,3 +236,4 @@
     }
 </style>
 {% endblock %}
+

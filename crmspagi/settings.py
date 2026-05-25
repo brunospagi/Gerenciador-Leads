@@ -220,6 +220,7 @@ TEMPLATES = [
                 'notificacoes.context_processors.unread_notifications_context',
                 'core.context_processors.banner_context',
                 'core.context_processors.build_info_context',
+                'core.context_processors.ponto_pendencias_context',
                 'usuarios.context_processors.module_access_context',
             ],
         },

@@ -1,0 +1,167 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="fas fa-user-check text-primary me-2"></i>Homologação de Ponto</h3>
+            <small class="text-muted">Aprovação por colaborador (manual ou em lote).</small>
+        </div>
+    </div>
+
+    <div class="card border-0 mb-3">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Colaborador</label>
+                    <select name="funcionario" class="form-select" required>
+                        <option value="">Selecione...</option>
+                        {% for f in funcionarios %}
+                        <option value="{{ f.id }}" {% if funcionario_selecionado == f.id %}selected{% endif %}>{{ f.nome_completo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Mês</label>
+                    <select name="mes" class="form-select">
+                        {% for m in meses %}
+                        <option value="{{ m }}" {% if mes_atual == m %}selected{% endif %}>{{ m|stringformat:"02d" }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Ano</label>
+                    <select name="ano" class="form-select">
+                        {% for a in anos %}
+                        <option value="{{ a }}" {% if ano_atual == a %}selected{% endif %}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button class="btn btn-primary" type="submit">Filtrar</button>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <a class="btn btn-outline-secondary" href="{% url 'controle_ponto:homologacao_admin' %}">Limpar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if funcionario_selecionado %}
+    <div class="card border-0 mb-3">
+        <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
+            <div>
+                <span class="badge text-bg-warning">Pendências: {{ total_pendencias }}</span>
+                {% if fechamento and fechamento.fechada %}
+                <span class="badge text-bg-success">Folha fechada</span>
+                {% else %}
+                <span class="badge text-bg-secondary">Folha aberta</span>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+                {% if fechamento and fechamento.fechada %}
+                <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="funcionario" value="{{ funcionario_selecionado }}">
+                    <input type="hidden" name="mes" value="{{ mes_atual }}">
+                    <input type="hidden" name="ano" value="{{ ano_atual }}">
+                    <input type="hidden" name="acao" value="reabrir_folha">
+                    <button type="submit" class="btn btn-outline-warning btn-sm">Reabrir Folha</button>
+                </form>
+                {% else %}
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalFecharFolha">Fechar Folha Ponto</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <form method="post" class="card border-0">
+        {% csrf_token %}
+        <input type="hidden" name="funcionario" value="{{ funcionario_selecionado }}">
+        <input type="hidden" name="mes" value="{{ mes_atual }}">
+        <input type="hidden" name="ano" value="{{ ano_atual }}">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;"><input type="checkbox" id="checkAll"></th>
+                            <th>Data</th>
+                            <th>Entrada</th>
+                            <th>Atraso</th>
+                            <th>Justificativa</th>
+                            <th>Status</th>
+                            <th style="width: 320px;">Ação Manual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in pendencias %}
+                        <tr>
+                            <td><input type="checkbox" name="pontos" value="{{ p.id }}" class="check-item"></td>
+                            <td>{{ p.data|date:"d/m/Y" }}</td>
+                            <td>{{ p.entrada|time:"H:i"|default:"--" }}</td>
+                            <td>{{ p.atraso_minutos }} min</td>
+                            <td>{{ p.justificativa_atraso|default:"-" }}</td>
+                            <td><span class="badge text-bg-warning">{{ p.get_status_homologacao_display }}</span></td>
+                            <td>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" name="acao" value="aprovar_um" class="btn btn-sm btn-outline-success" onclick="document.getElementById('ponto_id').value='{{ p.id }}'">Aprovar</button>
+                                    <button type="submit" name="acao" value="recusar_um" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('ponto_id').value='{{ p.id }}'">Recusar</button>
+                                    <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-primary">Ver</a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="7" class="text-center text-muted py-4">Sem pendências para este colaborador.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer d-flex flex-wrap gap-2 justify-content-end">
+            <input type="hidden" name="ponto_id" id="ponto_id" value="">
+            <input type="text" name="observacao" class="form-control" style="max-width: 360px;" placeholder="Observação (opcional)">
+            <button type="submit" name="acao" value="aprovar_lote" class="btn btn-success">Aprovar Selecionados</button>
+            <button type="submit" name="acao" value="recusar_lote" class="btn btn-danger">Recusar Selecionados</button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+
+<div class="modal fade" id="modalFecharFolha" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="funcionario" value="{{ funcionario_selecionado }}">
+                <input type="hidden" name="mes" value="{{ mes_atual }}">
+                <input type="hidden" name="ano" value="{{ ano_atual }}">
+                <input type="hidden" name="acao" value="fechar_folha">
+                <div class="modal-header">
+                    <h5 class="modal-title">Fechar Folha Ponto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Confirmar fechamento da folha ponto para este colaborador em {{ mes_atual|stringformat:"02d" }}/{{ ano_atual }}?</p>
+                    <textarea class="form-control" name="observacao" rows="3" placeholder="Observação do fechamento (opcional)"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Confirmar Fechamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const checkAll = document.getElementById('checkAll');
+    if (checkAll) {
+        checkAll.addEventListener('change', function () {
+            document.querySelectorAll('.check-item').forEach(el => el.checked = checkAll.checked);
+        });
+    }
+});
+</script>
+{% endblock %}

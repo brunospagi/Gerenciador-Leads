@@ -149,3 +149,27 @@ class RegistroPonto(models.Model):
     def __str__(self):
         return f"Ponto: {self.funcionario.nome_completo} - {self.data.strftime('%d/%m/%Y')}"
 
+
+class FechamentoFolhaPonto(models.Model):
+    funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE, related_name='fechamentos_ponto')
+    mes = models.PositiveSmallIntegerField()
+    ano = models.PositiveIntegerField()
+    fechada = models.BooleanField(default=False, verbose_name='Folha de ponto fechada?')
+    fechado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='fechamentos_folha_ponto',
+    )
+    fechado_em = models.DateTimeField(null=True, blank=True)
+    observacao = models.CharField(max_length=255, blank=True, default='')
+
+    class Meta:
+        unique_together = ('funcionario', 'mes', 'ano')
+        verbose_name = 'Fechamento da Folha de Ponto'
+        verbose_name_plural = 'Fechamentos da Folha de Ponto'
+
+    def __str__(self):
+        return f'{self.funcionario.nome_completo} - {self.mes:02d}/{self.ano}'
+
