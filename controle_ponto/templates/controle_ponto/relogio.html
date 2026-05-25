@@ -280,6 +280,7 @@ let falhasBiometriaConsecutivas = 0;
 let validacaoManualLiberada = false;
 let ultimaSelfieValidacaoBase64 = '';
 let ultimaSelfieTentativaBase64 = '';
+let geoRequestInFlight = false;
 
 function setChip(id, status, label) {
     const chip = document.getElementById(id);
@@ -457,6 +458,7 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
 }
 
 function validarGeolocalizacao() {
+    if (geoRequestInFlight) return;
     if (!navigator.geolocation) {
         geoAprovado = false;
         statusDiv.className = 'alert alert-danger';
@@ -464,10 +466,15 @@ function validarGeolocalizacao() {
         return;
     }
 
+    geoRequestInFlight = true;
+    let geoResolvido = false;
     statusDiv.className = 'alert alert-warning shadow-sm';
     statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Solicitando localizacao GPS...';
 
     const onSuccess = (position) => {
+        if (geoResolvido) return;
+        geoResolvido = true;
+        geoRequestInFlight = false;
         const userLat = position.coords.latitude;
         const userLng = position.coords.longitude;
 
@@ -498,6 +505,9 @@ function validarGeolocalizacao() {
     };
 
     const onError = (error) => {
+        if (geoResolvido) return;
+        geoResolvido = true;
+        geoRequestInFlight = false;
         geoAprovado = false;
         statusDiv.className = 'alert alert-danger';
         let detalhe = 'Nao foi possivel obter a localizacao.';
@@ -506,6 +516,12 @@ function validarGeolocalizacao() {
         else if (error && error.code === 3) detalhe = 'Tempo de localizacao esgotado.';
         statusDiv.innerHTML = `<strong>GPS:</strong> ${detalhe} <button type="button" class="btn btn-sm btn-light ms-2" onclick="validarGeolocalizacao()">Revalidar</button>`;
     };
+
+    // Alguns dispositivos/navegadores nao disparam callback de erro corretamente.
+    // Este watchdog evita que o status fique travado indefinidamente em "solicitando".
+    setTimeout(() => {
+        if (!geoResolvido) onError({ code: 3 });
+    }, 20000);
 
     navigator.geolocation.getCurrentPosition(
         onSuccess,
@@ -705,8 +721,8 @@ async function validarIdentidadeInicial(autoMode = false) {
     autoValidationInFlight = true;
 
     try {
-        const modoInput = document.getElementById('modoValidacaoInput');
-        if (modoInput) modoInput.value = 'biometria';
+        const modoInputFinal = document.getElementById('modoValidacaoInput');
+        if (modoInputFinal) modoInputFinal.value = 'biometria';
         setStep(1, 'active');
         setStep(2, 'active');
         setStep(3, 'idle');
@@ -1159,7 +1175,9 @@ setInterval(() => {
     }
 }, 10000);
 setInterval(() => {
-    validarGeolocalizacao();
+    if (!geoRequestInFlight && document.visibilityState === 'visible') {
+        validarGeolocalizacao();
+    }
 }, GEO_TTL_SECONDS * 1000);
 setInterval(() => {
     if (geoExpirado()) {
@@ -1171,7 +1189,6 @@ setInterval(() => {
 
 atualizarRelogio();
 resetSteps();
-window.onload = validarGeolocalizacao;
 document.addEventListener('DOMContentLoaded', function () {
     setTimeout(validarGeolocalizacao, 250);
 });
