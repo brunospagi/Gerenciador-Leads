@@ -214,6 +214,9 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
                 <input type="hidden" name="tipo_batida" id="tipoBatidaInput">
                 <input type="hidden" name="foto_base64" id="fotoBase64Input">
                 <input type="hidden" name="modo_validacao" id="modoValidacaoInput" value="biometria">
+                <input type="hidden" name="face_distance" id="faceDistanceInput" value="">
+                <input type="hidden" name="face_threshold" id="faceThresholdInput" value="">
+                <input type="hidden" name="face_match_aprovado" id="faceMatchAprovadoInput" value="0">
                 <input type="hidden" name="latitude" id="latInput">
                 <input type="hidden" name="longitude" id="lngInput">
                 <input type="hidden" name="geo_checked_at" id="geoCheckedAtInput">
@@ -605,6 +608,8 @@ function ativarFluxoManual() {
     ultimaSelfieValidacaoBase64 = ultimaSelfieTentativaBase64;
     const modoInput = document.getElementById('modoValidacaoInput');
     if (modoInput) modoInput.value = 'manual_foto_estatica';
+    const aprovInput = document.getElementById('faceMatchAprovadoInput');
+    if (aprovInput) aprovInput.value = '1';
     mostrarResultadoValidacao(
         true,
         'Validacao manual liberada.',
@@ -618,6 +623,14 @@ function reiniciarValidacao() {
     autoValidationInFlight = false;
     ultimaSelfieValidacaoBase64 = '';
     ultimaSelfieTentativaBase64 = '';
+    const distInput = document.getElementById('faceDistanceInput');
+    const thrInput = document.getElementById('faceThresholdInput');
+    const aprovInput = document.getElementById('faceMatchAprovadoInput');
+    const modoInput = document.getElementById('modoValidacaoInput');
+    if (distInput) distInput.value = '';
+    if (thrInput) thrInput.value = '';
+    if (aprovInput) aprovInput.value = '0';
+    if (modoInput) modoInput.value = 'biometria';
     setChip('chipLiveness', 'idle', 'Captura: aguardando');
     setChip('chipMatch', 'warn', 'Face Match: referencia carregada');
     setProgress(30);
@@ -722,6 +735,12 @@ async function validarIdentidadeInicial(autoMode = false) {
         if (!feedback.approved) {
             identidadeValidada = false;
             setChip('chipMatch', 'err', `Face Match: reprovado (${distance.toFixed(3)})`);
+            const distInput = document.getElementById('faceDistanceInput');
+            const thrInput = document.getElementById('faceThresholdInput');
+            const aprovInput = document.getElementById('faceMatchAprovadoInput');
+            if (distInput) distInput.value = String(Number(feedback.distance || distance).toFixed(4));
+            if (thrInput) thrInput.value = String(Number(feedback.threshold || DISTANCE_THRESHOLD).toFixed(4));
+            if (aprovInput) aprovInput.value = '0';
             setStep(4, 'err');
             setProgress(72);
             mostrarResultadoValidacao(
@@ -737,6 +756,14 @@ async function validarIdentidadeInicial(autoMode = false) {
         identidadeValidada = true;
         ultimaSelfieValidacaoBase64 = capturado.base64;
         falhasBiometriaConsecutivas = 0;
+        const distInput = document.getElementById('faceDistanceInput');
+        const thrInput = document.getElementById('faceThresholdInput');
+        const aprovInput = document.getElementById('faceMatchAprovadoInput');
+        const modoInput = document.getElementById('modoValidacaoInput');
+        if (distInput) distInput.value = String(Number(feedback.distance || distance).toFixed(4));
+        if (thrInput) thrInput.value = String(Number(feedback.threshold || DISTANCE_THRESHOLD).toFixed(4));
+        if (aprovInput) aprovInput.value = '1';
+        if (modoInput) modoInput.value = 'biometria';
         setChip('chipMatch', 'ok', `Face Match: aprovado (${Number(feedback.distance || distance).toFixed(3)})`);
         setStep(4, 'ok');
         setProgress(100);

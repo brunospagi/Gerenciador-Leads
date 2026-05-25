@@ -267,6 +267,7 @@
                     Build:
                     <span class="build-tag">#{{ app_build_number }}</span>
                     {% if app_build_sha %}<span class="build-tag">({{ app_build_sha }})</span>{% endif %}
+                    {% if app_build_datetime %}<span class="build-tag">{{ app_build_datetime }}</span>{% endif %}
                 </div>
             </footer>
         </div>

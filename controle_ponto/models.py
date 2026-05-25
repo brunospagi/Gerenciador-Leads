@@ -112,6 +112,35 @@ class RegistroPonto(models.Model):
     homologado_em = models.DateTimeField(null=True, blank=True, verbose_name="Data da HomologaÃ§Ã£o")
     observacao_homologacao = models.TextField(blank=True, null=True, verbose_name="ObservaÃ§Ã£o da HomologaÃ§Ã£o")
 
+    # Auditoria SpagiID (validacao facial usada no momento da batida)
+    modo_validacao = models.CharField(
+        max_length=30,
+        blank=True,
+        null=True,
+        verbose_name="Modo de Validação",
+        help_text="Ex.: biometria, manual_foto_estatica",
+    )
+    face_distance = models.FloatField(
+        blank=True,
+        null=True,
+        verbose_name="Distância Facial",
+        help_text="Menor é melhor; representa divergência da foto de cadastro.",
+    )
+    face_threshold = models.FloatField(
+        blank=True,
+        null=True,
+        verbose_name="Limite de Distância Facial",
+    )
+    face_match_aprovado = models.BooleanField(
+        default=False,
+        verbose_name="Face Match Aprovado",
+    )
+    face_validado_em = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Data/Hora da Validação Facial",
+    )
+
     class Meta:
         verbose_name = "Registro de Ponto"
         verbose_name_plural = "Registros de Ponto"

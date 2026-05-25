@@ -236,6 +236,10 @@ def relogio_ponto(request):
 
         tipo_batida = request.POST.get('tipo_batida')
         foto_base64 = request.POST.get('foto_base64')
+        modo_validacao = (request.POST.get('modo_validacao') or '').strip()
+        face_distance_raw = (request.POST.get('face_distance') or '').strip()
+        face_threshold_raw = (request.POST.get('face_threshold') or '').strip()
+        face_match_aprovado_raw = (request.POST.get('face_match_aprovado') or '').strip().lower()
         lat = request.POST.get('latitude')
         lng = request.POST.get('longitude')
         geo_checked_at = request.POST.get('geo_checked_at')
@@ -325,6 +329,24 @@ def relogio_ponto(request):
         if lat and lng:
             ponto.latitude = lat
             ponto.longitude = lng
+
+        # Auditoria SpagiID
+        if modo_validacao:
+            ponto.modo_validacao = modo_validacao[:30]
+        if face_distance_raw:
+            try:
+                ponto.face_distance = float(face_distance_raw)
+            except (TypeError, ValueError):
+                pass
+        if face_threshold_raw:
+            try:
+                ponto.face_threshold = float(face_threshold_raw)
+            except (TypeError, ValueError):
+                pass
+        ponto.face_match_aprovado = face_match_aprovado_raw in {'1', 'true', 'on', 'yes'}
+        if ponto.face_match_aprovado or (ponto.modo_validacao and ponto.modo_validacao.startswith('manual_')):
+            ponto.face_validado_em = timezone.now()
+
         ponto.save()
         _atualizar_avatar_com_foto_ponto(request.user, foto_base64)
 
@@ -677,6 +699,85 @@ def relatorio_mensal_rh(request):
         'contexto_alertas': contexto_alertas,
     }
     return render(request, 'controle_ponto/relatorio_mensal_rh.html', context)
+
+
+@login_required
+def relatorio_spagiid(request):
+    if not _is_gestor(request.user):
+        messages.error(request, 'Acesso negado ao relatorio SpagiID.')
+        return redirect('/')
+
+    hoje = timezone.now().date()
+    mes = _safe_int(request.GET.get('mes'), hoje.month, min_value=1, max_value=12)
+    ano = _safe_int(request.GET.get('ano'), hoje.year, min_value=hoje.year - 5, max_value=hoje.year + 5)
+    funcionario_id = request.GET.get('funcionario')
+    modo = (request.GET.get('modo') or '').strip()
+
+    pontos_qs = (
+        RegistroPonto.objects.filter(data__month=mes, data__year=ano)
+        .select_related('funcionario')
+        .order_by('-data', 'funcionario__user__first_name')
+    )
+    if funcionario_id:
+        pontos_qs = pontos_qs.filter(funcionario_id=funcionario_id)
+    if modo:
+        pontos_qs = pontos_qs.filter(modo_validacao=modo)
+
+    pontos = list(pontos_qs)
+
+    total_registros = len(pontos)
+    total_biometria = sum(1 for p in pontos if p.modo_validacao == 'biometria')
+    total_manual = sum(1 for p in pontos if p.modo_validacao == 'manual_foto_estatica')
+    total_face_aprovado = sum(1 for p in pontos if p.face_match_aprovado)
+    total_com_foto = sum(
+        1 for p in pontos
+        if p.foto_entrada or p.foto_saida_almoco or p.foto_retorno_almoco or p.foto_saida
+    )
+    distancias = [p.face_distance for p in pontos if p.face_distance is not None]
+    distancia_media = (sum(distancias) / len(distancias)) if distancias else None
+
+    pontos_view = []
+    for p in pontos:
+        similaridade = None
+        if p.face_distance is not None:
+            similaridade = max(0.0, min(100.0, (1 - float(p.face_distance)) * 100))
+        pontos_view.append(
+            {
+                'obj': p,
+                'similaridade': similaridade,
+                'teve_foto_entrada': bool(p.foto_entrada),
+                'teve_foto_saida_almoco': bool(p.foto_saida_almoco),
+                'teve_foto_retorno_almoco': bool(p.foto_retorno_almoco),
+                'teve_foto_saida': bool(p.foto_saida),
+            }
+        )
+
+    funcionarios_list = Funcionario.objects.filter(ativo=True).order_by('user__first_name')
+    modos_disponiveis = (
+        RegistroPonto.objects.exclude(modo_validacao__isnull=True)
+        .exclude(modo_validacao__exact='')
+        .values_list('modo_validacao', flat=True)
+        .distinct()
+    )
+
+    context = {
+        'mes_atual': mes,
+        'ano_atual': ano,
+        'funcionario_selecionado': int(funcionario_id) if funcionario_id else '',
+        'modo_selecionado': modo,
+        'funcionarios': funcionarios_list,
+        'modos_disponiveis': sorted(modos_disponiveis),
+        'meses': range(1, 13),
+        'anos': range(hoje.year - 2, hoje.year + 2),
+        'pontos_view': pontos_view,
+        'total_registros': total_registros,
+        'total_biometria': total_biometria,
+        'total_manual': total_manual,
+        'total_face_aprovado': total_face_aprovado,
+        'total_com_foto': total_com_foto,
+        'distancia_media': distancia_media,
+    }
+    return render(request, 'controle_ponto/relatorio_spagiid.html', context)
 
 
 class RegistroPontoUpdateView(LoginRequiredMixin, UpdateView):

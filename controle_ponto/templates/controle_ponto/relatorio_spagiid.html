@@ -1,0 +1,167 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container-fluid py-4 ponto-page">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="fas fa-user-shield text-primary me-2"></i>Relatorio SpagiID do Ponto</h3>
+            <small class="text-muted">Auditoria completa de validacao facial e metadados de cada batida.</small>
+        </div>
+        <div class="d-flex flex-wrap gap-2 d-print-none">
+            <a href="{% url 'controle_ponto:relatorio_mensal' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Espelho
+            </a>
+            <button type="button" onclick="window.print()" class="btn btn-secondary">
+                <i class="fas fa-print me-1"></i>Imprimir
+            </button>
+        </div>
+    </div>
+
+    <div class="card border-0 mb-4 d-print-none">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold small text-muted">Funcionario</label>
+                    <select name="funcionario" class="form-select">
+                        <option value="">Todos</option>
+                        {% for f in funcionarios %}
+                        <option value="{{ f.id }}" {% if funcionario_selecionado == f.id %}selected{% endif %}>{{ f.nome_completo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold small text-muted">Mes</label>
+                    <select name="mes" class="form-select">
+                        {% for m in meses %}
+                        <option value="{{ m }}" {% if mes_atual == m %}selected{% endif %}>{{ m|stringformat:"02d" }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold small text-muted">Ano</label>
+                    <select name="ano" class="form-select">
+                        {% for a in anos %}
+                        <option value="{{ a }}" {% if ano_atual == a %}selected{% endif %}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold small text-muted">Modo de validacao</label>
+                    <select name="modo" class="form-select">
+                        <option value="">Todos</option>
+                        {% for m in modos_disponiveis %}
+                        <option value="{{ m }}" {% if modo_selecionado == m %}selected{% endif %}>{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-1 d-grid">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i></button>
+                </div>
+                <div class="col-md-1 d-grid">
+                    <a href="{% url 'controle_ponto:relatorio_spagiid' %}" class="btn btn-outline-secondary">Limpar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-6 col-xl-2"><div class="card h-100 border-0"><div class="card-body"><small class="text-muted">Registros</small><div class="h3 fw-bold">{{ total_registros }}</div></div></div></div>
+        <div class="col-12 col-md-6 col-xl-2"><div class="card h-100 border-0"><div class="card-body"><small class="text-muted">Biometria</small><div class="h3 fw-bold text-primary">{{ total_biometria }}</div></div></div></div>
+        <div class="col-12 col-md-6 col-xl-2"><div class="card h-100 border-0"><div class="card-body"><small class="text-muted">Manual</small><div class="h3 fw-bold text-warning">{{ total_manual }}</div></div></div></div>
+        <div class="col-12 col-md-6 col-xl-2"><div class="card h-100 border-0"><div class="card-body"><small class="text-muted">Face Match OK</small><div class="h3 fw-bold text-success">{{ total_face_aprovado }}</div></div></div></div>
+        <div class="col-12 col-md-6 col-xl-2"><div class="card h-100 border-0"><div class="card-body"><small class="text-muted">Com Foto</small><div class="h3 fw-bold">{{ total_com_foto }}</div></div></div></div>
+        <div class="col-12 col-md-6 col-xl-2"><div class="card h-100 border-0"><div class="card-body"><small class="text-muted">Distancia media</small><div class="h4 fw-bold">{{ distancia_media|default:"-"|floatformat:4 }}</div></div></div></div>
+    </div>
+
+    <div class="card border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Colaborador</th>
+                            <th>Batidas</th>
+                            <th>Modo</th>
+                            <th>Face Match</th>
+                            <th>Similaridade</th>
+                            <th>Distancia</th>
+                            <th>Threshold</th>
+                            <th>Validado em</th>
+                            <th>IP/GPS</th>
+                            <th>Fotos</th>
+                            <th class="d-print-none">Auditoria</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in pontos_view %}
+                        {% with p=item.obj %}
+                        <tr>
+                            <td class="fw-semibold">{{ p.data|date:"d/m/Y" }}</td>
+                            <td>
+                                <div class="fw-semibold">{{ p.funcionario.nome_completo }}</div>
+                                <small class="text-muted">{{ p.funcionario.cargo|default:"-" }}</small>
+                            </td>
+                            <td>
+                                <div class="small">E: {{ p.entrada|time:"H:i"|default:"--" }}</div>
+                                <div class="small">SA: {{ p.saida_almoco|time:"H:i"|default:"--" }}</div>
+                                <div class="small">RA: {{ p.retorno_almoco|time:"H:i"|default:"--" }}</div>
+                                <div class="small">SF: {{ p.saida|time:"H:i"|default:"--" }}</div>
+                            </td>
+                            <td><span class="m3-badge m3-badge-neutral">{{ p.modo_validacao|default:"-" }}</span></td>
+                            <td>
+                                {% if p.face_match_aprovado %}
+                                <span class="m3-badge m3-badge-success">Aprovado</span>
+                                {% else %}
+                                <span class="m3-badge m3-badge-warning">Pendente/Manual</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.similaridade is not None %}
+                                <span class="fw-bold text-success">{{ item.similaridade|floatformat:2 }}%</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ p.face_distance|default:"-"|floatformat:4 }}</td>
+                            <td>{{ p.face_threshold|default:"-"|floatformat:4 }}</td>
+                            <td>{{ p.face_validado_em|date:"d/m/Y H:i"|default:"-" }}</td>
+                            <td>
+                                <div class="small">{{ p.ip_registrado|default:"-" }}</div>
+                                <div class="small text-muted">{{ p.latitude|default:"-" }}, {{ p.longitude|default:"-" }}</div>
+                            </td>
+                            <td>
+                                <div class="small">E {% if item.teve_foto_entrada %}✅{% else %}—{% endif %}</div>
+                                <div class="small">SA {% if item.teve_foto_saida_almoco %}✅{% else %}—{% endif %}</div>
+                                <div class="small">RA {% if item.teve_foto_retorno_almoco %}✅{% else %}—{% endif %}</div>
+                                <div class="small">SF {% if item.teve_foto_saida %}✅{% else %}—{% endif %}</div>
+                            </td>
+                            <td class="d-print-none">
+                                <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endwith %}
+                        {% empty %}
+                        <tr>
+                            <td colspan="12" class="text-center py-5 text-muted">Nenhum registro encontrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .ponto-page .card { border-radius: 16px !important; }
+    @media print {
+        .d-print-none, header, nav, #sidebar { display: none !important; }
+        body { background: #fff !important; font-size: 10px; }
+        #content-wrapper { width: 100% !important; margin-left: 0 !important; }
+    }
+</style>
+{% endblock %}
+
