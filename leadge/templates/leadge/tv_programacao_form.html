@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+
+{% block title %}Programação da TV{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0 text-primary">
+                        <i class="fa fa-stream me-2"></i>
+                        {% if form.instance.pk %}Editar Item da Programação{% else %}Novo Item da Programação{% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+
+                        {% if form.errors %}
+                            <div class="alert alert-danger">Corrija os erros para continuar.</div>
+                        {% endif %}
+
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label class="form-label fw-bold">Título</label>
+                                {{ form.titulo }}
+                            </div>
+                            <div class="col-md-2 mb-3">
+                                <label class="form-label fw-bold">Ordem</label>
+                                {{ form.ordem }}
+                            </div>
+                            <div class="col-md-2 mb-3 d-flex align-items-end">
+                                <div class="form-check form-switch">
+                                    {{ form.ativo }}
+                                    <label class="form-check-label" for="{{ form.ativo.id_for_label }}">Ativo</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">URL do Vídeo</label>
+                            {{ form.video_url }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Upload MP4 (Opcional)</label>
+                            {{ form.video_mp4 }}
+                            {% if form.instance.video_mp4 %}
+                                <small class="d-block mt-1">Atual: <a href="{{ form.instance.video_mp4.url }}" target="_blank">ver arquivo</a></small>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Ticker Manual deste Item (Opcional)</label>
+                            {{ form.manual_news_ticker }}
+                        </div>
+
+                        <div class="card bg-light border-0 mb-3">
+                            <div class="card-body">
+                                <h6 class="mb-3">Linha do Tempo</h6>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Dias da Semana</label>
+                                    {{ form.dias_semana }}
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Data Início</label>
+                                        {{ form.data_inicio }}
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Data Fim</label>
+                                        {{ form.data_fim }}
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Horário Início</label>
+                                        {{ form.horario_inicio }}
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Horário Fim</label>
+                                        {{ form.horario_fim }}
+                                    </div>
+                                </div>
+                                <small class="text-muted">
+                                    Se deixar datas/horários em branco, o item fica livre para todo o período.
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'tv_gestao' %}" class="btn btn-light border">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa fa-save me-1"></i>Salvar Item
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

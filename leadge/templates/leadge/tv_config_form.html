@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Configuração Global da TV{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0 text-primary"><i class="fa fa-cog me-2"></i>Configuração Global da TV (Fallback)</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+
+                        {% if form.errors %}
+                            <div class="alert alert-danger">Corrija os erros para continuar.</div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Título</label>
+                            {{ form.titulo }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">URL do Vídeo</label>
+                            {{ form.video_url }}
+                            <small class="text-muted d-block mt-1">Use embed do YouTube ou URL direta. MP4 tem prioridade se enviado.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Upload MP4 (Opcional)</label>
+                            {{ form.video_mp4 }}
+                            {% if form.instance.video_mp4 %}
+                                <small class="d-block mt-1">Atual: <a href="{{ form.instance.video_mp4.url }}" target="_blank">ver arquivo</a></small>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Chave API NewsData</label>
+                            {{ form.newsdata_api_key }}
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Ticker Manual (Opcional)</label>
+                            {{ form.manual_news_ticker }}
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'tv_gestao' %}" class="btn btn-light border">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fa fa-save me-1"></i>Salvar Configuração
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

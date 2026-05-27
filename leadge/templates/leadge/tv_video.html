@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ video_config.titulo }}</title>
+    <title>{{ video_ativo.titulo|default:video_config.titulo }}</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
@@ -44,6 +44,20 @@
             padding-top: 50vh;
             transform: translateY(-50%);
             font-family: sans-serif;
+        }
+        .on-air-badge {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            background: rgba(220, 53, 69, 0.92);
+            color: #fff;
+            font-weight: 700;
+            border-radius: 999px;
+            padding: 8px 14px;
+            z-index: 1200;
+            font-family: sans-serif;
+            letter-spacing: 0.2px;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
         }
         
         /* --- RODAPÉ --- */
@@ -122,17 +136,27 @@
 </head>
 <body>
 
+    {% if item_ativo %}
+    <div class="on-air-badge">
+        NO AR: {{ item_ativo.titulo }}
+    </div>
+    {% endif %}
+
     <div id="video-container">
-        {% if video_config.video_mp4 and video_config.video_mp4.url %}
+        {% if playlist_mode %}
+            <video id="playlist-player" class="responsive-video" autoplay muted playsinline>
+                Seu navegador não suporta a tag de vídeo.
+            </video>
+        {% elif video_ativo.video_mp4 and video_ativo.video_mp4.url %}
             <video class="responsive-video" autoplay muted loop playsinline>
-                <source src="{{ video_config.video_mp4.url }}" type="video/mp4">
+                <source src="{{ video_ativo.video_mp4.url }}" type="video/mp4">
                 Seu navegador não suporta a tag de vídeo.
             </video>
         
-        {% elif video_config.video_url %}
+        {% elif video_ativo.video_url %}
             <iframe 
                 class="responsive-video"
-                src="{{ video_config.video_url }}"
+                src="{{ video_ativo.video_url }}"
                 allow="autoplay; fullscreen"
                 autoplay
                 loop
@@ -149,6 +173,7 @@
             </div>
         {% endif %}
         </div>
+    {{ playlist_mp4_urls|json_script:"tv-mp4-playlist-data" }}
 
     <div id="footer-tv">
         <div class="info-box time-weather-group">
@@ -179,6 +204,8 @@
         const API_KEY_GOOGLE = "{{ GOOGLE_MAPS_API_KEY }}"; 
         const API_KEY_NEWS = "{{ NEWS_API_KEY }}";
         const MANUAL_NEWS = "{{ MANUAL_NEWS|escapejs }}";
+        const PLAYLIST_DATA_ELEMENT = document.getElementById('tv-mp4-playlist-data');
+        const MP4_PLAYLIST = PLAYLIST_DATA_ELEMENT ? JSON.parse(PLAYLIST_DATA_ELEMENT.textContent) : [];
 
         // Coordenadas padrão (São José dos Pinhais)
         const CIDADE = "São José dos Pinhais";
@@ -192,6 +219,35 @@
         const CLIMA_ICON_ELEMENT = document.getElementById('clima-icon');
         const NEWS_TEXT_ELEMENT = document.getElementById('news-text');
         const NEWS_SCROLLER = document.getElementById('noticias-scroller');
+
+        function initializeMp4Playlist() {
+            const player = document.getElementById('playlist-player');
+            if (!player || MP4_PLAYLIST.length === 0) {
+                return;
+            }
+
+            let currentIndex = 0;
+
+            function playCurrent() {
+                player.src = MP4_PLAYLIST[currentIndex];
+                player.load();
+                const playPromise = player.play();
+                if (playPromise && typeof playPromise.catch === 'function') {
+                    playPromise.catch((error) => {
+                        console.error('Falha ao reproduzir vídeo da playlist MP4:', error);
+                    });
+                }
+            }
+
+            function playNext() {
+                currentIndex = (currentIndex + 1) % MP4_PLAYLIST.length;
+                playCurrent();
+            }
+
+            player.addEventListener('ended', playNext);
+            player.addEventListener('error', playNext);
+            playCurrent();
+        }
 
         // --- LÓGICA DA HORA E DATA ---
         function updateTime() {
@@ -405,7 +461,7 @@
         }
 
         // --- LÓGICA DE RECARGA DE 24H ---
-        const VIDEO_URL = "{{ video_config.video_url|escapejs }}";
+        const VIDEO_URL = "{{ video_ativo.video_url|default:''|escapejs }}";
         const LAST_UPDATED_STR = "{{ video_config.last_updated|date:'U' }}";
         const CHECK_INTERVAL_MS = 60000;
         const REFRESH_THRESHOLD_MS = 24 * 60 * 60 * 1000;
@@ -425,6 +481,7 @@
         }
         
         // Inicia a busca do clima e notícias (o clima a cada 1h, notícias a cada 10 min)
+        initializeMp4Playlist();
         fetchWeather();
         fetchNews();
         setInterval(fetchWeather, 10800000); 

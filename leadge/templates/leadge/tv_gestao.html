@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block title %}Gestão da TV{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h3 class="mb-1"><i class="fa fa-tv text-primary me-2"></i>Gestão Completa da TV</h3>
+            <small class="text-muted">Programe vídeos por linha do tempo, datas e horários.</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'tv_video_display' %}" target="_blank" class="btn btn-outline-dark">
+                <i class="fa fa-play-circle me-1"></i> Abrir TV
+            </a>
+            <a href="{% url 'tv_config_update' %}" class="btn btn-outline-primary">
+                <i class="fa fa-cog me-1"></i> Configuração Global
+            </a>
+            <a href="{% url 'tv_programacao_create' %}" class="btn btn-primary">
+                <i class="fa fa-plus me-1"></i> Novo Item
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <h5 class="card-title">No Ar Agora</h5>
+                    {% if item_ativo %}
+                        <p class="mb-1"><strong>{{ item_ativo.titulo }}</strong></p>
+                        <p class="text-muted mb-0">
+                            Dias: {{ item_ativo.dias_semana_legivel }} |
+                            Horário:
+                            {% if item_ativo.horario_inicio %}{{ item_ativo.horario_inicio|time:"H:i" }}{% else %}00:00{% endif %}
+                            até
+                            {% if item_ativo.horario_fim %}{{ item_ativo.horario_fim|time:"H:i" }}{% else %}23:59{% endif %}
+                        </p>
+                    {% else %}
+                        <p class="mb-0 text-muted">Nenhum item da grade está ativo neste momento. A TV usa a configuração global de fallback.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Fallback Global</h5>
+                    <p class="mb-1"><strong>{{ tv_config.titulo }}</strong></p>
+                    <p class="text-muted mb-0">Usado quando não houver item ativo na programação.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Linha do Tempo da Programação</h5>
+            <span class="badge bg-secondary">{{ programacao|length }} itens</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Título</th>
+                        <th>Status</th>
+                        <th>Ordem</th>
+                        <th>Dias</th>
+                        <th>Horário</th>
+                        <th>Datas</th>
+                        <th class="text-end pe-3">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in programacao %}
+                    <tr>
+                        <td>
+                            <strong>{{ item.titulo }}</strong>
+                            {% if item.video_mp4 %}<br><small class="text-muted">Fonte: MP4</small>{% elif item.video_url %}<br><small class="text-muted">Fonte: URL</small>{% endif %}
+                        </td>
+                        <td>
+                            {% if item.ativo %}
+                                <span class="badge bg-success">Ativo</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inativo</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ item.ordem }}</td>
+                        <td><small>{{ item.dias_semana_legivel }}</small></td>
+                        <td>
+                            <small>
+                                {% if item.horario_inicio %}{{ item.horario_inicio|time:"H:i" }}{% else %}00:00{% endif %}
+                                -
+                                {% if item.horario_fim %}{{ item.horario_fim|time:"H:i" }}{% else %}23:59{% endif %}
+                            </small>
+                        </td>
+                        <td>
+                            <small>
+                                {% if item.data_inicio %}{{ item.data_inicio|date:"d/m/Y" }}{% else %}Livre{% endif %}
+                                -
+                                {% if item.data_fim %}{{ item.data_fim|date:"d/m/Y" }}{% else %}Livre{% endif %}
+                            </small>
+                        </td>
+                        <td class="text-end pe-3">
+                            <a href="{% url 'tv_programacao_update' item.pk %}" class="btn btn-sm btn-outline-primary" title="Editar">
+                                <i class="fa fa-edit"></i>
+                            </a>
+                            <a href="{% url 'tv_programacao_delete' item.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir">
+                                <i class="fa fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            Nenhum item cadastrado na programação da TV.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

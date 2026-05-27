@@ -82,3 +82,80 @@ class Banner(models.Model):
 
     def __str__(self):
         return self.titulo
+
+
+class TVProgramacaoItem(models.Model):
+    DIAS_SEMANA_CHOICES = (
+        ('0', 'Segunda'),
+        ('1', 'Terça'),
+        ('2', 'Quarta'),
+        ('3', 'Quinta'),
+        ('4', 'Sexta'),
+        ('5', 'Sábado'),
+        ('6', 'Domingo'),
+    )
+
+    titulo = models.CharField(max_length=120, verbose_name="Título da Programação")
+    video_url = models.URLField(
+        verbose_name="URL do Vídeo",
+        help_text="Aceita link embed de YouTube ou URL direta de mídia.",
+        blank=True,
+        null=True,
+    )
+    video_mp4 = models.FileField(
+        upload_to='tv_videos/',
+        storage=PublicMediaStorage(),
+        verbose_name="Upload de Vídeo MP4",
+        blank=True,
+        null=True,
+    )
+    manual_news_ticker = models.TextField(
+        verbose_name="Ticker Manual do Item (Opcional)",
+        help_text="Se preenchido, substitui o ticker padrão enquanto este item estiver no ar.",
+        blank=True,
+        null=True,
+    )
+    ativo = models.BooleanField(default=True, verbose_name="Ativo?")
+    ordem = models.PositiveIntegerField(default=0, verbose_name="Ordem de Prioridade")
+
+    dias_semana = models.CharField(
+        max_length=20,
+        default='0,1,2,3,4,5,6',
+        verbose_name="Dias da Semana",
+        help_text="Informe os números separados por vírgula: 0=Seg, 1=Ter, 2=Qua, 3=Qui, 4=Sex, 5=Sáb, 6=Dom.",
+    )
+    horario_inicio = models.TimeField(null=True, blank=True, verbose_name="Horário de Início")
+    horario_fim = models.TimeField(null=True, blank=True, verbose_name="Horário de Fim")
+    data_inicio = models.DateField(null=True, blank=True, verbose_name="Data Início")
+    data_fim = models.DateField(null=True, blank=True, verbose_name="Data Fim")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Item da Programação de TV"
+        verbose_name_plural = "Programação da TV"
+        ordering = ['ordem', 'id']
+
+    def clean(self):
+        super().clean()
+
+        if not self.video_url and not self.video_mp4:
+            raise ValidationError("Informe uma URL de vídeo ou faça upload de um MP4.")
+
+        if self.data_inicio and self.data_fim and self.data_fim < self.data_inicio:
+            raise ValidationError("A data final não pode ser menor que a data inicial.")
+
+        dias = [d.strip() for d in (self.dias_semana or '').split(',') if d.strip()]
+        if not dias:
+            raise ValidationError("Informe ao menos um dia da semana.")
+        if any(d not in {'0', '1', '2', '3', '4', '5', '6'} for d in dias):
+            raise ValidationError("Dias da semana inválidos. Use somente valores de 0 a 6.")
+
+    def dias_semana_legivel(self):
+        mapa = dict(self.DIAS_SEMANA_CHOICES)
+        dias = [d.strip() for d in (self.dias_semana or '').split(',') if d.strip()]
+        return ', '.join(mapa.get(d, d) for d in dias)
+
+    def __str__(self):
+        return f"{self.titulo} ({'Ativo' if self.ativo else 'Inativo'})"
