@@ -33,6 +33,13 @@
                 <div class="card-body">
                     <form method="post">
                         {% csrf_token %}
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for err in form.non_field_errors %}
+                                    <div><i class="fa fa-exclamation-triangle me-1"></i>{{ err }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                         
                         {# Campos do Formulário #}
                         {% for field in form %}

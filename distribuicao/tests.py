@@ -45,6 +45,34 @@ class DistribuicaoRegrasPontoTests(TestCase):
 
         self.assertEqual(proximo, user)
 
+    def test_manha_permite_entrada_com_atraso(self):
+        user, funcionario = self._criar_vendedor('vendedor_atrasado_manha')
+        RegistroPonto.objects.create(
+            funcionario=funcionario,
+            entrada=time(8, 20),
+            atraso_minutos=20,
+        )
+
+        with patch('distribuicao.logic.timezone.localtime', return_value=self._agora(10, 0)):
+            proximo = definir_proximo_vendedor()
+
+        self.assertEqual(proximo, user)
+
+    def test_tarde_antes_14_nao_exige_saida_almoco(self):
+        user, funcionario = self._criar_vendedor('vendedor_livre_ate_14')
+        RegistroPonto.objects.create(
+            funcionario=funcionario,
+            entrada=time(8, 0),
+            atraso_minutos=0,
+            saida_almoco=None,
+            retorno_almoco=None,
+        )
+
+        with patch('distribuicao.logic.timezone.localtime', return_value=self._agora(13, 45)):
+            proximo = definir_proximo_vendedor()
+
+        self.assertEqual(proximo, user)
+
     def test_bloqueia_distribuicao_apos_14_sem_saida_almoco(self):
         _, funcionario = self._criar_vendedor('vendedor_sem_saida_14')
         RegistroPonto.objects.create(funcionario=funcionario, entrada=time(8, 0))

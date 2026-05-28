@@ -11,19 +11,11 @@ import os
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "https://seu-n8n-webhook-url-aqui")
 
 
-def definir_proximo_vendedor():
-    """
-    Retorna o User do proximo vendedor e atualiza o timestamp dele.
-    Logica:
-    1. Filtra apenas ATIVOS.
-    2. Filtra apenas quem bateu ponto de ENTRADA no dia.
-    3. Bloqueia quem saiu para almoco e ainda nao registrou retorno.
-    4. Apos 14:00, bloqueia quem nao registrou saida para almoco.
-    5. Ordena colocando quem tem data NULL (nunca recebeu) no topo.
-    6. Depois ordena por quem recebeu ha mais tempo.
-    """
+def _queryset_vendedores_disponiveis(agora_local=None):
+    """Retorna queryset de vendedores elegiveis para receber lead no rodizio."""
     hoje = timezone.localdate()
-    agora_local = timezone.localtime()
+    agora_local = agora_local or timezone.localtime()
+    hora_atual = agora_local.time()
 
     vendedores_disponiveis = VendedorRodizio.objects.filter(
         ativo=True,
@@ -36,15 +28,28 @@ def definir_proximo_vendedor():
         & Q(vendedor__dados_funcionais__pontos__retorno_almoco__isnull=True)
     )
 
-    if agora_local.time() >= time(14, 0):
+    # Ate 14:00 fica livre mesmo sem saida de almoco.
+    # Apos 14:00, exige saida_almoco registrada.
+    if hora_atual >= time(14, 0):
         vendedores_disponiveis = vendedores_disponiveis.filter(
             vendedor__dados_funcionais__pontos__saida_almoco__isnull=False,
         )
 
-    proximo = vendedores_disponiveis.order_by(
+    return vendedores_disponiveis.distinct()
+
+
+def vendedor_disponivel_no_rodizio(vendedor, agora_local=None):
+    return _queryset_vendedores_disponiveis(agora_local=agora_local).filter(vendedor=vendedor).exists()
+
+
+def definir_proximo_vendedor():
+    """
+    Retorna o User do proximo vendedor e atualiza o timestamp dele.
+    """
+    proximo = _queryset_vendedores_disponiveis().order_by(
         F('ultima_atribuicao').asc(nulls_first=True),
         'ordem'
-    ).distinct().first()
+    ).first()
 
     if not proximo:
         return None
