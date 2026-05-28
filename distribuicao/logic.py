@@ -1,9 +1,9 @@
-from datetime import time
+from datetime import datetime, time
 
-from django.db.models import F, Q
 from django.utils import timezone
 
 from .models import VendedorRodizio
+from controle_ponto.models import RegistroPonto
 import requests
 import os
 
@@ -11,45 +11,60 @@ import os
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "https://seu-n8n-webhook-url-aqui")
 
 
-def _queryset_vendedores_disponiveis(agora_local=None):
-    """Retorna queryset de vendedores elegiveis para receber lead no rodizio."""
+def _listar_vendedores_disponiveis(agora_local=None):
+    """Retorna lista de objetos VendedorRodizio elegiveis no rodizio."""
     hoje = timezone.localdate()
     agora_local = agora_local or timezone.localtime()
     hora_atual = agora_local.time()
 
-    vendedores_disponiveis = VendedorRodizio.objects.filter(
-        ativo=True,
-        vendedor__dados_funcionais__ativo=True,
-        vendedor__dados_funcionais__pontos__data=hoje,
-        vendedor__dados_funcionais__pontos__entrada__isnull=False,
-    ).exclude(
-        Q(vendedor__dados_funcionais__pontos__data=hoje)
-        & Q(vendedor__dados_funcionais__pontos__saida_almoco__isnull=False)
-        & Q(vendedor__dados_funcionais__pontos__retorno_almoco__isnull=True)
+    candidatos = list(
+        VendedorRodizio.objects.filter(ativo=True).select_related('vendedor', 'vendedor__dados_funcionais')
+    )
+    candidatos.sort(
+        key=lambda item: (
+            item.ultima_atribuicao is not None,
+            item.ultima_atribuicao or datetime.min,
+            item.ordem,
+        )
     )
 
-    # Ate 14:00 fica livre mesmo sem saida de almoco.
-    # Apos 14:00, exige saida_almoco registrada.
-    if hora_atual >= time(14, 0):
-        vendedores_disponiveis = vendedores_disponiveis.filter(
-            vendedor__dados_funcionais__pontos__saida_almoco__isnull=False,
-        )
+    elegiveis = []
+    for candidato in candidatos:
+        funcionario = getattr(candidato.vendedor, 'dados_funcionais', None)
+        if not funcionario:
+            continue
 
-    return vendedores_disponiveis.distinct()
+        ponto_hoje = (
+            RegistroPonto.objects.filter(funcionario=funcionario, data=hoje)
+            .only('entrada', 'saida_almoco', 'retorno_almoco')
+            .first()
+        )
+        if not ponto_hoje or not ponto_hoje.entrada:
+            continue
+
+        # No almoço: saiu e ainda não retornou -> bloqueado.
+        if ponto_hoje.saida_almoco and not ponto_hoje.retorno_almoco:
+            continue
+
+        # Até 13:59 livre sem saída de almoço; após 14:00 precisa ter saída.
+        if hora_atual >= time(14, 0) and not ponto_hoje.saida_almoco:
+            continue
+
+        elegiveis.append(candidato)
+
+    return elegiveis
 
 
 def vendedor_disponivel_no_rodizio(vendedor, agora_local=None):
-    return _queryset_vendedores_disponiveis(agora_local=agora_local).filter(vendedor=vendedor).exists()
+    return any(item.vendedor_id == vendedor.id for item in _listar_vendedores_disponiveis(agora_local=agora_local))
 
 
 def definir_proximo_vendedor():
     """
     Retorna o User do proximo vendedor e atualiza o timestamp dele.
     """
-    proximo = _queryset_vendedores_disponiveis().order_by(
-        F('ultima_atribuicao').asc(nulls_first=True),
-        'ordem'
-    ).first()
+    vendedores_elegiveis = _listar_vendedores_disponiveis()
+    proximo = vendedores_elegiveis[0] if vendedores_elegiveis else None
 
     if not proximo:
         return None
