@@ -1,21 +1,29 @@
 # 10 - Comentarios Adicionais e Melhorias
 
-## Comentarios adicionais
+## Situacao atual
 
-- O projeto esta maduro funcionalmente e evoluiu em governanca de acesso.
-- A nova camada de permissao por modulo reduziu risco de exposicao indevida.
-- O campo `origem_cliente` em vendas melhora analise de canais.
+- Plataforma madura para operacao comercial de revenda.
+- Distribuicao, pipeline de leads, vendas, financeiro e RH integrados.
+- Governanca evoluida com backup operacional e trilha de auditoria.
 
-## Melhorias sugeridas
+## Melhorias recomendadas
 
-1. testes automatizados para middleware e regras de permissao
-2. dashboard executivo com metas e conversao por origem
-3. exportacao CSV/XLS dos relatorios principais
-4. trilha de auditoria mais detalhada por entidade
-5. observabilidade (alertas de erro e latencia)
+1. Cobertura de testes automatizados para regras de distribuicao e pipeline.
+2. Dashboard de produtividade por vendedor (SLA de contato, taxa por etapa do funil).
+3. Exportacao CSV/XLS para auditoria e BI externo.
+4. Alertas proativos para leads quentes sem andamento recente.
+5. Observabilidade centralizada (APM, logs estruturados e alertas de excecao).
+6. Politica de retencao e arquivamento de logs de auditoria.
 
-## Prioridade recomendada
+## Priorizacao sugerida
 
-- curto prazo: testes e observabilidade
-- medio prazo: analytics de origem e metas
-- longo prazo: automacoes inteligentes de follow-up
+- Curto prazo:
+  - testes de regras criticas
+  - monitoramento basico
+  - exportacao operacional
+- Medio prazo:
+  - analytics de conversao por origem
+  - alertas de follow-up
+- Longo prazo:
+  - automacoes inteligentes de atendimento
+  - modelos preditivos para prioridade de lead

@@ -2,61 +2,70 @@
 
 ## Variaveis principais
 
-- Django
-  - `DJANGO_SECRET_KEY`
-  - `DJANGO_DEBUG`
-  - `DJANGO_ALLOWED_HOSTS`
-  - `DJANGO_CSRF_TRUSTED_ORIGINS`
+### Django
 
-- Banco
-  - `DB_ENGINE` (`postgres` ou `sqlite`)
-  - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` (quando `DB_ENGINE=postgres`)
-  - `SQLITE_PATH` (quando `DB_ENGINE=sqlite`)
+- `DJANGO_SECRET_KEY`
+- `DJANGO_DEBUG`
+- `DJANGO_ALLOWED_HOSTS`
+- `DJANGO_CSRF_TRUSTED_ORIGINS`
+- `DJANGO_CONTENT_SECURITY_POLICY` (opcional para override)
 
-- Storage MinIO
-  - `MINIO_EXTERNAL_ENDPOINT`
-  - `MINIO_STORAGE_ENDPOINT`
-  - `MINIO_STORAGE_ACCESS_KEY`
-  - `MINIO_STORAGE_SECRET_KEY`
-  - `MINIO_STORAGE_USE_HTTPS`
-  - `MINIO_STORAGE_MEDIA_BUCKET_NAME`
+### Build e release
 
-- Integracoes
-  - `GEMINI_API_KEY`
-  - `GOOGLE_MAPS_API_KEY`
-  - `N8N_WEBHOOK_URL`
-  - `WEBHOOK_PONTO_URL`
+- `APP_BUILD_NUMBER`
+- `APP_BUILD_SHA`
 
-- OIDC (opcional)
-  - `OIDC_RP_CLIENT_ID`
-  - `OIDC_RP_CLIENT_SECRET`
-  - `OIDC_OP_AUTHORIZATION_ENDPOINT`
-  - `OIDC_OP_TOKEN_ENDPOINT`
-  - `OIDC_OP_USER_ENDPOINT`
+### Banco
 
-- Webpush
-  - `VAPID_PUBLIC_KEY`
-  - `VAPID_PRIVATE_KEY`
-  - `VAPID_ADMIN_EMAIL`
+- `DB_ENGINE` (`postgres` ou `sqlite`)
+- `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` (quando `postgres`)
+- `SQLITE_PATH` (quando `sqlite`)
 
-## Observacao
+### Storage MinIO
 
-Garanta que os valores de producao nao sejam versionados.
+- `MINIO_EXTERNAL_ENDPOINT`
+- `MINIO_STORAGE_ENDPOINT`
+- `MINIO_STORAGE_ACCESS_KEY`
+- `MINIO_STORAGE_SECRET_KEY`
+- `MINIO_STORAGE_USE_HTTPS`
+- `MINIO_STORAGE_MEDIA_BUCKET_NAME`
 
-O arquivo `.env.example` contem somente valores ficticios e deve ser usado como base.
+### Integracoes
 
-Exemplo rapido:
+- `GEMINI_API_KEY`
+- `GOOGLE_MAPS_API_KEY`
+- `N8N_WEBHOOK_URL`
+- `WEBHOOK_PONTO_URL`
+
+### OIDC (opcional)
+
+- `OIDC_RP_CLIENT_ID`
+- `OIDC_RP_CLIENT_SECRET`
+- `OIDC_OP_AUTHORIZATION_ENDPOINT`
+- `OIDC_OP_TOKEN_ENDPOINT`
+- `OIDC_OP_USER_ENDPOINT`
+
+### Webpush
+
+- `VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
+- `VAPID_ADMIN_EMAIL`
+
+## Exemplo rapido
 
 ```env
-# PostgreSQL
 DB_ENGINE=postgres
-DB_NAME=app_exemplo
-DB_USER=app_user
-DB_PASSWORD=senha_ficticia_123
+DB_NAME=spagileads
+DB_USER=postgres
+DB_PASSWORD=senha_ficticia
 DB_HOST=postgres
 DB_PORT=5432
-
-# SQLite
-# DB_ENGINE=sqlite
-# SQLITE_PATH=db.sqlite3
+DJANGO_DEBUG=False
 ```
+
+## Boas praticas
+
+- Nunca versionar `.env` de producao.
+- Rotacionar chaves periodicamente.
+- Separar credenciais por ambiente (dev/hml/prd).
+- Revisar CSP e hosts permitidos a cada mudanca de dominio.

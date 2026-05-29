@@ -2,17 +2,17 @@
 
 ## Modelo de acesso
 
-1. Perfil de usuario (`Profile.nivel_acesso`)
-2. Permissao por modulo (`ModulePermission`)
+1. Perfil de usuario (`Profile.nivel_acesso`).
+2. Permissao por modulo (`ModulePermission`).
 
-## Regras tecnicas
+## Controles tecnicos
 
-- `usuarios/permissions.py` centraliza `has_module_access`
-- `usuarios/middleware.py` bloqueia rotas por prefixo
-- superuser sempre tem acesso total
-- admin funcional pode ter acesso total por regra de perfil
+- `usuarios/permissions.py`: regra central `has_module_access`.
+- `usuarios/middleware.py`: bloqueio por prefixo de rota.
+- Views com decorators/mixins para regras por perfil.
+- Superuser com acesso total.
 
-## Modulos suportados
+## Modulos controlados
 
 - clientes
 - vendas
@@ -27,13 +27,29 @@
 - relatorios
 - usuarios_admin
 
-## UI de gestao
+## Hardening e cabecalhos
 
-- `Usuarios -> Permissoes por Modulo`
-- apenas super admin pode ver o card de permissoes no portal
+- `SecurityHeadersMiddleware` aplica:
+  - `Content-Security-Policy`
+  - `Referrer-Policy`
+  - `X-Content-Type-Options`
+  - `Permissions-Policy`
+
+## Auditoria operacional
+
+- `AuditLogMiddleware` registra requests autenticados de escrita (`POST`, `PUT`, `PATCH`, `DELETE`).
+- Dados coletados:
+  - usuario e nivel
+  - modulo e acao
+  - rota, metodo e status HTTP
+  - IP e user-agent
+  - payload sanitizado (sem campos sensiveis)
+- Consulta administrativa:
+  - `/painel-admin/logs-auditoria/`
 
 ## Boas praticas
 
-- revisao mensal de acessos
-- remover permissoes de usuarios inativos
-- evitar conceder permissao de modulo sem necessidade
+- Revisao mensal de acessos e perfis.
+- Principio do menor privilegio por modulo.
+- Revisar periodicamente logs de auditoria e eventos de erro.
+- Revogar acesso de usuarios inativos imediatamente.

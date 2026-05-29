@@ -2,32 +2,39 @@
 
 ## Stack
 
-- Python + Django
-- Templates server-side + Bootstrap
-- PostgreSQL (producao)
-- MinIO (arquivos)
-- WhiteNoise (estaticos)
-- OIDC opcional para SSO
+- Backend: Python + Django
+- Frontend: Django Templates + Bootstrap + JS
+- Banco: PostgreSQL (producao) ou SQLite (local)
+- Storage: MinIO (media), WhiteNoise (estaticos)
+- Integracoes: WebPush, webhooks (n8n), OIDC opcional
 
 ## Estrutura de apps
 
-- `crmspagi`: configuracao global e urls principais
-- `core`: componentes base e contexto
-- `usuarios`: perfis, dashboard admin, permissoes por modulo
-- `clientes`, `distribuicao`, `vendas_produtos`, `financeiro`
-- `financiamentos`, `controle_ponto`, `funcionarios`, `folha_pagamento`
-- `documentos`, `autorizacoes`, `avaliacoes`, `credenciais`, `notificacoes`, `leadge`
+- `crmspagi`: urls globais, views institucionais, dashboard executivo.
+- `core`: componentes base, seguranca, auditoria, utilitarios transversais.
+- `usuarios`: perfis, permissoes por modulo e administracao de usuarios.
+- `clientes`: CRM de leads, pipeline comercial e relatorios.
+- `distribuicao`: entrada/redistribuicao com regras de rodizio e disponibilidade.
+- `vendas_produtos`: vendas, servicos, comissao e fechamento mensal.
+- `financeiro`: transacoes e DRE.
+- `funcionarios`, `controle_ponto`, `folha_pagamento`: ciclo de RH.
+- `leadge`: TV corporativa e banners.
+- Outros: `documentos`, `autorizacoes`, `avaliacoes`, `credenciais`, `notificacoes`, `financiamentos`.
 
 ## Fluxo macro
 
-1. lead entra por clientes/distribuicao
-2. vendedor atende e atualiza status
-3. venda/servico e registrado
-4. financeiro consolida receitas/despesas
-5. relatorios apoiam decisao
+1. Lead entra em `distribuicao` (ou cadastro direto em `clientes`).
+2. Lead e atribuido por rodizio para vendedor elegivel.
+3. Vendedor evolui atendimento no pipeline comercial (`status_contato`, `etapa_funil`, andamento).
+4. Conversao gera venda/servico em `vendas_produtos`.
+5. Comissoes alimentam RH/folha e resultados operacionais.
+6. Receitas/despesas consolidam o DRE no financeiro.
+7. Auditoria e backup suportam governanca e continuidade.
 
-## Camadas de acesso
+## Camadas de acesso e seguranca
 
-- tela/menu (portal e sidebar)
-- middleware por rota (`ModulePermissionMiddleware`)
-- validacao em views (mixins/decorators)
+- Controle visual por menu/portal.
+- `ModulePermissionMiddleware` bloqueando modulo nao autorizado.
+- Regras por perfil em views (decorators/mixins).
+- `SecurityHeadersMiddleware` para headers defensivos.
+- `AuditLogMiddleware` registrando operacoes de escrita autenticadas.

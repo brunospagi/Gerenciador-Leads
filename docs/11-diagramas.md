@@ -4,85 +4,87 @@
 
 ```mermaid
 flowchart LR
-    U["Usuarios (Web/PWA)"] --> DJ["Django App (crmspagi)"]
-    DJ --> DB["PostgreSQL"]
-    DJ --> S3["MinIO (arquivos)"]
-    DJ --> WP["WebPush"]
-    DJ --> OIDC["OIDC/SSO (opcional)"]
-    DJ --> N8N["Webhooks (n8n)"]
+    U[Usuarios Web PWA] --> DJ[Django crmspagi]
+    DJ --> DB[(PostgreSQL ou SQLite)]
+    DJ --> S3[(MinIO media)]
+    DJ --> WS[WebPush]
+    DJ --> OIDC[OIDC opcional]
+    DJ --> N8N[Webhook n8n]
 ```
 
-## 2. Fluxo Comercial (Lead -> Venda -> Financeiro)
+## 2. Fluxo Comercial Lead ate Venda
 
 ```mermaid
 flowchart TD
-    A["Entrada de Lead"] --> B["Distribuicao por Rodizio"]
-    B --> C["Atendimento do Vendedor"]
-    C --> D["Historico e Status no Cliente"]
-    D --> E["Cadastro de Venda/Servico"]
-    E --> F["Calculo de Comissao"]
-    E --> G["Movimento Financeiro"]
-    G --> H["Relatorio DRE"]
+    A[Entrada de Lead] --> B[Distribuicao por Rodizio]
+    B --> C[Vendedor Responsavel]
+    C --> D[Painel Comercial do Lead]
+    D --> E[Andamentos Timeline]
+    E --> F{Converteu}
+    F -->|Sim| G[Cadastro de Venda Servico]
+    F -->|Nao| H[Follow up ou Encerramento]
+    G --> I[Comissao]
+    G --> J[Financeiro DRE]
 ```
 
-## 3. Controle de Acesso (Perfil + Modulo)
+## 3. Regras de Acesso
 
 ```mermaid
 flowchart TD
-    R["Requisicao do Usuario"] --> M["ModulePermissionMiddleware"]
-    M --> Q{"Modulo permitido?"}
-    Q -->|Nao| X["Redirect + Mensagem de Acesso Negado"]
-    Q -->|Sim| V["View da Funcionalidade"]
-    V --> P["Regras adicionais por Perfil (Admin/Gerente/etc)"]
-    P --> Y["Resposta OK"]
+    R[Request] --> M[ModulePermissionMiddleware]
+    M --> Q{Modulo permitido}
+    Q -->|Nao| X[Redirect com mensagem]
+    Q -->|Sim| V[View]
+    V --> P[Validacao por perfil]
+    P --> Y[Resposta]
 ```
 
-## 4. Fluxo de Ponto e RH
+## 4. Auditoria de Escrita
 
 ```mermaid
 flowchart TD
-    P1["Funcionario bate ponto"] --> P2["RegistroPonto"]
-    P2 --> P3["Auditoria (mapa/relatorio)"]
-    P3 --> P4["FolhaPagamento"]
-    P4 --> P5["Creditos/Descontos"]
-    P5 --> P6["Fechamento RH"]
+    A[Usuario autenticado] --> B[Requisicao POST PUT PATCH DELETE]
+    B --> C[AuditLogMiddleware]
+    C --> D[Sanitiza payload]
+    D --> E[(AuditLog)]
+    E --> F[Painel logs auditoria]
 ```
 
-## 5. Impressao de Relatorio de Distribuicao
+## 5. Backup Operacional
 
 ```mermaid
-sequenceDiagram
-    participant U as Usuario
-    participant T as Template
-    U->>T: Abre aba (Diario/Semanal/Mensal)
-    U->>T: Clique em "Imprimir / PDF"
-    T->>T: Define data-print-tab da aba ativa
-    T->>T: Exibe print-document dedicado
-    T-->>U: Documento limpo para impressao/PDF
+flowchart TD
+    A[Admin Gerente] --> B{Origem da acao}
+    B -->|Painel| C[/painel-admin/backup/]
+    B -->|CLI| D[manage.py gerar_backup_sistema]
+    C --> E[create_system_backup]
+    D --> E
+    E --> F[dumpdata JSON]
+    E --> G[copia media local se existir]
+    E --> H[metadata restore notes]
+    F --> I[zip final]
+    G --> I
+    H --> I
 ```
 
-## 6. Entidades Principais (Visao simplificada)
+## 6. Fluxo Ponto e Folha
 
 ```mermaid
-erDiagram
-    USER ||--|| PROFILE : possui
-    USER ||--|| MODULE_PERMISSION : possui
-    USER ||--o{ CLIENTE : vendedor
-    CLIENTE ||--o{ HISTORICO : interacoes
-    USER ||--o{ VENDA_PRODUTO : vendedor
-    USER ||--o{ VENDA_PRODUTO : gerente
-    USER ||--o{ TRANSACAO_FINANCEIRA : criado_por
-    FUNCIONARIO ||--o{ REGISTRO_PONTO : registra
+flowchart TD
+    A[Registro de ponto] --> B[Homologacao admin]
+    B --> C[Consolidacao RH]
+    C --> D[Calculo folha]
+    D --> E[Holerite detalhado]
+    E --> F[Hash de integridade no rodape]
 ```
 
-## 7. Operacao e Rotina
+## 7. TV Corporativa
 
 ```mermaid
 flowchart LR
-    C["Cron 03:00/08:00"] --> N["Comandos de Notificacao"]
-    E["Entrypoint"] --> MG["Migrate"]
-    E --> ST["Collectstatic"]
-    E --> G["Gunicorn"]
-    G --> APP["Aplicacao em execucao"]
+    A[Gestao TV] --> B[TVProgramacaoItem]
+    A --> C[TVVideo fallback]
+    B --> D[tv-video exibicao]
+    C --> D
+    D --> E[Ticker manual ou API noticias]
 ```
-

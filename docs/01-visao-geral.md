@@ -2,29 +2,30 @@
 
 ## Objetivo
 
-O CRM Spagi centraliza a operacao comercial e administrativa de uma loja automotiva.
+O CRM Spagi centraliza a operacao comercial e administrativa de uma revenda automotiva.
 
 ## Principais capacidades
 
-- gestao de leads e clientes
-- distribuicao automatica por rodizio
-- vendas e servicos com regras de comissao
-- controle financeiro com relatorio DRE
-- controle de ponto, funcionarios e folha
-- documentos e autorizacoes
-- controle de acesso por perfil e por modulo
+- Captacao e distribuicao de leads por rodizio.
+- Pipeline comercial com acompanhamento por etapa, status de contato e timeline.
+- Cadastro de vendas e servicos com regras de comissao.
+- Gestao financeira com DRE e transacoes recorrentes.
+- RH completo com funcionarios, ponto e folha.
+- Gestao de documentos, autorizacoes, credenciais e notificacoes.
+- Governanca por perfil, permissao de modulo e auditoria de acoes.
+- Painel de TV corporativa com programacao de videos e ticker.
 
-## Publico usuario
+## Perfis de usuario
 
-- vendedor
-- gerente
-- administrador
-- distribuidor
-- consignador
+- Vendedor
+- Gerente
+- Administrador
+- Distribuidor
+- Consignador
 
-## Resultado esperado
+## Resultados esperados
 
-- mais velocidade de atendimento
-- padrao de processo
-- rastreabilidade
-- indicadores de desempenho
+- Mais velocidade no atendimento ao lead.
+- Padronizacao de processo comercial.
+- Rastreabilidade operacional e administrativa.
+- Decisao orientada por dados e relatorios.

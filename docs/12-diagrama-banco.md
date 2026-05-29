@@ -1,7 +1,6 @@
 # 12 - Diagrama de Banco de Dados
 
-Este diagrama representa a estrutura principal do banco (visao funcional).  
-Ele foca nas entidades mais importantes para operacao e analise.
+Este diagrama representa as entidades centrais do sistema em nivel funcional.
 
 ## ER Principal
 
@@ -21,7 +20,6 @@ erDiagram
       string nivel_acesso
       bool pode_distribuir_leads
       bool pode_acessar_financeiro
-      string avatar
     }
 
     MODULE_PERMISSION {
@@ -36,22 +34,31 @@ erDiagram
       bool modulo_admin_usuarios
     }
 
-    USER_LOGIN_ACTIVITY {
-      int id PK
-      int user_id FK
-      datetime login_timestamp
-      string ip_address
-    }
-
     CLIENTE {
       int id PK
       int vendedor_id FK
       string nome_cliente
       string whatsapp
       string status_negociacao
-      string tipo_negociacao
+      string status_contato
+      string etapa_funil
+      string prioridade
       datetime data_primeiro_contato
+      datetime data_ultimo_contato
       datetime data_proximo_contato
+      datetime data_ultimo_andamento
+    }
+
+    LEAD_ANDAMENTO {
+      int id PK
+      int cliente_id FK
+      int usuario_id FK
+      string status_contato
+      string etapa_funil
+      string proximo_passo
+      datetime data_proxima_acao
+      text comentario
+      datetime criado_em
     }
 
     HISTORICO {
@@ -64,8 +71,8 @@ erDiagram
     VENDEDOR_RODIZIO {
       int id PK
       int vendedor_id FK
-      int ordem
       bool ativo
+      int ordem
       datetime ultima_atribuicao
     }
 
@@ -85,20 +92,11 @@ erDiagram
       date data_venda
     }
 
-    FECHAMENTO_MENSAL {
-      int id PK
-      int responsavel_id FK
-      int mes
-      int ano
-      datetime data_fechamento
-    }
-
     TRANSACAO_FINANCEIRA {
       int id PK
       int criado_por_id FK
       string tipo
       string categoria
-      string descricao
       decimal valor
       date data_vencimento
       date data_pagamento
@@ -123,8 +121,6 @@ erDiagram
       time retorno_almoco
       time saida
       string ip_registrado
-      string latitude
-      string longitude
     }
 
     FOLHA_PAGAMENTO {
@@ -136,125 +132,74 @@ erDiagram
       decimal total_creditos_manuais
       decimal total_descontos_manuais
       bool fechada
+      bool pago
     }
 
-    CREDITO {
+    AUDIT_LOG {
       int id PK
-      int funcionario_id FK
-      decimal valor_total
-      int parcelas
-      date data_inicio
-    }
-
-    DESCONTO {
-      int id PK
-      int funcionario_id FK
-      decimal valor_total
-      int parcelas
-      date data_inicio
-    }
-
-    FICHA {
-      int id PK
-      int cliente_id FK
-      string banco
-      string status
-      decimal valor
-      datetime criado_em
-    }
-
-    CREDENCIAL {
-      int id PK
-      string titulo
-      string usuario
-      string senha
-      string categoria
-    }
-
-    NOTIFICACAO {
-      int id PK
+      datetime created_at
       int user_id FK
+      string username_snapshot
+      string nivel_acesso_snapshot
+      string module
+      string action
+      string method
+      string path
+      int status_code
+      string ip_address
+      bool success
+      string severity
+    }
+
+    TV_VIDEO {
+      int id PK
       string titulo
-      text mensagem
-      bool lida
-      datetime criada_em
+      string video_url
+      string video_mp4
+      text manual_news_ticker
+      datetime last_updated
     }
 
-    AUTORIZACAO {
+    TV_PROGRAMACAO_ITEM {
       int id PK
-      int vendedor_id FK
-      int gerente_id FK
-      string status
-      datetime data_solicitacao
-      datetime data_aprovacao
-    }
-
-    PROCURACAO {
-      int id PK
-      int outorgado_id FK
-      string tipo_documento
-      string nome_outorgante
-      date data_emissao
-    }
-
-    OUTORGADO {
-      int id PK
-      string nome
-      string documento
-    }
-
-    AVALIACAO {
-      int id PK
-      int cadastrado_por_id FK
-      string placa
-      string marca
-      string modelo
-      decimal valor_fipe
-      decimal valor_sugerido
-      datetime criado_em
-    }
-
-    AVALIACAO_FOTO {
-      int id PK
-      int avaliacao_id FK
-      string foto
+      string titulo
+      string video_url
+      string video_mp4
+      bool ativo
+      int ordem
+      string dias_semana
+      time horario_inicio
+      time horario_fim
+      date data_inicio
+      date data_fim
     }
 
     USER ||--|| PROFILE : possui
     USER ||--|| MODULE_PERMISSION : possui
-    USER ||--o{ USER_LOGIN_ACTIVITY : logins
 
     USER ||--o{ CLIENTE : vendedor
-    CLIENTE ||--o{ HISTORICO : interacoes
+    CLIENTE ||--o{ HISTORICO : anotacoes
+    CLIENTE ||--o{ LEAD_ANDAMENTO : timeline
+    USER ||--o{ LEAD_ANDAMENTO : registra
+
     USER ||--o{ VENDEDOR_RODIZIO : participa
 
     USER ||--o{ VENDA_PRODUTO : vendedor
     USER ||--o{ VENDA_PRODUTO : gerente
     USER ||--o{ VENDA_PRODUTO : ajudante
-    USER ||--o{ FECHAMENTO_MENSAL : responsavel
+
     USER ||--o{ TRANSACAO_FINANCEIRA : criou
 
-    USER ||--|| FUNCIONARIO : dados_funcionais
+    USER ||--|| FUNCIONARIO : colaborador
     FUNCIONARIO ||--o{ REGISTRO_PONTO : registros
     FUNCIONARIO ||--o{ FOLHA_PAGAMENTO : folhas
-    FUNCIONARIO ||--o{ CREDITO : creditos
-    FUNCIONARIO ||--o{ DESCONTO : descontos
 
-    CLIENTE ||--o{ FICHA : financiamentos
-
-    USER ||--o{ NOTIFICACAO : recebe
-
-    USER ||--o{ AUTORIZACAO : vendedor
-    USER ||--o{ AUTORIZACAO : gerente
-
-    OUTORGADO ||--o{ PROCURACAO : documentos
-
-    USER ||--o{ AVALIACAO : cadastrou
-    AVALIACAO ||--o{ AVALIACAO_FOTO : fotos
+    USER ||--o{ AUDIT_LOG : gera
 ```
 
 ## Observacoes
 
-- O diagrama e funcional (alto nivel) e nao lista 100% dos campos tecnicos.
-- Para BI/relatorios, as tabelas mais centrais sao: `CLIENTE`, `VENDA_PRODUTO`, `TRANSACAO_FINANCEIRA`, `FOLHA_PAGAMENTO`.
-- Para governanca de acesso, foco em: `PROFILE`, `MODULE_PERMISSION`, `USER_LOGIN_ACTIVITY`.
+- O diagrama e funcional e nao lista todos os campos tecnicos de cada app.
+- Entidades centrais para BI comercial: `CLIENTE`, `LEAD_ANDAMENTO`, `VENDA_PRODUTO`.
+- Entidades centrais para financeiro e RH: `TRANSACAO_FINANCEIRA`, `REGISTRO_PONTO`, `FOLHA_PAGAMENTO`.
+- Entidade de governanca: `AUDIT_LOG`.

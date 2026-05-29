@@ -1,27 +1,52 @@
 # 09 - Troubleshooting
 
-## Erro de template com parenteses em `{% if %}`
+## 1. Lead nao distribui
 
-Django template nao aceita parenteses em condicoes. Use condicoes expandidas com `and/or`.
+Sinais:
+- Mensagem de "nenhum vendedor elegivel".
 
-## Usuario sem acesso a modulo
+Checklist:
+- Verificar vendedores ativos no rodizio.
+- Verificar entrada/almoco/retorno no ponto.
+- Verificar regras de bloqueio por horario.
+- Testar redistribuicao manual para validar fila.
 
-- verificar `usuarios/module_permissions`
-- verificar perfil (`nivel_acesso`)
-- verificar middleware de modulo
+## 2. Dashboard sem backup
 
-## Relatorio imprime pagina "quebrando layout"
+Sinais:
+- Botao nao gera download.
 
-- validar se template usa bloco de impressao dedicado (`print-document`)
-- validar aba ativa antes de chamar `window.print()`
+Checklist:
+- Confirmar permissao ADMIN/GERENTE.
+- Verificar logs de erro no servidor.
+- Rodar comando manual `gerar_backup_sistema`.
+- Verificar permissao de escrita em `./backups`.
 
-## Campo novo nao aparece
+## 3. Logs de auditoria vazios
 
-- confirmar migracao aplicada
-- limpar cache do navegador
-- reiniciar processo da aplicacao
+Checklist:
+- Confirmar `core.audit_middleware.AuditLogMiddleware` no `MIDDLEWARE`.
+- Validar que acao testada e de escrita (`POST`, `PUT`, `PATCH`, `DELETE`).
+- Validar usuario autenticado.
+- Confirmar migracao `core/migrations/0002_auditlog.py` aplicada.
 
-## Coleta de estaticos
+## 4. Campo novo nao aparece em tela
 
-- rodar `collectstatic`
-- confirmar `STATIC_ROOT` e WhiteNoise
+Checklist:
+- Confirmar migracoes aplicadas.
+- Limpar cache do navegador.
+- Reiniciar processo da aplicacao.
+
+## 5. Layout de impressao com quebra
+
+Checklist:
+- Confirmar template de impressao dedicado.
+- Verificar CSS de `@media print`.
+- Validar aba ativa antes de `window.print()`.
+
+## 6. Media/TV nao carrega
+
+Checklist:
+- Confirmar CSP (`media-src`) com dominio do bucket.
+- Validar URL/arquivo MP4 no MinIO.
+- Validar credenciais `MINIO_*`.

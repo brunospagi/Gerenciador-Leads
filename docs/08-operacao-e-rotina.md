@@ -16,27 +16,36 @@ Arquivo `crontab`:
 - 03:00 `check_inactivity`
 - 08:00 `check_overdue_clients`
 
-## Entrada da aplicacao
+## Backup
 
-`entrypoint.sh` executa:
+### Via painel
 
-1. cron
-2. migrate
-3. collectstatic
-4. comando final (gunicorn)
+- Acessar `/painel-admin/`.
+- Acionar botao `Baixar Backup (.zip)`.
 
-## Checklist de operacao
+### Via comando
 
-1. backup diario de banco
-2. monitoramento de logs
-3. revisao de permissoes
-4. validacao de webhooks e push
-5. em vendas: validar aprovacao e impressao automatica da minuta
+```bash
+python manage.py gerar_backup_sistema
+python manage.py gerar_backup_sistema --output-dir /caminho/customizado
+```
 
-## Fluxo de Minuta (Vendas)
+## Auditoria
 
-1. Registrar venda em `vendas_produtos`
-2. Gestor aprova venda (status `APROVADO`)
-3. Sistema redireciona para tela de minuta
-4. Impressao e aberta automaticamente
-5. Conferir rodape: usuario que gerou e horario
+- Consultar `/painel-admin/logs-auditoria/`.
+- Filtrar por usuario, modulo, metodo, severidade, resultado e periodo.
+- Revisar diariamente operacoes criticas.
+
+## Checklist operacional diario
+
+1. Confirmar entrada de leads e distribuicao sem bloqueios indevidos.
+2. Revisar leads atrasados e pipeline comercial.
+3. Validar aprovacoes pendentes em vendas e ponto.
+4. Revisar notificacoes e erros aparentes.
+
+## Checklist semanal
+
+1. Exportar relatorios principais (comercial, distribuicao, DRE).
+2. Conferir integridade de backup e espaco em disco.
+3. Revisar logs de auditoria e acessos administrativos.
+4. Revisar permissoes por modulo.

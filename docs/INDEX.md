@@ -1,6 +1,6 @@
 # Documentacao Completa - CRM Spagi
 
-Este diretorio concentra a documentacao tecnica e funcional do projeto.
+Este diretorio concentra a documentacao tecnica, funcional e operacional do sistema.
 
 ## Sumario
 
@@ -17,10 +17,18 @@ Este diretorio concentra a documentacao tecnica e funcional do projeto.
 - [11 - Diagramas](./11-diagramas.md)
 - [12 - Diagrama de Banco de Dados](./12-diagrama-banco.md)
 
+## Destaques desta revisao
+
+- Modulo comercial de leads com funil, status de contato e timeline de andamento.
+- Dashboard executivo com backup por botao e comando de gerenciamento.
+- Trilha de auditoria com tela de consulta para administracao.
+- Rotas e fluxos atualizados para o estado atual do codigo.
+
 ## Leitura recomendada
 
-1. 01 + 02 para entender o sistema
-2. 03 + 04 para subir ambiente
-3. 05 para governanca de acesso
-4. 06 + 07 para uso funcional e navegacao
-5. 08 + 09 para operacao/manutencao
+1. 01 + 02 para entendimento do sistema.
+2. 03 + 04 para preparar ambiente.
+3. 05 para governanca, seguranca e auditoria.
+4. 06 + 07 para operacao funcional por modulo.
+5. 08 + 09 para rotina e suporte.
+6. 11 + 12 para visao arquitetural e de dados.
