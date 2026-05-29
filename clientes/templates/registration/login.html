@@ -14,6 +14,8 @@
             --primary-color: #004b8d;
             --primary-gradient: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
             --corporate-color: #fd4b2d;
+            --motors-bg-start: #5a1414;
+            --motors-bg-end: #7a1b1b;
         }
 
         /* Trava a rolagem na tag body para evitar scrollbars duplas */
@@ -35,7 +37,7 @@
         .bg-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 75, 141, 0.75); 
+            background: rgba(90, 20, 20, 0.72); 
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             z-index: 1;
@@ -67,7 +69,7 @@
 
         /* Lado do Branding (Esquerdo) */
         .brand-panel {
-            background: var(--primary-gradient);
+            background: linear-gradient(145deg, var(--motors-bg-start) 0%, var(--motors-bg-end) 100%);
             padding: 3rem;
             color: white;
             display: flex;
@@ -78,9 +80,30 @@
         }
 
         .brand-panel img {
-            max-width: 110px;
-            margin-bottom: 1.5rem;
+            width: min(100%, 230px);
+            height: auto;
+            margin-bottom: 1rem;
             transition: all 0.3s ease;
+        }
+
+        .brand-powered {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.4rem;
+            margin-top: 0.8rem;
+        }
+
+        .brand-powered span {
+            font-size: 0.8rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .brand-powered-logo {
+            width: min(100%, 165px);
+            height: auto;
         }
 
         /* Lado do Formulário (Direito) */
@@ -164,8 +187,7 @@
             .login-card { max-width: 850px; }
             .brand-panel { padding: 2rem; }
             .form-panel { padding: 2rem; }
-            .brand-panel img { max-width: 80px; margin-bottom: 1rem; }
-            .brand-panel h2 { font-size: 1.5rem; margin-bottom: 0.5rem !important; }
+            .brand-panel img { width: min(100%, 180px); margin-bottom: 0.75rem; }
             .brand-panel p { font-size: 0.95rem; }
             
             /* Compactando o formulário */
@@ -188,8 +210,11 @@
         <div class="login-card row g-0">
             
             <div class="col-md-5 brand-panel d-none d-md-flex">
-                <img src="{% static 'images/logo-spagi-192x192.png' %}" alt="Logo SPAGI" class="img-fluid">
-                <h2 class="fw-bold mb-3"> <i class="fas fa-car-side"></i> SPAGI <span style="font-weight: 300;">CRM</span> </h2>
+                <img src="{% static 'images/logo-spagi-motors.webp' %}" alt="Logo Spagi Motors" class="img-fluid">
+                <div class="brand-powered">
+                    <span>Powered by</span>
+                    <img src="{% static 'images/logo-spagi.png' %}" alt="Spagi Sistemas" class="brand-powered-logo">
+                </div>
                 <p class="text-white-50">
                     Plataforma integrada para gestão eficiente de clientes, produtividade e acompanhamento de negociações.
                 </p>
@@ -199,8 +224,7 @@
                 <div class="form-panel">
                     
                     <div class="text-center mb-3 d-md-none">
-                        <img src="{% static 'images/logo-spagi-192x192.png' %}" alt="Logo SPAGI" style="max-width: 70px;" class="mb-2">
-                        <h5 class="fw-bold text-dark"> <i class="fas fa-car-side"></i> SPAGI <span style="font-weight: 300;">CRM</span> </h5>
+                        <img src="{% static 'images/logo-spagi-motors.webp' %}" alt="Logo Spagi Motors" style="max-width: 170px;" class="mb-2">
                     </div>
 
                     <h3 class="fw-bold text-dark mb-1 d-none d-md-block">Acessar Sistema</h3>

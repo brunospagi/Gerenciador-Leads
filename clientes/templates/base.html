@@ -47,14 +47,30 @@
         .sidebar-brand {
             padding: 25px 20px;
             text-align: center;
-            font-size: 1.5rem;
-            font-weight: 700;
-            letter-spacing: 1px;
             border-bottom: 1px solid rgba(255,255,255,0.05);
-            background: linear-gradient(90deg, #0f172a, #1e293b);
+            background: linear-gradient(120deg, #4b1010 0%, #6a1818 100%);
         }
 
-        .sidebar-brand i { color: var(--primary-color); }
+        .sidebar-brand img {
+            width: 100%;
+            max-width: 185px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .sidebar-brand .brand-powered {
+            margin-top: 10px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            color: rgba(255, 255, 255, 0.82);
+        }
+
+        .sidebar-brand .brand-powered img {
+            margin-top: 6px;
+            max-width: 140px;
+        }
 
         .sidebar-menu { padding: 20px 0; flex-grow: 1; overflow-y: auto;}
 
@@ -154,7 +170,11 @@
     <div id="wrapper">
         <nav id="sidebar">
             <div class="sidebar-brand">
-                <i class="fas fa-car-side"></i> SPAGI <span style="font-weight: 300;">CRM</span>
+                <img src="{% static 'images/logo-spagi-motors.webp' %}" alt="Spagi Motors">
+                <div class="brand-powered">
+                    Powered by
+                    <img src="{% static 'images/logo-spagi.png' %}" alt="Spagi Sistemas">
+                </div>
             </div>
 
                         <div class="sidebar-menu">
