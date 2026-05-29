@@ -205,6 +205,9 @@
                 </div>
             </div>
             <p class="text-center mt-3 mb-0 text-muted small">Declaramos ter recebido a importância líquida discriminada neste recibo.</p>
+            <p class="text-center mt-2 mb-0 text-muted small hash-holerite">
+                HASH DE INTEGRIDADE: {{ holerite_hash }}
+            </p>
         </div>
 
     </div>
@@ -236,6 +239,11 @@
     }
     .linha-gerencia td {
         background: #f2f5f9;
+    }
+    .hash-holerite {
+        font-family: "Consolas", "Courier New", monospace;
+        letter-spacing: 0.3px;
+        word-break: break-all;
     }
 
     @media print {
@@ -303,6 +311,9 @@
         }
         .comissao-header {
             padding: 8px 10px !important;
+        }
+        .hash-holerite {
+            font-size: 10px !important;
         }
     }
 </style>

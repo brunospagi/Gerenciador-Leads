@@ -3,6 +3,8 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
+import hashlib
+import json
 import calendar
 from datetime import datetime, date
 from decimal import Decimal
@@ -428,6 +430,46 @@ def detalhe_folha(request, pk):
         key=lambda item: (item['data_venda'], item['cliente_nome'] or '', item['papel'])
     )
 
+    hash_payload = {
+        'folha_id': folha.id,
+        'funcionario_id': folha.funcionario_id,
+        'mes': folha.mes,
+        'ano': folha.ano,
+        'fechada': folha.fechada,
+        'pago': folha.pago,
+        'total_vencimentos': str(total_vencimentos),
+        'total_descontos': str(total_descontos),
+        'salario_liquido': str(salario_liquido_exibicao),
+        'itens': [
+            {
+                'codigo': item.get('codigo'),
+                'descricao': item.get('descricao'),
+                'referencia': item.get('referencia'),
+                'vencimentos': str(item.get('vencimentos') or Decimal('0.00')),
+                'descontos': str(item.get('descontos') or Decimal('0.00')),
+            }
+            for item in itens_holerite
+        ],
+        'conferencias': [
+            {
+                'data_venda': conf['data_venda'].isoformat() if conf.get('data_venda') else None,
+                'cliente_nome': conf.get('cliente_nome'),
+                'tipo_produto': conf.get('tipo_produto'),
+                'veiculo': conf.get('veiculo'),
+                'placa': conf.get('placa'),
+                'papel': conf.get('papel'),
+                'minha_comissao': str(conf.get('minha_comissao') or Decimal('0.00')),
+                'comissao_outro': str(conf.get('comissao_outro') or Decimal('0.00')),
+                'outro_nome': conf.get('outro_nome'),
+                'is_gerencia': bool(conf.get('is_gerencia')),
+            }
+            for conf in conferencias_comissoes
+        ],
+    }
+    holerite_hash = hashlib.sha256(
+        json.dumps(hash_payload, sort_keys=True, ensure_ascii=True).encode('utf-8')
+    ).hexdigest().upper()
+
     return render(request, 'folha_pagamento/detalhe_folha.html', {
         'folha': folha,
         'itens': itens_holerite,
@@ -438,6 +480,7 @@ def detalhe_folha(request, pk):
         'total_conferencia_minha': total_conferencia_minha,
         'total_conferencia_outro': total_conferencia_outro,
         'total_conferencia_gerencia': total_conferencia_gerencia,
+        'holerite_hash': holerite_hash,
     })
 
 @login_required
