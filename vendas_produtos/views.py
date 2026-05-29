@@ -451,11 +451,14 @@ class VendaProdutoRelatorioView(LoginRequiredMixin, TemplateView):
                 except: pass
 
                 if is_gerente_row:
-                    vendas_equipe = qs_base.filter(
-                        status='APROVADO', 
-                        tipo_produto__in=['VENDA_VEICULO', 'VENDA_MOTO']
-                    ).exclude(
-                        Q(vendedor=vendedor_obj) | Q(vendedor_ajudante=vendedor_obj)
+                    vendas_equipe = (
+                        qs_base.filter(
+                            status='APROVADO',
+                            tipo_produto__in=['VENDA_VEICULO', 'VENDA_MOTO']
+                        )
+                        .exclude(Q(vendedor=vendedor_obj) | Q(vendedor_ajudante=vendedor_obj))
+                        .exclude(vendedor__is_superuser=True)
+                        .exclude(vendedor__profile__nivel_acesso__in=['ADMIN', 'GERENTE'])
                     )
                     
                     for v in vendas_equipe:

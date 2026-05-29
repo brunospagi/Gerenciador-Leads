@@ -291,20 +291,21 @@ def detalhe_folha(request, pk):
             is_gerente = True
     except: pass
 
+    vendas_base_equipe = VendaProduto.objects.none()
     if is_gerente:
-        # Conta Vendas da Equipe (Carros)
-        qtd_carros_equipe = VendaProduto.objects.filter(
-            data_venda__range=[data_inicio, data_fim], 
-            status='APROVADO',
-            tipo_produto='VENDA_VEICULO'
-        ).exclude(vendedor=folha.funcionario.user).count()
-
-        # Conta Vendas da Equipe (Motos)
-        qtd_motos_equipe = VendaProduto.objects.filter(
-            data_venda__range=[data_inicio, data_fim], 
-            status='APROVADO',
-            tipo_produto='VENDA_MOTO'
-        ).exclude(vendedor=folha.funcionario.user).count()
+        # Comissão de gerência: exclui vendas em nome de GERENTE/ADMIN/superusuário.
+        vendas_base_equipe = (
+            VendaProduto.objects.filter(
+                data_venda__range=[data_inicio, data_fim],
+                status='APROVADO',
+                tipo_produto__in=['VENDA_VEICULO', 'VENDA_MOTO'],
+            )
+            .exclude(vendedor=folha.funcionario.user)
+            .exclude(vendedor__is_superuser=True)
+            .exclude(vendedor__profile__nivel_acesso__in=['ADMIN', 'GERENTE'])
+        )
+        qtd_carros_equipe = vendas_base_equipe.filter(tipo_produto='VENDA_VEICULO').count()
+        qtd_motos_equipe = vendas_base_equipe.filter(tipo_produto='VENDA_MOTO').count()
 
         val_gerencia = (qtd_carros_equipe * Decimal('150.00')) + (qtd_motos_equipe * Decimal('80.00'))
 
@@ -382,6 +383,7 @@ def detalhe_folha(request, pk):
     conferencias_comissoes = []
     total_conferencia_minha = Decimal('0.00')
     total_conferencia_outro = Decimal('0.00')
+    total_conferencia_gerencia = Decimal('0.00')
     for venda in vendas_periodo:
         sou_titular = venda.vendedor_id == folha.funcionario.user.id
         minha_comissao = venda.comissao_vendedor if sou_titular else venda.comissao_ajudante
@@ -398,9 +400,33 @@ def detalhe_folha(request, pk):
             'minha_comissao': minha_comissao or Decimal('0.00'),
             'comissao_outro': comissao_outro or Decimal('0.00'),
             'outro_nome': (outro_usuario.get_full_name() or outro_usuario.username) if outro_usuario else '-',
+            'is_gerencia': False,
         })
         total_conferencia_minha += minha_comissao or Decimal('0.00')
         total_conferencia_outro += comissao_outro or Decimal('0.00')
+
+    # Detalhamento da comissão de gerência por venda da equipe.
+    if is_gerente:
+        for venda in vendas_base_equipe.select_related('vendedor').order_by('data_venda', 'id'):
+            valor_comissao_gerencia = Decimal('150.00') if venda.tipo_produto == 'VENDA_VEICULO' else Decimal('80.00')
+            conferencias_comissoes.append({
+                'data_venda': venda.data_venda,
+                'cliente_nome': venda.cliente_nome,
+                'tipo_produto': venda.get_tipo_produto_display(),
+                'veiculo': f"{(venda.marca_veiculo or '').strip()} {(venda.modelo_veiculo or '').strip()}".strip() or '-',
+                'placa': venda.placa or '-',
+                'papel': 'Gerência (Equipe)',
+                'minha_comissao': valor_comissao_gerencia,
+                'comissao_outro': Decimal('0.00'),
+                'outro_nome': venda.vendedor.get_full_name() or venda.vendedor.username,
+                'is_gerencia': True,
+            })
+            total_conferencia_minha += valor_comissao_gerencia
+            total_conferencia_gerencia += valor_comissao_gerencia
+
+    conferencias_comissoes.sort(
+        key=lambda item: (item['data_venda'], item['cliente_nome'] or '', item['papel'])
+    )
 
     return render(request, 'folha_pagamento/detalhe_folha.html', {
         'folha': folha,
@@ -411,6 +437,7 @@ def detalhe_folha(request, pk):
         'conferencias_comissoes': conferencias_comissoes,
         'total_conferencia_minha': total_conferencia_minha,
         'total_conferencia_outro': total_conferencia_outro,
+        'total_conferencia_gerencia': total_conferencia_gerencia,
     })
 
 @login_required

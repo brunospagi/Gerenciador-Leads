@@ -283,19 +283,20 @@ class FolhaPagamento(models.Model):
             pass
 
         if is_gerente:
-            # Vendas de OUTROS vendedores (exclude self), Aprovadas, Tipo CARRO
-            qtd_carros_equipe = VendaProduto.objects.filter(
-                data_venda__range=[data_inicio, data_fim], 
-                status='APROVADO',
-                tipo_produto='VENDA_VEICULO'
-            ).exclude(vendedor=self.funcionario.user).count()
-
-            # Vendas de OUTROS vendedores (exclude self), Aprovadas, Tipo MOTO
-            qtd_motos_equipe = VendaProduto.objects.filter(
-                data_venda__range=[data_inicio, data_fim], 
-                status='APROVADO',
-                tipo_produto='VENDA_MOTO'
-            ).exclude(vendedor=self.funcionario.user).count()
+            # Comissão de gerência: conta somente equipe comercial.
+            # Se a venda estiver no nome de GERENTE/ADMIN (ou superusuário), não entra.
+            vendas_base_equipe = (
+                VendaProduto.objects.filter(
+                    data_venda__range=[data_inicio, data_fim],
+                    status='APROVADO',
+                    tipo_produto__in=['VENDA_VEICULO', 'VENDA_MOTO'],
+                )
+                .exclude(vendedor=self.funcionario.user)
+                .exclude(vendedor__is_superuser=True)
+                .exclude(vendedor__profile__nivel_acesso__in=['ADMIN', 'GERENTE'])
+            )
+            qtd_carros_equipe = vendas_base_equipe.filter(tipo_produto='VENDA_VEICULO').count()
+            qtd_motos_equipe = vendas_base_equipe.filter(tipo_produto='VENDA_MOTO').count()
 
             valor_por_carro = Decimal('150.00')
             valor_por_moto = Decimal('80.00')
