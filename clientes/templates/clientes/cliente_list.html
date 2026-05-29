@@ -11,9 +11,12 @@
   <section class="m3-page-header">
     <div>
       <h1 class="m3-page-title"><i class="bi bi-people-fill me-2"></i>Pipeline de Leads</h1>
-      <p class="m3-page-subtitle">Acompanhe contatos, prioridade e avanços comerciais do time.</p>
+      <p class="m3-page-subtitle">Acompanhe contatos, etapas comerciais e avancos de cada lead.</p>
     </div>
-    <div class="m3-toolbar">
+    <div class="m3-toolbar d-flex gap-2">
+      <a href="{% url 'cliente_pipeline_comercial' %}" class="btn btn-outline-dark">
+        <i class="bi bi-kanban-fill me-1"></i>Painel Comercial
+      </a>
       <a href="{% url 'cliente_create' %}" class="btn btn-primary">
         <i class="bi bi-plus-lg me-1"></i>Novo Lead
       </a>
@@ -27,12 +30,12 @@
           <label for="q_id" class="form-label">Pesquisar lead</label>
           <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input type="text" name="q" id="q_id" class="form-control" value="{{ search_query }}" placeholder="Nome, veículo, fonte ou status">
+            <input type="text" name="q" id="q_id" class="form-control" value="{{ search_query }}" placeholder="Nome, veiculo, fonte ou status">
           </div>
         </div>
         <div class="col-lg-5">
-          <label class="form-label">Janela de último contato</label>
-          <div class="btn-group w-100" role="group" aria-label="Filtro de período">
+          <label class="form-label">Janela de ultimo contato</label>
+          <div class="btn-group w-100" role="group" aria-label="Filtro de periodo">
             <a href="?q={{ search_query }}" class="btn btn-outline-secondary {% if not periodo_selecionado %}active{% endif %}">Todos</a>
             <a href="?q={{ search_query }}&dias=15" class="btn btn-outline-secondary {% if periodo_selecionado == '15' %}active{% endif %}">15 dias</a>
             <a href="?q={{ search_query }}&dias=30" class="btn btn-outline-secondary {% if periodo_selecionado == '30' %}active{% endif %}">30 dias</a>
@@ -56,7 +59,7 @@
   <section class="card">
     <div class="m3-table-head">
       <h2 class="m3-section-title mb-0">Leads em carteira</h2>
-      <span class="m3-pill">Atualização em tempo real</span>
+      <span class="m3-pill">Atualizacao em tempo real</span>
     </div>
     <div class="card-body p-0">
       <div class="table-responsive">
@@ -64,14 +67,16 @@
           <thead class="table-light">
             <tr>
               <th>Cliente</th>
-              <th>Veículo</th>
+              <th>Veiculo</th>
               <th>Fonte</th>
-              <th>Último contato</th>
+              <th>Ultimo contato</th>
               <th>Status</th>
+              <th>Status contato</th>
+              <th>Etapa funil</th>
               {% if user.is_superuser %}
               <th>Vendedor</th>
               {% endif %}
-              <th class="text-center">Ações</th>
+              <th class="text-center">Acoes</th>
             </tr>
           </thead>
           <tbody>
@@ -84,26 +89,14 @@
               <td>{{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }} <span class="text-muted">{{ cliente.ano_veiculo }}</span></td>
               <td>{{ cliente.fonte_cliente|default:"N/A" }}</td>
               <td>{{ cliente.data_ultimo_contato|date:"d/m/Y H:i" }}</td>
-              <td>
-                <span class="m3-badge
-                  {% if cliente.status_negociacao == 'Novo' %}m3-badge-info
-                  {% elif cliente.status_negociacao == 'Pendente' %}m3-badge-warning
-                  {% elif cliente.status_negociacao == 'Em atendimento' %}m3-badge-primary
-                  {% elif cliente.status_negociacao == 'Agendado' %}m3-badge-primary
-                  {% elif cliente.status_negociacao == 'Vendido' %}m3-badge-success
-                  {% elif cliente.status_negociacao == 'Fechamento' %}m3-badge-warning
-                  {% elif cliente.status_negociacao == 'Sem resposta' %}m3-badge-neutral
-                  {% elif cliente.status_negociacao == 'Cancelado' %}m3-badge-danger
-                  {% else %}m3-badge-neutral
-                  {% endif %}">
-                  {{ cliente.get_status_negociacao_display }}
-                </span>
-              </td>
+              <td><span class="badge text-bg-info">{{ cliente.get_status_negociacao_display }}</span></td>
+              <td><span class="badge text-bg-secondary">{{ cliente.get_status_contato_display }}</span></td>
+              <td><span class="badge text-bg-dark">{{ cliente.get_etapa_funil_display }}</span></td>
               {% if user.is_superuser %}
               <td>{{ cliente.vendedor.username }}</td>
               {% endif %}
               <td class="text-center">
-                <a href="{% url 'cliente_detail' cliente.pk %}" class="btn btn-sm btn-outline-secondary" title="Ver detalhes"><i class="bi bi-eye"></i></a>
+                <a href="{% url 'cliente_detail' cliente.pk %}" class="btn btn-sm btn-outline-secondary" title="Atender lead"><i class="bi bi-eye"></i></a>
                 <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-sm btn-outline-primary" title="Editar lead"><i class="bi bi-pencil"></i></a>
               </td>
             </tr>
@@ -123,7 +116,7 @@
   </section>
 
   {% if is_paginated %}
-  <nav aria-label="Navegação das páginas" class="mt-2">
+  <nav aria-label="Navegacao das paginas" class="mt-2">
     <ul class="pagination justify-content-center mb-0">
       {% if page_obj.has_previous %}
       <li class="page-item"><a class="page-link" href="?page=1&q={{ search_query }}&dias={{ periodo_selecionado }}">&laquo;&laquo;</a></li>

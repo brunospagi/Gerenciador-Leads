@@ -33,6 +33,25 @@ class Cliente(models.Model):
         MORNO = 'Morno', 'Morno'
         QUENTE = 'Quente', 'Quente'
 
+    class StatusContato(models.TextChoices):
+        NAO_CONTATADO = 'Nao contatado', 'Não contatado'
+        TENTATIVA = 'Tentativa', 'Tentativa de contato'
+        CONTATO_REALIZADO = 'Contato realizado', 'Contato realizado'
+        AGUARDANDO_RETORNO = 'Aguardando retorno', 'Aguardando retorno'
+        SEM_INTERESSE = 'Sem interesse', 'Sem interesse'
+        FECHADO_SUCESSO = 'Fechado com sucesso', 'Fechado com sucesso'
+        PERDIDO = 'Perdido', 'Perdido'
+
+    class EtapaFunil(models.TextChoices):
+        RECEPCAO = 'Recepcao', 'Recepção do lead'
+        QUALIFICACAO = 'Qualificacao', 'Qualificação'
+        APRESENTACAO = 'Apresentacao', 'Apresentação do veículo'
+        PROPOSTA = 'Proposta', 'Proposta'
+        NEGOCIACAO = 'Negociacao', 'Negociação'
+        FECHAMENTO = 'Fechamento', 'Fechamento'
+        POS_VENDA = 'Pos-venda', 'Pós-venda'
+        ENCERRADO = 'Encerrado', 'Encerrado'
+
     class TipoNegociacao(models.TextChoices):
         VENDA = 'Venda', 'Venda'
         CONSIGNACAO = 'Consignacao', 'Consignação'
@@ -70,6 +89,19 @@ class Cliente(models.Model):
     status_negociacao = models.CharField(max_length=20, choices=StatusNegociacao.choices, default=StatusNegociacao.NOVO)
     proximo_passo = models.CharField(max_length=20, choices=ProximoPasso.choices)
     prioridade = models.CharField(max_length=10, choices=Prioridade.choices, default=Prioridade.MORNO)
+    status_contato = models.CharField(
+        max_length=25,
+        choices=StatusContato.choices,
+        default=StatusContato.NAO_CONTATADO,
+        verbose_name="Status do Contato"
+    )
+    etapa_funil = models.CharField(
+        max_length=20,
+        choices=EtapaFunil.choices,
+        default=EtapaFunil.RECEPCAO,
+        verbose_name="Etapa do Funil"
+    )
+    data_ultimo_andamento = models.DateTimeField(null=True, blank=True, verbose_name="Último andamento")
     observacao = models.TextField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
@@ -102,3 +134,22 @@ class Historico(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+
+
+class LeadAndamento(models.Model):
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='andamentos')
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='andamentos_registrados')
+    criado_em = models.DateTimeField(auto_now_add=True)
+    status_contato = models.CharField(max_length=25, choices=Cliente.StatusContato.choices)
+    etapa_funil = models.CharField(max_length=20, choices=Cliente.EtapaFunil.choices)
+    proximo_passo = models.CharField(max_length=20, choices=Cliente.ProximoPasso.choices, blank=True, null=True)
+    data_proxima_acao = models.DateTimeField(blank=True, null=True)
+    comentario = models.TextField()
+
+    class Meta:
+        ordering = ['-criado_em']
+        verbose_name = 'Andamento do Lead'
+        verbose_name_plural = 'Andamentos dos Leads'
+
+    def __str__(self):
+        return f"{self.cliente.nome_cliente} - {self.etapa_funil} ({self.criado_em:%d/%m/%Y %H:%M})"

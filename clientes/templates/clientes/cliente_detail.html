@@ -26,17 +26,13 @@
         padding: .5em .8em;
     }
 
-    /* --- NOVO: Estilos de Impressão --- */
     @media print {
-        /* Esconde tudo por padrão */
         body * {
             visibility: hidden;
         }
-        /* Mostra a área de impressão e seus filhos */
         .printable-area, .printable-area * {
             visibility: visible;
         }
-        /* Posiciona a área de impressão */
         .printable-area {
             position: absolute;
             left: 0;
@@ -48,12 +44,10 @@
         .no-print {
             display: none !important;
         }
-        /* Esconde os botões dentro do header da área de impressão */
         .printable-area .card-header div {
             display: none !important;
         }
     }
-    /* --- FIM NOVO --- */
 </style>
 
 <div class="row">
@@ -63,14 +57,12 @@
                 <h4 class="mb-0"><i class="bi bi-person-vcard me-2"></i>{{ cliente.nome_cliente }}</h4>
                 <div class="no-print">
                     <button onclick="window.print()" class="btn btn-info btn-sm"><i class="bi bi-printer-fill me-1"></i> Imprimir</button>
-                    
-                    {# --- NOVO BOTÃO DE REDISTRIBUIÇÃO --- #}
+
                     {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' or user.profile.nivel_acesso == 'DISTRIBUIDOR' %}
-                    <a href="{% url 'redistribuir-lead' cliente.pk %}" class="btn btn-outline-warning btn-sm text-white" title="Passar para outro vendedor (Rodízio)">
+                    <a href="{% url 'redistribuir-lead' cliente.pk %}" class="btn btn-outline-warning btn-sm text-white" title="Passar para outro vendedor (Rodizio)">
                         <i class="bi bi-arrow-repeat me-1"></i> Redistribuir
                     </a>
                     {% endif %}
-                    {# --- FIM NOVO BOTÃO --- #}
 
                     <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square me-1"></i> Editar</a>
                     {% if user.is_superuser %}
@@ -86,16 +78,16 @@
                             <ul class="list-group list-group-flush details-list-group p-3">
                                 <li class="list-group-item"><i class="bi bi-whatsapp"></i> <strong>WhatsApp:</strong> {{ cliente.whatsapp }}</li>
                                 <li class="list-group-item"><i class="bi bi-person-video3"></i> <strong>Vendedor:</strong> {{ cliente.vendedor.username|default:"N/A" }}</li>
-                                <li class="list-group-item"><i class="bi bi-person-check"></i> <strong>Fonte:</strong> {{ cliente.fonte_cliente|default:"Não informado" }}</li>
-                                <li class="list-group-item"><i class="bi bi-telephone-inbound"></i> <strong>Ligações:</strong> {{ cliente.quantidade_ligacoes }}</li>
+                                <li class="list-group-item"><i class="bi bi-person-check"></i> <strong>Fonte:</strong> {{ cliente.fonte_cliente|default:"Nao informado" }}</li>
+                                <li class="list-group-item"><i class="bi bi-telephone-inbound"></i> <strong>Ligacoes:</strong> {{ cliente.quantidade_ligacoes }}</li>
                             </ul>
                         </div>
                     </div>
                     <div class="col-md-6 mb-4">
                         <div class="card h-100 details-card">
-                            <div class="card-header">Dados do Veículo</div>
+                            <div class="card-header">Dados do Veiculo</div>
                             <ul class="list-group list-group-flush details-list-group p-3">
-                                <li class="list-group-item"><i class="bi bi-car-front-fill"></i> <strong>Veículo:</strong> {{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }}</li>
+                                <li class="list-group-item"><i class="bi bi-car-front-fill"></i> <strong>Veiculo:</strong> {{ cliente.marca_veiculo }} {{ cliente.modelo_veiculo }}</li>
                                 <li class="list-group-item"><i class="bi bi-calendar3"></i> <strong>Ano:</strong> {{ cliente.ano_veiculo }}</li>
                                 <li class="list-group-item"><i class="bi bi-tag"></i> <strong>Valor Estimado:</strong> R$ {{ cliente.valor_estimado_veiculo }}</li>
                             </ul>
@@ -103,43 +95,95 @@
                     </div>
                 </div>
 
-                <h5 class="mt-3"><i class="bi bi-chat-left-text-fill text-muted"></i> Observações</h5>
+                <h5 class="mt-3"><i class="bi bi-chat-left-text-fill text-muted"></i> Observacoes</h5>
                 <div class="p-3 bg-light rounded mt-2">
-                    <p class="mb-0">{{ cliente.observacao|linebreaks|default:"Nenhuma observação cadastrada." }}</p>
+                    <p class="mb-0">{{ cliente.observacao|linebreaks|default:"Nenhuma observacao cadastrada." }}</p>
                 </div>
-                 <a href="{% url 'cliente_list' %}" class="btn btn-secondary mt-4 no-print"><i class="bi bi-arrow-left me-1"></i> Voltar para a Lista</a>
-            </div>
-        </div>
-        <div class="card shadow-sm history-card no-print">
-            <div class="card-header bg-white">
-                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Histórico de Interações</h5>
-            </div>
-            <div class="card-body">
-                <form action="{% url 'adicionar_historico' cliente.pk %}" method="post" class="mb-4">
-                    {% csrf_token %}
-                    <div class="mb-2">
-                        {{ historico_form.motivacao }}
-                    </div>
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i> Adicionar Interação</button>
-                </form>
-                <hr>
-                {% for historico in historicos %}
-                    <div class="alert alert-light mb-2">
-                        <small class="fw-bold text-primary">{{ historico.data_interacao|date:"d/m/Y H:i" }}</small>
-                        <p class="mb-0 mt-1">{{ historico.motivacao|linebreaks }}</p>
-                    </div>
-                {% empty %}
-                    <p class="text-center text-muted">Nenhuma interação registrada ainda.</p>
-                {% endfor %}
+                <a href="{% url 'cliente_list' %}" class="btn btn-secondary mt-4 no-print"><i class="bi bi-arrow-left me-1"></i> Voltar para a Lista</a>
             </div>
         </div>
 
+        <div class="card shadow-sm history-card no-print">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-briefcase-fill me-2"></i>Andamento Comercial do Lead</h5>
+            </div>
+            <div class="card-body">
+                <form action="{% url 'registrar_andamento_lead' cliente.pk %}" method="post" class="row g-3 mb-4">
+                    {% csrf_token %}
+                    <div class="col-md-4">
+                        <label class="form-label">{{ lead_andamento_form.status_contato.label }}</label>
+                        {{ lead_andamento_form.status_contato }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">{{ lead_andamento_form.etapa_funil.label }}</label>
+                        {{ lead_andamento_form.etapa_funil }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">{{ lead_andamento_form.proximo_passo.label }}</label>
+                        {{ lead_andamento_form.proximo_passo }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">{{ lead_andamento_form.data_proxima_acao.label }}</label>
+                        {{ lead_andamento_form.data_proxima_acao }}
+                        <small class="text-muted">Opcional: define o proximo follow-up e agenda contato.</small>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">{{ lead_andamento_form.comentario.label }}</label>
+                        {{ lead_andamento_form.comentario }}
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check2-square me-1"></i> Registrar Andamento</button>
+                    </div>
+                </form>
+
+                <h6 class="mb-2"><i class="bi bi-activity me-1"></i>Timeline Comercial</h6>
+                <div class="mb-3">
+                    {% for evento in andamentos %}
+                    <div class="alert alert-light mb-2 border-start border-4 border-primary">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <small class="fw-bold text-primary">{{ evento.criado_em|date:"d/m/Y H:i" }}</small>
+                            <small class="text-muted">{{ evento.usuario.username|default:"Sistema" }}</small>
+                        </div>
+                        <div class="small mb-1">
+                            <span class="badge text-bg-secondary">{{ evento.get_etapa_funil_display }}</span>
+                            <span class="badge text-bg-info">{{ evento.get_status_contato_display }}</span>
+                            {% if evento.proximo_passo %}
+                            <span class="badge text-bg-light border">{{ evento.get_proximo_passo_display }}</span>
+                            {% endif %}
+                        </div>
+                        {% if evento.data_proxima_acao %}
+                        <div class="small text-muted mb-1"><i class="bi bi-calendar-event me-1"></i>Proxima acao: {{ evento.data_proxima_acao|date:"d/m/Y H:i" }}</div>
+                        {% endif %}
+                        <p class="mb-0">{{ evento.comentario|linebreaks }}</p>
+                    </div>
+                    {% empty %}
+                    <p class="text-center text-muted">Sem andamentos registrados. Atualize o lead para iniciar o historico comercial.</p>
+                    {% endfor %}
+                </div>
+
+                <hr>
+                <h6 class="mb-2"><i class="bi bi-journal-text me-1"></i>Anotacoes Gerais</h6>
+                <form action="{% url 'adicionar_historico' cliente.pk %}" method="post" class="mb-3">
+                    {% csrf_token %}
+                    <div class="mb-2">{{ historico_form.motivacao }}</div>
+                    <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-circle me-1"></i> Adicionar Anotacao</button>
+                </form>
+                {% for historico in historicos %}
+                <div class="alert alert-light mb-2">
+                    <small class="fw-bold text-primary">{{ historico.data_interacao|date:"d/m/Y H:i" }}</small>
+                    <p class="mb-0 mt-1">{{ historico.motivacao|linebreaks }}</p>
+                </div>
+                {% empty %}
+                <p class="text-center text-muted">Nenhuma anotacao registrada ainda.</p>
+                {% endfor %}
+            </div>
+        </div>
     </div>
 
     <div class="col-lg-4 no-print">
         <div class="card shadow-sm">
              <div class="card-header bg-dark text-white">
-                <h5 class="mb-0"><i class="bi bi-graph-up-arrow me-2"></i>Status da Negociação</h5>
+                <h5 class="mb-0"><i class="bi bi-graph-up-arrow me-2"></i>Status da Negociacao</h5>
             </div>
             <div class="card-body text-center">
                 <h6 class="text-muted">Prioridade</h6>
@@ -155,12 +199,14 @@
             </div>
             <ul class="list-group list-group-flush details-list-group p-3">
                 <li class="list-group-item"><i class="bi bi-flag-fill"></i> <strong>Status:</strong> <span class="badge bg-info text-dark">{{ cliente.get_status_negociacao_display }}</span></li>
+                <li class="list-group-item"><i class="bi bi-telephone"></i> <strong>Status contato:</strong> <span class="badge bg-secondary">{{ cliente.get_status_contato_display }}</span></li>
+                <li class="list-group-item"><i class="bi bi-diagram-3"></i> <strong>Etapa funil:</strong> <span class="badge bg-primary">{{ cliente.get_etapa_funil_display }}</span></li>
                 <li class="list-group-item"><i class="bi bi-gear-wide-connected"></i> <strong>Tipo:</strong> <span class="badge bg-success">{{ cliente.get_tipo_negociacao_display }}</span></li>
-                <li class="list-group-item"><i class="bi bi-calendar-check-fill"></i> <strong>Último Contato:</strong> {{ cliente.data_ultimo_contato|date:"d/m/Y H:i" }}</li>
-                <li class="list-group-item"><i class="bi bi-calendar-event-fill"></i> <strong>Próximo Contato:</strong> {{ cliente.data_proximo_contato|date:"d/m/Y" }}</li>
+                <li class="list-group-item"><i class="bi bi-calendar-check-fill"></i> <strong>Ultimo contato:</strong> {{ cliente.data_ultimo_contato|date:"d/m/Y H:i" }}</li>
+                <li class="list-group-item"><i class="bi bi-calendar-event-fill"></i> <strong>Proximo contato:</strong> {{ cliente.data_proximo_contato|date:"d/m/Y H:i" }}</li>
             </ul>
 
         </div>
-    </div>  
+    </div>
 </div>
 {% endblock %}

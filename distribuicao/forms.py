@@ -55,6 +55,9 @@ class LeadEntradaForm(forms.ModelForm):
         )
         self.fields['vendedor_manual'].queryset = User.objects.filter(id__in=vendedores_ids).order_by('first_name', 'username')
         self.fields['vendedor_manual'].empty_label = "Selecione o vendedor"
+        self.fields['vendedor_manual'].label_from_instance = (
+            lambda user: user.get_full_name().strip() or user.username
+        )
         self.fields['lancamento_esporadico'].help_text = "Usa o vendedor escolhido apenas neste lead e mantém a fila atual."
         self.fields['vendedor_manual'].help_text = "Obrigatório quando lançamento manual estiver marcado."
 

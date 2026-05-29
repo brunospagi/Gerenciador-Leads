@@ -117,7 +117,7 @@
                                     <td>{{ lead.whatsapp }}</td>
                                     <td><small>{{ lead.marca_veiculo|default:"" }} {{ lead.modelo_veiculo|default:"-" }}</small></td>
                                     <td>
-                                        <span class="badge bg-primary bg-opacity-75 text-white">{{ lead.vendedor.username }}</span>
+                                        <span class="badge bg-primary bg-opacity-75 text-white">{{ lead.vendedor.get_full_name|default:lead.vendedor.username }}</span>
                                     </td>
                                     <td class="text-center">
                                         {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' or user.profile.nivel_acesso == 'DISTRIBUIDOR' %}

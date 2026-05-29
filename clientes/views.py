@@ -1,8 +1,8 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView, TemplateView
-from .models import Cliente, Historico
-from .forms import ClienteForm, HistoricoForm
+from .models import Cliente, Historico, LeadAndamento
+from .forms import ClienteForm, HistoricoForm, LeadAndamentoForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -16,8 +16,23 @@ import json
 from django.contrib.auth.models import User
 from collections import defaultdict
 from django.contrib import messages 
+from core.audit import create_audit_log, get_client_ip
 
 CLOSED_STATUSES = [Cliente.StatusNegociacao.FINALIZADO, Cliente.StatusNegociacao.VENDIDO]
+
+
+def _mapear_status_negociacao_por_andamento(status_contato, etapa_funil):
+    if status_contato == Cliente.StatusContato.FECHADO_SUCESSO:
+        return Cliente.StatusNegociacao.VENDIDO
+    if status_contato in [Cliente.StatusContato.SEM_INTERESSE, Cliente.StatusContato.PERDIDO]:
+        return Cliente.StatusNegociacao.FINALIZADO
+    if etapa_funil == Cliente.EtapaFunil.FECHAMENTO:
+        return Cliente.StatusNegociacao.FECHAMENTO
+    if status_contato == Cliente.StatusContato.AGUARDANDO_RETORNO:
+        return Cliente.StatusNegociacao.PENDENTE
+    if status_contato in [Cliente.StatusContato.TENTATIVA, Cliente.StatusContato.NAO_CONTATADO]:
+        return Cliente.StatusNegociacao.SEM_RESPOSTA
+    return Cliente.StatusNegociacao.EM_ATENDIMENTO
 
 
 class CalendarioView(LoginRequiredMixin, TemplateView):
@@ -72,7 +87,9 @@ class ClienteListView(LoginRequiredMixin, ListView):
                 Q(marca_veiculo__icontains=query) |
                 Q(modelo_veiculo__icontains=query) |
                 Q(ano_veiculo__icontains=query) |
-                Q(fonte_cliente__icontains=query)
+                Q(fonte_cliente__icontains=query) |
+                Q(status_contato__icontains=query) |
+                Q(etapa_funil__icontains=query)
             )
         periodo = self.request.GET.get('dias')
         if periodo and periodo.isdigit():
@@ -113,6 +130,14 @@ class ClienteDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context['historico_form'] = HistoricoForm()
         context['historicos'] = self.object.historico.all()
+        context['lead_andamento_form'] = LeadAndamentoForm(
+            initial={
+                'status_contato': self.object.status_contato,
+                'etapa_funil': self.object.etapa_funil,
+                'proximo_passo': self.object.proximo_passo,
+            }
+        )
+        context['andamentos'] = self.object.andamentos.select_related('usuario').all()
         return context
 
 class ClienteCreateView(LoginRequiredMixin, CreateView):
@@ -268,7 +293,139 @@ def adicionar_historico(request, pk):
             cliente.save()
             
     return redirect('cliente_detail', pk=cliente.pk)
-    
+
+
+@login_required
+def registrar_andamento_lead(request, pk):
+    cliente = get_object_or_404(Cliente, pk=pk)
+    if not request.user.is_superuser and cliente.vendedor != request.user:
+        raise PermissionDenied("Voce nao tem permissao para registrar andamento neste lead.")
+
+    if request.method != 'POST':
+        return redirect('cliente_detail', pk=cliente.pk)
+
+    form = LeadAndamentoForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Nao foi possivel registrar o andamento. Revise os campos.")
+        return redirect('cliente_detail', pk=cliente.pk)
+
+    andamento = form.save(commit=False)
+    andamento.cliente = cliente
+    andamento.usuario = request.user
+    andamento.save()
+
+    cliente.status_contato = andamento.status_contato
+    cliente.etapa_funil = andamento.etapa_funil
+    if andamento.proximo_passo:
+        cliente.proximo_passo = andamento.proximo_passo
+
+    if andamento.data_proxima_acao:
+        cliente.data_proximo_contato = andamento.data_proxima_acao
+        if andamento.data_proxima_acao.date() > timezone.localdate():
+            cliente.status_negociacao = Cliente.StatusNegociacao.AGENDADO
+        else:
+            cliente.status_negociacao = _mapear_status_negociacao_por_andamento(
+                andamento.status_contato,
+                andamento.etapa_funil,
+            )
+    else:
+        cliente.status_negociacao = _mapear_status_negociacao_por_andamento(
+            andamento.status_contato,
+            andamento.etapa_funil,
+        )
+    cliente.data_ultimo_andamento = timezone.now()
+    cliente.data_ultimo_contato = timezone.now()
+    cliente.save()
+
+    Historico.objects.create(
+        cliente=cliente,
+        motivacao=(
+            f"Andamento comercial registrado por {request.user.username}: "
+            f"Etapa={andamento.get_etapa_funil_display()} | "
+            f"Status contato={andamento.get_status_contato_display()} | "
+            f"Comentario={andamento.comentario}"
+        ),
+    )
+
+    create_audit_log(
+        user=request.user,
+        module="clientes",
+        action="registrar_andamento_lead",
+        method=request.method,
+        path=request.get_full_path(),
+        status_code=200,
+        ip_address=get_client_ip(request),
+        user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        object_repr=f"Cliente#{cliente.pk}",
+        payload={
+            "cliente_id": cliente.pk,
+            "etapa_funil": andamento.etapa_funil,
+            "status_contato": andamento.status_contato,
+            "proximo_passo": andamento.proximo_passo,
+            "data_proxima_acao": andamento.data_proxima_acao.isoformat() if andamento.data_proxima_acao else "",
+        },
+        success=True,
+    )
+
+    messages.success(request, "Andamento comercial atualizado com sucesso.")
+    return redirect('cliente_detail', pk=cliente.pk)
+
+
+class PainelComercialLeadsView(LoginRequiredMixin, TemplateView):
+    template_name = 'clientes/painel_comercial.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        queryset = Cliente.objects.filter(vendedor=user) if not user.is_superuser else Cliente.objects.all()
+        queryset = queryset.exclude(status_negociacao__in=CLOSED_STATUSES).select_related('vendedor')
+
+        etapa = (self.request.GET.get('etapa') or '').strip()
+        if etapa:
+            queryset = queryset.filter(etapa_funil=etapa)
+
+        status_contato = (self.request.GET.get('status_contato') or '').strip()
+        if status_contato:
+            queryset = queryset.filter(status_contato=status_contato)
+
+        q = (self.request.GET.get('q') or '').strip()
+        if q:
+            queryset = queryset.filter(
+                Q(nome_cliente__icontains=q)
+                | Q(whatsapp__icontains=q)
+                | Q(marca_veiculo__icontains=q)
+                | Q(modelo_veiculo__icontains=q)
+                | Q(observacao__icontains=q)
+            )
+
+        queryset = queryset.order_by('data_proximo_contato', '-data_ultimo_contato')
+        leads_lista = list(queryset)
+        agora = timezone.now()
+
+        etapas = list(Cliente.EtapaFunil.choices)
+        grouped = []
+        for etapa_value, etapa_label in etapas:
+            leads_etapa = [lead for lead in leads_lista if lead.etapa_funil == etapa_value]
+            grouped.append(
+                {
+                    'etapa': etapa_value,
+                    'etapa_label': etapa_label,
+                    'leads': leads_etapa[:30],
+                    'total': len(leads_etapa),
+                }
+            )
+
+        context['leads_total'] = len(leads_lista)
+        context['leads_atrasados'] = sum(1 for lead in leads_lista if lead.data_proximo_contato and lead.data_proximo_contato < agora)
+        context['leads_quentes'] = sum(1 for lead in leads_lista if lead.prioridade == Cliente.Prioridade.QUENTE)
+        context['etapas_grouped'] = grouped
+        context['filtro_etapa'] = etapa
+        context['filtro_status_contato'] = status_contato
+        context['filtro_q'] = q
+        context['status_contato_choices'] = Cliente.StatusContato.choices
+        context['etapa_choices'] = Cliente.EtapaFunil.choices
+        return context
+
 
 # ... (Restante do arquivo como relatorios, delete, etc. permanece o mesmo)
 class ClienteAtrasadoListView(LoginRequiredMixin, ListView):

@@ -37,6 +37,9 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
         return redirect('portal')
 
     def form_valid(self, form):
+        def _nome_usuario(user):
+            return (user.get_full_name() or "").strip() or user.username
+
         is_redistribuicao = form.instance.pk is not None
         vendedor_antigo = form.instance.vendedor if is_redistribuicao else None
 
@@ -64,6 +67,8 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
 
         form.instance.vendedor = vendedor_selecionado
         form.instance.status_negociacao = Cliente.StatusNegociacao.NOVO
+        form.instance.status_contato = Cliente.StatusContato.NAO_CONTATADO
+        form.instance.etapa_funil = Cliente.EtapaFunil.RECEPCAO
         form.instance.prioridade = Cliente.Prioridade.MORNO
         form.instance.tipo_contato = Cliente.TipoContato.MENSAGEM
         form.instance.proximo_passo = Cliente.ProximoPasso.MENSAGEM
@@ -76,18 +81,18 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
                 cliente=self.object,
                 motivacao=(
                     f'Redistribuicao via Entrada (Duplicidade detectada). '
-                    f'De: {vendedor_antigo.username} Para: {vendedor_selecionado.username}.'
+                    f'De: {_nome_usuario(vendedor_antigo)} Para: {_nome_usuario(vendedor_selecionado)}.'
                     + (' Lancamento manual esporadico (fila preservada).' if lancamento_esporadico else '')
                 ),
             )
             msg = (
-                f'Lead EXISTENTE atualizado e transferido de {vendedor_antigo.username} para: {vendedor_selecionado.username}'
+                f'Lead EXISTENTE atualizado e transferido de {_nome_usuario(vendedor_antigo)} para: {_nome_usuario(vendedor_selecionado)}'
                 + (' (manual esporadico, fila preservada).' if lancamento_esporadico else '')
             )
             messages.warning(self.request, msg)
         else:
             msg = (
-                f'Novo lead cadastrado e enviado para: {vendedor_selecionado.username}'
+                f'Novo lead cadastrado e enviado para: {_nome_usuario(vendedor_selecionado)}'
                 + (' (manual esporadico, fila preservada).' if lancamento_esporadico else '')
             )
             messages.success(self.request, msg)
@@ -203,6 +208,9 @@ class RedistribuirLeadView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         return redirect('portal')
 
     def form_valid(self, form):
+        def _nome_usuario(user):
+            return (user.get_full_name() or "").strip() or user.username
+
         cliente = self.object
         vendedor_antigo = cliente.vendedor
         novo_vendedor = definir_proximo_vendedor()
@@ -223,11 +231,11 @@ class RedistribuirLeadView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
             cliente=cliente,
             motivacao=(
                 f'Redistribuido manualmente (Rodizio). '
-                f'De: {vendedor_antigo.username} Para: {novo_vendedor.username} por {self.request.user.username}.'
+                f'De: {_nome_usuario(vendedor_antigo)} Para: {_nome_usuario(novo_vendedor)} por {_nome_usuario(self.request.user)}.'
             ),
         )
 
-        messages.success(self.request, f'Lead redistribuido para {novo_vendedor.username}!')
+        messages.success(self.request, f'Lead redistribuido para {_nome_usuario(novo_vendedor)}!')
         return super().form_valid(form)
 
     def get_success_url(self):

@@ -13,11 +13,14 @@ from .views import (
     relatorio_dashboard,
     exportar_relatorio_pdf,
     ClienteDeleteView ,
-    CalendarioView
+    CalendarioView,
+    PainelComercialLeadsView,
+    registrar_andamento_lead,
 )
 
 urlpatterns = [
     path('', ClienteListView.as_view(), name='cliente_list'),
+    path('pipeline-comercial/', PainelComercialLeadsView.as_view(), name='cliente_pipeline_comercial'),
     path('calendario/', CalendarioView.as_view(), name='calendario'),
     path('relatorios/exportar/', exportar_relatorio_pdf, name='exportar_relatorio_pdf'),
     path('relatorios/', relatorio_dashboard, name='relatorios'),
@@ -28,6 +31,7 @@ urlpatterns = [
     path('cliente/<int:pk>/editar/', ClienteUpdateView.as_view(), name='cliente_update'),
     path('cliente/<int:pk>/excluir/', ClienteDeleteView.as_view(), name='cliente_delete'),
     path('cliente/<int:pk>/adicionar_historico/', adicionar_historico, name='adicionar_historico'),
+    path('cliente/<int:pk>/registrar_andamento/', registrar_andamento_lead, name='registrar_andamento_lead'),
     path('relatorios/atrasados/', relatorio_atrasados_por_vendedor, name='relatorio_atrasados'),
     path('relatorios/atrasados/exportar/', exportar_relatorio_atrasados_pdf, name='exportar_relatorio_atrasados_pdf'),
     path('offline/', offline_view, name='offline'),
