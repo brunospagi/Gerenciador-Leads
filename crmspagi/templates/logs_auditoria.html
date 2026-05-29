@@ -1,0 +1,158 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container-fluid py-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h3 class="fw-bold mb-0"><i class="fas fa-user-shield text-dark me-2"></i>Logs de Auditoria</h3>
+            <p class="text-muted mb-0 small">Rastreamento de ações críticas para análise administrativa.</p>
+        </div>
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Voltar ao Dashboard
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4 mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-2">
+                <div class="col-lg-3 col-md-6">
+                    <input type="text" name="q" value="{{ filtro_q }}" class="form-control" placeholder="Buscar por ação, módulo, rota, usuário...">
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <select name="user_id" class="form-select">
+                        <option value="">Todos usuários</option>
+                        {% for u in usuarios_filtro %}
+                        <option value="{{ u.id }}" {% if filtro_user_id == u.id|stringformat:"s" %}selected{% endif %}>
+                            {{ u.get_full_name|default:u.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <select name="module" class="form-select">
+                        <option value="">Todos módulos</option>
+                        {% for modulo in modulos_filtro %}
+                        <option value="{{ modulo }}" {% if filtro_module == modulo %}selected{% endif %}>{{ modulo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-1 col-md-6">
+                    <select name="method" class="form-select">
+                        <option value="">Método</option>
+                        <option value="POST" {% if filtro_method == 'POST' %}selected{% endif %}>POST</option>
+                        <option value="PUT" {% if filtro_method == 'PUT' %}selected{% endif %}>PUT</option>
+                        <option value="PATCH" {% if filtro_method == 'PATCH' %}selected{% endif %}>PATCH</option>
+                        <option value="DELETE" {% if filtro_method == 'DELETE' %}selected{% endif %}>DELETE</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <select name="severity" class="form-select">
+                        <option value="">Severidade</option>
+                        <option value="INFO" {% if filtro_severity == 'INFO' %}selected{% endif %}>INFO</option>
+                        <option value="WARN" {% if filtro_severity == 'WARN' %}selected{% endif %}>WARN</option>
+                        <option value="ERROR" {% if filtro_severity == 'ERROR' %}selected{% endif %}>ERROR</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <select name="success" class="form-select">
+                        <option value="">Resultado</option>
+                        <option value="1" {% if filtro_success == '1' %}selected{% endif %}>Sucesso</option>
+                        <option value="0" {% if filtro_success == '0' %}selected{% endif %}>Falha</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <input type="date" name="data_inicio" value="{{ filtro_data_inicio }}" class="form-control">
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <input type="date" name="data_fim" value="{{ filtro_data_fim }}" class="form-control">
+                </div>
+                <div class="col-lg-4 col-md-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter me-2"></i>Filtrar
+                    </button>
+                    <a href="{% url 'logs_auditoria' %}" class="btn btn-outline-secondary">
+                        Limpar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Data/Hora</th>
+                            <th>Usuário</th>
+                            <th>Módulo</th>
+                            <th>Ação</th>
+                            <th>Método</th>
+                            <th>Status</th>
+                            <th>IP</th>
+                            <th>Detalhes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in page_obj %}
+                        <tr>
+                            <td class="ps-3">
+                                <div class="fw-semibold">{{ log.created_at|date:"d/m/Y H:i:s" }}</div>
+                                <small class="text-muted">{{ log.path|truncatechars:60 }}</small>
+                            </td>
+                            <td>
+                                <div class="fw-semibold">{{ log.username_snapshot|default:"(sistema)" }}</div>
+                                <small class="text-muted">{{ log.nivel_acesso_snapshot|default:"-" }}</small>
+                            </td>
+                            <td><span class="badge text-bg-secondary">{{ log.module }}</span></td>
+                            <td>{{ log.action }}</td>
+                            <td><code>{{ log.method|default:"-" }}</code></td>
+                            <td>
+                                {% if log.success %}
+                                    <span class="badge text-bg-success">OK {{ log.status_code|default:"-" }}</span>
+                                {% else %}
+                                    <span class="badge text-bg-danger">ERRO {{ log.status_code|default:"-" }}</span>
+                                {% endif %}
+                                <div class="small text-muted mt-1">{{ log.severity }}</div>
+                            </td>
+                            <td><code>{{ log.ip_address|default:"-" }}</code></td>
+                            <td style="min-width: 280px;">
+                                <details>
+                                    <summary class="small text-primary">Ver payload</summary>
+                                    <pre class="small bg-light border rounded p-2 mt-2 mb-0">{{ log.payload|pprint }}</pre>
+                                </details>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">Nenhum log encontrado para os filtros informados.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="mt-3">
+        <ul class="pagination justify-content-end">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?{% if querystring_base %}{{ querystring_base }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a>
+            </li>
+            {% endif %}
+            <li class="page-item disabled">
+                <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+            </li>
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?{% if querystring_base %}{{ querystring_base }}&{% endif %}page={{ page_obj.next_page_number }}">Próxima</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

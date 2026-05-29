@@ -7,6 +7,8 @@ from crmspagi import views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('painel-admin/', views.admin_dashboard, name='admin_dashboard'),
+    path('painel-admin/backup/', views.gerar_backup_sistema, name='gerar_backup_sistema'),
+    path('painel-admin/logs-auditoria/', views.logs_auditoria, name='logs_auditoria'),
     path('contas/', include('django.contrib.auth.urls')),
     path('', login_required(TemplateView.as_view(template_name='portal.html')), name='portal'),    path('', include('leadge.urls')),
     path('clientes/', include('clientes.urls')), 

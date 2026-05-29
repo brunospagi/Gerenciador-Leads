@@ -10,6 +10,13 @@
         <div>
             <a href="{% url 'financeiro:relatorio_dre' %}" class="btn btn-dark shadow-sm"><i class="fas fa-file-invoice-dollar me-2"></i> Ver DRE Completo</a>
             <a href="{% url 'tv_gestao' %}" class="btn btn-outline-primary shadow-sm ms-2"><i class="fas fa-tv me-2"></i> Gerenciar TV</a>
+            <a href="{% url 'logs_auditoria' %}" class="btn btn-outline-secondary shadow-sm ms-2"><i class="fas fa-user-shield me-2"></i> Logs de Auditoria</a>
+            <form method="post" action="{% url 'gerar_backup_sistema' %}" class="d-inline-block ms-2">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success shadow-sm">
+                    <i class="fas fa-database me-2"></i> Baixar Backup (.zip)
+                </button>
+            </form>
         </div>
     </div>
 

@@ -187,6 +187,23 @@ python manage.py check_inactivity
 python manage.py check_overdue_clients
 ```
 
+Comando de backup do sistema:
+
+```bash
+python manage.py gerar_backup_sistema
+# opcional: definir pasta de saida
+python manage.py gerar_backup_sistema --output-dir /caminho/para/backups
+```
+
+O backup tambem pode ser gerado no painel executivo (`/painel-admin/`) pelo botao
+`Baixar Backup (.zip)`.
+
+Auditoria de acoes administrativas:
+
+- Tela no painel: `/painel-admin/logs-auditoria/` (somente ADMIN/superuser)
+- Registros automaticos de requisicoes de escrita (`POST`, `PUT`, `PATCH`, `DELETE`)
+- Filtros por usuario, modulo, metodo, severidade, resultado e periodo
+
 ## 10. Jobs Agendados (Cron)
 
 Arquivo: `crontab`
