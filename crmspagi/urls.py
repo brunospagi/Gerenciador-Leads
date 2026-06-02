@@ -1,10 +1,11 @@
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
 from crmspagi import views
 
 urlpatterns = [
+    re_path(r'^static/(?P<path>.*)$', views.static_asset_fallback, name='static_asset_fallback'),
     path('admin/', admin.site.urls),
     path('painel-admin/', views.admin_dashboard, name='admin_dashboard'),
     path('painel-admin/backup/', views.gerar_backup_sistema, name='gerar_backup_sistema'),
