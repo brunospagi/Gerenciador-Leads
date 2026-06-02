@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger shadow">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fa fa-trash-alt me-2"></i>Confirmar Exclusao</h5>
+                </div>
+                <div class="card-body text-center p-4">
+                    <i class="fa fa-exclamation-triangle text-warning fa-3x mb-3"></i>
+                    <h4 class="mb-3">Excluir desconto/vale?</h4>
+
+                    <p class="text-muted mb-3">
+                        Colaborador: <strong>{{ desconto.funcionario.user.get_full_name|default:desconto.funcionario.user.username }}</strong><br>
+                        Tipo: <strong>{{ desconto.get_tipo_display }}</strong><br>
+                        Descricao: <strong>{{ desconto.descricao }}</strong><br>
+                        Valor total: <strong>R$ {{ desconto.valor_total|floatformat:2 }}</strong>
+                    </p>
+
+                    {% if bloqueado %}
+                        <div class="alert alert-warning small">
+                            Este desconto/vale ja foi processado em folha fechada e nao pode ser excluido.
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning small">
+                            Essa acao remove todas as parcelas deste lancamento e recalcula as folhas abertas impactadas.
+                        </div>
+                    {% endif %}
+
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-center gap-2 mt-4">
+                            <a href="{% url 'rh_lista_lancamentos' %}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-danger px-4" {% if bloqueado %}disabled{% endif %}>
+                                Sim, Excluir
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

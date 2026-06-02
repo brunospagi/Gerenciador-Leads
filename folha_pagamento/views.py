@@ -1,6 +1,7 @@
 ﻿from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
 import hashlib
@@ -24,6 +25,9 @@ def is_admin_financeiro(user):
 
 def _recalcular_folhas_abertas_por_parcelas(funcionario, parcelas):
     referencias = set((p.mes_referencia, p.ano_referencia) for p in parcelas)
+    _recalcular_folhas_abertas_por_referencias(funcionario, referencias)
+
+def _recalcular_folhas_abertas_por_referencias(funcionario, referencias):
     for mes, ano in referencias:
         folha, _ = FolhaPagamento.objects.get_or_create(
             funcionario=funcionario,
@@ -161,6 +165,88 @@ def lancar_desconto(request):
         'cor_card': 'danger',      # Define cor Vermelha
         'icone': 'fa-minus-circle',
         'btn_label': 'Confirmar Desconto'
+    })
+
+@login_required
+@user_passes_test(is_admin_financeiro)
+def editar_desconto(request, pk):
+    desconto = get_object_or_404(
+        Desconto.objects.select_related('funcionario', 'funcionario__user'),
+        pk=pk
+    )
+
+    if desconto.parcelas.filter(processada_na_folha=True).exists():
+        messages.error(
+            request,
+            "Este desconto/vale ja foi processado em folha fechada e nao pode ser alterado."
+        )
+        return redirect('rh_lista_lancamentos')
+
+    parcelas_anteriores = list(desconto.parcelas.all())
+    referencias_anteriores = {
+        (p.mes_referencia, p.ano_referencia) for p in parcelas_anteriores
+    }
+
+    if request.method == 'POST':
+        form = LancarDescontoForm(request.POST, instance=desconto)
+        if form.is_valid():
+            with transaction.atomic():
+                desconto = form.save()
+                desconto.parcelas.all().delete()
+                desconto.gerar_parcelas()
+                referencias_novas = {
+                    (p.mes_referencia, p.ano_referencia)
+                    for p in desconto.parcelas.all()
+                }
+
+            referencias = referencias_anteriores | referencias_novas
+            _recalcular_folhas_abertas_por_referencias(desconto.funcionario, referencias)
+            messages.success(request, "Desconto/vale atualizado com sucesso.")
+            return redirect('rh_lista_lancamentos')
+    else:
+        form = LancarDescontoForm(instance=desconto)
+
+    return render(request, 'folha_pagamento/form_desconto.html', {
+        'form': form,
+        'titulo': 'Editar Debito/Desconto',
+        'cor_card': 'warning',
+        'icone': 'fa-edit',
+        'btn_label': 'Salvar Alteracao',
+        'cancel_url': reverse('rh_lista_lancamentos'),
+    })
+
+@login_required
+@user_passes_test(is_admin_financeiro)
+def excluir_desconto(request, pk):
+    desconto = get_object_or_404(
+        Desconto.objects.select_related('funcionario', 'funcionario__user'),
+        pk=pk
+    )
+
+    bloqueado = desconto.parcelas.filter(processada_na_folha=True).exists()
+
+    if request.method == 'POST':
+        if bloqueado:
+            messages.error(
+                request,
+                "Este desconto/vale ja foi processado em folha fechada e nao pode ser excluido."
+            )
+            return redirect('rh_lista_lancamentos')
+
+        parcelas = list(desconto.parcelas.all())
+        referencias = {(p.mes_referencia, p.ano_referencia) for p in parcelas}
+        funcionario = desconto.funcionario
+
+        with transaction.atomic():
+            desconto.delete()
+
+        _recalcular_folhas_abertas_por_referencias(funcionario, referencias)
+        messages.success(request, "Desconto/vale excluido com sucesso.")
+        return redirect('rh_lista_lancamentos')
+
+    return render(request, 'folha_pagamento/confirmar_delete_desconto.html', {
+        'desconto': desconto,
+        'bloqueado': bloqueado,
     })
 
 @login_required

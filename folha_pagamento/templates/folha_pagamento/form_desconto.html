@@ -8,26 +8,34 @@
         <div class="card-body p-4">
             <form method="post">
                 {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger small">{{ form.non_field_errors }}</div>
+                {% endif %}
                 
                 <div class="mb-3">
                     <label class="form-label fw-bold">Colaborador</label>
                     {{ form.funcionario }}
+                    {{ form.funcionario.errors }}
                 </div>
                 
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Tipo</label>
                         {{ form.tipo }}
+                        {{ form.tipo.errors }}
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Valor Total (R$)</label>
                         {{ form.valor_total }}
+                        {{ form.valor_total.errors }}
                     </div>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label fw-bold">Descrição</label>
                     {{ form.descricao }}
+                    {{ form.descricao.errors }}
                 </div>
 
                 <hr>
@@ -41,20 +49,27 @@
                     <div class="col-md-4">
                         <label class="form-label small">Qtd. Parcelas</label>
                         {{ form.qtd_parcelas }}
+                        {{ form.qtd_parcelas.errors }}
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small">Mês Início</label>
                         {{ form.mes_inicio }}
+                        {{ form.mes_inicio.errors }}
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small">Ano Início</label>
                         {{ form.ano_inicio }}
+                        {{ form.ano_inicio.errors }}
                     </div>
                 </div>
 
                 <div class="d-grid mt-4">
                     <button type="submit" class="btn btn-{{ cor_card }} fw-bold">{{ btn_label }}</button>
-                    <a href="{% url 'rh_dashboard' %}" class="btn btn-link text-muted mt-2">Cancelar</a>
+                    {% if cancel_url %}
+                        <a href="{{ cancel_url }}" class="btn btn-link text-muted mt-2">Cancelar</a>
+                    {% else %}
+                        <a href="{% url 'rh_dashboard' %}" class="btn btn-link text-muted mt-2">Cancelar</a>
+                    {% endif %}
                 </div>
             </form>
         </div>

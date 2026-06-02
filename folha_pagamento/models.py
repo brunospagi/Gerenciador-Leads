@@ -101,28 +101,33 @@ class Desconto(models.Model):
     mes_inicio = models.IntegerField(verbose_name="Mês Início (1-12)", default=timezone.now().month)
     ano_inicio = models.IntegerField(verbose_name="Ano Início", default=timezone.now().year)
 
+    def gerar_parcelas(self):
+        qtd_parcelas = self.qtd_parcelas if self.parcelado else 1
+        qtd_parcelas = max(int(qtd_parcelas or 1), 1)
+        valor_parcela = self.valor_total / qtd_parcelas
+        mes_atual = self.mes_inicio
+        ano_atual = self.ano_inicio
+
+        for i in range(qtd_parcelas):
+            if mes_atual > 12:
+                mes_atual = 1
+                ano_atual += 1
+
+            ParcelaDesconto.objects.create(
+                desconto_pai=self,
+                numero_parcela=i + 1,
+                valor=valor_parcela,
+                mes_referencia=mes_atual,
+                ano_referencia=ano_atual
+            )
+            mes_atual += 1
+
     def save(self, *args, **kwargs):
         is_new = self.pk is None
         super().save(*args, **kwargs)
         
         if is_new:
-            valor_parcela = self.valor_total / self.qtd_parcelas
-            mes_atual = self.mes_inicio
-            ano_atual = self.ano_inicio
-
-            for i in range(self.qtd_parcelas):
-                if mes_atual > 12:
-                    mes_atual = 1
-                    ano_atual += 1
-                
-                ParcelaDesconto.objects.create(
-                    desconto_pai=self,
-                    numero_parcela=i+1,
-                    valor=valor_parcela,
-                    mes_referencia=mes_atual,
-                    ano_referencia=ano_atual
-                )
-                mes_atual += 1
+            self.gerar_parcelas()
 
     def __str__(self):
         return f"DESC: {self.get_tipo_display()} - {self.funcionario.user.username}"

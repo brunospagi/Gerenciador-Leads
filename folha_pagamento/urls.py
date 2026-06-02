@@ -4,6 +4,8 @@ from . import views
 urlpatterns = [
     path('', views.dashboard_rh, name='rh_dashboard'),
     path('desconto/novo/', views.lancar_desconto, name='rh_lancar_desconto'),
+    path('desconto/<int:pk>/editar/', views.editar_desconto, name='rh_editar_desconto'),
+    path('desconto/<int:pk>/excluir/', views.excluir_desconto, name='rh_excluir_desconto'),
     path('credito/novo/', views.lancar_credito, name='rh_lancar_credito'),
     path('lancamentos/lista/', views.lista_lancamentos_manuais, name='rh_lista_lancamentos'),
     path('folha/<int:pk>/', views.detalhe_folha, name='rh_detalhe_folha'),

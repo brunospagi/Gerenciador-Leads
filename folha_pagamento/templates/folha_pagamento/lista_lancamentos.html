@@ -44,7 +44,7 @@
                         <tbody>
                             {% for item in creditos %}
                             <tr>
-                                <td class="fw-bold">{{ item.credito_pai.funcionario.user.username }}</td>
+                                <td class="fw-bold">{{ item.credito_pai.funcionario.user.get_full_name|default:item.credito_pai.funcionario.user.username }}</td>
                                 <td>
                                     <div class="text-dark small fw-bold">{{ item.credito_pai.get_tipo_display }}</div>
                                     <small class="text-muted">{{ item.credito_pai.descricao|truncatechars:20 }}</small>
@@ -75,21 +75,34 @@
                                 <th>Desc.</th>
                                 <th>Parc.</th>
                                 <th class="text-end">Valor</th>
+                                <th class="text-end">Acoes</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for item in descontos %}
                             <tr>
-                                <td class="fw-bold">{{ item.desconto_pai.funcionario.user.username }}</td>
+                                <td class="fw-bold">{{ item.desconto_pai.funcionario.user.get_full_name|default:item.desconto_pai.funcionario.user.username }}</td>
                                 <td>
                                     <div class="text-dark small fw-bold">{{ item.desconto_pai.get_tipo_display }}</div>
                                     <small class="text-muted">{{ item.desconto_pai.descricao|truncatechars:20 }}</small>
                                 </td>
                                 <td>{{ item.numero_parcela }}/{{ item.desconto_pai.qtd_parcelas }}</td>
                                 <td class="text-end fw-bold text-danger">R$ {{ item.valor|floatformat:2 }}</td>
+                                <td class="text-end">
+                                    {% if item.processada_na_folha %}
+                                        <span class="badge bg-secondary">Processado</span>
+                                    {% else %}
+                                        <a href="{% url 'rh_editar_desconto' item.desconto_pai.pk %}" class="btn btn-outline-warning btn-sm" title="Editar desconto/vale">
+                                            <i class="fa fa-edit"></i>
+                                        </a>
+                                        <a href="{% url 'rh_excluir_desconto' item.desconto_pai.pk %}" class="btn btn-outline-danger btn-sm ms-1" title="Excluir desconto/vale">
+                                            <i class="fa fa-trash"></i>
+                                        </a>
+                                    {% endif %}
+                                </td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="4" class="text-center text-muted py-3">Nenhum desconto neste mês.</td></tr>
+                            <tr><td colspan="5" class="text-center text-muted py-3">Nenhum desconto neste mês.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>

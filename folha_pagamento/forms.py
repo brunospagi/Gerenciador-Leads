@@ -18,6 +18,27 @@ class _ValorMonetarioMixin:
             raise forms.ValidationError('Informe um valor total vÃ¡lido.')
 
 
+    def clean(self):
+        cleaned_data = super().clean()
+        parcelado = cleaned_data.get('parcelado')
+        qtd_parcelas = cleaned_data.get('qtd_parcelas') or 1
+        mes_inicio = cleaned_data.get('mes_inicio')
+        ano_inicio = cleaned_data.get('ano_inicio')
+
+        if not parcelado:
+            cleaned_data['qtd_parcelas'] = 1
+        elif qtd_parcelas < 1:
+            self.add_error('qtd_parcelas', 'Informe pelo menos 1 parcela.')
+
+        if mes_inicio and not 1 <= mes_inicio <= 12:
+            self.add_error('mes_inicio', 'Informe um mes entre 1 e 12.')
+
+        if ano_inicio and ano_inicio < 2000:
+            self.add_error('ano_inicio', 'Informe um ano valido.')
+
+        return cleaned_data
+
+
 class LancarDescontoForm(_ValorMonetarioMixin, forms.ModelForm):
     class Meta:
         model = Desconto
