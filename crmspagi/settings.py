@@ -124,14 +124,6 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # ConfiguraÃ§Ã£o do WhiteNoise para servir arquivos estÃ¡ticos em produÃ§Ã£o
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-STORAGES = {
-    'default': {
-        'BACKEND': 'crmspagi.storage_backends.PublicMediaStorage',
-    },
-    'staticfiles': {
-        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
-    },
-}
 
 # Application definition
 INSTALLED_APPS = [

@@ -1,16 +1,12 @@
-import mimetypes
-from pathlib import PurePosixPath
-
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.db.models import Sum, Q
-from django.http import FileResponse, Http404
-from django.views.decorators.http import require_POST, require_safe
+from django.http import FileResponse
+from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
-from django.contrib.staticfiles import finders
 
 # Importe os modelos dos seus aplicativos
 from vendas_produtos.models import VendaProduto
@@ -30,26 +26,6 @@ def _is_admin_only(user):
     profile = getattr(user, 'profile', None)
     nivel = getattr(profile, 'nivel_acesso', '')
     return user.is_superuser or nivel == 'ADMIN'
-
-
-@require_safe
-def static_asset_fallback(request, path):
-    normalized_path = (path or '').replace('\\', '/').lstrip('/')
-    if not normalized_path or '..' in PurePosixPath(normalized_path).parts:
-        raise Http404('Arquivo estatico nao encontrado.')
-
-    absolute_path = finders.find(normalized_path)
-    if not absolute_path:
-        raise Http404('Arquivo estatico nao encontrado.')
-
-    content_type, _ = mimetypes.guess_type(absolute_path)
-    response = FileResponse(
-        open(absolute_path, 'rb'),
-        content_type=content_type or 'application/octet-stream',
-    )
-    response['Cache-Control'] = 'public, max-age=3600'
-    return response
-
 
 @login_required
 def admin_dashboard(request):
