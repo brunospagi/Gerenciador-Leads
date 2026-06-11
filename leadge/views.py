@@ -21,12 +21,21 @@ class TVVideoView(View):
         )
         itens_ativos = get_tv_programacao_ativa_lista()
         item_ativo = itens_ativos[0] if itens_ativos else None
-        playlist_mp4_urls = [
-            item.video_mp4.url
-            for item in itens_ativos
-            if item.video_mp4 and getattr(item.video_mp4, 'url', None)
-        ]
-        playlist_mode = len(playlist_mp4_urls) >= 2
+        playlist_items = []
+        for item in itens_ativos:
+            if item.video_mp4 and getattr(item.video_mp4, 'url', None):
+                playlist_items.append({
+                    'titulo': item.titulo,
+                    'tipo': 'video',
+                    'url': item.video_mp4.url,
+                })
+            elif item.video_url:
+                playlist_items.append({
+                    'titulo': item.titulo,
+                    'tipo': 'iframe' if 'youtube.com/embed/' in item.video_url else 'video',
+                    'url': item.video_url,
+                })
+        playlist_mode = len(playlist_items) >= 2
         video_ativo = item_ativo or video_config
         ticker_manual = (
             item_ativo.manual_news_ticker
@@ -39,7 +48,7 @@ class TVVideoView(View):
             'video_ativo': video_ativo,
             'item_ativo': item_ativo,
             'playlist_mode': playlist_mode,
-            'playlist_mp4_urls': playlist_mp4_urls,
+            'playlist_items': playlist_items,
             'GOOGLE_MAPS_API_KEY': settings.GOOGLE_MAPS_API_KEY,
             'NEWS_API_KEY': video_config.newsdata_api_key,
             'MANUAL_NEWS': ticker_manual,

@@ -144,9 +144,7 @@
 
     <div id="video-container">
         {% if playlist_mode %}
-            <video id="playlist-player" class="responsive-video" autoplay muted playsinline>
-                Seu navegador não suporta a tag de vídeo.
-            </video>
+            <div id="playlist-player"></div>
         {% elif video_ativo.video_mp4 and video_ativo.video_mp4.url %}
             <video class="responsive-video" autoplay muted loop playsinline>
                 <source src="{{ video_ativo.video_mp4.url }}" type="video/mp4">
@@ -173,7 +171,7 @@
             </div>
         {% endif %}
         </div>
-    {{ playlist_mp4_urls|json_script:"tv-mp4-playlist-data" }}
+    {{ playlist_items|json_script:"tv-playlist-data" }}
 
     <div id="footer-tv">
         <div class="info-box time-weather-group">
@@ -204,8 +202,9 @@
         const API_KEY_GOOGLE = "{{ GOOGLE_MAPS_API_KEY }}"; 
         const API_KEY_NEWS = "{{ NEWS_API_KEY }}";
         const MANUAL_NEWS = "{{ MANUAL_NEWS|escapejs }}";
-        const PLAYLIST_DATA_ELEMENT = document.getElementById('tv-mp4-playlist-data');
-        const MP4_PLAYLIST = PLAYLIST_DATA_ELEMENT ? JSON.parse(PLAYLIST_DATA_ELEMENT.textContent) : [];
+        const PLAYLIST_DATA_ELEMENT = document.getElementById('tv-playlist-data');
+        const TV_PLAYLIST = PLAYLIST_DATA_ELEMENT ? JSON.parse(PLAYLIST_DATA_ELEMENT.textContent) : [];
+        const IFRAME_PLAY_SECONDS = 60;
 
         // Coordenadas padrão (São José dos Pinhais)
         const CIDADE = "São José dos Pinhais";
@@ -220,35 +219,66 @@
         const NEWS_TEXT_ELEMENT = document.getElementById('news-text');
         const NEWS_SCROLLER = document.getElementById('noticias-scroller');
 
-        function initializeMp4Playlist() {
+        function initializePlaylist() {
             const player = document.getElementById('playlist-player');
-            if (!player || MP4_PLAYLIST.length === 0) {
+            if (!player || TV_PLAYLIST.length === 0) {
                 return;
             }
 
             let currentIndex = 0;
+            let iframeTimer = null;
+
+            function playNext() {
+                currentIndex = (currentIndex + 1) % TV_PLAYLIST.length;
+                playCurrent();
+            }
 
             function playCurrent() {
-                player.src = MP4_PLAYLIST[currentIndex];
-                player.load();
-                const playPromise = player.play();
+                const item = TV_PLAYLIST[currentIndex];
+                if (!item || !item.url) {
+                    playNext();
+                    return;
+                }
+
+                if (iframeTimer) {
+                    clearTimeout(iframeTimer);
+                    iframeTimer = null;
+                }
+
+                if (item.tipo === 'iframe') {
+                    const separator = item.url.includes('?') ? '&' : '?';
+                    const iframe = document.createElement('iframe');
+                    iframe.className = 'responsive-video';
+                    iframe.src = `${item.url}${separator}autoplay=1&mute=1`;
+                    iframe.allow = 'autoplay; fullscreen';
+                    iframe.frameBorder = '0';
+                    iframe.allowFullscreen = true;
+                    player.replaceChildren(iframe);
+                    iframeTimer = setTimeout(playNext, IFRAME_PLAY_SECONDS * 1000);
+                    return;
+                }
+
+                const video = document.createElement('video');
+                video.className = 'responsive-video';
+                video.autoplay = true;
+                video.muted = true;
+                video.playsInline = true;
+                video.src = item.url;
+                video.addEventListener('ended', playNext, { once: true });
+                video.addEventListener('error', playNext, { once: true });
+                player.replaceChildren(video);
+                video.load();
+                const playPromise = video.play();
                 if (playPromise && typeof playPromise.catch === 'function') {
                     playPromise.catch((error) => {
-                        console.error('Falha ao reproduzir vídeo da playlist MP4:', error);
+                        console.error('Falha ao reproduzir video da playlist da TV:', error);
+                        setTimeout(playNext, 3000);
                     });
                 }
             }
 
-            function playNext() {
-                currentIndex = (currentIndex + 1) % MP4_PLAYLIST.length;
-                playCurrent();
-            }
-
-            player.addEventListener('ended', playNext);
-            player.addEventListener('error', playNext);
             playCurrent();
         }
-
         // --- LÓGICA DA HORA E DATA ---
         function updateTime() {
             const now = new Date();
@@ -481,7 +511,7 @@
         }
         
         // Inicia a busca do clima e notícias (o clima a cada 1h, notícias a cada 10 min)
-        initializeMp4Playlist();
+        initializePlaylist();
         fetchWeather();
         fetchNews();
         setInterval(fetchWeather, 10800000); 
@@ -533,6 +563,6 @@
             console.error('Falha ao registrar Periodic Sync:', error);
         }
     }
- </script>
+</script>
 </body>
 </html>
