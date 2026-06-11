@@ -505,6 +505,10 @@ def relatorio_dashboard(request):
     vendedor_labels = [item['vendedor__username'] for item in vendedor_data]
     vendedor_values = [item['total'] for item in vendedor_data]
 
+    fonte_data = clientes_todos.values('fonte_cliente').annotate(total=Count('id')).order_by('-total')
+    fonte_labels = json.dumps([item['fonte_cliente'] or 'Nao informado' for item in fonte_data], ensure_ascii=False)
+    fonte_values = json.dumps([item['total'] for item in fonte_data])
+
     vendas_data = clientes_concluidos.filter(
         tipo_negociacao=Cliente.TipoNegociacao.VENDA
     ).values('vendedor__username').annotate(total=Count('id')).order_by('-total')
@@ -530,6 +534,8 @@ def relatorio_dashboard(request):
         'tipo_negociacao_values': tipo_negociacao_values,
         'vendedor_labels': vendedor_labels,
         'vendedor_values': vendedor_values,
+        'fonte_labels': fonte_labels,
+        'fonte_values': fonte_values,
         'start_date': start_date,
         'end_date': end_date,
         'vendas_por_vendedor_labels': vendas_por_vendedor_labels,
@@ -582,6 +588,9 @@ def exportar_relatorio_pdf(request):
     vendedor_list = clientes_todos.values('vendedor__username').annotate(total=Count('id')).order_by('-total')
     vendedor_dict = {item['vendedor__username']: item['total'] for item in vendedor_list}
 
+    fonte_list = clientes_todos.values('fonte_cliente').annotate(total=Count('id')).order_by('-total')
+    fonte_dict = {item['fonte_cliente'] or 'Nao informado': item['total'] for item in fonte_list}
+
     vendas_list = clientes_concluidos.filter(
         tipo_negociacao=Cliente.TipoNegociacao.VENDA
     ).values('vendedor__username').annotate(total=Count('id')).order_by('-total')
@@ -600,6 +609,7 @@ def exportar_relatorio_pdf(request):
         'status_data': status_data_dict,
         'tipo_negociacao_data': tipo_negociacao_dict,
         'vendedor_data': vendedor_dict,
+        'fonte_data': fonte_dict,
         'start_date': start_date,
         'end_date': end_date,
         'vendas_por_vendedor_data': vendas_por_vendedor_dict,

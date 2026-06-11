@@ -127,6 +127,14 @@
     </div>
     <div class="col-lg-6 mb-4">
         <div class="card shadow-sm chart-card">
+            <div class="card-header">Leads por Fonte</div>
+            <div class="card-body">
+                <canvas id="fonteChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6 mb-4">
+        <div class="card shadow-sm chart-card">
             <div class="card-header">Vendas Concluídas por Vendedor</div>
             <div class="card-body">
                 <canvas id="vendasVendedorChart"></canvas>
@@ -185,6 +193,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 data: {{ vendedor_values|safe }},
                 backgroundColor: 'rgba(13, 110, 253, 0.7)',
                 borderColor: 'rgba(13, 110, 253, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: { ...commonChartOptions, indexAxis: 'y', scales: { x: { beginAtZero: true } } }
+    });
+
+    // Grafico: origem dos leads
+    const ctxFonte = document.getElementById('fonteChart').getContext('2d');
+    new Chart(ctxFonte, {
+        type: 'bar',
+        data: {
+            labels: {{ fonte_labels|safe }},
+            datasets: [{
+                label: 'Leads por Fonte',
+                data: {{ fonte_values|safe }},
+                backgroundColor: 'rgba(13, 202, 240, 0.7)',
+                borderColor: 'rgba(13, 202, 240, 1)',
                 borderWidth: 1
             }]
         },

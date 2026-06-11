@@ -73,86 +73,97 @@
         <div class="col-12 col-md-6 col-xl-2"><div class="card h-100 border-0"><div class="card-body"><small class="text-muted">Distancia media</small><div class="h4 fw-bold">{{ distancia_media|default:"-"|floatformat:4 }}</div></div></div></div>
     </div>
 
-    <div class="card border-0">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Data</th>
-                            <th>Colaborador</th>
-                            <th>Batidas</th>
-                            <th>Modo</th>
-                            <th>Face Match</th>
-                            <th>Similaridade</th>
-                            <th>Distancia</th>
-                            <th>Threshold</th>
-                            <th>Validado em</th>
-                            <th>IP/GPS</th>
-                            <th>Fotos</th>
-                            <th class="d-print-none">Auditoria</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in pontos_view %}
-                        {% with p=item.obj %}
-                        <tr>
-                            <td class="fw-semibold">{{ p.data|date:"d/m/Y" }}</td>
-                            <td>
-                                <div class="fw-semibold">{{ p.funcionario.nome_completo }}</div>
-                                <small class="text-muted">{{ p.funcionario.cargo|default:"-" }}</small>
-                            </td>
-                            <td>
-                                <div class="small">E: {{ p.entrada|time:"H:i"|default:"--" }}</div>
-                                <div class="small">SA: {{ p.saida_almoco|time:"H:i"|default:"--" }}</div>
-                                <div class="small">RA: {{ p.retorno_almoco|time:"H:i"|default:"--" }}</div>
-                                <div class="small">SF: {{ p.saida|time:"H:i"|default:"--" }}</div>
-                            </td>
-                            <td><span class="m3-badge m3-badge-neutral">{{ p.modo_validacao|default:"-" }}</span></td>
-                            <td>
-                                {% if p.face_match_aprovado %}
-                                <span class="m3-badge m3-badge-success">Aprovado</span>
-                                {% else %}
-                                <span class="m3-badge m3-badge-warning">Pendente/Manual</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if item.similaridade is not None %}
-                                <span class="fw-bold text-success">{{ item.similaridade|floatformat:2 }}%</span>
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ p.face_distance|default:"-"|floatformat:4 }}</td>
-                            <td>{{ p.face_threshold|default:"-"|floatformat:4 }}</td>
-                            <td>{{ p.face_validado_em|date:"d/m/Y H:i"|default:"-" }}</td>
-                            <td>
-                                <div class="small">{{ p.ip_registrado|default:"-" }}</div>
-                                <div class="small text-muted">{{ p.latitude|default:"-" }}, {{ p.longitude|default:"-" }}</div>
-                            </td>
-                            <td>
-                                <div class="small">E {% if item.teve_foto_entrada %}✅{% else %}—{% endif %}</div>
-                                <div class="small">SA {% if item.teve_foto_saida_almoco %}✅{% else %}—{% endif %}</div>
-                                <div class="small">RA {% if item.teve_foto_retorno_almoco %}✅{% else %}—{% endif %}</div>
-                                <div class="small">SF {% if item.teve_foto_saida %}✅{% else %}—{% endif %}</div>
-                            </td>
-                            <td class="d-print-none">
-                                <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-info">
-                                    <i class="fas fa-eye"></i>
-                                </a>
-                            </td>
-                        </tr>
-                        {% endwith %}
-                        {% empty %}
-                        <tr>
-                            <td colspan="12" class="text-center py-5 text-muted">Nenhum registro encontrado.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    {% regroup pontos_view by obj.data as dias_ponto %}
+    {% if dias_ponto %}
+    <div class="d-flex flex-column gap-3">
+        {% for dia in dias_ponto %}
+        <div class="card border-0">
+            <div class="card-header bg-light border-0 py-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="fw-bold"><i class="fas fa-calendar-day text-primary me-2"></i>{{ dia.grouper|date:"d/m/Y" }}</div>
+                    <small class="text-muted">{{ dia.list|length }} colaborador(es)</small>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Colaborador</th>
+                                <th>Batidas</th>
+                                <th>Modo</th>
+                                <th>Face Match</th>
+                                <th>Similaridade</th>
+                                <th>Distancia</th>
+                                <th>Threshold</th>
+                                <th>Validado em</th>
+                                <th>IP/GPS</th>
+                                <th>Fotos</th>
+                                <th class="d-print-none">Auditoria</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in dia.list %}
+                            {% with p=item.obj %}
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">{{ p.funcionario.nome_completo }}</div>
+                                    <small class="text-muted">{{ p.funcionario.cargo|default:"-" }}</small>
+                                </td>
+                                <td>
+                                    <div class="small">E: {{ p.entrada|time:"H:i"|default:"--" }}</div>
+                                    <div class="small">SA: {{ p.saida_almoco|time:"H:i"|default:"--" }}</div>
+                                    <div class="small">RA: {{ p.retorno_almoco|time:"H:i"|default:"--" }}</div>
+                                    <div class="small">SF: {{ p.saida|time:"H:i"|default:"--" }}</div>
+                                </td>
+                                <td><span class="m3-badge m3-badge-neutral">{{ p.modo_validacao|default:"-" }}</span></td>
+                                <td>
+                                    {% if p.face_match_aprovado %}
+                                    <span class="m3-badge m3-badge-success">Aprovado</span>
+                                    {% else %}
+                                    <span class="m3-badge m3-badge-warning">Pendente/Manual</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.similaridade is not None %}
+                                    <span class="fw-bold text-success">{{ item.similaridade|floatformat:2 }}%</span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ p.face_distance|default:"-"|floatformat:4 }}</td>
+                                <td>{{ p.face_threshold|default:"-"|floatformat:4 }}</td>
+                                <td>{{ p.face_validado_em|date:"d/m/Y H:i"|default:"-" }}</td>
+                                <td>
+                                    <div class="small">{{ p.ip_registrado|default:"-" }}</div>
+                                    <div class="small text-muted">{{ p.latitude|default:"-" }}, {{ p.longitude|default:"-" }}</div>
+                                </td>
+                                <td>
+                                    <div class="small">E {% if item.teve_foto_entrada %}Sim{% else %}-{% endif %}</div>
+                                    <div class="small">SA {% if item.teve_foto_saida_almoco %}Sim{% else %}-{% endif %}</div>
+                                    <div class="small">RA {% if item.teve_foto_retorno_almoco %}Sim{% else %}-{% endif %}</div>
+                                    <div class="small">SF {% if item.teve_foto_saida %}Sim{% else %}-{% endif %}</div>
+                                </td>
+                                <td class="d-print-none">
+                                    <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-info">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endwith %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
+        {% endfor %}
     </div>
+    {% else %}
+    <div class="card border-0">
+        <div class="card-body text-center py-5 text-muted">Nenhum registro encontrado.</div>
+    </div>
+    {% endif %}
 </div>
 
 <style>
@@ -164,4 +175,3 @@
     }
 </style>
 {% endblock %}
-
