@@ -42,6 +42,9 @@
             "url": "url"
         }
     },
+    "edge_side_panel": {
+        "preferred_width": 520
+    },
     "widgets": [
         {
             "name": "Spagi TV Agora",
