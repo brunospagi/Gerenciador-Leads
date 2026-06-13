@@ -32,6 +32,16 @@
             "title": "Abrir Spagi TV"
         }
     ],
+    "share_target": {
+        "action": "/tv-video/",
+        "method": "GET",
+        "enctype": "application/x-www-form-urlencoded",
+        "params": {
+            "title": "title",
+            "text": "text",
+            "url": "url"
+        }
+    },
     "icons": [
         {
             "src": "/static/images/logo-spagi-192x192.png",
