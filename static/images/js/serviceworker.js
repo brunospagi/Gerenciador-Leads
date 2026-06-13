@@ -12,6 +12,8 @@ const shouldBypassCache = request => {
     return (
         url.pathname.startsWith('/tv-video/')
         || url.pathname.includes('/tv_videos/')
+        || url.pathname.endsWith('/manifest.json')
+        || url.pathname.endsWith('/manifest.tv.json')
         || request.destination === 'video'
     );
 };
