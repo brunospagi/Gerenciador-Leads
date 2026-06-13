@@ -38,6 +38,19 @@
             /* Garante que o vídeo MP4 cubra a área */
             object-fit: cover; 
         }
+        .playlist-status {
+            color: white;
+            font-family: sans-serif;
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            background: #000;
+            z-index: 10;
+        }
         .error-message {
             color: white;
             text-align: center;
@@ -233,6 +246,13 @@
                 playCurrent();
             }
 
+            function showStatus(message) {
+                const status = document.createElement('div');
+                status.className = 'playlist-status';
+                status.textContent = message;
+                player.replaceChildren(status);
+            }
+
             function playCurrent() {
                 const item = TV_PLAYLIST[currentIndex];
                 if (!item || !item.url) {
@@ -262,7 +282,12 @@
                 video.className = 'responsive-video';
                 video.autoplay = true;
                 video.muted = true;
+                video.defaultMuted = true;
                 video.playsInline = true;
+                video.preload = 'auto';
+                video.setAttribute('muted', '');
+                video.setAttribute('playsinline', '');
+                video.setAttribute('webkit-playsinline', '');
                 video.src = item.url;
                 video.addEventListener('ended', playNext, { once: true });
                 video.addEventListener('error', playNext, { once: true });
@@ -272,6 +297,7 @@
                 if (playPromise && typeof playPromise.catch === 'function') {
                     playPromise.catch((error) => {
                         console.error('Falha ao reproduzir video da playlist da TV:', error);
+                        showStatus('Nao foi possivel iniciar este video. Tentando o proximo item...');
                         setTimeout(playNext, 3000);
                     });
                 }
@@ -522,10 +548,17 @@
     </script>
     <script>
      if ("serviceWorker" in navigator) {
-         navigator.serviceWorker.register("{% static 'images/js/serviceworker.js' %}")
+         let refreshingServiceWorker = false;
+         navigator.serviceWorker.addEventListener('controllerchange', function () {
+             if (refreshingServiceWorker) return;
+             refreshingServiceWorker = true;
+             window.location.reload();
+         });
+         navigator.serviceWorker.register("{% static 'images/js/serviceworker.js' %}?v={{ tv_sw_version }}")
              .then(function (registration) {
                  console.log("Service Worker registrado com sucesso (TV):", registration);
-                 
+                 registration.update();
+                  
                 // --- NOVO: Registrar Periodic Sync ---
                 if ('periodicSync' in registration) {
                     requestPeriodicSyncPermission(registration);

@@ -23,6 +23,15 @@ var filesToCache = [
     'https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js' // Adiciona a própria lib ao cache
 ];
 
+const shouldBypassCache = request => {
+    const url = new URL(request.url);
+    return (
+        url.pathname.startsWith('/tv-video/')
+        || url.pathname.includes('/tv_videos/')
+        || request.destination === 'video'
+    );
+};
+
 // Função para atualizar o cache
 const updateCache = () => {
     return caches.open(staticCacheName).then(cache => {
@@ -44,19 +53,27 @@ self.addEventListener("install", event => {
 // Clear cache on activate
 self.addEventListener('activate', event => {
     event.waitUntil(
-        caches.keys().then(cacheNames => {
-            return Promise.all(
-                cacheNames
-                    .filter(cacheName => (cacheName.startsWith("django-pwa-")))
-                    .filter(cacheName => (cacheName !== staticCacheName))
-                    .map(cacheName => caches.delete(cacheName))
-            );
-        })
+        Promise.all([
+            self.clients.claim(),
+            caches.keys().then(cacheNames => {
+                return Promise.all(
+                    cacheNames
+                        .filter(cacheName => (cacheName.startsWith("django-pwa-")))
+                        .filter(cacheName => (cacheName !== staticCacheName))
+                        .map(cacheName => caches.delete(cacheName))
+                );
+            })
+        ])
     );
 });
 
 // Serve from Cache
 self.addEventListener("fetch", event => {
+    if (shouldBypassCache(event.request)) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
     event.respondWith(
         caches.match(event.request)
             .then(response => {
