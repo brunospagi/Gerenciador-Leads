@@ -55,6 +55,9 @@
     "edge_side_panel": {
         "preferred_width": 520
     },
+    "note_taking": {
+        "new_note_url": "/tv-video/?note=new"
+    },
     "widgets": [
         {
             "name": "Spagi TV Agora",
