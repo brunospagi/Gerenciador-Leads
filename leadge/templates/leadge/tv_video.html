@@ -240,6 +240,8 @@
 
             let currentIndex = 0;
             let iframeTimer = null;
+            let videoTimer = null;
+            let playbackToken = 0;
 
             function playNext() {
                 currentIndex = (currentIndex + 1) % TV_PLAYLIST.length;
@@ -264,6 +266,12 @@
                     clearTimeout(iframeTimer);
                     iframeTimer = null;
                 }
+                if (videoTimer) {
+                    clearTimeout(videoTimer);
+                    videoTimer = null;
+                }
+                playbackToken += 1;
+                const currentToken = playbackToken;
 
                 if (item.tipo === 'iframe') {
                     const separator = item.url.includes('?') ? '&' : '?';
@@ -274,7 +282,9 @@
                     iframe.frameBorder = '0';
                     iframe.allowFullscreen = true;
                     player.replaceChildren(iframe);
-                    iframeTimer = setTimeout(playNext, IFRAME_PLAY_SECONDS * 1000);
+                    iframeTimer = setTimeout(() => {
+                        if (currentToken === playbackToken) playNext();
+                    }, IFRAME_PLAY_SECONDS * 1000);
                     return;
                 }
 
@@ -289,16 +299,37 @@
                 video.setAttribute('playsinline', '');
                 video.setAttribute('webkit-playsinline', '');
                 video.src = item.url;
-                video.addEventListener('ended', playNext, { once: true });
-                video.addEventListener('error', playNext, { once: true });
+                video.addEventListener('loadedmetadata', () => {
+                    if (videoTimer) {
+                        clearTimeout(videoTimer);
+                        videoTimer = null;
+                    }
+                    const durationSeconds = Number.isFinite(video.duration) && video.duration > 0
+                        ? video.duration
+                        : IFRAME_PLAY_SECONDS;
+                    videoTimer = setTimeout(() => {
+                        if (currentToken === playbackToken) playNext();
+                    }, Math.ceil(durationSeconds + 1) * 1000);
+                }, { once: true });
+                video.addEventListener('ended', () => {
+                    if (currentToken === playbackToken) playNext();
+                }, { once: true });
+                video.addEventListener('error', () => {
+                    if (currentToken === playbackToken) playNext();
+                }, { once: true });
                 player.replaceChildren(video);
                 video.load();
+                videoTimer = setTimeout(() => {
+                    if (currentToken === playbackToken) playNext();
+                }, IFRAME_PLAY_SECONDS * 1000);
                 const playPromise = video.play();
                 if (playPromise && typeof playPromise.catch === 'function') {
                     playPromise.catch((error) => {
                         console.error('Falha ao reproduzir video da playlist da TV:', error);
                         showStatus('Nao foi possivel iniciar este video. Tentando o proximo item...');
-                        setTimeout(playNext, 3000);
+                        setTimeout(() => {
+                            if (currentToken === playbackToken) playNext();
+                        }, 3000);
                     });
                 }
             }
@@ -548,54 +579,17 @@
     </script>
     <script>
      if ("serviceWorker" in navigator) {
-         let refreshingServiceWorker = false;
-         navigator.serviceWorker.addEventListener('controllerchange', function () {
-             if (refreshingServiceWorker) return;
-             refreshingServiceWorker = true;
-             window.location.reload();
-         });
-         navigator.serviceWorker.register("{% static 'images/js/serviceworker.js' %}?v={{ tv_sw_version }}")
-             .then(function (registration) {
-                 console.log("Service Worker registrado com sucesso (TV):", registration);
-                 registration.update();
-                  
-                // --- NOVO: Registrar Periodic Sync ---
-                if ('periodicSync' in registration) {
-                    requestPeriodicSyncPermission(registration);
-                }
-                // --- FIM NOVO ---
-                 
+         navigator.serviceWorker.getRegistrations()
+             .then(function (registrations) {
+                 registrations.forEach(function (registration) {
+                     registration.unregister();
+                 });
+                 console.log("Service Workers desativados na TV para evitar cache do player.");
              })
              .catch(function (error) {
-                 console.log("Falha ao registrar Service Worker (TV):", error);
+                 console.log("Falha ao desativar Service Worker na TV:", error);
              });
      }
-     
-    // --- NOVO: Função para pedir permissão e registrar o sync (copiado do base.html) ---
-    async function requestPeriodicSyncPermission(registration) {
-        try {
-            const status = await navigator.permissions.query({name: 'periodic-background-sync'});
-            if (status.state === 'granted') {
-                await registerPeriodicSync(registration);
-            } else {
-                console.log('Permissão para Periodic Sync não está "granted". Estado: ' + status.state);
-            }
-        } catch (error) {
-            console.error('Falha ao verificar permissão de Periodic Sync:', error);
-        }
-    }
-
-    async function registerPeriodicSync(registration) {
-        try {
-            await registration.periodicSync.unregister('update-cache-daily');
-            await registration.periodicSync.register('update-cache-daily', {
-                minInterval: 24 * 60 * 60 * 1000, // 1 dia
-            });
-            console.log('Periodic Sync (update-cache-daily) registrado com sucesso.');
-        } catch (error) {
-            console.error('Falha ao registrar Periodic Sync:', error);
-        }
-    }
 </script>
 </body>
 </html>
