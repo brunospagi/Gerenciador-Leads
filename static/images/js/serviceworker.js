@@ -4,7 +4,9 @@ var filesToCache = [
     '/static/manifest.tv.json',
     '/static/images/logo-spagi.png',
     '/static/images/logo-spagi-192x192.png',
-    '/static/images/logo-spagi-512x512.png'
+    '/static/images/logo-spagi-512x512.png',
+    '/static/widgets/spagi-tv-template.json',
+    '/static/widgets/spagi-tv-data.json'
 ];
 
 const shouldBypassCache = request => {
@@ -41,6 +43,7 @@ self.addEventListener('activate', event => {
     event.waitUntil(
         Promise.all([
             self.clients.claim(),
+            updateSpagiTvWidgets(),
             caches.keys().then(cacheNames => {
                 return Promise.all(
                     cacheNames
@@ -211,6 +214,39 @@ self.addEventListener('notificationclick', (event) => {
             return clients.openWindow(urlToOpen);
         })
     );
+});
+
+async function renderSpagiTvWidget(widget) {
+    if (!self.widgets || !widget || !widget.definition) {
+        return;
+    }
+
+    const template = await (await fetch(widget.definition.msAcTemplate)).text();
+    const data = await (await fetch(widget.definition.data)).text();
+    await self.widgets.updateByTag(widget.definition.tag, { template, data });
+}
+
+async function updateSpagiTvWidgets() {
+    if (!self.widgets) {
+        return;
+    }
+
+    const widget = await self.widgets.getByTag('spagi-tv-now');
+    if (widget) {
+        await renderSpagiTvWidget(widget);
+    }
+}
+
+self.addEventListener('widgetinstall', event => {
+    event.waitUntil(renderSpagiTvWidget(event.widget));
+});
+
+self.addEventListener('widgetresume', event => {
+    event.waitUntil(renderSpagiTvWidget(event.widget));
+});
+
+self.addEventListener('widgetclick', event => {
+    event.waitUntil(clients.openWindow('/tv-video/'));
 });
 
 

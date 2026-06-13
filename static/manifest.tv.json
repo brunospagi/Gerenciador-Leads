@@ -42,6 +42,34 @@
             "url": "url"
         }
     },
+    "widgets": [
+        {
+            "name": "Spagi TV Agora",
+            "short_name": "TV Agora",
+            "description": "Atalho rapido para abrir o player da Spagi TV.",
+            "tag": "spagi-tv-now",
+            "template": "spagi-tv-widget",
+            "ms_ac_template": "/static/widgets/spagi-tv-template.json",
+            "data": "/static/widgets/spagi-tv-data.json",
+            "type": "application/json",
+            "auth": false,
+            "update": 86400,
+            "multiple": false,
+            "icons": [
+                {
+                    "src": "/static/images/logo-spagi-192x192.png",
+                    "sizes": "192x192"
+                }
+            ],
+            "screenshots": [
+                {
+                    "src": "/static/images/logo-spagi-512x512.png",
+                    "sizes": "512x512",
+                    "label": "Widget da Spagi TV"
+                }
+            ]
+        }
+    ],
     "icons": [
         {
             "src": "/static/images/logo-spagi-192x192.png",
