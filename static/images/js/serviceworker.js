@@ -1,26 +1,17 @@
-// Importa a biblioteca idb-keyval (necessária para o Background Sync)
-importScripts('https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js');
+// Background Sync usa idb-keyval quando disponivel, mas o PWA nao pode depender de CDN para instalar.
+try {
+    importScripts('https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js');
+} catch (error) {
+    console.warn('idb-keyval indisponivel; sync offline sera ignorado.', error);
+}
 
 var staticCacheName = "django-pwa-v" + new Date().getTime();
 var filesToCache = [
-    // URLs da Aplicação
-    '/',
-    '/offline',
-    
-    // Manifest e Ícones
     '/static/manifest.json',
+    '/static/manifest.tv.json',
     '/static/images/logo-spagi.png',
-    
-    // CSS (CDNs)
-    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
-    'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css',
-    'https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/css/lightbox.min.css',
-    
-    // JS (CDNs)
-    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js',
-    'https://unpkg.com/imask',
-    'https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/js/lightbox.min.js',
-    'https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js' // Adiciona a própria lib ao cache
+    '/static/images/logo-spagi-192x192.png',
+    '/static/images/logo-spagi-512x512.png'
 ];
 
 const shouldBypassCache = request => {
@@ -35,7 +26,7 @@ const shouldBypassCache = request => {
 // Função para atualizar o cache
 const updateCache = () => {
     return caches.open(staticCacheName).then(cache => {
-        return cache.addAll(filesToCache);
+        return Promise.allSettled(filesToCache.map(url => cache.add(url)));
     });
 };
 
@@ -45,7 +36,7 @@ self.addEventListener("install", event => {
     event.waitUntil(
         caches.open(staticCacheName)
             .then(cache => {
-                return cache.addAll(filesToCache);
+                return Promise.allSettled(filesToCache.map(url => cache.add(url)));
             })
     )
 });
@@ -80,7 +71,7 @@ self.addEventListener("fetch", event => {
                 return response || fetch(event.request);
             })
             .catch(() => {
-                return caches.match('offline');
+                return caches.match('/static/images/logo-spagi.png');
             })
     )
 });
@@ -103,6 +94,11 @@ self.addEventListener('sync', (event) => {
 });
 
 async function sendOfflineClients() {
+    if (typeof idbKeyval === 'undefined') {
+        console.warn('idb-keyval nao carregado; sync offline ignorado.');
+        return;
+    }
+
     let outbox = (await idbKeyval.get('client-outbox')) || [];
     if (outbox.length === 0) {
         return;
@@ -221,3 +217,5 @@ self.addEventListener('notificationclick', (event) => {
         })
     );
 });
+
+

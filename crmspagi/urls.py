@@ -1,11 +1,12 @@
 from django.contrib import admin
 from django.urls import path, include
-from django.views.generic import TemplateView
+from django.views.generic import RedirectView, TemplateView
 from django.contrib.auth.decorators import login_required
 from crmspagi import views
 
 urlpatterns = [
     path('serviceworker.js', views.service_worker, name='service_worker'),
+    path('favicon.ico', RedirectView.as_view(url='/static/images/logo-spagi-192x192.png', permanent=True)),
     path('admin/', admin.site.urls),
     path('painel-admin/', views.admin_dashboard, name='admin_dashboard'),
     path('painel-admin/backup/', views.gerar_backup_sistema, name='gerar_backup_sistema'),
