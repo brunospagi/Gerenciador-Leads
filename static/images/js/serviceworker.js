@@ -1,10 +1,3 @@
-// Background Sync usa idb-keyval quando disponivel, mas o PWA nao pode depender de CDN para instalar.
-try {
-    importScripts('https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js');
-} catch (error) {
-    console.warn('idb-keyval indisponivel; sync offline sera ignorado.', error);
-}
-
 var staticCacheName = "django-pwa-v" + new Date().getTime();
 var filesToCache = [
     '/static/manifest.json',

@@ -536,6 +536,17 @@
             
             try {
                 const response = await fetch(newsUrl);
+
+                if (!response.ok) {
+                    if (response.status === 429) {
+                        console.warn("Limite da API Newsdata.io atingido. Mantendo ticker sem noticias externas.");
+                        NEWS_TEXT_ELEMENT.textContent = "Noticias temporariamente indisponiveis. Configure um ticker manual no admin para evitar limite da API.";
+                        return;
+                    }
+
+                    throw new Error(`Newsdata.io respondeu com status ${response.status}`);
+                }
+
                 const data = await response.json();
                 
                 if (data.results && data.results.length > 0) {
@@ -579,14 +590,14 @@
         fetchWeather();
         fetchNews();
         setInterval(fetchWeather, 10800000); 
-        setInterval(fetchNews, 10800000); // 10 minutos (600000 ms)
+        setInterval(fetchNews, 10800000); // 3 horas, reduzindo risco de limite da Newsdata.io
         setInterval(checkRefreshNeeded, CHECK_INTERVAL_MS);
         
         console.log("Player de TV Inicializado. Clima, notícias e auto-refresh ativos.");
     </script>
     <script>
      if ("serviceWorker" in navigator) {
-         const serviceWorkerUrl = "{% url 'service_worker' %}?v={{ tv_sw_version }}";
+         const serviceWorkerUrl = "{% url 'service_worker' %}?v={{ tv_sw_version }}&sw=3";
          navigator.serviceWorker.getRegistrations()
              .then(function (registrations) {
                  return Promise.all(registrations.map(function (registration) {
@@ -597,11 +608,14 @@
                  }));
              })
              .then(function () {
+                 console.log("Service Worker URL da TV:", serviceWorkerUrl);
                  return navigator.serviceWorker.register(serviceWorkerUrl, { scope: '/' });
              })
              .then(function (registration) {
                  console.log("Service Worker registrado no escopo correto da TV:", registration.scope);
-                 registration.update();
+                 return registration.update().catch(function (error) {
+                     console.warn("Nao foi possivel atualizar o Service Worker imediatamente:", error);
+                 });
              })
              .catch(function (error) {
                  console.log("Falha ao registrar Service Worker da TV:", error);
