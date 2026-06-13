@@ -25,6 +25,13 @@
             }
         }
     ],
+    "protocol_handlers": [
+        {
+            "protocol": "web+spagitv",
+            "url": "/tv-video/?source=%s",
+            "title": "Abrir Spagi TV"
+        }
+    ],
     "icons": [
         {
             "src": "/static/images/logo-spagi-192x192.png",
