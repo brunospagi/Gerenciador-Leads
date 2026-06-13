@@ -6,10 +6,25 @@
     "id": "/tv-video/",
     "scope": "/tv-video/",
     "display": "fullscreen", 
+    "display_override": ["fullscreen", "standalone"],
     "background_color": "#000000",
     "theme_color": "#000000",
     "orientation": "landscape-primary",
     "lang": "pt-BR",
+    "launch_handler": {
+        "client_mode": "navigate-existing"
+    },
+    "file_handlers": [
+        {
+            "action": "/tv-video/",
+            "name": "Abrir video na Spagi TV",
+            "accept": {
+                "video/mp4": [".mp4", ".m4v"],
+                "video/webm": [".webm"],
+                "video/ogg": [".ogv", ".ogg"]
+            }
+        }
+    ],
     "icons": [
         {
             "src": "/static/images/logo-spagi-192x192.png",
