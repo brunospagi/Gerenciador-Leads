@@ -3,7 +3,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.db.models import Sum, Q
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponse
+from django.contrib.staticfiles import finders
 from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
@@ -26,6 +27,18 @@ def _is_admin_only(user):
     profile = getattr(user, 'profile', None)
     nivel = getattr(profile, 'nivel_acesso', '')
     return user.is_superuser or nivel == 'ADMIN'
+
+
+def service_worker(request):
+    service_worker_path = finders.find('images/js/serviceworker.js')
+    if not service_worker_path:
+        return HttpResponse('// Service Worker nao encontrado.', content_type='application/javascript', status=404)
+
+    with open(service_worker_path, 'rb') as service_worker_file:
+        response = HttpResponse(service_worker_file.read(), content_type='application/javascript')
+    response['Service-Worker-Allowed'] = '/'
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
 
 @login_required
 def admin_dashboard(request):

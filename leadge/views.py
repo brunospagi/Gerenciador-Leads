@@ -114,7 +114,8 @@ class TVGestaoView(LoginRequiredMixin, AdminRequiredMixin, TemplateView):
         )
         context['tv_config'] = config
         context['programacao'] = TVProgramacaoItem.objects.all().order_by('ordem', 'id')
-        context['item_ativo'] = get_tv_programacao_ativa()
+        context['itens_ativos'] = get_tv_programacao_ativa_lista()
+        context['item_ativo'] = context['itens_ativos'][0] if context['itens_ativos'] else None
         return context
 
 

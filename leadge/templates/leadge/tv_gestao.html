@@ -27,17 +27,26 @@
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
                     <h5 class="card-title">No Ar Agora</h5>
-                    {% if item_ativo %}
+                    {% if itens_ativos %}
+                        {% if itens_ativos|length > 1 %}
+                        <p class="mb-1"><strong>Playlist ativa: {{ itens_ativos|length }} videos em sequencia</strong></p>
+                        <ol class="text-muted mb-2 ps-3">
+                            {% for item in itens_ativos %}
+                            <li>{{ item.titulo }}</li>
+                            {% endfor %}
+                        </ol>
+                        {% else %}
                         <p class="mb-1"><strong>{{ item_ativo.titulo }}</strong></p>
+                        {% endif %}
                         <p class="text-muted mb-0">
                             Dias: {{ item_ativo.dias_semana_legivel }} |
-                            Horário:
+                            Horario:
                             {% if item_ativo.horario_inicio %}{{ item_ativo.horario_inicio|time:"H:i" }}{% else %}00:00{% endif %}
-                            até
+                            ate
                             {% if item_ativo.horario_fim %}{{ item_ativo.horario_fim|time:"H:i" }}{% else %}23:59{% endif %}
                         </p>
                     {% else %}
-                        <p class="mb-0 text-muted">Nenhum item da grade está ativo neste momento. A TV usa a configuração global de fallback.</p>
+                        <p class="mb-0 text-muted">Nenhum item da grade esta ativo neste momento. A TV usa a configuracao global de fallback.</p>
                     {% endif %}
                 </div>
             </div>

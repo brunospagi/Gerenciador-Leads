@@ -218,6 +218,7 @@
         const PLAYLIST_DATA_ELEMENT = document.getElementById('tv-playlist-data');
         const TV_PLAYLIST = PLAYLIST_DATA_ELEMENT ? JSON.parse(PLAYLIST_DATA_ELEMENT.textContent) : [];
         const IFRAME_PLAY_SECONDS = 60;
+        const PLAYLIST_INDEX_KEY = 'spagi-tv-playlist-index';
 
         // Coordenadas padrão (São José dos Pinhais)
         const CIDADE = "São José dos Pinhais";
@@ -237,14 +238,19 @@
             if (!player || TV_PLAYLIST.length === 0) {
                 return;
             }
+            console.log(`TV playlist: ${TV_PLAYLIST.length} item(ns) carregado(s).`, TV_PLAYLIST);
 
-            let currentIndex = 0;
+            let currentIndex = Number(sessionStorage.getItem(PLAYLIST_INDEX_KEY) || 0);
+            if (!Number.isInteger(currentIndex) || currentIndex < 0 || currentIndex >= TV_PLAYLIST.length) {
+                currentIndex = 0;
+            }
             let iframeTimer = null;
             let videoTimer = null;
             let playbackToken = 0;
 
             function playNext() {
                 currentIndex = (currentIndex + 1) % TV_PLAYLIST.length;
+                sessionStorage.setItem(PLAYLIST_INDEX_KEY, String(currentIndex));
                 playCurrent();
             }
 
@@ -261,6 +267,8 @@
                     playNext();
                     return;
                 }
+                sessionStorage.setItem(PLAYLIST_INDEX_KEY, String(currentIndex));
+                console.log(`TV playlist: reproduzindo ${currentIndex + 1}/${TV_PLAYLIST.length}`, item.titulo || item.url);
 
                 if (iframeTimer) {
                     clearTimeout(iframeTimer);
@@ -579,15 +587,25 @@
     </script>
     <script>
      if ("serviceWorker" in navigator) {
+         const serviceWorkerUrl = "{% url 'service_worker' %}?v={{ tv_sw_version }}";
          navigator.serviceWorker.getRegistrations()
              .then(function (registrations) {
-                 registrations.forEach(function (registration) {
-                     registration.unregister();
-                 });
-                 console.log("Service Workers desativados na TV para evitar cache do player.");
+                 return Promise.all(registrations.map(function (registration) {
+                     if (registration.scope.includes('/static/images/js/')) {
+                         return registration.unregister();
+                     }
+                     return Promise.resolve();
+                 }));
+             })
+             .then(function () {
+                 return navigator.serviceWorker.register(serviceWorkerUrl, { scope: '/' });
+             })
+             .then(function (registration) {
+                 console.log("Service Worker registrado no escopo correto da TV:", registration.scope);
+                 registration.update();
              })
              .catch(function (error) {
-                 console.log("Falha ao desativar Service Worker na TV:", error);
+                 console.log("Falha ao registrar Service Worker da TV:", error);
              });
      }
 </script>

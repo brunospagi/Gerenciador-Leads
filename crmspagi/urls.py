@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from crmspagi import views
 
 urlpatterns = [
+    path('serviceworker.js', views.service_worker, name='service_worker'),
     path('admin/', admin.site.urls),
     path('painel-admin/', views.admin_dashboard, name='admin_dashboard'),
     path('painel-admin/backup/', views.gerar_backup_sistema, name='gerar_backup_sistema'),
