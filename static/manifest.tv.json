@@ -6,7 +6,17 @@
     "id": "/tv-video/",
     "scope": "/tv-video/",
     "display": "fullscreen", 
-    "display_override": ["window-controls-overlay", "fullscreen", "standalone"],
+    "display_override": ["window-controls-overlay", "tabbed", "fullscreen", "standalone"],
+    "tab_strip": {
+        "home_tab": {
+            "scope_patterns": [
+                { "pathname": "/tv-video/" }
+            ]
+        },
+        "new_tab_button": {
+            "url": "/tv-video/"
+        }
+    },
     "background_color": "#000000",
     "theme_color": "#000000",
     "orientation": "landscape-primary",
