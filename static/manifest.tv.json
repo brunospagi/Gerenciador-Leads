@@ -21,6 +21,11 @@
     "theme_color": "#000000",
     "orientation": "landscape-primary",
     "lang": "pt-BR",
+    "serviceworker": {
+        "src": "/serviceworker.js",
+        "scope": "/tv-video/",
+        "use_cache": false
+    },
     "launch_handler": {
         "client_mode": "navigate-existing"
     },

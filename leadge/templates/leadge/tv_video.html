@@ -601,7 +601,7 @@
          navigator.serviceWorker.getRegistrations()
              .then(function (registrations) {
                  return Promise.all(registrations.map(function (registration) {
-                     if (registration.scope.includes('/static/images/js/')) {
+                     if (registration.scope.includes('/static/images/js/') || registration.scope === window.location.origin + '/') {
                          return registration.unregister();
                      }
                      return Promise.resolve();
@@ -609,7 +609,10 @@
              })
              .then(function () {
                  console.log("Service Worker URL da TV:", serviceWorkerUrl);
-                 return navigator.serviceWorker.register(serviceWorkerUrl, { scope: '/' });
+                 return navigator.serviceWorker.register(serviceWorkerUrl, {
+                     scope: '/tv-video/',
+                     updateViaCache: 'none'
+                 });
              })
              .then(function (registration) {
                  console.log("Service Worker registrado no escopo correto da TV:", registration.scope);
