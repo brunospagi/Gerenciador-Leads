@@ -176,6 +176,11 @@ def _extrair_ids_evo_crm(data):
     return lead_id, deal_id, retorno
 
 
+def _resposta_indica_jornada_ativa(corpo_resposta):
+    texto = (corpo_resposta or "").lower()
+    return "active journey" in texto and "pipeline" in texto
+
+
 def criar_lead_evo_crm(cliente):
     """Cria o lead no Evo CRM sem interromper o fluxo local de distribuicao."""
     if cliente.evo_crm_lead_id and cliente.evo_crm_deal_id:
@@ -228,6 +233,22 @@ def criar_lead_evo_crm(cliente):
             corpo_resposta = exc.response.text
         except Exception:
             corpo_resposta = ""
+
+        if getattr(exc.response, "status_code", None) == 422 and _resposta_indica_jornada_ativa(corpo_resposta):
+            cliente.evo_crm_pipeline_id = settings.EVO_CRM_PIPELINE_ID
+            cliente.save(update_fields=["evo_crm_pipeline_id", "data_ultimo_contato"])
+            logger.info(
+                "Contato do cliente %s ja possui jornada ativa no pipeline do Evo CRM. body=%s",
+                cliente.pk,
+                corpo_resposta,
+            )
+            return {
+                "success": True,
+                "skipped": True,
+                "configured": True,
+                "reason": "active_journey_exists",
+                "response_body": corpo_resposta,
+            }
 
         logger.warning(
             "Falha ao criar lead no Evo CRM para cliente %s: status=%s body=%s payload=%s",
