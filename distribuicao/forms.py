@@ -29,6 +29,7 @@ class LeadEntradaForm(forms.ModelForm):
         model = Cliente
         fields = [
             'nome_cliente', 
+            'email',
             'whatsapp', 
             'tipo_veiculo', 
             'marca_veiculo', 
@@ -39,6 +40,7 @@ class LeadEntradaForm(forms.ModelForm):
         ]
         widgets = {
             'nome_cliente': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome completo'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'email@cliente.com'}),
             'whatsapp': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '(XX) XXXXX-XXXX', 'data-mask': '(00) 00000-0000'}),
             'tipo_veiculo': forms.Select(attrs={'class': 'form-select'}),
             'marca_veiculo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Honda'}),
@@ -49,6 +51,7 @@ class LeadEntradaForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['email'].required = True
         vendedores_ids = (
             VendedorRodizio.objects.filter(ativo=True)
             .values_list('vendedor_id', flat=True)

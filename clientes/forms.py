@@ -12,7 +12,7 @@ class ClienteForm(forms.ModelForm):
     class Meta:
         model = Cliente
         fields = [
-            'whatsapp', 'nome_cliente', 'tipo_veiculo',
+            'whatsapp', 'nome_cliente', 'email', 'tipo_veiculo',
             'marca_veiculo', 'modelo_veiculo', 'ano_veiculo', 'valor_estimado_veiculo',
             'fonte_cliente', 'quantidade_ligacoes', 'tipo_negociacao', 'tipo_contato',
             'status_negociacao', 'status_contato', 'etapa_funil', 'proximo_passo', 'prioridade', 'observacao', 'vendedor',
@@ -21,6 +21,7 @@ class ClienteForm(forms.ModelForm):
         widgets = {
             'observacao': forms.Textarea(attrs={'rows': 3}),
             'whatsapp': forms.TextInput(attrs={'placeholder': '(99) 9 9999-9999'}),
+            'email': forms.EmailInput(attrs={'placeholder': 'email@cliente.com'}),
             'valor_estimado_veiculo': forms.TextInput(attrs={'placeholder': 'R$ 0,00'}),
             'marca_veiculo': forms.TextInput(attrs={'placeholder': 'Ex: Chevrolet'}),
             'modelo_veiculo': forms.TextInput(attrs={'placeholder': 'Ex: Onix 1.0'}),

@@ -116,6 +116,7 @@ def _montar_payload_evo_crm(cliente):
     telefone = _normalizar_telefone_evo(cliente.whatsapp)
     contato = {
         "name": cliente.nome_cliente,
+        "email": cliente.email or "",
         "identifier": f"spagi-lead-{cliente.pk}",
     }
     if telefone:
@@ -125,7 +126,7 @@ def _montar_payload_evo_crm(cliente):
         "pipeline_id": settings.EVO_CRM_PIPELINE_ID,
     }
     if settings.EVO_CRM_PIPELINE_STAGE_ID:
-        deal["pipeline_stage_id"] = settings.EVO_CRM_PIPELINE_STAGE_ID
+        deal["stage_id"] = settings.EVO_CRM_PIPELINE_STAGE_ID
 
     return {
         "contact": contato,

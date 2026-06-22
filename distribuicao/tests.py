@@ -117,7 +117,7 @@ class DistribuicaoRegrasPontoTests(TestCase):
     EVO_CRM_API_URL='https://api.evoai.app',
     EVO_CRM_API_TOKEN='token-teste',
     EVO_CRM_PIPELINE_ID='ec29bfe0-4104-4a3c-a85a-d9868fdc773d',
-    EVO_CRM_PIPELINE_STAGE_ID='',
+    EVO_CRM_PIPELINE_STAGE_ID='7e472e0c-6a1b-4853-9708-3cec505be167',
     EVO_CRM_TIMEOUT_SECONDS=4,
 )
 class DistribuicaoEvoCrmTests(TestCase):
@@ -126,6 +126,7 @@ class DistribuicaoEvoCrmTests(TestCase):
         self.cliente = Cliente.objects.create(
             vendedor=self.user,
             nome_cliente='Maria da Silva',
+            email='maria@teste.com',
             whatsapp='(41) 99999-1111',
             tipo_veiculo='carros',
             marca_veiculo='Honda',
@@ -158,10 +159,11 @@ class DistribuicaoEvoCrmTests(TestCase):
         chamada = mock_post.call_args.kwargs
         self.assertEqual(chamada['headers']['api_access_token'], 'token-teste')
         self.assertEqual(chamada['json']['deal']['pipeline_id'], 'ec29bfe0-4104-4a3c-a85a-d9868fdc773d')
+        self.assertEqual(chamada['json']['deal']['stage_id'], '7e472e0c-6a1b-4853-9708-3cec505be167')
+        self.assertEqual(chamada['json']['contact']['email'], 'maria@teste.com')
         self.assertEqual(chamada['json']['contact']['phone_number'], '+5541999991111')
         self.assertEqual(chamada['json']['contact']['name'], 'Maria da Silva')
         self.assertNotIn('source_id', chamada['json']['contact'])
-        self.assertNotIn('title', chamada['json']['deal'])
 
     @override_settings(EVO_CRM_API_TOKEN='', EVO_CRM_PIPELINE_ID='')
     @patch('distribuicao.logic.requests.post')
