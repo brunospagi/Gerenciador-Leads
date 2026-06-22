@@ -160,6 +160,8 @@ class DistribuicaoEvoCrmTests(TestCase):
         self.assertEqual(chamada['json']['deal']['pipeline_id'], 'ec29bfe0-4104-4a3c-a85a-d9868fdc773d')
         self.assertEqual(chamada['json']['contact']['phone_number'], '+5541999991111')
         self.assertEqual(chamada['json']['contact']['name'], 'Maria da Silva')
+        self.assertNotIn('source_id', chamada['json']['contact'])
+        self.assertNotIn('title', chamada['json']['deal'])
 
     @override_settings(EVO_CRM_API_TOKEN='', EVO_CRM_PIPELINE_ID='')
     @patch('distribuicao.logic.requests.post')

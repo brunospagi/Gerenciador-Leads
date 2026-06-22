@@ -163,11 +163,11 @@
         border-radius: 6px;
     }
 </style>
+{{ evo_crm_debug|json_script:"evo-crm-debug-data" }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const manualCheck = document.getElementById('id_lancamento_esporadico');
     const vendedorSelect = document.getElementById('id_vendedor_manual');
-    if (!manualCheck || !vendedorSelect) return;
 
     function syncManualFields() {
         const enabled = !!manualCheck.checked;
@@ -175,8 +175,16 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!enabled) vendedorSelect.value = '';
     }
 
-    manualCheck.addEventListener('change', syncManualFields);
-    syncManualFields();
+    if (manualCheck && vendedorSelect) {
+        manualCheck.addEventListener('change', syncManualFields);
+        syncManualFields();
+    }
+
+    const evoCrmDebugNode = document.getElementById('evo-crm-debug-data');
+    const evoCrmDebug = evoCrmDebugNode ? JSON.parse(evoCrmDebugNode.textContent) : null;
+    if (evoCrmDebug) {
+        console.error('Falha ao criar lead no Evo CRM:', evoCrmDebug);
+    }
 });
 </script>
 {% endblock %}

@@ -117,26 +117,12 @@ def _montar_payload_evo_crm(cliente):
     contato = {
         "name": cliente.nome_cliente,
         "identifier": f"spagi-lead-{cliente.pk}",
-        "type": "person",
-        "custom_attributes": {
-            "lead_source": cliente.fonte_cliente or "",
-            "tipo_veiculo": cliente.tipo_veiculo or "",
-            "marca_veiculo": cliente.marca_veiculo or "",
-            "modelo_veiculo": cliente.modelo_veiculo or "",
-            "ano_veiculo": cliente.ano_veiculo or "",
-            "vendedor_atribuido": cliente.vendedor.username if cliente.vendedor else "",
-        },
-        "additional_attributes": {
-            "description": cliente.observacao or "",
-        },
     }
     if telefone:
         contato["phone_number"] = telefone
-        contato["source_id"] = telefone
 
     deal = {
         "pipeline_id": settings.EVO_CRM_PIPELINE_ID,
-        "title": f"{cliente.nome_cliente} - {cliente.modelo_veiculo or 'Lead'}",
     }
     if settings.EVO_CRM_PIPELINE_STAGE_ID:
         deal["pipeline_stage_id"] = settings.EVO_CRM_PIPELINE_STAGE_ID
@@ -147,12 +133,18 @@ def _montar_payload_evo_crm(cliente):
         "custom_fields": {
             "source": cliente.fonte_cliente or "distribuicao",
             "campaign": "spagi-distribuicao",
+            "tipo_veiculo": cliente.tipo_veiculo or "",
+            "marca_veiculo": cliente.marca_veiculo or "",
+            "modelo_veiculo": cliente.modelo_veiculo or "",
+            "ano_veiculo": cliente.ano_veiculo or "",
+            "vendedor_atribuido": cliente.vendedor.username if cliente.vendedor else "",
         },
         "metadata": {
             "cliente_id": cliente.id,
             "tipo_veiculo": cliente.tipo_veiculo or "",
             "marca_veiculo": cliente.marca_veiculo or "",
             "modelo_veiculo": cliente.modelo_veiculo or "",
+            "observacao": cliente.observacao or "",
         },
     }
 
@@ -205,8 +197,29 @@ def criar_lead_evo_crm(cliente):
             "lead_id": lead_id,
             "deal_id": deal_id,
         }
+    except requests.HTTPError as exc:
+        corpo_resposta = ""
+        try:
+            corpo_resposta = exc.response.text
+        except Exception:
+            corpo_resposta = ""
+
+        logger.warning(
+            "Falha ao criar lead no Evo CRM para cliente %s: status=%s body=%s payload=%s",
+            cliente.pk,
+            getattr(exc.response, "status_code", "n/a"),
+            corpo_resposta,
+            payload,
+        )
+        return {
+            "success": False,
+            "skipped": False,
+            "configured": True,
+            "error": str(exc),
+            "response_body": corpo_resposta,
+        }
     except Exception as exc:
-        logger.warning("Falha ao criar lead no Evo CRM para cliente %s: %s", cliente.pk, exc)
+        logger.warning("Falha ao criar lead no Evo CRM para cliente %s: %s | payload=%s", cliente.pk, exc, payload)
         return {
             "success": False,
             "skipped": False,

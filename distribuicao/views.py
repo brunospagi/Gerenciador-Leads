@@ -104,6 +104,11 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
                 messages.info(self.request, 'Lead criado tambem no Evo CRM com sucesso.')
             elif evo_resultado.get('configured') and not evo_resultado.get('skipped'):
                 messages.warning(self.request, 'Lead salvo localmente, mas houve falha ao criar no Evo CRM.')
+                self.request.session['evo_crm_debug'] = {
+                    'cliente_id': self.object.id,
+                    'erro': evo_resultado.get('error', ''),
+                    'response_body': evo_resultado.get('response_body', ''),
+                }
 
         enviar_webhook_n8n(self.object)
         return response
@@ -111,6 +116,7 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['ultimos_leads'] = Cliente.objects.order_by('-id')[:10]
+        context['evo_crm_debug'] = self.request.session.pop('evo_crm_debug', None)
         return context
 
 
