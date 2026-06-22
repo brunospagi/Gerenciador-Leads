@@ -165,6 +165,24 @@ class DistribuicaoEvoCrmTests(TestCase):
         self.assertEqual(chamada['json']['contact']['name'], 'Maria da Silva')
         self.assertNotIn('source_id', chamada['json']['contact'])
 
+    @patch('distribuicao.logic.requests.post')
+    def test_trata_como_sucesso_quando_api_nao_retorna_ids(self, mock_post):
+        mock_post.return_value.json.return_value = {
+            'success': True,
+            'data': {},
+        }
+        mock_post.return_value.raise_for_status.return_value = None
+
+        resultado = criar_lead_evo_crm(self.cliente)
+
+        self.assertTrue(resultado['success'])
+        self.assertTrue(resultado['skipped'])
+        self.assertEqual(resultado['reason'], 'created_without_ids')
+        self.cliente.refresh_from_db()
+        self.assertEqual(self.cliente.evo_crm_pipeline_id, 'ec29bfe0-4104-4a3c-a85a-d9868fdc773d')
+        self.assertIsNone(self.cliente.evo_crm_lead_id)
+        self.assertIsNone(self.cliente.evo_crm_deal_id)
+
     @override_settings(EVO_CRM_API_TOKEN='', EVO_CRM_PIPELINE_ID='')
     @patch('distribuicao.logic.requests.post')
     def test_nao_chama_api_sem_configuracao(self, mock_post):

@@ -102,6 +102,8 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
             evo_resultado = criar_lead_evo_crm(self.object)
             if evo_resultado.get('success') and not evo_resultado.get('skipped'):
                 messages.info(self.request, 'Lead criado tambem no Evo CRM com sucesso.')
+            elif evo_resultado.get('reason') == 'created_without_ids':
+                messages.info(self.request, 'Lead aceito pelo Evo CRM, mas a API nao retornou os IDs externos.')
             elif evo_resultado.get('reason') == 'active_journey_exists':
                 messages.info(self.request, 'Contato ja possui jornada ativa nesse pipeline do Evo CRM. Lead local salvo sem duplicar o cadastro externo.')
             elif evo_resultado.get('configured') and not evo_resultado.get('skipped'):

@@ -213,7 +213,21 @@ def criar_lead_evo_crm(cliente):
         lead_id, deal_id, retorno = _extrair_ids_evo_crm(data)
 
         if not lead_id or not deal_id:
-            raise ValueError(f"Resposta do Evo CRM nao trouxe lead_id/deal_id. retorno={retorno}")
+            cliente.evo_crm_pipeline_id = settings.EVO_CRM_PIPELINE_ID
+            cliente.save(update_fields=["evo_crm_pipeline_id", "data_ultimo_contato"])
+            logger.info(
+                "Lead do cliente %s criado no Evo CRM sem IDs de retorno. resposta=%s payload=%s",
+                cliente.pk,
+                data,
+                payload,
+            )
+            return {
+                "success": True,
+                "skipped": True,
+                "configured": True,
+                "reason": "created_without_ids",
+                "raw_response": data,
+            }
 
         cliente.evo_crm_lead_id = lead_id
         cliente.evo_crm_deal_id = deal_id
