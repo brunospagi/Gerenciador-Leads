@@ -4,11 +4,13 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.test.utils import override_settings
 from django.utils import timezone
 
+from clientes.models import Cliente
 from controle_ponto.models import RegistroPonto
 from funcionarios.models import Funcionario
-from distribuicao.logic import definir_proximo_vendedor
+from distribuicao.logic import criar_lead_evo_crm, definir_proximo_vendedor
 from distribuicao.models import VendedorRodizio
 
 
@@ -109,3 +111,62 @@ class DistribuicaoRegrasPontoTests(TestCase):
             proximo = definir_proximo_vendedor()
 
         self.assertEqual(proximo, user)
+
+
+@override_settings(
+    EVO_CRM_API_URL='https://api.evoai.app',
+    EVO_CRM_API_TOKEN='token-teste',
+    EVO_CRM_PIPELINE_ID='ec29bfe0-4104-4a3c-a85a-d9868fdc773d',
+    EVO_CRM_PIPELINE_STAGE_ID='',
+    EVO_CRM_TIMEOUT_SECONDS=4,
+)
+class DistribuicaoEvoCrmTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='vendedor_evo', password='123456')
+        self.cliente = Cliente.objects.create(
+            vendedor=self.user,
+            nome_cliente='Maria da Silva',
+            whatsapp='(41) 99999-1111',
+            tipo_veiculo='carros',
+            marca_veiculo='Honda',
+            modelo_veiculo='Civic',
+            fonte_cliente='Instagram',
+            data_proximo_contato=timezone.now(),
+            tipo_contato=Cliente.TipoContato.MENSAGEM,
+            proximo_passo=Cliente.ProximoPasso.MENSAGEM,
+        )
+
+    @patch('distribuicao.logic.requests.post')
+    def test_cria_lead_no_evo_crm_e_salva_ids(self, mock_post):
+        mock_post.return_value.json.return_value = {
+            'success': True,
+            'data': {
+                'lead_id': 'lead-uuid-1',
+                'deal_id': 'deal-uuid-1',
+            },
+        }
+        mock_post.return_value.raise_for_status.return_value = None
+
+        resultado = criar_lead_evo_crm(self.cliente)
+
+        self.assertTrue(resultado['success'])
+        self.cliente.refresh_from_db()
+        self.assertEqual(self.cliente.evo_crm_lead_id, 'lead-uuid-1')
+        self.assertEqual(self.cliente.evo_crm_deal_id, 'deal-uuid-1')
+        self.assertEqual(self.cliente.evo_crm_pipeline_id, 'ec29bfe0-4104-4a3c-a85a-d9868fdc773d')
+
+        chamada = mock_post.call_args.kwargs
+        self.assertEqual(chamada['headers']['api_access_token'], 'token-teste')
+        self.assertEqual(chamada['json']['deal']['pipeline_id'], 'ec29bfe0-4104-4a3c-a85a-d9868fdc773d')
+        self.assertEqual(chamada['json']['contact']['phone_number'], '+5541999991111')
+        self.assertEqual(chamada['json']['contact']['name'], 'Maria da Silva')
+
+    @override_settings(EVO_CRM_API_TOKEN='', EVO_CRM_PIPELINE_ID='')
+    @patch('distribuicao.logic.requests.post')
+    def test_nao_chama_api_sem_configuracao(self, mock_post):
+        resultado = criar_lead_evo_crm(self.cliente)
+
+        self.assertFalse(resultado['success'])
+        self.assertTrue(resultado['skipped'])
+        self.assertEqual(resultado['reason'], 'not_configured')
+        mock_post.assert_not_called()

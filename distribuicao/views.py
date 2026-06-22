@@ -10,6 +10,7 @@ from django.views.generic import CreateView, TemplateView, UpdateView
 from clientes.models import Cliente, Historico
 from .forms import LeadEntradaForm
 from .logic import (
+    criar_lead_evo_crm,
     definir_proximo_vendedor,
     enviar_webhook_n8n,
     vendedor_disponivel_no_rodizio,
@@ -96,6 +97,13 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
                 + (' (manual esporadico, fila preservada).' if lancamento_esporadico else '')
             )
             messages.success(self.request, msg)
+
+        if not is_redistribuicao:
+            evo_resultado = criar_lead_evo_crm(self.object)
+            if evo_resultado.get('success') and not evo_resultado.get('skipped'):
+                messages.info(self.request, 'Lead criado tambem no Evo CRM com sucesso.')
+            elif evo_resultado.get('configured') and not evo_resultado.get('skipped'):
+                messages.warning(self.request, 'Lead salvo localmente, mas houve falha ao criar no Evo CRM.')
 
         enviar_webhook_n8n(self.object)
         return response

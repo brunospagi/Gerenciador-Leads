@@ -103,6 +103,9 @@ class Cliente(models.Model):
     )
     data_ultimo_andamento = models.DateTimeField(null=True, blank=True, verbose_name="Último andamento")
     observacao = models.TextField(blank=True, null=True)
+    evo_crm_lead_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="Lead ID Evo CRM")
+    evo_crm_deal_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="Deal ID Evo CRM")
+    evo_crm_pipeline_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="Pipeline ID Evo CRM")
 
     def save(self, *args, **kwargs):
         # Se for um cliente novo, define uma data de próximo contato padrão
