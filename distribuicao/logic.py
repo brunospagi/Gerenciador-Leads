@@ -150,6 +150,32 @@ def _montar_payload_evo_crm(cliente):
     }
 
 
+def _extrair_ids_evo_crm(data):
+    retorno = data.get("data") or {}
+
+    lead_id = retorno.get("lead_id")
+    deal_id = retorno.get("deal_id")
+
+    if lead_id or deal_id:
+        return lead_id, deal_id, retorno
+
+    lead = retorno.get("lead") or retorno.get("contact") or {}
+    deal = retorno.get("deal") or retorno.get("pipeline_item") or {}
+
+    lead_id = (
+        lead.get("id")
+        or lead.get("lead_id")
+        or retorno.get("id")
+    )
+    deal_id = (
+        deal.get("id")
+        or deal.get("deal_id")
+        or retorno.get("deal", {}).get("id")
+    )
+
+    return lead_id, deal_id, retorno
+
+
 def criar_lead_evo_crm(cliente):
     """Cria o lead no Evo CRM sem interromper o fluxo local de distribuicao."""
     if cliente.evo_crm_lead_id and cliente.evo_crm_deal_id:
@@ -179,12 +205,10 @@ def criar_lead_evo_crm(cliente):
         if not data.get("success"):
             raise ValueError(data.get("message") or "Evo CRM retornou sucesso=False.")
 
-        retorno = data.get("data") or {}
-        lead_id = retorno.get("lead_id")
-        deal_id = retorno.get("deal_id")
+        lead_id, deal_id, retorno = _extrair_ids_evo_crm(data)
 
         if not lead_id or not deal_id:
-            raise ValueError("Resposta do Evo CRM nao trouxe lead_id/deal_id.")
+            raise ValueError(f"Resposta do Evo CRM nao trouxe lead_id/deal_id. retorno={retorno}")
 
         cliente.evo_crm_lead_id = lead_id
         cliente.evo_crm_deal_id = deal_id

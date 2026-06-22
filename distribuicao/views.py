@@ -108,6 +108,8 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
                     'cliente_id': self.object.id,
                     'erro': evo_resultado.get('error', ''),
                     'response_body': evo_resultado.get('response_body', ''),
+                    'lead_id': evo_resultado.get('lead_id', ''),
+                    'deal_id': evo_resultado.get('deal_id', ''),
                 }
 
         enviar_webhook_n8n(self.object)
