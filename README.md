@@ -1,113 +1,80 @@
 # CRM Spagi - Gerenciador de Leads
 
-Sistema CRM web focado no segmento automotivo, com controle de leads, distribuicao, vendas, financeiro, RH, documentos e permissoes por modulo.
+Sistema CRM web focado no segmento automotivo, com controle de leads, distribuição, vendas, financeiro, RH, documentos e permissões por módulo.
 
-## Documentacao Completa
+## Documentação Completa
 
-A documentacao detalhada do projeto esta em:
+- [docs/INDEX.md](./docs/INDEX.md) - documentação técnica detalhada, por assunto
+- [README_EXECUTIVO.md](./README_EXECUTIVO.md) - resumo para gestão/diretoria
 
-- [docs/INDEX.md](./docs/INDEX.md)
-- [README_EXECUTIVO.md](./README_EXECUTIVO.md)
+## 1. Visão Geral
 
-## 1. Visao Geral
+O projeto é desenvolvido em Django e organiza o ciclo comercial completo:
 
-O projeto foi desenvolvido em Django e organiza o ciclo comercial completo:
-
-- Entrada de lead
-- Distribuicao automatica por rodizio
-- Atendimento e historico do cliente
-- Venda e servicos com comissao automatica
+- Entrada de lead e distribuição automática por rodízio
+- Atendimento com pipeline comercial (etapa, status de contato, timeline de andamento)
+- Venda e serviços com comissão automática
 - Acompanhamento financeiro e DRE
-- RH, ponto e folha
-- Documentos e autorizacoes
-- Permissoes por perfil e por modulo
+- RH, ponto e folha de pagamento
+- Documentos e autorizações
+- Permissões por perfil e por módulo, com trilha de auditoria
 
-## 2. Stack Tecnologica
+## 2. Stack Tecnológica
 
-- Backend: Python + Django
-- Banco: PostgreSQL (producao) / SQLite (local opcional)
-- Frontend: Django Templates + Bootstrap + JS
-- Storage de arquivos: MinIO (django-minio-storage)
-- Auth opcional: OIDC (mozilla-django-oidc)
-- Deploy: Docker + Gunicorn + WhiteNoise
-- PDF: xhtml2pdf
-- Integracoes: requests, webpush, Gemini, Webhooks
+- **Backend**: Python + Django 5.2 (requer Python 3.10+)
+- **Banco**: PostgreSQL (produção) / SQLite (local opcional)
+- **Frontend**: Django Templates + Bootstrap 5 + JS (design system M3 em `static/css/app_m3.css` e `static/js/app_ux.js`)
+- **Storage de arquivos**: MinIO (`django-minio-storage`)
+- **Auth opcional**: OIDC (`mozilla-django-oidc`)
+- **Deploy**: Docker (usuário não-root) + Gunicorn + WhiteNoise + cron
+- **PDF**: xhtml2pdf
+- **Integrações**: requests, webpush, Gemini, Evo CRM, webhooks (n8n)
 
-## 3. Apps (Modulos)
+## 3. Apps (Módulos)
 
-- `clientes`: CRM de leads, calendario, atrasados, relatorios e PDF
-- `distribuicao`: entrada/redistribuicao por rodizio e relatorio
-- `vendas_produtos`: vendas e servicos, comissoes, fechamento mensal, relatorios
-- `financeiro`: transacoes e DRE
+- `clientes`: CRM de leads, calendário, atrasados, relatórios e PDF
+- `distribuicao`: entrada/redistribuição por rodízio, checagem de duplicidade ao vivo e relatório
+- `vendas_produtos`: vendas e serviços, comissões, fechamento mensal, relatórios
+- `financeiro`: transações e DRE
 - `financiamentos`: kanban de financiamentos
-- `controle_ponto`: registro de ponto, mapa e auditoria
-- `folha_pagamento`: lancamentos e folha
+- `controle_ponto`: registro de ponto, homologação e auditoria
+- `folha_pagamento`: lançamentos e folha
 - `funcionarios`: cadastro de equipe
-- `documentos`: procuracoes e outorgados
-- `autorizacoes`: solicitacoes e aprovacao
-- `avaliacoes`: avaliacoes e gerador de anuncios
-- `credenciais`: gestao de acessos/senhas internas
-- `usuarios`: perfis, dashboard admin, permissoes por modulo
-- `notificacoes`: alertas e comandos agendados
-- `leadge`: banners e recursos visuais
-- `core` e `crmspagi`: base do projeto, urls e configuracoes
+- `documentos`: procurações e outorgados
+- `autorizacoes`: solicitações e aprovação
+- `avaliacoes`: avaliações de veículo e gerador de anúncios
+- `credenciais`: gestão de acessos/senhas internas
+- `usuarios`: perfis, dashboard admin, permissões por módulo
+- `notificacoes`: alertas, push (webpush) e comandos agendados
+- `leadge`: TV corporativa, banners e recursos visuais
+- `core` e `crmspagi`: base do projeto, urls, middlewares e configurações
 
-## 4. Permissoes e Seguranca
+## 4. Permissões e Segurança
 
 O sistema usa duas camadas:
 
-1. Perfil do usuario (`nivel_acesso`: ADMIN, GERENTE, VENDEDOR, etc.)
-2. Permissao por modulo (`ModulePermission`)
+1. Perfil do usuário (`nivel_acesso`: ADMIN, GERENTE, VENDEDOR, etc.)
+2. Permissão por módulo (`ModulePermission`)
 
-Implementacoes recentes:
+Pontos principais:
 
 - Middleware: `usuarios.middleware.ModulePermissionMiddleware`
-- Regras centrais: `usuarios.permissions.has_module_access`
-- Gestao via tela: `Usuarios -> Permissoes por Modulo`
-- Sidebar e portal exibem apenas modulos permitidos
+- Regra central: `usuarios.permissions.has_module_access` (sem registro de `ModulePermission`, o acesso é negado por padrão em vez de liberado)
+- Gestão via tela: `Usuários -> Permissões por Módulo`
+- Sidebar e portal exibem apenas os módulos permitidos ao usuário logado
+- Trilha de auditoria de operações de escrita em `/painel-admin/logs-auditoria/`
 
-## 5. Novidades em Vendas
+Veja detalhes em [docs/05-permissoes-e-seguranca.md](./docs/05-permissoes-e-seguranca.md).
 
-Foi adicionado o campo `origem_cliente` em `VendaProduto` com opcoes:
+## 5. Requisitos
 
-- Indicacao
-- Instagram
-- Facebook
-- OLX
-- Site
-- Passagem na Loja
-- WhatsApp
-- Outro
+- Python 3.10+ (o Django 5.2 não roda em versões anteriores)
+- PostgreSQL (recomendado em produção) ou SQLite (local)
+- Docker (opcional, recomendado para produção)
 
-Tambem foi adicionada a impressao de `MINUTA` no fluxo de aprovacao:
+Dependências e versões estão fixadas em `requirements.txt`.
 
-- Ao aprovar uma venda, o sistema redireciona para a minuta com impressao automatica
-- A minuta possui logo, rodape com horario e usuario que gerou
-- A minuta inclui campos de cadastro do cliente/veiculo para preenchimento completo
-- Bloco final com marcacao manual: `CONSIGNADO ( )` e `PROPRIO ( )`
-
-Campos novos no modelo `VendaProduto` para suportar a minuta:
-
-- `dtnasc_cliente`, `rgIE_cliente`, `telCel_cliente`, `cpfCNPJ_cliente`
-- `endereco_cliente`, `numero_cliente`, `cep_cliente`, `bairro_cliente`, `cidade_com_cliente`
-- `marca_veiculo`, `km_veiculo`, `data_compra`, `documentacao_veiculo`
-
-Arquivos relacionados:
-
-- `vendas_produtos/models.py`
-- `vendas_produtos/forms.py`
-- `vendas_produtos/templates/vendas_produtos/form.html`
-- `vendas_produtos/migrations/0016_vendaproduto_origem_cliente.py`
-
-## 6. Requisitos
-
-- Python 3.10+
-- PostgreSQL (recomendado)
-- Docker (opcional, recomendado para producao)
-
-Dependencias principais estao em `requirements.txt`.
-
-## 7. Configuracao de Ambiente
+## 6. Configuração de Ambiente
 
 Copie o arquivo de exemplo:
 
@@ -115,40 +82,38 @@ Copie o arquivo de exemplo:
 cp .env.example .env
 ```
 
-Variaveis principais:
+Variáveis principais:
 
-- `DJANGO_SECRET_KEY`
-- `DJANGO_DEBUG`
-- `DJANGO_ALLOWED_HOSTS`
-- `DJANGO_CSRF_TRUSTED_ORIGINS`
-- `DJANGO_SECURE_SSL_REDIRECT`
-- `DJANGO_USE_X_FORWARDED_HOST`
-- `DJANGO_SECURE_HSTS_SECONDS`
-- `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS`
-- `DJANGO_SECURE_HSTS_PRELOAD`
-- `DJANGO_CONTENT_SECURITY_POLICY` (opcional para override)
-- `APP_BUILD_NUMBER` (numero da build exibido no rodape)
-- `APP_BUILD_SHA` (hash curto/commit exibido no rodape)
-- `DB_ENGINE` (`postgres` ou `sqlite`)
-- `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` (quando `DB_ENGINE=postgres`)
-- `SQLITE_PATH` (quando `DB_ENGINE=sqlite`)
-- `MINIO_*`
-- `OIDC_*` (se usar login SSO)
-- `VAPID_*` (webpush)
-- `N8N_WEBHOOK_URL`, `WEBHOOK_PONTO_URL`
-- `GEMINI_API_KEY`
+| Variável | Uso |
+| --- | --- |
+| `DJANGO_SECRET_KEY` | chave secreta do Django |
+| `DJANGO_DEBUG` | `True`/`False` |
+| `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS` | hosts e origens confiáveis |
+| `DJANGO_SECURE_SSL_REDIRECT`, `DJANGO_USE_X_FORWARDED_HOST` | proxy/HTTPS |
+| `DJANGO_SECURE_HSTS_SECONDS`, `..._INCLUDE_SUBDOMAINS`, `..._PRELOAD` | HSTS |
+| `DJANGO_CONTENT_SECURITY_POLICY` | override opcional da CSP padrão |
+| `APP_BUILD_NUMBER`, `APP_BUILD_SHA` | build exibida no rodapé |
+| `ENABLE_CRON` | controla se este container roda o cron interno (ver seção 9) |
+| `DB_ENGINE` | `postgres` ou `sqlite` |
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | quando `DB_ENGINE=postgres` |
+| `SQLITE_PATH` | quando `DB_ENGINE=sqlite` |
+| `MINIO_*` | storage de arquivos |
+| `OIDC_*` | login SSO (opcional) |
+| `VAPID_*` | webpush |
+| `N8N_WEBHOOK_URL`, `WEBHOOK_PONTO_URL` | webhooks |
+| `GEMINI_API_KEY` | integrações de IA (avaliações, extração de documentos) |
 
-Observacoes importantes:
+Observações importantes:
 
-- `.env.example` foi sanitizado com valores ficticios (somente modelo)
-- `DJANGO_DEBUG` agora e interpretado corretamente como booleano (`True`/`False`)
-- o rodape exibe build via `APP_BUILD_NUMBER` e `APP_BUILD_SHA` (ou `GITHUB_SHA`/`RENDER_GIT_COMMIT` como fallback)
-- headers de seguranca foram reforcados (CSP, Referrer-Policy, nosniff e Permissions-Policy)
-- endpoints webpush usam CSRF normal com envio automatico de `X-CSRFToken` no frontend
+- `.env.example` contém apenas valores fictícios (modelo).
+- O rodapé exibe a build via `APP_BUILD_NUMBER`/`APP_BUILD_SHA` (ou `GITHUB_SHA`/`RENDER_GIT_COMMIT` como fallback).
+- Headers de segurança reforçados: CSP, Referrer-Policy, `nosniff` e Permissions-Policy.
+- Endpoints webpush usam CSRF normal com envio automático de `X-CSRFToken` no frontend.
+- Arquivos de shell/config (`*.sh`, `crontab`, `Dockerfile`) têm quebra de linha forçada para LF via `.gitattributes` — evita builds Docker quebrados quando o checkout é feito no Windows.
 
-## 8. Rodando Localmente
+## 7. Rodando Localmente
 
-### Opcao A: ambiente Python
+### Opção A: ambiente Python
 
 ```bash
 python -m venv .venv
@@ -163,14 +128,16 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-### Opcao B: Docker
+### Opção B: Docker
 
 ```bash
 docker build -t crmspagi .
 docker run -p 8000:8000 --env-file .env crmspagi
 ```
 
-## 9. Comandos Uteis
+O container roda a aplicação (Gunicorn) com um usuário não-root; o cron interno continua rodando como root (necessário para `/etc/cron.d`).
+
+## 8. Comandos Úteis
 
 ```bash
 python manage.py makemigrations
@@ -180,11 +147,12 @@ python manage.py check
 python manage.py test
 ```
 
-Comandos de notificacao (usados no cron):
+Comandos de notificação e reconciliação (usados no cron/rotina):
 
 ```bash
 python manage.py check_inactivity
 python manage.py check_overdue_clients
+python manage.py sincronizar_evo_crm          # reprocessa leads recentes sem sincronizar com o Evo CRM
 ```
 
 Comando de backup do sistema:
@@ -195,147 +163,84 @@ python manage.py gerar_backup_sistema
 python manage.py gerar_backup_sistema --output-dir /caminho/para/backups
 ```
 
-O backup tambem pode ser gerado no painel executivo (`/painel-admin/`) pelo botao
-`Baixar Backup (.zip)`.
+O backup também pode ser gerado no painel executivo (`/painel-admin/`) pelo botão `Baixar Backup (.zip)`.
 
-Auditoria de acoes administrativas:
+## 9. Testes e CI
 
-- Tela no painel: `/painel-admin/logs-auditoria/` (somente ADMIN/superuser)
-- Registros automaticos de requisicoes de escrita (`POST`, `PUT`, `PATCH`, `DELETE`)
-- Filtros por usuario, modulo, metodo, severidade, resultado e periodo
+```bash
+python manage.py test
+```
+
+O pipeline de CI (`.github/workflows/django.yml`) roda em Python 3.12 com SQLite e executa a suíte completa a cada push/PR para `main`. Cobertura automatizada inclui: distribuição (rodízio, deduplicação, integração Evo CRM), permissões por módulo, upload de documentos/biometria, comissões de venda, DRE financeiro e pipeline de clientes.
 
 ## 10. Jobs Agendados (Cron)
 
 Arquivo: `crontab`
 
-- `check_inactivity`: diariamente 03:00
-- `check_overdue_clients`: diariamente 08:00
+- `check_inactivity`: diariamente às 03:00
+- `check_overdue_clients`: diariamente às 08:00
+
+O cron roda dentro do próprio container web, controlado pela variável `ENABLE_CRON` (default `true`). **Se a aplicação escalar com múltiplas réplicas, defina `ENABLE_CRON=false` em todas menos uma** — caso contrário cada réplica roda seu próprio cron e os jobs (e notificações que eles disparam) executam duplicados.
 
 ## 11. Estrutura de Deploy
 
-O `entrypoint.sh` faz:
+O `entrypoint.sh` faz, nesta ordem:
 
-1. sobe cron
-2. roda migracoes
-3. roda collectstatic
-4. inicia o processo principal (Gunicorn)
+1. Sobe o cron (se `ENABLE_CRON=true`)
+2. Roda migrações (`migrate`)
+3. Roda `collectstatic`
+4. Troca para o usuário não-root e inicia o processo principal (Gunicorn), via `gosu`
 
-## 12. Observacoes Adicionais (Importantes)
-
-- Sempre rode `migrate` apos atualizar o codigo.
-- Ha migracoes novas de permissao/modulo e origem de cliente em vendas.
-- Em ambientes Windows pode haver variacao de final de linha (CRLF/LF); isso nao afeta execucao do Django.
-- Validar permissao por modulo apos criar novos usuarios.
-- Para producao, revise `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, MinIO e OIDC.
-
-## 13. Checklist de Pos-Atualizacao
-
-1. `python manage.py migrate`
-2. Validar login de ADMIN e perfil comum
-3. Conferir cards e menu lateral por modulo
-4. Testar cadastro de venda com `origem_cliente`
-5. Testar impressao do relatorio de distribuicao
-
-## 14. Controle de Ponto (Novas Rotinas)
-
-- Nova tela de homologacao por colaborador:
-  - URL: `/ponto/homologacao/`
-  - Permite aprovacao manual por registro
-  - Permite aprovacao/recusa em lote (selecionados)
-  - Filtro por colaborador, mes e ano
-- Fechamento da folha ponto por colaborador e mes:
-  - Acao via modal dentro da homologacao
-  - Bloqueia novas batidas no relogio para o mes fechado
-  - Reabertura manual pelo administrador/gerente
-- Pendencias automaticas para homologacao:
-  - Entradas com atraso acima da tolerancia ficam pendentes
-  - Entradas com validacao manual (`manual_*`) ficam pendentes
-- Alerta para administracao:
-  - Ao entrar no sistema, admin/gerente recebe modal se houver pendencias
-  - Link direto para a tela de homologacao
-
-## 15. UX de Suporte (WhatsApp)
-
-- Botao flutuante de suporte no canto inferior quando estiver em rotas com `whatsapp`:
-  - Telefone: `+55 41 99924-8121`
-  - Link: `https://wa.me/5541999248121`
-
-## 14. Melhorias Recomendadas
-
-- Adicionar testes automatizados para regras de permissao por modulo
-- Criar dashboards de conversao por origem do lead
-- Adicionar exportacao CSV/XLS para relatorios principais
-- Padronizar auditoria de alteracoes em entidades criticas
-
-## 15. Design System (M3)
-
-Foi padronizado um design system inspirado em Material 3 para toda a aplicacao:
-
-- CSS global em `static/css/app_m3.css`
-- UX global em `static/js/app_ux.js`
-- Bases principais atualizadas:
-  - `crmspagi/templates/base_portal.html`
-  - `clientes/templates/base.html`
-  - `avaliacoes/templates/base.html`
-
-Recursos ativos globalmente:
-
-- Barra de progresso e mascara de carregamento em navegacao e requisicoes `fetch`
-- Feedback de envio de formularios com botao em estado `Enviando...`
-- Validacao visual de campos obrigatorios e invalidos
-- Auto-dismiss de alertas
-- Mascaras utilitarias (`money-mask`, `cpf-mask`, `cep-mask`, `phone-mask`)
-
-Observacao sobre NPM/Docker:
-
-- Nesta etapa nao foi necessario pipeline npm para aplicar o M3 (assets servidos via `static` do Django).
-- O Docker atual continua valido sem alteracao obrigatoria para frontend build.
-
-## 16. QA Funcional (Fluxos Criticos)
-
-Execute este roteiro antes de cada deploy:
-
-1. Vendas
-- Criar venda com e sem adicionais.
-- Editar venda pendente.
-- Aprovar venda como GERENTE (sem alterar custo) e como ADMIN (alterando custo).
-- Reprovar venda com motivo.
-- Validar impressao de comprovante e minuta.
-- Validar ajuste de custo apos aprovacao (somente ADMIN).
-
-2. Ponto
-- Registrar entrada dentro da tolerancia.
-- Registrar entrada com atraso e justificativa.
-- Validar que a foto capturada no ponto atualiza automaticamente o avatar do usuario.
-- Homologar ocorrencia (aceitar/recusar) em `Ocorrencias de Ponto`.
-- Validar `Espelho de Ponto Mensal` e `Relatorio de Entradas`.
-- Validar impressao A4 (portrait/landscape conforme tela).
-
-3. RH/Folha
-- Atualizar referencia do mes.
-- Fechar mes e marcar pagamento do mes.
-- Abrir detalhe da folha e validar conferencia de comissoes.
-- Validar permissao: ADMIN x colaborador.
-
-4. Financeiro
-- Criar lancamento receita/despesa.
-- Executar acao em lote (pendente/efetivado).
-- Validar DRE por mes.
-- Garantir que nao-admin so veja seus proprios lancamentos.
-
-## 17. Checklist de Deploy e Seguranca
+## 12. Checklist de Deploy e Segurança
 
 1. `python manage.py migrate`
 2. `python manage.py collectstatic --noinput`
 3. `python manage.py check`
-4. Validar login e menu por perfil (ADMIN, GERENTE, VENDEDOR, RH)
-5. Validar cookies/headers de seguranca (`CSP`, `Referrer-Policy`, `nosniff`)
-6. Validar CSRF em formularios e `fetch` com `X-CSRFToken`
-7. Validar build no rodape (`APP_BUILD_NUMBER` / `APP_BUILD_SHA`)
-8. Validar impressao A4 dos relatorios operacionais
-9. Revisar logs de erro apos subir
-10. Confirmar backup do banco antes de release critica
+4. `python manage.py test`
+5. Validar login e menu por perfil (ADMIN, GERENTE, VENDEDOR, RH)
+6. Validar cookies/headers de segurança (CSP, Referrer-Policy, `nosniff`)
+7. Validar CSRF em formulários e `fetch` com `X-CSRFToken`
+8. Validar build no rodapé (`APP_BUILD_NUMBER`/`APP_BUILD_SHA`)
+9. Revisar logs de erro após subir
+10. **Fazer backup do banco antes de qualquer release com migration nova** (ver `python manage.py gerar_backup_sistema`)
 
----
+## 13. QA Funcional (Fluxos Críticos)
 
-Se quiser, eu tambem posso gerar uma versao do README com diagrama de arquitetura (fluxo lead -> distribuicao -> venda -> financeiro) e um guia de onboarding para novos usuarios (vendedor, gerente e admin).
+Execute este roteiro antes de cada deploy relevante:
+
+**Vendas**
+- Criar venda com e sem adicionais; editar venda pendente.
+- Aprovar venda como GERENTE (sem alterar custo) e como ADMIN (alterando custo); reprovar com motivo.
+- Validar impressão de comprovante e minuta.
+
+**Ponto**
+- Registrar entrada dentro/fora da tolerância (com justificativa).
+- Validar que a foto capturada atualiza o avatar do usuário.
+- Homologar ocorrência (aceitar/recusar) e validar espelho de ponto mensal.
+
+**RH/Folha**
+- Atualizar referência do mês, fechar mês e marcar pagamento.
+- Abrir detalhe da folha e validar conferência de comissões.
+- Validar permissão: ADMIN x colaborador.
+
+**Financeiro**
+- Criar lançamento receita/despesa; executar ação em lote (pendente/efetivado).
+- Validar DRE por mês.
+- Garantir que não-admin só veja seus próprios lançamentos.
+
+**Distribuição**
+- Cadastrar lead com telefone já existente e confirmar aviso de duplicidade ao vivo (sem reload).
+- Redistribuir lead e validar rodízio.
+
+## 14. Recursos de UX
+
+- Design system inspirado em Material 3 (`static/css/app_m3.css`, `static/js/app_ux.js`): barra de progresso em navegação/`fetch`, feedback de envio (`Enviando...`), validação visual de campos obrigatórios/inválidos, auto-dismiss de alertas, máscaras utilitárias (`money-mask`, `cpf-mask`, `cep-mask`, `phone-mask`).
+- Service Worker/push notifications registrados a partir do layout principal (`clientes/templates/base.html`), com suporte a cadastro de cliente offline (sincronização automática ao reconectar).
+- Botão flutuante de suporte via WhatsApp em rotas relevantes (`+55 41 99924-8121`).
+
+## 15. Melhorias Recomendadas
+
+- Dashboards de conversão por origem do lead e SLA de follow-up
+- Exportação CSV/XLS para relatórios principais
+- Observabilidade centralizada (APM, logs estruturados, alertas de exceção)
+- Ampliar cobertura de testes para folha de pagamento, controle de ponto e financiamentos
