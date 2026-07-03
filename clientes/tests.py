@@ -177,3 +177,35 @@ class RegistrarAndamentoLeadTests(TestCase):
         self.cliente.refresh_from_db()
         self.assertEqual(self.cliente.status_contato, Cliente.StatusContato.CONTATO_REALIZADO)
         self.assertEqual(self.cliente.etapa_funil, Cliente.EtapaFunil.QUALIFICACAO)
+
+
+class MigrationValorEstimadoParseTests(TestCase):
+    """
+    Regressao: em producao, um valor legado de 'valor_estimado_veiculo' (texto livre)
+    estourou a precisao do DecimalField(max_digits=12, decimal_places=2) e derrubou a
+    migration inteira com 'numeric field overflow'. A funcao de parse precisa tratar
+    esse caso como nao conversivel (None) em vez de deixar o Decimal estourado ir para o save().
+    """
+
+    @staticmethod
+    def _carregar_parse_valor_estimado():
+        import importlib
+
+        modulo = importlib.import_module(
+            'clientes.migrations.0012_valor_estimado_veiculo_para_decimal'
+        )
+        return modulo._parse_valor_estimado
+
+    def test_valor_dentro_da_faixa_e_convertido(self):
+        parse = self._carregar_parse_valor_estimado()
+        self.assertEqual(parse('R$ 45.000,00'), Decimal('45000.00'))
+
+    def test_valor_que_estoura_precisao_vira_none(self):
+        parse = self._carregar_parse_valor_estimado()
+        # Lixo/numero de telefone digitado por engano no campo: mais de 10 digitos inteiros.
+        self.assertIsNone(parse('11987654321099'))
+        self.assertIsNone(parse('999999999999999,00'))
+
+    def test_valor_no_limite_exato_e_aceito(self):
+        parse = self._carregar_parse_valor_estimado()
+        self.assertEqual(parse('9999999999,99'), Decimal('9999999999.99'))

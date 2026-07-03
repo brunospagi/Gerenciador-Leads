@@ -127,9 +127,6 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # DiretÃ³rios adicionais para arquivos estÃ¡ticos
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-# ConfiguraÃ§Ã£o do WhiteNoise para servir arquivos estÃ¡ticos em produÃ§Ã£o
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -200,7 +197,21 @@ MINIO_STORAGE_SECRET_KEY = os.getenv('MINIO_STORAGE_SECRET_KEY')
 MINIO_STORAGE_USE_HTTPS = os.getenv('MINIO_STORAGE_USE_HTTPS', 'True') == 'True'
 MINIO_STORAGE_MEDIA_BUCKET_NAME = os.getenv('MINIO_STORAGE_MEDIA_BUCKET_NAME', 'leads-spagi-media')
 MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
-DEFAULT_FILE_STORAGE = 'crmspagi.storage_backends.PublicMediaStorage'
+
+# NOTA: DEFAULT_FILE_STORAGE / STATICFILES_STORAGE (estilo antigo) foram removidos pelo
+# Django a partir da 5.1 - o shim de compatibilidade que convertia essas configuracoes
+# automaticamente para STORAGES nao existe mais nesta versao. Definir apenas as
+# configuracoes antigas faz o Django ignora-las silenciosamente e cair nos backends
+# padrao (FileSystemStorage local / StaticFilesStorage sem hash), o que enviava uploads
+# de usuario para o disco do container (perdidos a cada redeploy) em vez do MinIO.
+STORAGES = {
+    "default": {
+        "BACKEND": "crmspagi.storage_backends.PublicMediaStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # --- ConfiguraÃ§Ãµes do django-webpush (LIDAS DO .ENV) ---
 WEBPUSH_SETTINGS = {

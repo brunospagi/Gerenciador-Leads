@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # Controla se este container deve rodar o cron interno (check_inactivity, check_overdue_clients).
 # Default "true" preserva o comportamento atual. Se a aplicacao for escalada com multiplas
