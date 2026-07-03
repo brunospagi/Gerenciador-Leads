@@ -1,7 +1,7 @@
 from django import forms
 from clientes.models import Cliente
-import re
 from django.contrib.auth.models import User
+from .logic import encontrar_cliente_por_whatsapp
 from .models import VendedorRodizio
 
 class LeadEntradaForm(forms.ModelForm):
@@ -78,12 +78,8 @@ class LeadEntradaForm(forms.ModelForm):
             self.add_error('vendedor_manual', "O vendedor selecionado não está ativo no rodízio.")
 
         if whatsapp:
-            # Remove formatação para buscar no banco (apenas números)
-            numeros = re.sub(r'\D', '', whatsapp)
-            
-            # Busca cliente existente (contendo o número)
-            cliente_existente = Cliente.objects.filter(whatsapp__icontains=numeros).first()
-            
+            cliente_existente = encontrar_cliente_por_whatsapp(whatsapp)
+
             if cliente_existente:
                 # Se encontrou e o usuário NÃO marcou para redistribuir -> Bloqueia e avisa
                 if not redistribuir:

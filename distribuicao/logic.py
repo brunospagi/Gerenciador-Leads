@@ -5,6 +5,7 @@ import re
 
 import requests
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 
 from .models import VendedorRodizio
@@ -17,15 +18,37 @@ logger = logging.getLogger(__name__)
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "https://seu-n8n-webhook-url-aqui")
 
 
-def _listar_vendedores_disponiveis(agora_local=None):
+def encontrar_cliente_por_whatsapp(whatsapp):
+    """
+    Procura um Cliente existente cujo whatsapp bata (por digitos) com o informado.
+    Cliente.whatsapp e salvo com a formatacao digitada (nao normalizado), entao
+    comparamos os digitos extraidos dos dois lados para evitar falso positivo/negativo
+    por diferenca de formatacao.
+    """
+    from clientes.models import Cliente
+
+    numeros = re.sub(r"\D", "", whatsapp or "")
+    if not numeros:
+        return None
+
+    candidatos = Cliente.objects.exclude(whatsapp="").select_related("vendedor")
+    for candidato in candidatos:
+        if re.sub(r"\D", "", candidato.whatsapp or "") == numeros:
+            return candidato
+    return None
+
+
+def _listar_vendedores_disponiveis(agora_local=None, lock=False):
     """Retorna lista de objetos VendedorRodizio elegiveis no rodizio."""
     hoje = timezone.localdate()
     agora_local = agora_local or timezone.localtime()
     hora_atual = agora_local.time()
 
-    candidatos = list(
-        VendedorRodizio.objects.filter(ativo=True).select_related('vendedor', 'vendedor__dados_funcionais')
-    )
+    queryset = VendedorRodizio.objects.filter(ativo=True).select_related('vendedor', 'vendedor__dados_funcionais')
+    if lock:
+        # Serializa concorrentes na definicao do proximo vendedor (evita atribuir o mesmo vendedor duas vezes).
+        queryset = queryset.select_for_update()
+    candidatos = list(queryset)
     candidatos.sort(
         key=lambda item: (
             item.ultima_atribuicao is not None,
@@ -69,17 +92,18 @@ def definir_proximo_vendedor():
     """
     Retorna o User do proximo vendedor e atualiza o timestamp dele.
     """
-    vendedores_elegiveis = _listar_vendedores_disponiveis()
-    proximo = vendedores_elegiveis[0] if vendedores_elegiveis else None
+    with transaction.atomic():
+        vendedores_elegiveis = _listar_vendedores_disponiveis(lock=True)
+        proximo = vendedores_elegiveis[0] if vendedores_elegiveis else None
 
-    if not proximo:
-        return None
+        if not proximo:
+            return None
 
-    # Atualiza o horario para o momento atual (fim da fila)
-    proximo.ultima_atribuicao = timezone.now()
-    proximo.save()
+        # Atualiza o horario para o momento atual (fim da fila)
+        proximo.ultima_atribuicao = timezone.now()
+        proximo.save(update_fields=["ultima_atribuicao"])
 
-    return proximo.vendedor
+        return proximo.vendedor
 
 
 def enviar_webhook_n8n(cliente):
@@ -98,7 +122,7 @@ def enviar_webhook_n8n(cliente):
         # Timeout curto para nao travar o painel se o n8n demorar
         requests.post(N8N_WEBHOOK_URL, json=payload, timeout=2)
     except Exception as e:
-        print(f"[ALERTA] Falha no Webhook n8n: {e}")
+        logger.warning("Falha no Webhook n8n para cliente %s: %s", cliente.pk, e)
 
 
 def _normalizar_telefone_evo(telefone):

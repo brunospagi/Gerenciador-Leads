@@ -1,9 +1,12 @@
 import base64
 import json
+import logging
 import re
 import time
 
 from avaliacoes.ai_runtime import get_gemini_runtime
+
+logger = logging.getLogger(__name__)
 
 
 def extract_crlv_data_with_gemini(pdf_file):
@@ -12,7 +15,7 @@ def extract_crlv_data_with_gemini(pdf_file):
     """
     gemini_client, model_name, config_error = get_gemini_runtime()
     if config_error or not gemini_client:
-        print(f"Erro: configuração Gemini indisponível. Motivo: {config_error}")
+        logger.warning("Configuracao Gemini indisponivel. Motivo: %s", config_error)
         return None
 
     try:
@@ -63,7 +66,7 @@ def extract_crlv_data_with_gemini(pdf_file):
                 if is_transient and attempt < max_attempts:
                     time.sleep(attempt)
                     continue
-                print(f"Erro ao processar PDF com Gemini: {e}")
+                logger.warning("Erro ao processar PDF com Gemini: %s", e)
                 return None
 
         if not response:
@@ -79,5 +82,5 @@ def extract_crlv_data_with_gemini(pdf_file):
         return data
 
     except Exception as e:
-        print(f"Erro ao processar PDF com Gemini: {e}")
+        logger.warning("Erro ao processar PDF com Gemini: %s", e)
         return None

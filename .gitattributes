@@ -1,0 +1,6 @@
+# Forca LF nesses arquivos independente do core.autocrlf do desenvolvedor.
+# Sem isso, um checkout Windows com autocrlf=true grava CRLF nesses arquivos,
+# o que quebra o shebang (#!/bin/sh) ao rodar dentro do container Linux.
+*.sh text eol=lf
+crontab text eol=lf
+Dockerfile text eol=lf

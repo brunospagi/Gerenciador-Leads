@@ -1,9 +1,26 @@
-﻿from django.db import models
+﻿from django.core.exceptions import ValidationError
+from django.db import models
 from django.contrib.auth.models import User
-from django.core.validators import MinValueValidator
+from django.core.validators import FileExtensionValidator, MinValueValidator
 
 # Importa o storage configurado para o MinIO S3
 from crmspagi.storage_backends import PublicMediaStorage
+
+FOTO_BIOMETRIA_MAX_SIZE_MB = 5
+
+
+def cpf_temporario_por_user_id(user_id):
+    # CPF tecnico de 11 digitos (placeholder ate o RH preencher o CPF real), usado
+    # pelo signal de criacao automatica de Funcionario. Ver Funcionario.cpf_pendente.
+    return f"{int(user_id):011d}"
+
+
+def validar_tamanho_foto_biometria(arquivo):
+    limite_bytes = FOTO_BIOMETRIA_MAX_SIZE_MB * 1024 * 1024
+    if arquivo.size > limite_bytes:
+        raise ValidationError(
+            f'A imagem excede o tamanho maximo permitido ({FOTO_BIOMETRIA_MAX_SIZE_MB}MB).'
+        )
 
 
 class Funcionario(models.Model):
@@ -21,6 +38,10 @@ class Funcionario(models.Model):
         null=True,
         blank=True,
         verbose_name='Foto Base para Biometria Facial',
+        validators=[
+            FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png']),
+            validar_tamanho_foto_biometria,
+        ],
     )
 
     # Dados pessoais
@@ -67,6 +88,11 @@ class Funcionario(models.Model):
         if full_name:
             return full_name
         return self.user.username
+
+    @property
+    def cpf_pendente(self):
+        """True se o CPF ainda e o placeholder gerado automaticamente (RH nao preencheu o real)."""
+        return bool(self.user_id) and self.cpf == cpf_temporario_por_user_id(self.user_id)
 
     def __str__(self):
         return f'{self.nome_completo} - {self.cargo}'

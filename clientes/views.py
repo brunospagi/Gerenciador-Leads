@@ -306,8 +306,15 @@ def registrar_andamento_lead(request, pk):
 
     form = LeadAndamentoForm(request.POST)
     if not form.is_valid():
-        messages.error(request, "Nao foi possivel registrar o andamento. Revise os campos.")
-        return redirect('cliente_detail', pk=cliente.pk)
+        messages.error(request, "Nao foi possivel registrar o andamento. Revise os campos abaixo.")
+        context = {
+            'cliente': cliente,
+            'historico_form': HistoricoForm(),
+            'historicos': cliente.historico.all(),
+            'lead_andamento_form': form,
+            'andamentos': cliente.andamentos.select_related('usuario').all(),
+        }
+        return render(request, 'clientes/cliente_detail.html', context)
 
     andamento = form.save(commit=False)
     andamento.cliente = cliente
@@ -730,6 +737,3 @@ def exportar_relatorio_atrasados_pdf(request):
     if pisa_status.err:
        return HttpResponse('Ocorreram alguns erros <pre>' + html + '</pre>')
     return response
-
-def offline_view(request):
-    return render(request, "clientes/offline.html")

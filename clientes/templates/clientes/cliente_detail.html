@@ -110,6 +110,20 @@
             <div class="card-body">
                 <form action="{% url 'registrar_andamento_lead' cliente.pk %}" method="post" class="row g-3 mb-4">
                     {% csrf_token %}
+                    {% if lead_andamento_form.errors %}
+                        <div class="col-12">
+                            <div class="alert alert-danger">
+                                <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill me-2"></i>Corrija os campos abaixo:</div>
+                                <ul class="mb-0">
+                                    {% for field in lead_andamento_form %}
+                                        {% for error in field.errors %}
+                                            <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    {% endif %}
                     <div class="col-md-4">
                         <label class="form-label">{{ lead_andamento_form.status_contato.label }}</label>
                         {{ lead_andamento_form.status_contato }}

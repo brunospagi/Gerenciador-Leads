@@ -1,3 +1,5 @@
+import logging
+
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
@@ -6,6 +8,8 @@ from .models import Notificacao
 from usuarios.models import Profile
 import webpush  # --- NOVO IMPORT CORRETO ---
 import json
+
+logger = logging.getLogger(__name__)
 
 @receiver(post_save, sender=Cliente)
 def criar_notificacao_novo_lead(sender, instance, created, **kwargs):
@@ -42,5 +46,5 @@ def criar_notificacao_novo_lead(sender, instance, created, **kwargs):
                 # a biblioteca `webpush` pode lançar uma exceção.
                 # Apenas logamos e continuamos, pois a notificação
                 # interna (no banco) já foi salva.
-                print(f"Erro ao enviar Push Notification para {admin.username}: {e}")
+                logger.warning("Erro ao enviar Push Notification para %s: %s", admin.username, e)
             # --- FIM CORREÇÃO ---

@@ -3,12 +3,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
 
-from .models import Funcionario
-
-
-def _cpf_temporario_por_user(user_id):
-    # CPF técnico de 11 dígitos para não estourar max_length e manter unicidade por usuário.
-    return f"{int(user_id):011d}"
+from .models import Funcionario, cpf_temporario_por_user_id
 
 
 @receiver(post_save, sender=User)
@@ -25,7 +20,7 @@ def criar_perfil_funcionario(sender, instance, created, **kwargs):
 
     Funcionario.objects.create(
         user=instance,
-        cpf=_cpf_temporario_por_user(instance.id),
+        cpf=cpf_temporario_por_user_id(instance.id),
         telefone='A preencher',
         endereco='A preencher',
         cargo='Novo Colaborador',

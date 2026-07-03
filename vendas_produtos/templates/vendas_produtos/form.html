@@ -31,8 +31,20 @@
 
     <form method="post" enctype="multipart/form-data" id="vendaForm">
         {% csrf_token %}
-        {% if form.non_field_errors %}
-            <div class="alert alert-danger rounded-3 mb-4 shadow-sm">{{ form.non_field_errors }}</div>
+        {% if form.errors %}
+            <div class="alert alert-danger rounded-3 mb-4 shadow-sm" id="alert-erros-formulario">
+                <div class="fw-bold mb-2"><i class="fa fa-exclamation-triangle me-2"></i>Corrija os campos abaixo antes de salvar:</div>
+                <ul class="mb-0">
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                            <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
         {% endif %}
 
         {# Seletor de Modo (Oculto se for edição) #}
@@ -226,7 +238,22 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    
+
+    // --- MARCA CAMPOS COM ERRO DE VALIDACAO DO SERVIDOR (borda vermelha + rolagem ate o resumo) ---
+    (function highlightServerErrors() {
+        var errorFieldIds = [
+            {% for field in form %}{% if field.errors %}'id_{{ field.name }}',{% endif %}{% endfor %}
+        ];
+        errorFieldIds.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.classList.add('is-invalid');
+        });
+        var alertBox = document.getElementById('alert-erros-formulario');
+        if (alertBox) {
+            alertBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    })();
+
     // --- INICIALIZAÇÃO ROBUSTA DO MODO (CORREÇÃO DE EDIÇÃO) ---
     // Lê o valor salvo no banco e marca o radio correto antes da tela carregar
     const tipoSelectInit = document.getElementById('id_tipo_produto');

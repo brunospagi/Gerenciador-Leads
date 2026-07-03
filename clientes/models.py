@@ -63,7 +63,8 @@ class Cliente(models.Model):
         ('caminhoes', 'Caminhão'),
     )
 
-    vendedor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='clientes')
+    # PROTECT: excluir um vendedor nao pode apagar silenciosamente os leads dele.
+    vendedor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='clientes')
     whatsapp = models.CharField(max_length=20)
     nome_cliente = models.CharField(max_length=255)
     email = models.EmailField(blank=True, null=True, verbose_name="Email")
@@ -72,7 +73,9 @@ class Cliente(models.Model):
     modelo_veiculo = models.CharField(max_length=100, verbose_name="Modelo do Veículo", blank=True, null=True)
     ano_veiculo = models.CharField(max_length=20, verbose_name="Ano do Veículo", blank=True, null=True)
     
-    valor_estimado_veiculo = models.CharField(max_length=50, blank=True, null=True, verbose_name="Valor Estimado do Veículo")
+    valor_estimado_veiculo = models.DecimalField(
+        max_digits=12, decimal_places=2, blank=True, null=True, verbose_name="Valor Estimado do Veículo"
+    )
     fonte_cliente = models.CharField(max_length=100, blank=True, null=True, verbose_name="Fonte do Cliente")
     quantidade_ligacoes = models.IntegerField(default=0, verbose_name="Quantidade de Ligações")
     
@@ -104,9 +107,11 @@ class Cliente(models.Model):
     )
     data_ultimo_andamento = models.DateTimeField(null=True, blank=True, verbose_name="Último andamento")
     observacao = models.TextField(blank=True, null=True)
-    evo_crm_lead_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="Lead ID Evo CRM")
-    evo_crm_deal_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="Deal ID Evo CRM")
-    evo_crm_pipeline_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="Pipeline ID Evo CRM")
+    evo_crm_lead_id = models.CharField(max_length=100, blank=True, null=True, unique=True, verbose_name="Lead ID Evo CRM")
+    evo_crm_deal_id = models.CharField(max_length=100, blank=True, null=True, unique=True, verbose_name="Deal ID Evo CRM")
+    # Nao e unico: e o ID de configuracao do pipeline (settings.EVO_CRM_PIPELINE_ID),
+    # o mesmo valor se repete em todo cliente sincronizado.
+    evo_crm_pipeline_id = models.CharField(max_length=100, blank=True, null=True, db_index=True, verbose_name="Pipeline ID Evo CRM")
 
     def save(self, *args, **kwargs):
         # Se for um cliente novo, define uma data de próximo contato padrão

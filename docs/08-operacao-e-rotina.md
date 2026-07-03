@@ -16,6 +16,11 @@ Arquivo `crontab`:
 - 03:00 `check_inactivity`
 - 08:00 `check_overdue_clients`
 
+O cron roda dentro do proprio container web (`entrypoint.sh`), controlado pela variavel
+`ENABLE_CRON` (default `true`). **Se a aplicacao escalar com multiplas replicas, defina
+`ENABLE_CRON=false` em todas menos uma** — caso contrario cada replica roda seu proprio
+cron e os jobs (e as notificacoes que eles disparam) executam duplicados.
+
 ## Backup
 
 ### Via painel

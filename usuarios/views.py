@@ -13,7 +13,7 @@ from .forms import (
 from django.contrib.auth.models import User
 from .models import Profile, UserLoginActivity, ModulePermission
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count
+from django.db.models import Count, ProtectedError
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from datetime import timedelta
@@ -88,6 +88,17 @@ class UserDeleteView(AdminRequiredMixin, DeleteView):
     model = User
     template_name = 'usuarios/user_confirm_delete.html'
     success_url = reverse_lazy('user_list')
+
+    def form_valid(self, form):
+        try:
+            return super().form_valid(form)
+        except ProtectedError:
+            messages.error(
+                self.request,
+                'Não é possível excluir este usuário: existem leads e/ou vendas associados a ele. '
+                'Redistribua os leads e reatribua as vendas antes de excluir a conta.',
+            )
+            return redirect('user_list')
 
 
 class UserPasswordChangeView(AdminRequiredMixin, FormView):
