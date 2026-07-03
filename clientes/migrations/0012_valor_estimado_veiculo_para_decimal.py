@@ -3,9 +3,14 @@ from decimal import Decimal, InvalidOperation
 
 from django.db import migrations, models
 
+# Precisa bater com max_digits=12, decimal_places=2 do campo novo (10 digitos inteiros + 2 decimais).
+_VALOR_MAXIMO = Decimal('9999999999.99')
+_VALOR_MINIMO = -_VALOR_MAXIMO
+
 
 def _parse_valor_estimado(bruto):
-    """Converte texto livre (ex: 'R$ 45.000,00') para Decimal. Retorna None se nao for parseavel."""
+    """Converte texto livre (ex: 'R$ 45.000,00') para Decimal. Retorna None se nao for parseavel
+    ou se o valor estourar a precisao do campo destino (dado legado invalido/lixo)."""
     if not bruto:
         return None
     limpo = re.sub(r'[^0-9,.\-]', '', bruto).strip()
@@ -15,9 +20,16 @@ def _parse_valor_estimado(bruto):
     if ',' in limpo:
         limpo = limpo.replace('.', '').replace(',', '.')
     try:
-        return Decimal(limpo)
+        valor = Decimal(limpo)
     except (InvalidOperation, ValueError):
         return None
+
+    if valor > _VALOR_MAXIMO or valor < _VALOR_MINIMO:
+        # Dado legado invalido (ex: numero de telefone/lixo digitado no campo) nao cabe no
+        # DecimalField novo. Preferimos deixar em branco a derrubar a migration inteira.
+        return None
+
+    return valor
 
 
 def copiar_valor_estimado(apps, schema_editor):
@@ -33,8 +45,8 @@ def copiar_valor_estimado(apps, schema_editor):
     if nao_convertidos:
         print(
             f"[AVISO] {nao_convertidos} valor(es) de 'valor_estimado_veiculo' nao puderam ser "
-            "convertidos automaticamente para numero e ficaram em branco (NULL). "
-            "Revise manualmente se necessario."
+            "convertidos automaticamente para numero (formato invalido ou fora da faixa suportada) "
+            "e ficaram em branco (NULL). Revise manualmente se necessario."
         )
 
 
