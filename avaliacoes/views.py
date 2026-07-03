@@ -1,4 +1,6 @@
-﻿import requests
+﻿import logging
+
+import requests
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView
@@ -20,6 +22,8 @@ from requests.exceptions import RequestException, Timeout
 from django.http import JsonResponse
 
 from .ai_runtime import get_gemini_runtime
+
+logger = logging.getLogger(__name__)
 
 
 # --- LÃ“GICA DE EXTRAÃ‡ÃƒO WEB (SCRAPER ROBUSTO COM TRATAMENTO DE TIMEOUT) ---
@@ -150,7 +154,7 @@ def generate_high_conversion_description(vehicle_description, marketplace='Faceb
                     "Tente novamente em alguns minutos."
                 )
 
-            print(f"Erro inesperado no Gemini request: {e}")
+            logger.warning("Erro inesperado no Gemini request: %s", e)
             return f"⚠️ Erro de Comunicação com a IA: O serviço Gemini falhou ao responder. Detalhes: {type(e).__name__}"
 
     # 3. LÃ“GICA DE EXCLUSÃƒO OBRIGATÃ“RIA (PÃ³s-processamento de seguranÃ§a)
@@ -332,8 +336,7 @@ class AvaliacaoCreateView(LoginRequiredMixin, CreateView):
             for f in files[:20]:
                 AvaliacaoFoto.objects.create(avaliacao=self.object, foto=f)
         except Exception as e:
-            print(f"ERRO AO SALVAR ARQUIVO: {e}")
-            pass
+            logger.warning("Erro ao salvar arquivo de avaliacao: %s", e)
         return redirect(self.success_url)
 
 class AvaliacaoDetailView(LoginRequiredMixin, DetailView):
@@ -361,34 +364,44 @@ class AvaliacaoDeleteView(LoginRequiredMixin, DeleteView):
 FIPE_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 }
+FIPE_TIMEOUT_SECONDS = 5
 
 def get_fipe_marcas(request, tipo_veiculo):
     try:
-        # Adicionado headers=FIPE_HEADERS
-        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas', headers=FIPE_HEADERS)
+        response = requests.get(
+            f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas',
+            headers=FIPE_HEADERS,
+            timeout=FIPE_TIMEOUT_SECONDS,
+        )
         response.raise_for_status()
         return JsonResponse(response.json(), safe=False)
     except requests.RequestException as e:
-        print(f"Erro FIPE Marcas: {e}") # Log do erro no terminal para debug
+        logger.warning("Erro FIPE Marcas: %s", e)
         return JsonResponse({'error': 'Erro ao buscar marcas'}, status=500)
 
 def get_fipe_modelos(request, tipo_veiculo, marca_id):
     try:
-        # Adicionado headers=FIPE_HEADERS
-        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas/{marca_id}/modelos', headers=FIPE_HEADERS)
+        response = requests.get(
+            f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas/{marca_id}/modelos',
+            headers=FIPE_HEADERS,
+            timeout=FIPE_TIMEOUT_SECONDS,
+        )
         response.raise_for_status()
         return JsonResponse(response.json().get('modelos', []), safe=False)
     except requests.RequestException as e:
-        print(f"Erro FIPE Modelos: {e}")
+        logger.warning("Erro FIPE Modelos: %s", e)
         return JsonResponse({'error': 'Erro ao buscar modelos'}, status=500)
 
 def get_fipe_anos(request, tipo_veiculo, marca_id, modelo_id):
     try:
-        # Adicionado headers=FIPE_HEADERS
-        response = requests.get(f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas/{marca_id}/modelos/{modelo_id}/anos', headers=FIPE_HEADERS)
+        response = requests.get(
+            f'https://parallelum.com.br/fipe/api/v1/{tipo_veiculo}/marcas/{marca_id}/modelos/{modelo_id}/anos',
+            headers=FIPE_HEADERS,
+            timeout=FIPE_TIMEOUT_SECONDS,
+        )
         response.raise_for_status()
         return JsonResponse(response.json(), safe=False)
     except requests.RequestException as e:
-        print(f"Erro FIPE Anos: {e}")
+        logger.warning("Erro FIPE Anos: %s", e)
         return JsonResponse({'error': 'Erro ao buscar anos'}, status=500)
 

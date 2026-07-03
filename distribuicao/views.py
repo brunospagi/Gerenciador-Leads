@@ -1,7 +1,10 @@
+import logging
 from datetime import datetime, timedelta
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -12,9 +15,29 @@ from .forms import LeadEntradaForm
 from .logic import (
     criar_lead_evo_crm,
     definir_proximo_vendedor,
+    encontrar_cliente_por_whatsapp,
     enviar_webhook_n8n,
     vendedor_disponivel_no_rodizio,
 )
+
+logger = logging.getLogger(__name__)
+
+
+@login_required
+def verificar_duplicidade_whatsapp(request):
+    """Checa em tempo real (via AJAX) se ja existe um lead com este whatsapp."""
+    whatsapp = request.GET.get('whatsapp', '')
+    cliente_existente = encontrar_cliente_por_whatsapp(whatsapp)
+
+    if not cliente_existente:
+        return JsonResponse({'duplicado': False})
+
+    vendedor_nome = cliente_existente.vendedor.get_full_name() or cliente_existente.vendedor.username
+    return JsonResponse({
+        'duplicado': True,
+        'vendedor_nome': vendedor_nome,
+        'data_entrada': timezone.localtime(cliente_existente.data_primeiro_contato).strftime('%d/%m/%Y às %H:%M'),
+    })
 
 
 class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
@@ -245,7 +268,7 @@ class RedistribuirLeadView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         try:
             enviar_webhook_n8n(cliente)
         except Exception as e:
-            print(f'Erro ao enviar webhook na redistribuicao: {e}')
+            logger.warning('Erro ao enviar webhook na redistribuicao do cliente %s: %s', cliente.pk, e)
 
         Historico.objects.create(
             cliente=cliente,

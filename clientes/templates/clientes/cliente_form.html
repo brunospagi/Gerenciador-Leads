@@ -17,45 +17,69 @@
                 <form method="post" id="clienteForm">
                     {% csrf_token %}
                     
+                    {% if form.errors %}
+                        <div class="alert alert-danger" id="alert-erros-formulario">
+                            <div class="fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill me-2"></i>Corrija os campos abaixo antes de salvar:</div>
+                            <ul class="mb-0">
+                                {% for field in form %}
+                                    {% for error in field.errors %}
+                                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% for error in form.non_field_errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
                     <h5 class="mb-3 border-bottom pb-2"><i class="bi bi-person-badge me-2"></i>1. Dados do Cliente</h5>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="{{ form.nome_cliente.id_for_label }}" class="form-label">{{ form.nome_cliente.label }}</label>
                             {{ form.nome_cliente }}
+                            {% if form.nome_cliente.errors %}<div class="text-danger small mt-1">{{ form.nome_cliente.errors.as_text }}</div>{% endif %}
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="{{ form.email.id_for_label }}" class="form-label">{{ form.email.label }}</label>
                             {{ form.email }}
+                            {% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors.as_text }}</div>{% endif %}
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="{{ form.whatsapp.id_for_label }}" class="form-label">{{ form.whatsapp.label }}</label>
                             {{ form.whatsapp }}
+                            {% if form.whatsapp.errors %}<div class="text-danger small mt-1">{{ form.whatsapp.errors.as_text }}</div>{% endif %}
                         </div>
                     </div>
-                    
+
                     <h5 class="mt-4 mb-3 border-bottom pb-2"><i class="bi bi-car-front-fill me-2"></i>2. Dados do Veículo (Manual)</h5>
                     <div class="row align-items-end">
                         <div class="col-md-4 mb-3">
                             <label for="{{ form.tipo_veiculo.id_for_label }}" class="form-label">{{ form.tipo_veiculo.label }}</label>
                             {{ form.tipo_veiculo }}
+                            {% if form.tipo_veiculo.errors %}<div class="text-danger small mt-1">{{ form.tipo_veiculo.errors.as_text }}</div>{% endif %}
                         </div>
                         <div class="col-md-4 mb-3">
                             <label for="{{ form.marca_veiculo.id_for_label }}" class="form-label">Marca</label>
                             {{ form.marca_veiculo }}
+                            {% if form.marca_veiculo.errors %}<div class="text-danger small mt-1">{{ form.marca_veiculo.errors.as_text }}</div>{% endif %}
                         </div>
                         <div class="col-md-4 mb-3">
                             <label for="{{ form.modelo_veiculo.id_for_label }}" class="form-label">Modelo</label>
                             {{ form.modelo_veiculo }}
+                            {% if form.modelo_veiculo.errors %}<div class="text-danger small mt-1">{{ form.modelo_veiculo.errors.as_text }}</div>{% endif %}
                         </div>
                         <div class="col-md-4 mb-3">
                             <label for="{{ form.ano_veiculo.id_for_label }}" class="form-label">Ano</label>
                             {{ form.ano_veiculo }}
+                            {% if form.ano_veiculo.errors %}<div class="text-danger small mt-1">{{ form.ano_veiculo.errors.as_text }}</div>{% endif %}
                         </div>
                          <div class="col-md-6 mb-3">
                             <label for="{{ form.valor_estimado_veiculo.id_for_label }}" class="form-label">{{ form.valor_estimado_veiculo.label }}</label>
                             {{ form.valor_estimado_veiculo }}
+                            {% if form.valor_estimado_veiculo.errors %}<div class="text-danger small mt-1">{{ form.valor_estimado_veiculo.errors.as_text }}</div>{% endif %}
                         </div>
                     </div>
                     
@@ -132,6 +156,21 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', (event) => {
+    // Marca campos com erro de validacao do servidor (borda vermelha) e rola ate o resumo.
+    (function highlightServerErrors() {
+        var errorFieldIds = [
+            {% for field in form %}{% if field.errors %}'id_{{ field.name }}',{% endif %}{% endfor %}
+        ];
+        errorFieldIds.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.classList.add('is-invalid');
+        });
+        var alertBox = document.getElementById('alert-erros-formulario');
+        if (alertBox) {
+            alertBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    })();
+
     // Aplica máscara no campo de WhatsApp
     const phoneInput = document.getElementById('id_whatsapp');
     if (phoneInput) {

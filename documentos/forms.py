@@ -1,5 +1,8 @@
 from django import forms
+from django.core.validators import FileExtensionValidator
 from .models import Procuracao, Outorgado # Adicionado Outorgado
+
+CRLV_PDF_MAX_SIZE_MB = 10
 
 class OutorgadoForm(forms.ModelForm):
     """
@@ -53,5 +56,18 @@ class CRLVUploadForm(forms.Form):
     crlv_pdf = forms.FileField(
         label="Carregar CRLV-e (PDF)",
         required=True,
+        validators=[FileExtensionValidator(allowed_extensions=['pdf'])],
         widget=forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': '.pdf'})
     )
+
+    def clean_crlv_pdf(self):
+        arquivo = self.cleaned_data['crlv_pdf']
+        content_type = getattr(arquivo, 'content_type', '') or ''
+        if content_type and content_type != 'application/pdf':
+            raise forms.ValidationError('O arquivo enviado nao e um PDF valido.')
+        limite_bytes = CRLV_PDF_MAX_SIZE_MB * 1024 * 1024
+        if arquivo.size > limite_bytes:
+            raise forms.ValidationError(
+                f'O arquivo excede o tamanho maximo permitido ({CRLV_PDF_MAX_SIZE_MB}MB).'
+            )
+        return arquivo

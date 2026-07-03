@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
@@ -17,6 +19,8 @@ from urllib.parse import urlparse
 from django.contrib.staticfiles import finders
 from django.contrib import messages 
 from django.core.files.uploadedfile import InMemoryUploadedFile
+
+logger = logging.getLogger(__name__)
 
 
 # --- Mixin para restringir acesso apenas a Admins ---
@@ -210,13 +214,12 @@ def link_callback(uri, rel):
 
         # 6. Verifica se o arquivo realmente existe
         if not os.path.isfile(result):
-            print(f"Erro no link_callback: Não foi possível encontrar o arquivo para o URI: {uri}")
-            print(f"Caminho procurado: {result}")
+            logger.warning("link_callback: arquivo nao encontrado para URI=%s caminho=%s", uri, result)
             return None
-            
+
         return result
     except Exception as e:
-        print(f"Exceção no link_callback: {e} - URI: {uri}")
+        logger.warning("Excecao no link_callback: %s - URI: %s", e, uri)
         return None
 
 

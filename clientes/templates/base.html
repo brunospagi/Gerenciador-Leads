@@ -5,9 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CRM Spagi - Painel de Controle</title>
-    
+
+    <meta name="theme-color" content="#0f172a">
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <link rel="apple-touch-icon" href="{% static 'images/logo-spagi.png' %}">
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/css/lightbox.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/app_m3.css' %}">
 
@@ -202,6 +208,10 @@
                     <li><a href="{% url 'painel-distribuicao' %}"><i class="fas fa-random"></i> Distribuição de Leads</a></li>
                     {% endif %}
 
+                    {% if module_access.avaliacoes %}
+                    <li><a href="{% url 'avaliacao_list' %}"><i class="fas fa-car"></i> Avaliações</a></li>
+                    {% endif %}
+
                     {% if module_access.financeiro %}
                     <li class="menu-header mt-3">Caixa e Finanças</li>
                     <li><a href="{% url 'financeiro:lista_transacoes' %}"><i class="fas fa-wallet" style="color:#10b981;"></i> Gestão Financeira</a></li>
@@ -256,6 +266,7 @@
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3">
                         <li><a class="dropdown-item py-2" href="{% url 'profile' %}"><i class="fas fa-user-circle me-2 text-primary"></i> Meu Perfil</a></li>
                         <li><a class="dropdown-item py-2" href="{% url 'password_change' %}"><i class="fas fa-lock me-2 text-primary"></i> Alterar Senha</a></li>
+                        <li><a class="dropdown-item py-2" href="#" id="enable-push-notifications"><i class="fas fa-bell me-2 text-primary"></i> Ativar Notificações</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li>
                             <form method="post" action="{% url 'logout' %}" class="px-2 pb-1">
@@ -309,6 +320,132 @@
             });
         });
     </script>
+
+    <script src="https://unpkg.com/imask"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/js/lightbox.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
+
+    <script>
+        // Função utilitária para converter a chave VAPID
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding)
+                .replace(/-/g, '+')
+                .replace(/_/g, '/');
+
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("{% static 'images/js/serviceworker.js' %}")
+                .then(function (registration) {
+                    console.log("Service Worker registrado com sucesso:", registration);
+
+                    if ('periodicSync' in registration) {
+                        requestPeriodicSyncPermission(registration);
+                    }
+
+                    // Expõe a 'registration' globalmente para o script de push usar
+                    window.swRegistration = registration;
+                })
+                .catch(function (error) {
+                    console.log("Falha ao registrar Service Worker:", error);
+                });
+        }
+
+        async function requestPeriodicSyncPermission(registration) {
+            try {
+                const status = await navigator.permissions.query({name: 'periodic-background-sync'});
+                if (status.state === 'granted') {
+                    await registerPeriodicSync(registration);
+                } else {
+                    console.log('Permissão para Periodic Sync não está "granted". Estado: ' + status.state);
+                }
+            } catch (error) {
+                console.error('Falha ao verificar permissão de Periodic Sync:', error);
+            }
+        }
+
+        async function registerPeriodicSync(registration) {
+            try {
+                await registration.periodicSync.unregister('update-cache-daily');
+                await registration.periodicSync.register('update-cache-daily', {
+                    minInterval: 24 * 60 * 60 * 1000, // 1 dia
+                });
+                console.log('Periodic Sync (update-cache-daily) registrado com sucesso.');
+            } catch (error) {
+                console.error('Falha ao registrar Periodic Sync:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const pushButton = document.getElementById('enable-push-notifications');
+            if (pushButton) {
+                pushButton.addEventListener('click', askForPushPermission);
+            }
+        });
+
+        async function askForPushPermission() {
+            if (!('Notification' in window) || !('PushManager' in window) || !window.swRegistration) {
+                alert('Seu navegador não suporta Notificações Push.');
+                return;
+            }
+
+            const permission = await Notification.requestPermission();
+
+            if (permission === 'granted') {
+                console.log('Permissão de notificação concedida.');
+                await subscribeUserToPush();
+            } else {
+                console.warn('Permissão de notificação negada.');
+            }
+        }
+
+        async function subscribeUserToPush() {
+            try {
+                const response = await fetch("{% url 'get_vapid_public_key' %}");
+                if (!response.ok) {
+                    throw new Error('Falha ao buscar a chave VAPID do servidor.');
+                }
+                const data = await response.json();
+                const vapidPublicKey = data.vapid_public_key;
+                const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
+
+                const subscription = await window.swRegistration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: applicationServerKey
+                });
+
+                console.log('Inscrição PUSH obtida:', JSON.stringify(subscription));
+
+                const saveResponse = await fetch("{% url 'save_webpush_subscription' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(subscription.toJSON())
+                });
+
+                if (saveResponse.ok) {
+                    alert('Notificações ativadas com sucesso!');
+                } else {
+                    const errorData = await saveResponse.json();
+                    throw new Error(errorData.error || 'Falha ao salvar inscrição no servidor.');
+                }
+
+            } catch (error) {
+                console.error('Falha ao se inscrever no Push:', error);
+                alert('Erro ao ativar notificações: ' + error.message);
+            }
+        }
+    </script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

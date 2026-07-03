@@ -9,12 +9,17 @@ ENV PYTHONUNBUFFERED=1
 # - libpq-dev: para compilar o psycopg2
 # - cron: para as tarefas agendadas
 # - libfreetype6-dev: para a compilação do xhtml2pdf
+# - gosu: para o entrypoint largar privilegio de root antes de subir o gunicorn
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     cron \
     libfreetype6-dev \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
+
+# Usuario nao-root que vai rodar o processo da aplicacao (gunicorn)
+RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /usr/sbin/nologin appuser
 
 # Define o diretório de trabalho
 WORKDIR /app
@@ -32,11 +37,17 @@ COPY . .
 COPY crontab /etc/cron.d/my-cron-jobs
 RUN sed -i 's/\r$//' /etc/cron.d/my-cron-jobs \
     && chmod 0644 /etc/cron.d/my-cron-jobs \
-    && touch /app/cron.log
+    && touch /app/cron.log \
+    && chown appuser:appuser /app/cron.log
 
 # Copia e dá permissão de execução para o script de entrypoint
+# (sed remove eventual CRLF do arquivo, caso o build venha de um checkout Windows)
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+RUN sed -i 's/\r$//' /app/entrypoint.sh \
+    && chmod +x /app/entrypoint.sh
+
+# Garante que a aplicacao (arquivos estaticos, staticfiles, etc) seja legivel/gravavel pelo appuser
+RUN chown -R appuser:appuser /app
 
 # Expõe a porta que o Gunicorn irá usar
 EXPOSE 8000

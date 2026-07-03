@@ -61,10 +61,12 @@
                         {% endfor %}
 
                         {# === SEÇÃO DE CONFIRMAÇÃO DE REDISTRIBUIÇÃO === #}
-                        {# Só aparece se houver erro no WhatsApp (duplicidade) #}
-                        {% if form.whatsapp.errors %}
-                        <div class="alert alert-warning border-warning mt-3">
+                        {# Some via JS (verificacao ao vivo) ou aparece de novo apos erro do servidor #}
+                        <div id="alerta-duplicidade" class="alert alert-warning border-warning mt-3" {% if not form.whatsapp.errors %}style="display:none;"{% endif %}>
                             <h6 class="alert-heading fw-bold"><i class="fa fa-exchange-alt"></i> Transferência de Lead</h6>
+                            <div id="duplicidade-mensagem" class="small mb-2">
+                                {% if form.whatsapp.errors %}{{ form.whatsapp.errors|striptags }}{% endif %}
+                            </div>
                             <hr>
                             <div class="form-check">
                                 {{ form.redistribuir }}
@@ -76,12 +78,11 @@
                                 Ao marcar esta opção, o lead será retirado do vendedor atual e entregue ao próximo da fila do rodízio.
                             </small>
                         </div>
-                        {% else %}
-                            {# Campo oculto para não quebrar a validação se não houver erro #}
-                            <div class="d-none">
-                                {{ form.redistribuir }}
-                            </div>
-                        {% endif %}
+
+                        <small id="verificando-duplicidade" class="d-block text-muted mt-2" style="display:none;">
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            Verificando se este número já está cadastrado...
+                        </small>
 
                         <button type="submit" class="btn btn-success w-100 mt-3 py-2 fw-bold">
                             <i class="fa fa-check me-2"></i>Confirmar Entrada
@@ -166,6 +167,17 @@
 {{ evo_crm_debug|json_script:"evo-crm-debug-data" }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // Marca campos com erro de validacao do servidor (borda vermelha).
+    (function highlightServerErrors() {
+        var errorFieldIds = [
+            {% for field in form %}{% if field.errors %}'id_{{ field.name }}',{% endif %}{% endfor %}
+        ];
+        errorFieldIds.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.classList.add('is-invalid');
+        });
+    })();
+
     const manualCheck = document.getElementById('id_lancamento_esporadico');
     const vendedorSelect = document.getElementById('id_vendedor_manual');
 
@@ -184,6 +196,67 @@ document.addEventListener('DOMContentLoaded', function () {
     const evoCrmDebug = evoCrmDebugNode ? JSON.parse(evoCrmDebugNode.textContent) : null;
     if (evoCrmDebug) {
         console.error('Falha ao criar lead no Evo CRM:', evoCrmDebug);
+    }
+
+    // --- Verificacao de duplicidade de telefone ao vivo (sem precisar submeter o form) ---
+    const whatsappInput = document.getElementById('id_whatsapp');
+    const alertaDuplicidade = document.getElementById('alerta-duplicidade');
+    const duplicidadeMensagem = document.getElementById('duplicidade-mensagem');
+    const verificandoLabel = document.getElementById('verificando-duplicidade');
+    let duplicidadeTimer = null;
+    let duplicidadeRequestId = 0;
+
+    function esconderAlertaDuplicidade() {
+        if (alertaDuplicidade) alertaDuplicidade.style.display = 'none';
+        if (whatsappInput) whatsappInput.classList.remove('is-invalid');
+    }
+
+    async function verificarDuplicidade() {
+        const valor = whatsappInput ? whatsappInput.value : '';
+        const digitos = valor.replace(/\D/g, '');
+        if (digitos.length < 10) {
+            esconderAlertaDuplicidade();
+            return;
+        }
+
+        const requestId = ++duplicidadeRequestId;
+        if (verificandoLabel) verificandoLabel.style.display = 'block';
+
+        try {
+            const resp = await fetch("{% url 'verificar-duplicidade-whatsapp' %}?whatsapp=" + encodeURIComponent(valor));
+            if (requestId !== duplicidadeRequestId) return; // resposta antiga, ignora
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            if (data.duplicado) {
+                if (duplicidadeMensagem) {
+                    duplicidadeMensagem.innerHTML = (
+                        '⚠️ Lead já cadastrado! Pertence a: <strong>' + data.vendedor_nome + '</strong>. ' +
+                        'Data de entrada: ' + data.data_entrada + '. ' +
+                        'Marque "Redistribuir" abaixo se quiser transferir para um novo vendedor.'
+                    );
+                }
+                if (alertaDuplicidade) alertaDuplicidade.style.display = 'block';
+                if (whatsappInput) whatsappInput.classList.add('is-invalid');
+            } else {
+                esconderAlertaDuplicidade();
+            }
+        } catch (e) {
+            // Falha de rede na checagem ao vivo nao deve travar o preenchimento do form;
+            // a validacao no submit ainda cobre o caso.
+        } finally {
+            if (requestId === duplicidadeRequestId && verificandoLabel) {
+                verificandoLabel.style.display = 'none';
+            }
+        }
+    }
+
+    if (whatsappInput) {
+        whatsappInput.addEventListener('input', function () {
+            if (duplicidadeTimer) clearTimeout(duplicidadeTimer);
+            duplicidadeTimer = setTimeout(verificarDuplicidade, 500);
+        });
+        whatsappInput.addEventListener('blur', verificarDuplicidade);
     }
 });
 </script>

@@ -10,13 +10,18 @@ from django.utils import timezone
 from clientes.models import Cliente
 from controle_ponto.models import RegistroPonto
 from funcionarios.models import Funcionario
+from distribuicao.forms import LeadEntradaForm
 from distribuicao.logic import criar_lead_evo_crm, definir_proximo_vendedor
 from distribuicao.models import VendedorRodizio
 
 
 class DistribuicaoRegrasPontoTests(TestCase):
     def _criar_vendedor(self, username='vendedor1'):
-        user = User.objects.create_user(username=username, password='123456')
+        user = User(username=username)
+        user.set_password('123456')
+        # Evita perfil funcional automático do signal; o teste cria o Funcionario explicitamente abaixo.
+        user._skip_funcionario_signal = True
+        user.save()
         funcionario = Funcionario.objects.create(
             user=user,
             cpf=f"000.000.000-{str(user.id).zfill(2)}",
@@ -112,6 +117,107 @@ class DistribuicaoRegrasPontoTests(TestCase):
 
         self.assertEqual(proximo, user)
 
+    def test_rodizio_alterna_entre_vendedores_elegiveis(self):
+        user_a, funcionario_a = self._criar_vendedor('vendedor_rodizio_a')
+        user_b, funcionario_b = self._criar_vendedor('vendedor_rodizio_b')
+        for funcionario in (funcionario_a, funcionario_b):
+            RegistroPonto.objects.create(funcionario=funcionario, entrada=time(8, 0))
+
+        VendedorRodizio.objects.filter(vendedor=user_a).update(ordem=1)
+        VendedorRodizio.objects.filter(vendedor=user_b).update(ordem=2)
+
+        with patch('distribuicao.logic.timezone.localtime', return_value=self._agora(10, 0)):
+            primeiro = definir_proximo_vendedor()
+            segundo = definir_proximo_vendedor()
+            terceiro = definir_proximo_vendedor()
+
+        # Primeira rodada respeita a ordem cadastrada; depois alterna por quem foi atribuido ha mais tempo.
+        self.assertEqual(primeiro, user_a)
+        self.assertEqual(segundo, user_b)
+        self.assertEqual(terceiro, user_a)
+
+
+class LeadEntradaFormDedupTests(TestCase):
+    def setUp(self):
+        self.vendedor = User.objects.create_user(username='vendedor_dedup', password='123456')
+
+    def _dados_base(self, whatsapp):
+        return {
+            'nome_cliente': 'Cliente Teste',
+            'email': 'cliente@teste.com',
+            'whatsapp': whatsapp,
+            'tipo_veiculo': 'carros',
+            'marca_veiculo': 'Honda',
+            'modelo_veiculo': 'Civic',
+            'fonte_cliente': 'Instagram',
+            'observacao': '',
+        }
+
+    def test_detecta_duplicata_com_formatacao_diferente(self):
+        Cliente.objects.create(
+            vendedor=self.vendedor,
+            nome_cliente='Cliente Existente',
+            whatsapp='(41) 99999-1111',
+            tipo_contato=Cliente.TipoContato.MENSAGEM,
+            proximo_passo=Cliente.ProximoPasso.MENSAGEM,
+        )
+
+        # Mesmo numero, digitado sem formatacao: precisa ser detectado como duplicata.
+        form = LeadEntradaForm(data=self._dados_base('41999991111'))
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('whatsapp', form.errors)
+
+    def test_nao_marca_falso_positivo_por_substring(self):
+        Cliente.objects.create(
+            vendedor=self.vendedor,
+            nome_cliente='Cliente Existente',
+            whatsapp='(41) 41987-6543',
+            tipo_contato=Cliente.TipoContato.MENSAGEM,
+            proximo_passo=Cliente.ProximoPasso.MENSAGEM,
+        )
+
+        # "9876543" e substring dos digitos acima, mas e um numero diferente de verdade.
+        form = LeadEntradaForm(data=self._dados_base('9876543'))
+
+        self.assertTrue(form.is_valid())
+
+
+class VerificarDuplicidadeWhatsappViewTests(TestCase):
+    def setUp(self):
+        self.vendedor = User.objects.create_user(username='vendedor_ajax', password='123456')
+        self.vendedor.module_permissions.modulo_distribuicao = True
+        self.vendedor.module_permissions.save()
+        self.client.force_login(self.vendedor)
+
+    def test_retorna_duplicado_true_quando_ja_existe(self):
+        Cliente.objects.create(
+            vendedor=self.vendedor,
+            nome_cliente='Cliente Existente',
+            whatsapp='(41) 99999-1111',
+            tipo_contato=Cliente.TipoContato.MENSAGEM,
+            proximo_passo=Cliente.ProximoPasso.MENSAGEM,
+        )
+
+        resposta = self.client.get('/distribuicao/verificar-duplicidade/', {'whatsapp': '41999991111'})
+
+        self.assertEqual(resposta.status_code, 200)
+        dados = resposta.json()
+        self.assertTrue(dados['duplicado'])
+        self.assertIn('vendedor_nome', dados)
+        self.assertIn('data_entrada', dados)
+
+    def test_retorna_duplicado_false_quando_nao_existe(self):
+        resposta = self.client.get('/distribuicao/verificar-duplicidade/', {'whatsapp': '41988887777'})
+
+        self.assertEqual(resposta.status_code, 200)
+        self.assertFalse(resposta.json()['duplicado'])
+
+    def test_exige_login(self):
+        self.client.logout()
+        resposta = self.client.get('/distribuicao/verificar-duplicidade/', {'whatsapp': '41988887777'})
+        self.assertNotEqual(resposta.status_code, 200)
+
 
 @override_settings(
     EVO_CRM_API_URL='https://api.evoai.app',
@@ -192,3 +298,39 @@ class DistribuicaoEvoCrmTests(TestCase):
         self.assertTrue(resultado['skipped'])
         self.assertEqual(resultado['reason'], 'not_configured')
         mock_post.assert_not_called()
+
+    @patch('distribuicao.logic.requests.post')
+    def test_comando_sincronizar_evo_crm_reprocessa_pendentes(self, mock_post):
+        from io import StringIO
+        from django.core.management import call_command
+
+        mock_post.return_value.json.return_value = {
+            'success': True,
+            'data': {'lead_id': 'lead-retry-1', 'deal_id': 'deal-retry-1'},
+        }
+        mock_post.return_value.raise_for_status.return_value = None
+
+        self.assertIsNone(self.cliente.evo_crm_lead_id)
+
+        saida = StringIO()
+        call_command('sincronizar_evo_crm', stdout=saida)
+
+        self.cliente.refresh_from_db()
+        self.assertEqual(self.cliente.evo_crm_lead_id, 'lead-retry-1')
+        self.assertEqual(self.cliente.evo_crm_deal_id, 'deal-retry-1')
+        self.assertIn('1 sincronizado(s)', saida.getvalue())
+
+    @patch('distribuicao.logic.requests.post')
+    def test_comando_sincronizar_evo_crm_ignora_ja_sincronizados(self, mock_post):
+        from io import StringIO
+        from django.core.management import call_command
+
+        self.cliente.evo_crm_lead_id = 'lead-ja-sincronizado'
+        self.cliente.evo_crm_deal_id = 'deal-ja-sincronizado'
+        self.cliente.save(update_fields=['evo_crm_lead_id', 'evo_crm_deal_id'])
+
+        saida = StringIO()
+        call_command('sincronizar_evo_crm', stdout=saida)
+
+        mock_post.assert_not_called()
+        self.assertIn('Nenhum lead pendente', saida.getvalue())

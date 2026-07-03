@@ -27,27 +27,17 @@ def _get_profile(user):
         return None
 
 
-def _legacy_default_access(user, module_key):
-    profile = _get_profile(user)
-    nivel = getattr(profile, 'nivel_acesso', '')
+def _get_or_create_module_permissions(user):
+    # Importado aqui para evitar import circular (models importa deste modulo indiretamente).
+    from .models import ModulePermission
 
-    if module_key in {'clientes', 'vendas', 'financiamentos', 'ponto', 'avaliacoes'}:
-        return True
-    if module_key == 'financeiro':
-        return bool(getattr(profile, 'pode_acessar_financeiro', False))
-    if module_key == 'distribuicao':
-        return nivel in {'ADMIN', 'GERENTE', 'DISTRIBUIDOR'} or bool(getattr(profile, 'pode_distribuir_leads', False))
-    if module_key == 'rh':
-        return nivel in {'ADMIN', 'GERENTE'}
-    if module_key == 'relatorios':
-        return nivel in {'ADMIN', 'GERENTE'}
-    if module_key == 'usuarios_admin':
-        return nivel == 'ADMIN'
-    if module_key == 'credenciais':
-        return nivel == 'ADMIN'
-    if module_key in {'documentos', 'autorizacoes'}:
-        return True
-    return False
+    try:
+        return user.module_permissions
+    except (AttributeError, ObjectDoesNotExist):
+        # Usuario legitimo sem registro (ex.: criado antes da migracao 0007). Autocura
+        # criando o registro com os defaults do model, em vez de liberar acesso amplo.
+        permissao, _ = ModulePermission.objects.get_or_create(user=user)
+        return permissao
 
 
 def has_module_access(user, module_key):
@@ -65,7 +55,10 @@ def has_module_access(user, module_key):
         return False
 
     try:
-        perms = user.module_permissions
-        return bool(getattr(perms, field_name, False))
-    except (AttributeError, ObjectDoesNotExist, DatabaseError, OperationalError, ProgrammingError):
-        return _legacy_default_access(user, module_key)
+        perms = _get_or_create_module_permissions(user)
+    except (DatabaseError, OperationalError, ProgrammingError):
+        # Falha de infra (ex.: migracao ainda nao aplicada) -> nega por seguranca
+        # em vez de liberar acesso amplo aos modulos.
+        return False
+
+    return bool(getattr(perms, field_name, False))

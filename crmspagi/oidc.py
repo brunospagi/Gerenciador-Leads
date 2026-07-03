@@ -1,5 +1,10 @@
+import logging
+
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 from usuarios.models import Profile
+
+logger = logging.getLogger(__name__)
+
 
 class SpagiOIDCBackend(OIDCAuthenticationBackend):
     def update_user(self, user, claims):
@@ -10,8 +15,8 @@ class SpagiOIDCBackend(OIDCAuthenticationBackend):
         # Pega a lista de grupos que vem do Authentik
         # (Certifique-se que no Authentik você configurou o envio da claim 'groups')
         roles = claims.get('groups', [])
-        
-        print(f"Login SSO - Usuário: {user.email} - Grupos: {roles}") # Log para debug
+
+        logger.info("Login SSO: usuario_id=%s grupos=%s", user.id, roles)
 
         # Lógica de Mapeamento de Permissões
         # Ajuste os nomes 'CRM_Admin', etc. conforme os grupos que criar no Authentik

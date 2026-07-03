@@ -25,29 +25,29 @@ def get_apolice_upload_path(instance, filename):
 # === CONFIGURAÇÃO DE COMISSÕES (PAINEL ADMIN) ===
 class ParametrosComissao(models.Model):
     # Carros
-    comissao_carro_padrao = models.DecimalField(max_digits=10, decimal_places=2, default=500.00, verbose_name="Comissão Carro (Padrão)")
-    comissao_carro_desconto = models.DecimalField(max_digits=10, decimal_places=2, default=200.00, verbose_name="Comissão Carro (c/ Desconto)")
-    
+    comissao_carro_padrao = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('500.00'), verbose_name="Comissão Carro (Padrão)")
+    comissao_carro_desconto = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('200.00'), verbose_name="Comissão Carro (c/ Desconto)")
+
     # Motos
-    comissao_moto = models.DecimalField(max_digits=10, decimal_places=2, default=150.00, verbose_name="Comissão Moto")
+    comissao_moto = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('150.00'), verbose_name="Comissão Moto")
 
     # Consignação e Compra
-    comissao_consignacao = models.DecimalField(max_digits=10, decimal_places=2, default=350.00, verbose_name="Comissão Consignação/Compra")
+    comissao_consignacao = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('350.00'), verbose_name="Comissão Consignação/Compra")
 
     # Seguro Garantia
-    garantia_custo = models.DecimalField(max_digits=10, decimal_places=2, default=997.00, verbose_name="Custo Garantia (Provider)")
-    garantia_base = models.DecimalField(max_digits=10, decimal_places=2, default=1300.00, verbose_name="Preço Base Garantia")
+    garantia_custo = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('997.00'), verbose_name="Custo Garantia (Provider)")
+    garantia_base = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('1300.00'), verbose_name="Preço Base Garantia")
 
     # Seguro Novo
-    seguro_novo_ref = models.DecimalField(max_digits=10, decimal_places=2, default=150.00, verbose_name="Ref. Comissão Seguro Novo")
-    
+    seguro_novo_ref = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('150.00'), verbose_name="Ref. Comissão Seguro Novo")
+
     # Percentuais de Split
-    split_transferencia = models.DecimalField(max_digits=5, decimal_places=2, default=0.30, verbose_name="Split Transf. (Vendedor %)")
-    
+    split_transferencia = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.30'), verbose_name="Split Transf. (Vendedor %)")
+
     # REFINANCIAMENTO (Padrão 35%)
-    split_refin = models.DecimalField(max_digits=5, decimal_places=2, default=0.35, verbose_name="Split Refin. (Vendedor %)")
-    
-    split_ajudante = models.DecimalField(max_digits=5, decimal_places=2, default=0.50, verbose_name="Split Ajudante (%)")
+    split_refin = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.35'), verbose_name="Split Refin. (Vendedor %)")
+
+    split_ajudante = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.50'), verbose_name="Split Ajudante (%)")
 
     def __str__(self):
         return "Configuração Geral de Comissões"
@@ -105,7 +105,8 @@ class VendaProduto(models.Model):
         ('OUTRO', 'Outro'),
     ]
 
-    vendedor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='vendas_produtos')
+    # PROTECT: excluir um vendedor nao pode apagar silenciosamente o historico de vendas/comissoes.
+    vendedor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='vendas_produtos')
     gerente = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='conferencias_produtos')
     
     vendedor_ajudante = models.ForeignKey(

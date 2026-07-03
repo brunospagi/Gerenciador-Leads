@@ -1,3 +1,6 @@
+import re
+from decimal import Decimal, InvalidOperation
+
 from django.contrib.auth.models import User
 from django import forms
 from .models import Cliente, Historico, LeadAndamento
@@ -7,6 +10,12 @@ class ClienteForm(forms.ModelForm):
     data_proximo_contato = forms.DateTimeField(
         required=False,
         widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'})
+    )
+    # CharField proposital: o input recebe mascara "R$ 1.234,56" (IMask) no template,
+    # entao o parse para Decimal precisa remover "R$"/milhar antes de validar o numero.
+    valor_estimado_veiculo = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'R$ 0,00'}),
     )
 
     class Meta:
@@ -22,11 +31,24 @@ class ClienteForm(forms.ModelForm):
             'observacao': forms.Textarea(attrs={'rows': 3}),
             'whatsapp': forms.TextInput(attrs={'placeholder': '(99) 9 9999-9999'}),
             'email': forms.EmailInput(attrs={'placeholder': 'email@cliente.com'}),
-            'valor_estimado_veiculo': forms.TextInput(attrs={'placeholder': 'R$ 0,00'}),
             'marca_veiculo': forms.TextInput(attrs={'placeholder': 'Ex: Chevrolet'}),
             'modelo_veiculo': forms.TextInput(attrs={'placeholder': 'Ex: Onix 1.0'}),
             'ano_veiculo': forms.TextInput(attrs={'placeholder': 'Ex: 2022'}),
         }
+
+    def clean_valor_estimado_veiculo(self):
+        bruto = (self.cleaned_data.get('valor_estimado_veiculo') or '').strip()
+        if not bruto:
+            return None
+        limpo = re.sub(r'[^0-9,.\-]', '', bruto)
+        if not limpo:
+            raise forms.ValidationError('Informe um valor numérico válido (ex: R$ 45.000,00).')
+        if ',' in limpo:
+            limpo = limpo.replace('.', '').replace(',', '.')
+        try:
+            return Decimal(limpo)
+        except (InvalidOperation, ValueError):
+            raise forms.ValidationError('Informe um valor numérico válido (ex: R$ 45.000,00).')
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
