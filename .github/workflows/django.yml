@@ -15,8 +15,27 @@ jobs:
       matrix:
         python-version: ["3.12"]
 
+    # Producao roda em Postgres, nao SQLite. SQLite ignora select_for_update()
+    # silenciosamente (nao suporta lock de linha), entao um teste rodando so contra
+    # SQLite nao pega restricoes especificas do Postgres (ex: "FOR UPDATE cannot be
+    # applied to the nullable side of an outer join", que ja derrubou a distribuicao
+    # de leads em producao sem nunca ter falhado aqui). Por isso a suite roda nos dois.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
-      DB_ENGINE: sqlite
       DJANGO_SECRET_KEY: ci-test-secret-key
       DJANGO_DEBUG: "False"
 
@@ -34,8 +53,22 @@ jobs:
       # Mesma etapa que o entrypoint.sh roda em producao. Necessaria porque
       # STORAGES['staticfiles'] usa manifest (WhiteNoise), que exige o manifest
       # gerado por collectstatic para resolver {% static %} nos templates.
+      env:
+        DB_ENGINE: sqlite
       run: |
         python manage.py collectstatic --noinput
-    - name: Run Tests
+    - name: Run Tests (SQLite)
+      env:
+        DB_ENGINE: sqlite
+      run: |
+        python manage.py test
+    - name: Run Tests (PostgreSQL, paridade com producao)
+      env:
+        DB_ENGINE: postgres
+        DB_NAME: ci
+        DB_USER: ci
+        DB_PASSWORD: ci
+        DB_HOST: localhost
+        DB_PORT: 5432
       run: |
         python manage.py test
