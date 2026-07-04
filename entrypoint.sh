@@ -40,6 +40,24 @@ python manage.py migrate --noinput
 echo "Coletando arquivos estaticos..."
 python manage.py collectstatic --noinput --clear
 
+# Verificacao defensiva: alguns arquivos criticos (usados no layout base) precisam
+# existir apos o collectstatic. Ja aconteceu em producao do collectstatic reportar
+# sucesso mas um arquivo especifico nao aparecer em STATIC_ROOT, causando 500 na
+# primeira pagina acessada. Falhar aqui, com diagnostico, e muito mais facil de
+# investigar do que um 500 silencioso depois.
+for f in staticfiles/css/app_m3.css staticfiles/js/app_ux.js staticfiles/staticfiles.json; do
+  if [ ! -s "/app/$f" ]; then
+    echo "ERRO: arquivo estatico esperado nao foi encontrado (ou esta vazio) apos collectstatic: /app/$f"
+    echo "--- Diagnostico ---"
+    echo "Conteudo de /app/staticfiles:"
+    ls -la /app/staticfiles 2>&1 || echo "(diretorio /app/staticfiles nao existe)"
+    echo "Espaco em disco:"
+    df -h /app 2>&1 || true
+    exit 1
+  fi
+done
+echo "Arquivos estaticos verificados com sucesso."
+
 # Inicia o servidor Gunicorn (ou o comando passado do CMD do Dockerfile) sem privilegio de root.
 # O cron (acima) continua rodando como root, ja que os jobs em /etc/cron.d exigem isso.
 echo "Iniciando a aplicacao..."
