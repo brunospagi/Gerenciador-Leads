@@ -22,6 +22,7 @@ class AuditLogAdmin(admin.ModelAdmin):
     list_filter = ("module", "method", "severity", "success", "created_at")
     search_fields = ("action", "path", "username_snapshot", "object_repr")
     ordering = ("-created_at",)
+    date_hierarchy = "created_at"
     readonly_fields = (
         "created_at",
         "user",

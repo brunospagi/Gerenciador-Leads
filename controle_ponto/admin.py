@@ -63,3 +63,5 @@ class RegistroPontoAdmin(admin.ModelAdmin):
     )
     list_filter = ('data', 'funcionario', 'status_homologacao')
     search_fields = ('funcionario__user__first_name', 'funcionario__user__last_name', 'ip_registrado', 'justificativa_atraso')
+    autocomplete_fields = ('funcionario', 'homologado_por')
+    date_hierarchy = 'data'

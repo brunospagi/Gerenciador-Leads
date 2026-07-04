@@ -18,6 +18,8 @@ class VendaProdutoAdmin(admin.ModelAdmin):
     list_display = ('tipo_produto', 'origem_cliente', 'modelo_veiculo', 'placa', 'vendedor', 'data_venda', 'status', 'comissao_vendedor')
     list_filter = ('tipo_produto', 'origem_cliente', 'status', 'data_venda')
     search_fields = ('placa', 'modelo_veiculo', 'cliente_nome')
+    autocomplete_fields = ('vendedor',)
+    date_hierarchy = 'data_venda'
 
 @admin.register(FechamentoMensal)
 class FechamentoMensalAdmin(admin.ModelAdmin):
