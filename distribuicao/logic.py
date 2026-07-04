@@ -47,7 +47,11 @@ def _listar_vendedores_disponiveis(agora_local=None, lock=False):
     queryset = VendedorRodizio.objects.filter(ativo=True).select_related('vendedor', 'vendedor__dados_funcionais')
     if lock:
         # Serializa concorrentes na definicao do proximo vendedor (evita atribuir o mesmo vendedor duas vezes).
-        queryset = queryset.select_for_update()
+        # of=('self',) restringe o lock so a tabela de VendedorRodizio: sem isso o Postgres
+        # rejeita com "FOR UPDATE cannot be applied to the nullable side of an outer join",
+        # porque vendedor__dados_funcionais e o lado reverso de um OneToOneField (nem todo
+        # User tem Funcionario), resolvido com LEFT OUTER JOIN.
+        queryset = queryset.select_for_update(of=('self',))
     candidatos = list(queryset)
     candidatos.sort(
         key=lambda item: (
