@@ -82,12 +82,17 @@ body {
   border-radius: var(--m3-radius-md) !important;
   box-shadow: var(--m3-shadow-sm) !important;
   background: var(--m3-surface-2);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: box-shadow 0.2s ease;
 }
 
+/* Sem "transform" aqui de proposito: um transform em qualquer estado (incluindo
+   :hover) vira o containing block dos descendentes com position:fixed/absolute.
+   Modais (data-bs-toggle="modal") sao renderizados dentro de .card em varias
+   telas (ex: comprovante de venda em vendas_produtos/lista.html); com o mouse
+   sobre o card, o :hover ligava/desligava esse transform e o modal/backdrop
+   "piscava", pulando de fixo-na-tela para preso dentro do card. */
 .card:hover {
   box-shadow: var(--m3-shadow-md) !important;
-  transform: translateY(-1px);
 }
 
 .card-header {
