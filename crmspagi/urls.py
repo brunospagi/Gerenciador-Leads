@@ -4,6 +4,10 @@ from django.views.generic import RedirectView, TemplateView
 from django.contrib.auth.decorators import login_required
 from crmspagi import views
 
+admin.site.site_header = 'Spagi CRM — Administração'
+admin.site.site_title = 'Spagi CRM Admin'
+admin.site.index_title = 'Painel de Administração'
+
 urlpatterns = [
     path('serviceworker.js', views.service_worker, name='service_worker'),
     path('favicon.ico', RedirectView.as_view(url='/static/images/logo-spagi-192x192.png', permanent=True)),
