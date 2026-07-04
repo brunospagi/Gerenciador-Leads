@@ -342,11 +342,23 @@
         document.addEventListener("DOMContentLoaded", function() {
             const currentPath = window.location.pathname;
             const menuLinks = document.querySelectorAll('.sidebar-menu a');
+            // Marca so o link mais especifico (maior href) que bate com a rota atual.
+            // Um "includes" simples de substring marcava "Bater Ponto" (/ponto/) como
+            // ativo tambem em qualquer outra pagina do app (/ponto/relatorio/,
+            // /ponto/homologacao/, etc), porque uma e prefixo textual da outra.
+            let melhorLink = null;
+            let melhorTamanho = -1;
             menuLinks.forEach(link => {
-                if (link.getAttribute('href') === currentPath || (currentPath.includes(link.getAttribute('href')) && link.getAttribute('href') !== '/')) {
-                    link.classList.add('active');
+                const href = link.getAttribute('href');
+                if (!href || href === '/') return;
+                const prefixo = href.endsWith('/') ? href : href + '/';
+                const bate = href === currentPath || currentPath.startsWith(prefixo);
+                if (bate && href.length > melhorTamanho) {
+                    melhorLink = link;
+                    melhorTamanho = href.length;
                 }
             });
+            if (melhorLink) melhorLink.classList.add('active');
 
             const supportBtn = document.getElementById('whatsappSupportBtn');
             if (supportBtn && window.location.pathname.toLowerCase().includes('whatsapp')) {
