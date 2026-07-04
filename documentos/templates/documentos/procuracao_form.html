@@ -38,7 +38,21 @@
                 {% endif %}
                 <form method="post" id="procuracaoForm">
                     {% csrf_token %}
-                    
+
+                    {% if form.errors %}
+                        <div class="alert alert-danger" id="alert-erros-formulario">
+                            <div class="fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill me-2"></i>Corrija os campos abaixo antes de salvar:</div>
+                            <ul class="mb-0">
+                                {% for field in form %}
+                                    {% for error in field.errors %}
+                                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
                     <h5 class="mb-3 border-bottom pb-2"><i class="bi bi-person-badge me-2"></i>1. Dados do Outorgante (Quem vendeu o veículo)</h5>
                     <div class="row align-items-center">
                         <div class="col-md-6 mb-3">
@@ -140,6 +154,16 @@ document.addEventListener('DOMContentLoaded', (event) => {
         updateMask();
     }
     // --- Fim da máscara dinâmica ---
+
+    var errorFieldIds = [
+        {% for field in form %}{% if field.errors %}'id_{{ field.name }}',{% endif %}{% endfor %}
+    ];
+    errorFieldIds.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.add('is-invalid');
+    });
+    var alertBox = document.getElementById('alert-erros-formulario');
+    if (alertBox) alertBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
 });
 </script>
 {% endblock %}

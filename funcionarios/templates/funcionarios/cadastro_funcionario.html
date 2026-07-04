@@ -25,10 +25,22 @@
                 {% csrf_token %}
 
                 {% if user_form.errors or func_form.errors %}
-                    <div class="alert alert-danger shadow-sm">
-                        <strong>Atenção.</strong> Verifique os erros abaixo.
-                        {{ user_form.errors }}
-                        {{ func_form.errors }}
+                    <div class="alert alert-danger shadow-sm" id="alert-erros-formulario">
+                        <div class="fw-bold mb-2"><i class="fa fa-exclamation-triangle me-2"></i>Corrija os campos abaixo antes de salvar:</div>
+                        <ul class="mb-0">
+                            {% for field in user_form %}
+                                {% for error in field.errors %}
+                                    <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                            {% for field in func_form %}
+                                {% for error in field.errors %}
+                                    <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                            {% for error in user_form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                            {% for error in func_form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                        </ul>
                     </div>
                 {% endif %}
 
@@ -196,6 +208,22 @@
             alternarCampoUltimoDia();
             ativo.addEventListener('change', alternarCampoUltimoDia);
         }
+
+        // Marca campos com erro de validacao do servidor (borda vermelha) e rola ate o resumo.
+        (function highlightServerErrors() {
+            var errorFieldIds = [
+                {% for field in user_form %}{% if field.errors %}'id_{{ field.name }}',{% endif %}{% endfor %}
+                {% for field in func_form %}{% if field.errors %}'id_{{ field.name }}',{% endif %}{% endfor %}
+            ];
+            errorFieldIds.forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.classList.add('is-invalid');
+            });
+            var alertBox = document.getElementById('alert-erros-formulario');
+            if (alertBox) {
+                alertBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        })();
     });
 </script>
 {% endblock %}
