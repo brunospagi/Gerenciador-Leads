@@ -106,6 +106,10 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
                 <div class="position-relative bg-dark rounded-4 overflow-hidden mb-4 shadow-sm camera-frame" style="height: 350px; border: 4px solid #f8f9fa;">
                     <video id="videoElement" autoplay playsinline style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);"></video>
                     <div id="faceGuide" class="position-absolute top-50 start-50 translate-middle face-guide"></div>
+                    <svg class="face-guide-ring" viewBox="0 0 216 276" xmlns="http://www.w3.org/2000/svg">
+                        <ellipse class="face-guide-ring-track" cx="108" cy="138" rx="97" ry="127"></ellipse>
+                        <ellipse id="faceGuideRingFill" class="face-guide-ring-fill" cx="108" cy="138" rx="97" ry="127"></ellipse>
+                    </svg>
                     <button type="button" class="position-absolute top-0 start-0 mt-3 ms-3 btn btn-link text-white p-0" onclick="voltarParaInicio()">
                         <i class="fas fa-times fs-4"></i>
                     </button>
@@ -132,7 +136,9 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
 
             <div id="processamentoSection" style="display:none;" class="text-center">
                 <div class="alert alert-light border shadow-sm py-5">
-                    <div class="spinner-border text-primary mb-3" role="status"></div>
+                    <svg class="processamento-spinner-svg mb-3" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+                        <circle class="processamento-spinner-path" cx="25" cy="25" r="20" fill="none"></circle>
+                    </svg>
                     <h5 class="fw-bold mb-2" id="processamentoTitulo">Enviando selfie criptografada</h5>
                     <p class="text-muted mb-0" id="processamentoSubtitulo">Aguarde alguns segundos...</p>
                 </div>
@@ -141,7 +147,15 @@ const TOLERANCIA_ATRASO_MIN = Number('{{ config.tolerancia_atraso_minutos|defaul
 
             <div id="resultadoSection" style="display:none;" class="text-start">
                 <div id="resultadoCard" class="alert alert-success border shadow-sm">
-                    <h5 class="fw-bold mb-2"><i class="fas fa-check-circle me-1"></i> Identidade validada</h5>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <svg id="resultadoIconSvg" class="resultado-icon-svg" viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+                            <circle class="resultado-icon-circle" cx="26" cy="26" r="23" fill="none"></circle>
+                            <path class="resultado-icon-check" fill="none" d="M14 27l7 7 16-16"></path>
+                            <path class="resultado-icon-cross1" fill="none" d="M16 16l20 20"></path>
+                            <path class="resultado-icon-cross2" fill="none" d="M36 16l-20 20"></path>
+                        </svg>
+                        <h5 class="fw-bold mb-0" id="resultadoTitulo">Identidade validada</h5>
+                    </div>
                     <p id="resultadoMensagem" class="mb-2">validacao concluida.</p>
                     <small id="resultadoDetalhe" class="text-muted"></small>
                 </div>
@@ -386,6 +400,20 @@ async function mostrarEtapaProcessamento(tipo) {
     }
 }
 
+function calcularPerimetroElipse(rx, ry) {
+    return Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
+}
+
+const FACE_GUIDE_RING_PERIMETRO = calcularPerimetroElipse(97, 127);
+
+function atualizarAnelProgresso(percent) {
+    const fill = document.getElementById('faceGuideRingFill');
+    if (!fill) return;
+    fill.style.strokeDasharray = `${FACE_GUIDE_RING_PERIMETRO}`;
+    fill.style.strokeDashoffset = `${FACE_GUIDE_RING_PERIMETRO * (1 - percent / 100)}`;
+    fill.classList.toggle('is-complete', percent >= 100);
+}
+
 function setProgress(percent) {
     const bar = document.getElementById('validationProgressBar');
     const label = document.getElementById('progressLabel');
@@ -396,6 +424,7 @@ function setProgress(percent) {
         bar.classList.toggle('bg-primary', value < 100);
     }
     if (label) label.innerText = `${value}%`;
+    atualizarAnelProgresso(value);
 }
 
 function setStep(stepNumber, status) {
@@ -678,19 +707,27 @@ function reiniciarValidacao() {
     atualizarFallbackManualUI();
 }
 
+function dispararAnimacaoResultado(aprovado) {
+    const svg = document.getElementById('resultadoIconSvg');
+    if (!svg) return;
+    svg.classList.remove('is-animating');
+    svg.classList.toggle('is-error', !aprovado);
+    void svg.offsetWidth; // forca reflow para reiniciar a animacao CSS de traco a cada tentativa
+    svg.classList.add('is-animating');
+}
+
 function mostrarResultadoValidacao(aprovado, mensagem, detalhe = '') {
     const card = document.getElementById('resultadoCard');
     const msg = document.getElementById('resultadoMensagem');
     const det = document.getElementById('resultadoDetalhe');
     const checks = document.getElementById('resultChecks');
+    const titulo = document.getElementById('resultadoTitulo');
     if (msg) msg.innerText = mensagem || '';
     if (det) det.innerText = detalhe || '';
     if (card) {
         card.className = aprovado ? 'alert alert-success border shadow-sm' : 'alert alert-danger border shadow-sm';
-        card.querySelector('h5').innerHTML = aprovado
-            ? '<i class="fas fa-check-circle me-1"></i> Identidade validada'
-            : '<i class="fas fa-times-circle me-1"></i> Falha na validacao';
     }
+    if (titulo) titulo.innerText = aprovado ? 'Identidade validada' : 'Falha na validação';
     if (checks) {
         checks.classList.toggle('is-failed', !aprovado);
         checks.querySelectorAll('.ft-result-item i').forEach((icon) => {
@@ -700,6 +737,9 @@ function mostrarResultadoValidacao(aprovado, mensagem, detalhe = '') {
     document.getElementById('detecaoSection').style.display = 'none';
     document.getElementById('processamentoSection').style.display = 'none';
     document.getElementById('resultadoSection').style.display = 'block';
+    // So dispara a animacao de traco DEPOIS da secao ficar visivel: com display:none
+    // o elemento nao tem caixa de layout e a animacao CSS nunca chega a iniciar.
+    dispararAnimacaoResultado(aprovado);
 }
 
 async function validarIdentidadeInicial(autoMode = false) {
@@ -1375,6 +1415,126 @@ document.addEventListener('DOMContentLoaded', function () {
         border-radius: 50%;
         box-shadow: 0 0 0 0 rgba(45, 119, 255, 0.6);
         animation: faceGuidePulse 1.8s ease-in-out infinite;
+    }
+
+    /* Anel de progresso ao redor do oval, no estilo do indicador circular do FaceTec */
+    .ponto-relogio-wrap .face-guide-ring {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-90deg);
+        width: 216px;
+        height: 276px;
+        pointer-events: none;
+        z-index: 2;
+    }
+
+    .ponto-relogio-wrap .face-guide-ring-track {
+        fill: none;
+        stroke: rgba(255, 255, 255, 0.18);
+        stroke-width: 4;
+    }
+
+    .ponto-relogio-wrap .face-guide-ring-fill {
+        fill: none;
+        stroke: #2d77ff;
+        stroke-width: 4;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.25s ease, stroke 0.25s ease;
+    }
+
+    .ponto-relogio-wrap .face-guide-ring-fill.is-complete {
+        stroke: #22c55e;
+    }
+
+    /* Spinner customizado (desenho de traco), no lugar do spinner padrao do Bootstrap */
+    .ponto-relogio-wrap .processamento-spinner-svg {
+        width: 54px;
+        height: 54px;
+        animation: ptoSpinnerRotate 2s linear infinite;
+    }
+
+    .ponto-relogio-wrap .processamento-spinner-path {
+        stroke: #2d77ff;
+        stroke-width: 4;
+        stroke-linecap: round;
+        animation: ptoSpinnerStretch 1.5s ease-in-out infinite;
+    }
+
+    /* Icone de resultado (check/X) "desenhado" via animacao de traco SVG */
+    .ponto-relogio-wrap .resultado-icon-svg {
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+    }
+
+    .ponto-relogio-wrap .resultado-icon-circle {
+        stroke-width: 3;
+        stroke: #16a34a;
+        stroke-dasharray: 145;
+        stroke-dashoffset: 145;
+    }
+
+    .ponto-relogio-wrap .resultado-icon-check {
+        stroke: #16a34a;
+        stroke-width: 4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-dasharray: 32;
+        stroke-dashoffset: 32;
+    }
+
+    .ponto-relogio-wrap .resultado-icon-cross1,
+    .ponto-relogio-wrap .resultado-icon-cross2 {
+        stroke: #dc2626;
+        stroke-width: 4;
+        stroke-linecap: round;
+        stroke-dasharray: 30;
+        stroke-dashoffset: 30;
+        display: none;
+    }
+
+    .ponto-relogio-wrap .resultado-icon-svg.is-error .resultado-icon-circle {
+        stroke: #dc2626;
+    }
+
+    .ponto-relogio-wrap .resultado-icon-svg.is-error .resultado-icon-check {
+        display: none;
+    }
+
+    .ponto-relogio-wrap .resultado-icon-svg.is-error .resultado-icon-cross1,
+    .ponto-relogio-wrap .resultado-icon-svg.is-error .resultado-icon-cross2 {
+        display: block;
+    }
+
+    .ponto-relogio-wrap .resultado-icon-svg.is-animating .resultado-icon-circle {
+        animation: revealStroke 0.5s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+    }
+
+    .ponto-relogio-wrap .resultado-icon-svg.is-animating .resultado-icon-check {
+        animation: revealStroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.5s forwards;
+    }
+
+    .ponto-relogio-wrap .resultado-icon-svg.is-animating.is-error .resultado-icon-cross1 {
+        animation: revealStroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.5s forwards;
+    }
+
+    .ponto-relogio-wrap .resultado-icon-svg.is-animating.is-error .resultado-icon-cross2 {
+        animation: revealStroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.65s forwards;
+    }
+
+    @keyframes ptoSpinnerRotate {
+        100% { transform: rotate(360deg); }
+    }
+
+    @keyframes ptoSpinnerStretch {
+        0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; }
+        50% { stroke-dasharray: 90, 150; stroke-dashoffset: -35; }
+        100% { stroke-dasharray: 90, 150; stroke-dashoffset: -125; }
+    }
+
+    @keyframes revealStroke {
+        100% { stroke-dashoffset: 0; }
     }
 
     .ponto-relogio-wrap .ft-logo-watermark {
