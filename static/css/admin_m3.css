@@ -1,0 +1,197 @@
+/*
+  Tema do Django admin com a identidade visual M3 (mesmos tokens de static/css/app_m3.css).
+  Sobrescreve as variaveis CSS que o proprio admin do Django ja expoe (admin/css/base.css),
+  em vez de reescrever os componentes do zero - baixo risco, cobre light/dark/auto.
+*/
+
+html[data-theme="light"],
+:root {
+  --primary: #295ea7;
+  --secondary: #1f4677;
+  --accent: #0f766e;
+  --primary-fg: #ffffff;
+
+  --body-fg: #1f2a37;
+  --body-bg: #f7f9fc;
+  --body-quiet-color: #5b6674;
+  --body-medium-color: #3d4854;
+  --body-loud-color: #1f2a37;
+
+  --header-color: #ffffff;
+  --header-branding-color: #ffffff;
+  --header-bg: #0f172a;
+  --header-link-color: #ffffff;
+
+  --breadcrumbs-fg: #c9d8ee;
+  --breadcrumbs-link-fg: #ffffff;
+  --breadcrumbs-bg: #16213b;
+
+  --link-fg: #295ea7;
+  --link-hover-color: #1f4677;
+  --link-selected-fg: #295ea7;
+
+  --hairline-color: #e3e9f2;
+  --border-color: #d6deea;
+
+  --error-fg: #c53b40;
+
+  --message-success-bg: #dff5e8;
+  --message-warning-bg: #fbeed4;
+  --message-error-bg: #fbe4e4;
+
+  --darkened-bg: #eef3fa;
+  --selected-bg: #eaf1fb;
+  --selected-row: #fbeed4;
+
+  --button-fg: #ffffff;
+  --button-bg: #295ea7;
+  --button-hover-bg: #1f4677;
+  --default-button-bg: #1f4677;
+  --default-button-hover-bg: #295ea7;
+  --close-button-bg: #6b7686;
+  --close-button-hover-bg: #4c5566;
+  --delete-button-bg: #c53b40;
+  --delete-button-hover-bg: #a12f34;
+
+  --object-tools-fg: var(--button-fg);
+  --object-tools-bg: #1f4677;
+  --object-tools-hover-bg: #295ea7;
+
+  --font-family-primary: 'Poppins', 'Segoe UI', system-ui, Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #16213b;
+    --primary-fg: #f0f4fa;
+
+    --body-fg: #e7ecf3;
+    --body-bg: #0f172a;
+    --body-quiet-color: #b7c2d3;
+    --body-medium-color: #d3dbe8;
+    --body-loud-color: #ffffff;
+
+    --header-bg: #0b1120;
+    --breadcrumbs-bg: #16213b;
+    --breadcrumbs-link-fg: #e7ecf3;
+
+    --link-fg: #6fa3e6;
+    --link-hover-color: #9dc1f0;
+    --link-selected-fg: #6fa3e6;
+
+    --hairline-color: #26314a;
+    --border-color: #2c3a56;
+
+    --darkened-bg: #16213b;
+    --selected-bg: #1b2740;
+    --selected-row: #2a2410;
+
+    --button-bg: #295ea7;
+    --button-hover-bg: #3a72c4;
+    --default-button-bg: #1f4677;
+    --default-button-hover-bg: #295ea7;
+  }
+}
+
+html[data-theme="dark"] {
+  --primary: #16213b;
+  --primary-fg: #f0f4fa;
+
+  --body-fg: #e7ecf3;
+  --body-bg: #0f172a;
+  --body-quiet-color: #b7c2d3;
+  --body-medium-color: #d3dbe8;
+  --body-loud-color: #ffffff;
+
+  --header-bg: #0b1120;
+  --breadcrumbs-bg: #16213b;
+  --breadcrumbs-link-fg: #e7ecf3;
+
+  --link-fg: #6fa3e6;
+  --link-hover-color: #9dc1f0;
+  --link-selected-fg: #6fa3e6;
+
+  --hairline-color: #26314a;
+  --border-color: #2c3a56;
+
+  --darkened-bg: #16213b;
+  --selected-bg: #1b2740;
+  --selected-row: #2a2410;
+
+  --button-bg: #295ea7;
+  --button-hover-bg: #3a72c4;
+  --default-button-bg: #1f4677;
+  --default-button-hover-bg: #295ea7;
+}
+
+/* --- Polimento extra: cantos arredondados e sombras suaves, no estilo M3 --- */
+
+body {
+  font-family: var(--font-family-primary);
+}
+
+#header {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+#branding h1,
+#branding h1 a:link,
+#branding h1 a:visited {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.module {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.04);
+}
+
+.module h2,
+.module caption,
+.inline-group h2 {
+  border-radius: 0;
+}
+
+#changelist-filter,
+.dashboard .module table {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.button,
+input[type="submit"],
+input[type="button"],
+.submit-row input,
+a.button {
+  border-radius: 8px !important;
+}
+
+#changelist-filter {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.selector-chosen h2,
+.selector-available h2 {
+  border-radius: 8px 8px 0 0;
+}
+
+/* Link de volta ao CRM, adicionado no branding (ver templates/admin/base_site.html) */
+.m3-admin-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 16px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff !important;
+  font-size: 0.82rem;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.m3-admin-back-link:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff !important;
+}
