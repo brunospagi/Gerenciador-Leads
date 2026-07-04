@@ -29,9 +29,11 @@ class TransacaoFinanceiraAdmin(admin.ModelAdmin):
     
     # Navegação por datas no topo
     date_hierarchy = 'data_vencimento'
-    
+
     # Permite alterar o status de "Efetivado" diretamente na lista sem entrar no registo
     list_editable = ('efetivado',)
+
+    autocomplete_fields = ('criado_por',)
     
     # Organização do formulário em blocos (Fieldsets)
     fieldsets = (

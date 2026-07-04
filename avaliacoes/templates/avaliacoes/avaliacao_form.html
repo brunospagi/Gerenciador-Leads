@@ -16,6 +16,21 @@
             <div class="card-body p-4">
                 <form method="post" enctype="multipart/form-data" id="avaliacaoForm">
                     {% csrf_token %}
+
+                    {% if form.errors %}
+                        <div class="alert alert-danger" id="alert-erros-formulario">
+                            <div class="fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill me-2"></i>Corrija os campos abaixo antes de salvar:</div>
+                            <ul class="mb-0">
+                                {% for field in form %}
+                                    {% for error in field.errors %}
+                                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
                     {{ form.marca }}
                     {{ form.modelo }}
                     {{ form.ano }}
@@ -232,6 +247,16 @@ document.addEventListener('DOMContentLoaded', () => {
             input.classList.add('form-control');
         }
     });
+
+    const errorFieldIds = [
+        {% for field in form %}{% if field.errors %}'id_{{ field.name }}',{% endif %}{% endfor %}
+    ];
+    errorFieldIds.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('is-invalid');
+    });
+    const alertBox = document.getElementById('alert-erros-formulario');
+    if (alertBox) alertBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
 });
 </script>
 {% endblock %}

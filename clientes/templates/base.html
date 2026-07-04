@@ -116,6 +116,42 @@
             letter-spacing: 1px;
         }
 
+        /* --- SEÇÕES COLAPSÁVEIS DO MENU --- */
+        .menu-header-toggle {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .menu-header-toggle:hover { color: #94a3b8; }
+
+        .menu-header-chevron {
+            font-size: 0.7rem;
+            transition: transform 0.2s ease;
+        }
+
+        .menu-section .submenu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.25s ease;
+        }
+
+        .menu-section.is-open .submenu {
+            max-height: 600px;
+        }
+
+        .menu-section.is-open .menu-header-chevron {
+            transform: rotate(180deg);
+        }
+
         /* --- CONTEÚDO PRINCIPAL --- */
         #content-wrapper { width: 100%; display: flex; flex-direction: column; transition: all 0.3s; min-height: 100dvh; height: auto; overflow: visible; }
 
@@ -211,37 +247,50 @@
                     {% if module_access.avaliacoes %}
                     <li><a href="{% url 'avaliacao_list' %}"><i class="fas fa-car"></i> Avaliações</a></li>
                     {% endif %}
-
-                    {% if module_access.financeiro %}
-                    <li class="menu-header mt-3">Caixa e Finanças</li>
-                    <li><a href="{% url 'financeiro:lista_transacoes' %}"><i class="fas fa-wallet" style="color:#10b981;"></i> Gestão Financeira</a></li>
-                    {% endif %}
-
-                    {% if module_access.relatorios and user.is_superuser or module_access.relatorios and user.profile.nivel_acesso == 'ADMIN' or module_access.relatorios and user.profile.nivel_acesso == 'GERENTE' or module_access.rh or module_access.usuarios_admin %}
-                    <li class="menu-header mt-3">Administração</li>
-                    {% endif %}
-
-                    {% if module_access.relatorios and user.is_superuser or module_access.relatorios and user.profile.nivel_acesso == 'ADMIN' or module_access.relatorios and user.profile.nivel_acesso == 'GERENTE' %}
-                    <li><a href="{% url 'admin_dashboard' %}"><i class="fas fa-chart-line text-warning"></i> Dashboard Executivo</a></li>
-                    <li><a href="{% url 'controle_ponto:relatorio_mensal' %}"><i class="fas fa-calendar-check"></i> Espelho de Ponto</a></li>
-                    {% endif %}
-
-                    {% if module_access.rh %}
-                    <li><a href="{% url 'lista_funcionarios' %}"><i class="fas fa-id-card"></i> Equipe (RH)</a></li>
-                    {% endif %}
-
-                    {% if module_access.usuarios_admin and user.is_superuser or module_access.usuarios_admin and user.profile.nivel_acesso == 'ADMIN' %}
-                    <li><a href="{% url 'user_list' %}"><i class="fas fa-user-shield"></i> Acessos e Perfis</a></li>
-                    {% endif %}
-
-                    {% if module_access.credenciais %}
-                    <li><a href="{% url 'credencial_list' %}"><i class="fas fa-key"></i> Senhas e Credenciais</a></li>
-                    {% endif %}
-
-                    {% if user.is_superuser %}
-                    <li><a href="{% url 'user_module_permissions' %}"><i class="fas fa-shield-alt"></i> Permissões por Módulo</a></li>
-                    {% endif %}
                 </ul>
+
+                {% if module_access.financeiro %}
+                <div class="menu-section" data-section-key="financas">
+                    <button type="button" class="menu-header menu-header-toggle mt-3" aria-expanded="false">
+                        <span>Caixa e Finanças</span>
+                        <i class="fas fa-chevron-down menu-header-chevron"></i>
+                    </button>
+                    <ul class="submenu">
+                        <li><a href="{% url 'financeiro:lista_transacoes' %}"><i class="fas fa-wallet" style="color:#10b981;"></i> Gestão Financeira</a></li>
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if module_access.relatorios and user.is_superuser or module_access.relatorios and user.profile.nivel_acesso == 'ADMIN' or module_access.relatorios and user.profile.nivel_acesso == 'GERENTE' or module_access.rh or module_access.usuarios_admin %}
+                <div class="menu-section" data-section-key="administracao">
+                    <button type="button" class="menu-header menu-header-toggle mt-3" aria-expanded="false">
+                        <span>Administração</span>
+                        <i class="fas fa-chevron-down menu-header-chevron"></i>
+                    </button>
+                    <ul class="submenu">
+                        {% if module_access.relatorios and user.is_superuser or module_access.relatorios and user.profile.nivel_acesso == 'ADMIN' or module_access.relatorios and user.profile.nivel_acesso == 'GERENTE' %}
+                        <li><a href="{% url 'admin_dashboard' %}"><i class="fas fa-chart-line text-warning"></i> Dashboard Executivo</a></li>
+                        <li><a href="{% url 'controle_ponto:relatorio_mensal' %}"><i class="fas fa-calendar-check"></i> Espelho de Ponto</a></li>
+                        {% endif %}
+
+                        {% if module_access.rh %}
+                        <li><a href="{% url 'lista_funcionarios' %}"><i class="fas fa-id-card"></i> Equipe (RH)</a></li>
+                        {% endif %}
+
+                        {% if module_access.usuarios_admin and user.is_superuser or module_access.usuarios_admin and user.profile.nivel_acesso == 'ADMIN' %}
+                        <li><a href="{% url 'user_list' %}"><i class="fas fa-user-shield"></i> Acessos e Perfis</a></li>
+                        {% endif %}
+
+                        {% if module_access.credenciais %}
+                        <li><a href="{% url 'credencial_list' %}"><i class="fas fa-key"></i> Senhas e Credenciais</a></li>
+                        {% endif %}
+
+                        {% if user.is_superuser %}
+                        <li><a href="{% url 'user_module_permissions' %}"><i class="fas fa-shield-alt"></i> Permissões por Módulo</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                {% endif %}
             </div>
         </nav>
 
@@ -330,6 +379,24 @@
                 }
             });
             if (melhorLink) melhorLink.classList.add('active');
+
+            document.querySelectorAll('.menu-section[data-section-key]').forEach(section => {
+                const key = 'sidebarSection:' + section.dataset.sectionKey;
+                const toggleBtn = section.querySelector('.menu-header-toggle');
+                const temLinkAtivo = !!section.querySelector('a.active');
+                const salvo = localStorage.getItem(key);
+                const deveAbrir = temLinkAtivo || salvo === '1';
+                section.classList.toggle('is-open', deveAbrir);
+                if (toggleBtn) toggleBtn.setAttribute('aria-expanded', String(deveAbrir));
+
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', () => {
+                        const aberto = section.classList.toggle('is-open');
+                        toggleBtn.setAttribute('aria-expanded', String(aberto));
+                        localStorage.setItem(key, aberto ? '1' : '0');
+                    });
+                }
+            });
         });
     </script>
 

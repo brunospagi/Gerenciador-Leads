@@ -8,3 +8,4 @@ class VendedorRodizioAdmin(admin.ModelAdmin):
     list_filter = ('ativo',)
     search_fields = ('vendedor__username', 'vendedor__first_name')
     ordering = ('ordem', 'ultima_atribuicao')
+    autocomplete_fields = ('vendedor',)

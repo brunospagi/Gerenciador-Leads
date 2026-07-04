@@ -13,6 +13,8 @@ class AvaliacaoAdmin(admin.ModelAdmin):
     list_display = ('placa', 'marca', 'modelo', 'ano', 'status', 'data_criacao', 'cadastrado_por')
     search_fields = ('placa', 'marca', 'modelo', 'ano', 'telefone')
     list_filter = ('status', 'tipo_veiculo', 'data_criacao')
+    autocomplete_fields = ('cadastrado_por',)
+    date_hierarchy = 'data_criacao'
     inlines = [AvaliacaoFotoInline]
 
 
