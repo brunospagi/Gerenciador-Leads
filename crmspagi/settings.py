@@ -209,7 +209,12 @@ STORAGES = {
         "BACKEND": "crmspagi.storage_backends.PublicMediaStorage",
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        # LenientManifestStaticFilesStorage = CompressedManifestStaticFilesStorage do
+        # WhiteNoise com manifest_strict=False: se um arquivo estatico nao tiver
+        # entrada no manifest (falha pontual de post-processing, arquivo adicionado
+        # apos o collectstatic, etc.), {% static %} cai para a URL sem hash daquele
+        # arquivo em vez de derrubar a pagina inteira com 500.
+        "BACKEND": "crmspagi.storage_backends.LenientManifestStaticFilesStorage",
     },
 }
 
