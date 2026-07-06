@@ -2,65 +2,184 @@
 
 {% block content %}
 <style>
-    .profile-card .list-group-item {
-        border: none;
-        padding: 1rem 1.25rem;
-    }
-    .profile-card .list-group-item i {
-        width: 24px;
-        text-align: center;
-        margin-right: 15px;
-        color: #6c757d;
-    }
-    /* --- NOVO: Estilo para o avatar --- */
     .profile-avatar {
-        width: 120px;
-        height: 120px;
+        width: 130px;
+        height: 130px;
         object-fit: cover;
         border-radius: 50%;
         border: 4px solid #fff;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.15);
     }
+    .profile-header-card .card-body { padding: 2rem; }
+    .profile-field-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #6c757d;
+        margin-bottom: 2px;
+    }
+    .profile-field-value { font-size: 0.95rem; color: #212529; }
+    .profile-field-value.text-placeholder { color: #adb5bd; font-style: italic; }
 </style>
 
 <div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="card shadow-sm profile-card">
-            <div class="card-header bg-dark text-white">
-                <h4 class="mb-0"><i class="bi bi-person-circle me-2"></i>Perfil de Usuário</h4>
-            </div>
-            
-            <div class="card-body p-4">
-                <div class="text-center mb-4">
-                    <img src="{{ user.profile.get_avatar_url }}" alt="Avatar" class="profile-avatar">
-                </div>
+    <div class="col-lg-9">
 
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item fs-5"><i class="bi bi-person-fill"></i><strong>Nome de Usuário:</strong> {{ user.username }}</li>
-                    <li class="list-group-item fs-5"><i class="bi bi-envelope-fill"></i><strong>Email:</strong> {{ user.email }}</li>
-                    <li class="list-group-item fs-5"><i class="bi bi-shield-check"></i><strong>Nível de Acesso:</strong> <span class="badge bg-primary">{{ user.profile.get_nivel_acesso_display }}</span></li>
-                </ul>
+        <div class="card shadow-sm border-0 rounded-3 profile-header-card mb-4">
+            <div class="card-body">
+                <div class="d-flex flex-column flex-md-row align-items-center align-items-md-start gap-4">
+                    <img src="{{ user.profile.get_avatar_url }}" alt="Avatar" class="profile-avatar">
+
+                    <div class="flex-grow-1 text-center text-md-start">
+                        <h3 class="fw-bold mb-0">{{ user.get_full_name|default:user.username }}</h3>
+                        <div class="text-muted mb-2">@{{ user.username }}</div>
+                        <div class="mb-2">
+                            <span class="badge bg-primary"><i class="bi bi-shield-check me-1"></i>{{ user.profile.get_nivel_acesso_display }}</span>
+                            {% if dados_funcionais and not dados_funcionais.ativo %}
+                                <span class="badge bg-secondary">Inativo</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-muted"><i class="bi bi-envelope-fill me-1"></i>{{ user.email|default:"Sem e-mail cadastrado" }}</div>
+                    </div>
+
+                    <div class="text-center text-md-end">
+                        <a href="{% url 'password_change' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-key-fill me-1"></i>Trocar Senha</a>
+                    </div>
+                </div>
 
                 <hr class="my-4">
 
-                <form method="post" enctype="multipart/form-data">
+                <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
                     {% csrf_token %}
-                    <h5 class="mb-3">Alterar Foto de Perfil</h5>
-                    <div class="mb-3">
-                        <label for="{{ form.avatar.id_for_label }}" class="form-label">{{ form.avatar.label }}</label>
+                    <div class="col-md-8">
+                        <label for="{{ form.avatar.id_for_label }}" class="form-label small fw-bold text-muted">{{ form.avatar.label }}</label>
                         {{ form.avatar }}
                         {% for error in form.avatar.errors %}
                             <div class="text-danger small mt-1">{{ error }}</div>
                         {% endfor %}
                     </div>
-                    <button type="submit" class="btn btn-success"><i class="bi bi-upload me-1"></i>Salvar Novo Avatar</button>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-success w-100"><i class="bi bi-upload me-1"></i>Salvar Nova Foto</button>
+                    </div>
                 </form>
-                
-            </div>
-            <div class="card-footer bg-light text-end">
-                <a href="{% url 'password_change' %}" class="btn btn-primary"><i class="bi bi-key-fill me-1"></i>Trocar Senha</a>
             </div>
         </div>
+
+        <div class="card shadow-sm border-0 rounded-3">
+            <div class="card-header bg-primary text-white py-3">
+                <h5 class="mb-0 fw-bold"><i class="fa fa-id-card me-2"></i>Cadastro Funcional</h5>
+            </div>
+            <div class="card-body p-4">
+                {% if not dados_funcionais %}
+                    <div class="alert alert-secondary mb-0">
+                        <i class="bi bi-info-circle me-1"></i> Cadastro funcional ainda não realizado. Fale com o RH.
+                    </div>
+                {% else %}
+                    {% if dados_funcionais.cpf_pendente %}
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle me-1"></i> Seu cadastro funcional está incompleto — o RH ainda precisa preencher seus dados.
+                        </div>
+                    {% endif %}
+
+                    <h6 class="text-primary fw-bold border-bottom pb-2 mb-3">Dados Pessoais</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="profile-field-label">CPF</div>
+                            <div class="profile-field-value {% if dados_funcionais.cpf_pendente %}text-placeholder{% endif %}">
+                                {% if dados_funcionais.cpf_pendente %}Pendente{% else %}{{ dados_funcionais.cpf }}{% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="profile-field-label">RG</div>
+                            <div class="profile-field-value">{{ dados_funcionais.rg|default:"—" }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="profile-field-label">Data de Nascimento</div>
+                            <div class="profile-field-value">{{ dados_funcionais.data_nascimento|date:"d/m/Y"|default:"—" }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="profile-field-label">Telefone</div>
+                            <div class="profile-field-value">{{ dados_funcionais.telefone }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="profile-field-label">Endereço</div>
+                            <div class="profile-field-value">{{ dados_funcionais.endereco }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="profile-field-label">CEP</div>
+                            <div class="profile-field-value">{{ dados_funcionais.cep|default:"—" }}</div>
+                        </div>
+                    </div>
+
+                    <h6 class="text-success fw-bold border-bottom pb-2 mb-3">Dados Contratuais</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <div class="profile-field-label">Cargo</div>
+                            <div class="profile-field-value">{{ dados_funcionais.cargo }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="profile-field-label">Data de Admissão</div>
+                            <div class="profile-field-value">{{ dados_funcionais.data_admissao|date:"d/m/Y" }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="profile-field-label">Situação</div>
+                            <div class="profile-field-value">
+                                {% if dados_funcionais.ativo %}
+                                    <span class="badge bg-success">Ativo</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inativo</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="profile-field-label">Salário Base</div>
+                            <div class="profile-field-value">R$ {{ dados_funcionais.salario_base|floatformat:2 }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="profile-field-label">Vale Transporte</div>
+                            <div class="profile-field-value">
+                                {% if dados_funcionais.opta_vt %}
+                                    Sim — R$ {{ dados_funcionais.valor_diario_vt|floatformat:2 }}/dia
+                                {% else %}
+                                    Não
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="text-info fw-bold border-bottom pb-2 mb-3">Dados Bancários</h6>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <div class="profile-field-label">Banco</div>
+                            <div class="profile-field-value">{{ dados_funcionais.banco }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="profile-field-label">Agência</div>
+                            <div class="profile-field-value">{{ dados_funcionais.agencia }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="profile-field-label">Conta</div>
+                            <div class="profile-field-value">{{ dados_funcionais.conta }}</div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="profile-field-label">Tipo de Conta</div>
+                            <div class="profile-field-value">{{ dados_funcionais.get_tipo_conta_display }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="profile-field-label">Chave Pix</div>
+                            <div class="profile-field-value">{{ dados_funcionais.chave_pix|default:"—" }}</div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            {% if dados_funcionais %}
+                <div class="card-footer bg-light text-muted small">
+                    <i class="bi bi-info-circle me-1"></i>Para atualizar esses dados, entre em contato com o RH.
+                </div>
+            {% endif %}
+        </div>
+
     </div>
 </div>
 {% endblock %}

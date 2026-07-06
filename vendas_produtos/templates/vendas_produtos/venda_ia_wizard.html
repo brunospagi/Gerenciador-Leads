@@ -1,0 +1,419 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Nova Venda com IA{% endblock %}
+
+{% block content %}
+<style>
+    .clean-card { border: none; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); margin-bottom: 24px; background: #fff; }
+    .clean-header { padding: 20px 24px; border-bottom: 1px solid #f0f2f5; font-weight: 700; color: #2c3e50; display: flex; align-items: center; background: linear-gradient(to right, #ffffff, #f8f9fa); border-radius: 12px 12px 0 0; }
+    .clean-header i { margin-right: 12px; color: #3498db; font-size: 1.1em; }
+    .clean-body { padding: 24px; }
+
+    .ia-stepper { display: flex; align-items: center; justify-content: center; margin-bottom: 28px; flex-wrap: wrap; }
+    .ia-stepper .step { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #adb5bd; text-align: center; }
+    .ia-stepper .step .circle {
+        width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        border: 2px solid #dee2e6; font-weight: 700; background: #fff; color: #adb5bd;
+    }
+    .ia-stepper .step.active .circle { border-color: #3b82f6; color: #3b82f6; }
+    .ia-stepper .step.done .circle { border-color: #22c55e; background: #22c55e; color: #fff; }
+    .ia-stepper .step.active { color: #3b82f6; font-weight: 600; }
+    .ia-stepper .step.done { color: #22c55e; }
+    .ia-stepper .line { width: 60px; height: 2px; background: #dee2e6; margin: 0 8px; margin-bottom: 22px; }
+
+    .ia-step-panel { display: none; }
+    .ia-step-panel.active { display: block; }
+
+    .ia-resultado { border: 1px solid #e9ecef; border-radius: 8px; padding: 12px 16px; margin-top: 12px; background: #f8f9fa; }
+    .ia-resultado .campo { font-size: 0.85rem; margin-bottom: 4px; }
+    .ia-resultado .campo strong { color: #2c3e50; }
+
+    .ia-secao-titulo { font-weight: 700; color: #2c3e50; border-bottom: 1px solid #eef0f2; padding-bottom: 6px; margin: 18px 0 12px; }
+    .form-label-sm { font-size: 0.78rem; font-weight: 600; color: #6c757d; margin-bottom: 3px; }
+</style>
+
+<div class="container py-5" style="max-width: 900px;">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark mb-0"><i class="fa fa-robot text-primary me-2"></i>Nova Venda com IA</h2>
+            <p class="text-muted mb-0">Envie os documentos, revise os dados e finalize a venda em um só fluxo</p>
+        </div>
+        <a href="{% url 'venda_produto_list' %}" class="btn btn-outline-secondary"><i class="fa fa-times me-2"></i>Cancelar</a>
+    </div>
+
+    <div class="ia-stepper">
+        <div class="step active" id="stepIndicator1">
+            <div class="circle">1</div>
+            <div>Documento<br>do Cliente</div>
+        </div>
+        <div class="line"></div>
+        <div class="step" id="stepIndicator2">
+            <div class="circle">2</div>
+            <div>Documento<br>do Veículo</div>
+        </div>
+        <div class="line"></div>
+        <div class="step" id="stepIndicator3">
+            <div class="circle">3</div>
+            <div>Dados<br>da Venda</div>
+        </div>
+    </div>
+
+    {# --- PASSO 1: documento do cliente (extração AJAX, fora do form principal) --- #}
+    <div class="ia-step-panel active" id="painelPasso1">
+        <div class="clean-card">
+            <div class="clean-header"><i class="fa fa-id-card"></i>Passo 1 — Documento do Cliente (RG ou CNH)</div>
+            <div class="clean-body">
+                <p class="text-muted small">Envie uma foto ou PDF legível do RG ou CNH do cliente. A IA tenta extrair nome, CPF, RG e data de nascimento — você poderá revisar tudo no passo final.</p>
+                <input type="file" class="form-control mb-3" id="inputDocCliente" accept="image/*,application/pdf">
+                <button type="button" class="btn btn-primary" id="btnExtrairCliente"><i class="fa fa-magic me-1"></i>Extrair com IA</button>
+
+                <div id="resultadoCliente"></div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+                    <button type="button" class="btn btn-outline-secondary" id="btnPularCliente">Pular esta etapa</button>
+                    <button type="button" class="btn btn-success" id="btnAvancarPasso2">Avançar <i class="fa fa-arrow-right ms-1"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# --- PASSO 2: documento do veículo (extração AJAX, fora do form principal) --- #}
+    <div class="ia-step-panel" id="painelPasso2">
+        <div class="clean-card">
+            <div class="clean-header"><i class="fa fa-car"></i>Passo 2 — Documento do Veículo (CRLV-e em PDF)</div>
+            <div class="clean-body">
+                <p class="text-muted small">Envie o CRLV-e do veículo em PDF. A IA tenta extrair placa, marca/modelo, cor e ano.</p>
+                <input type="file" class="form-control mb-3" id="inputDocVeiculo" accept="application/pdf">
+                <button type="button" class="btn btn-primary" id="btnExtrairVeiculo"><i class="fa fa-magic me-1"></i>Extrair com IA</button>
+
+                <div id="resultadoVeiculo"></div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <button type="button" class="btn btn-outline-secondary" id="btnVoltarPasso1"><i class="fa fa-arrow-left me-1"></i>Voltar</button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary" id="btnPularVeiculo">Pular esta etapa</button>
+                        <button type="button" class="btn btn-success" id="btnAvancarPasso3">Avançar <i class="fa fa-arrow-right ms-1"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# --- PASSO 3: formulário real da venda (VendaProdutoForm) --- #}
+    <div class="ia-step-panel" id="painelPasso3">
+        <form method="post" enctype="multipart/form-data" id="vendaIaForm">
+            {% csrf_token %}
+            <div class="clean-card">
+                <div class="clean-header"><i class="fa fa-file-invoice-dollar"></i>Passo 3 — Dados da Venda</div>
+                <div class="clean-body">
+
+                    {% if form.errors %}
+                        <div class="alert alert-danger" id="alertErrosVenda">
+                            <div class="fw-bold mb-2"><i class="fa fa-exclamation-triangle me-2"></i>Corrija os campos abaixo antes de salvar:</div>
+                            <ul class="mb-0">
+                                {% for field in form %}
+                                    {% for error in field.errors %}
+                                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+
+                    <div class="ia-secao-titulo"><i class="fa fa-user me-2 text-primary"></i>Cliente</div>
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label-sm">Nome do Cliente</label>{{ form.cliente_nome }}</div>
+                        <div class="col-md-3"><label class="form-label-sm">CPF/CNPJ</label>{{ form.cpfCNPJ_cliente }}</div>
+                        <div class="col-md-3"><label class="form-label-sm">RG/IE</label>{{ form.rgIE_cliente }}</div>
+                        <div class="col-md-3"><label class="form-label-sm">Data de Nascimento</label>{{ form.dtnasc_cliente }}</div>
+                        <div class="col-md-3"><label class="form-label-sm">Celular</label>{{ form.telCel_cliente }}</div>
+                    </div>
+
+                    <div class="ia-secao-titulo"><i class="fa fa-car me-2 text-primary"></i>Veículo</div>
+                    <div class="row g-3">
+                        <div class="col-md-3"><label class="form-label-sm">Marca</label>{{ form.marca_veiculo }}</div>
+                        <div class="col-md-5"><label class="form-label-sm">Modelo</label>{{ form.modelo_veiculo }}</div>
+                        <div class="col-md-4"><label class="form-label-sm">Placa</label>{{ form.placa }}</div>
+                        <div class="col-md-4"><label class="form-label-sm">Cor</label>{{ form.cor }}</div>
+                        <div class="col-md-4"><label class="form-label-sm">Ano (Ex: 2023/2024)</label>{{ form.ano }}</div>
+                        <div class="col-md-4"><label class="form-label-sm">KM</label>{{ form.km_veiculo }}</div>
+                    </div>
+
+                    <div class="ia-secao-titulo"><i class="fa fa-tag me-2 text-primary"></i>Venda</div>
+                    <div class="row g-3">
+                        <div class="col-md-4"><label class="form-label-sm">Tipo de Operação</label>{{ form.tipo_produto }}</div>
+                        <div class="col-md-4"><label class="form-label-sm">Deu Desconto?</label>{{ form.com_desconto }}</div>
+                        <div class="col-md-4"><label class="form-label-sm">Valor Total (R$)</label>{{ form.valor_venda }}</div>
+                        <div class="col-md-4"><label class="form-label-sm">Data da Venda</label>{{ form.data_venda }}</div>
+                    </div>
+
+                    <div class="ia-secao-titulo"><i class="fa fa-money-bill-wave me-2 text-primary"></i>Forma de Pagamento</div>
+                    <div class="row g-3">
+                        <div class="col-md-2 col-6"><label class="form-label-sm">Pix</label>{{ form.pgto_pix }}</div>
+                        <div class="col-md-2 col-6"><label class="form-label-sm">Transferência</label>{{ form.pgto_transferencia }}</div>
+                        <div class="col-md-2 col-6"><label class="form-label-sm">Débito</label>{{ form.pgto_debito }}</div>
+                        <div class="col-md-2 col-6"><label class="form-label-sm">Crédito</label>{{ form.pgto_credito }}</div>
+                        <div class="col-md-4 col-12"><label class="form-label-sm">Financiamento</label>{{ form.pgto_financiamento }}</div>
+                    </div>
+                    <div class="row g-3 mt-1" id="blocoFinanciamento" style="display:none;">
+                        <div class="col-md-6"><label class="form-label-sm">Banco Financiador</label>{{ form.banco_financiamento }}</div>
+                        <div class="col-md-6"><label class="form-label-sm">Nº da Proposta</label>{{ form.numero_proposta }}</div>
+                    </div>
+
+                    <div class="ia-secao-titulo"><i class="fa fa-receipt me-2 text-primary"></i>Comprovante</div>
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label-sm">Comprovante de Pagamento (obrigatório para Pix/Transferência)</label>
+                            {{ form.comprovante }}
+                        </div>
+                    </div>
+
+                    {# Demais campos do form enviados ocultos com seus valores padrão. #}
+                    <div class="d-none">
+                        {% for field in form %}
+                            {% if field.name not in campos_visiveis %}{{ field }}{% endif %}
+                        {% endfor %}
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <button type="button" class="btn btn-outline-secondary" id="btnVoltarPasso2"><i class="fa fa-arrow-left me-1"></i>Voltar</button>
+                        <button type="submit" class="btn btn-success fw-bold" id="btnFinalizarVenda"><i class="fa fa-check me-1"></i>Finalizar Venda e Gerar Minuta</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <div class="modal fade" id="modalPreviewComprovante" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title"><i class="fa fa-robot me-2"></i>Verificação do Comprovante</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body" id="modalPreviewComprovanteBody"></div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const temErros = {% if form.errors %}true{% else %}false{% endif %};
+
+    function getCookieLocal(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str == null ? '' : String(str);
+        return div.innerHTML;
+    }
+
+    function setCampo(id, valor) {
+        if (!valor) return;
+        const el = document.getElementById(id);
+        if (el) el.value = valor;
+    }
+
+    // --- Máscara de moeda (formato brasileiro) ---
+    function maskCurrency(valor) {
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
+    }
+    function parseMonetary(val) {
+        if (val === null || val === undefined) return 0;
+        let s = String(val).trim();
+        if (!s) return 0;
+        s = s.replace(/[^\d,.\-]/g, '');
+        if (s.includes(',')) {
+            s = s.replace(/\./g, '').replace(',', '.');
+        } else {
+            const dots = (s.match(/\./g) || []).length;
+            if (dots > 1) s = s.replace(/\./g, '');
+        }
+        const n = parseFloat(s);
+        return Number.isFinite(n) ? n : 0;
+    }
+    const moneyInputs = document.querySelectorAll('#vendaIaForm .money-mask');
+    moneyInputs.forEach(function (input) {
+        // Formata valor pré-existente (ex.: reexibição após erro de validação).
+        if (input.value && input.value.trim() !== '') {
+            input.value = maskCurrency(parseMonetary(input.value));
+        }
+        input.addEventListener('input', function (e) {
+            const digits = e.target.value.replace(/\D/g, '');
+            e.target.value = digits === '' ? '' : maskCurrency(parseFloat(digits) / 100);
+            atualizarBlocoFinanciamento();
+        });
+    });
+
+    // --- Bloco de financiamento (banco/proposta) só quando há valor financiado ---
+    const inputFinanciamento = document.getElementById('id_pgto_financiamento');
+    const blocoFinanciamento = document.getElementById('blocoFinanciamento');
+    function atualizarBlocoFinanciamento() {
+        if (!inputFinanciamento || !blocoFinanciamento) return;
+        blocoFinanciamento.style.display = parseMonetary(inputFinanciamento.value) > 0 ? '' : 'none';
+    }
+    atualizarBlocoFinanciamento();
+
+    // --- Navegação entre passos ---
+    function mostrarPasso(n) {
+        [1, 2, 3].forEach(function (i) {
+            document.getElementById('painelPasso' + i).classList.toggle('active', i === n);
+            const ind = document.getElementById('stepIndicator' + i);
+            ind.classList.toggle('active', i === n);
+            ind.classList.toggle('done', i < n);
+        });
+    }
+
+    // --- Extração de documento via IA ---
+    function extrairDocumento(inputId, url, resultadoId, onSucesso) {
+        const input = document.getElementById(inputId);
+        const arquivo = input.files && input.files[0];
+        if (!arquivo) {
+            alert('Selecione um arquivo antes de extrair.');
+            return;
+        }
+        const resultadoEl = document.getElementById(resultadoId);
+        resultadoEl.innerHTML = '<div class="text-muted small mt-2"><i class="fa fa-spinner fa-spin me-1"></i>Analisando documento com IA...</div>';
+
+        const formData = new FormData();
+        formData.append('arquivo', arquivo);
+
+        fetch(url, { method: 'POST', body: formData, headers: { 'X-CSRFToken': getCookieLocal('csrftoken') || '' } })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.disponivel) {
+                    resultadoEl.innerHTML = '<div class="text-muted small mt-2"><i class="fa fa-info-circle me-1"></i>Não foi possível extrair automaticamente. Você pode preencher manualmente no passo final.</div>';
+                    return;
+                }
+                onSucesso(data.dados, resultadoEl);
+            })
+            .catch(function () {
+                resultadoEl.innerHTML = '<div class="text-muted small mt-2"><i class="fa fa-info-circle me-1"></i>Não foi possível verificar agora. Você pode preencher manualmente no passo final.</div>';
+            });
+    }
+
+    function preview(resultadoEl, linhas) {
+        const filtradas = linhas.filter(function (l) { return l[1]; });
+        if (!filtradas.length) {
+            resultadoEl.innerHTML = '<div class="text-muted small mt-2"><i class="fa fa-info-circle me-1"></i>Nenhum dado identificado. Preencha manualmente no passo final.</div>';
+            return;
+        }
+        resultadoEl.innerHTML = '<div class="ia-resultado">' + filtradas.map(function (l) {
+            return '<div class="campo"><strong>' + escapeHtml(l[0]) + ':</strong> ' + escapeHtml(l[1]) + '</div>';
+        }).join('') + '<div class="small text-success mt-2"><i class="fa fa-check-circle me-1"></i>Dados aplicados ao passo final.</div></div>';
+    }
+
+    document.getElementById('btnExtrairCliente').addEventListener('click', function () {
+        extrairDocumento('inputDocCliente', "{% url 'venda_ia_extrair_cliente' %}", 'resultadoCliente', function (dados, el) {
+            setCampo('id_cliente_nome', dados.nome);
+            setCampo('id_cpfCNPJ_cliente', dados.cpf);
+            setCampo('id_rgIE_cliente', dados.rg);
+            setCampo('id_dtnasc_cliente', dados.data_nascimento);
+            preview(el, [
+                ['Nome', dados.nome],
+                ['CPF', dados.cpf],
+                ['RG', dados.rg],
+                ['Data de Nascimento', dados.data_nascimento],
+            ]);
+        });
+    });
+
+    document.getElementById('btnExtrairVeiculo').addEventListener('click', function () {
+        extrairDocumento('inputDocVeiculo', "{% url 'venda_ia_extrair_veiculo' %}", 'resultadoVeiculo', function (dados, el) {
+            setCampo('id_placa', dados.veiculo_placa);
+            setCampo('id_cor', dados.veiculo_cor);
+            const marcaModelo = (dados.veiculo_marca_modelo || '').trim();
+            if (marcaModelo) {
+                const partes = marcaModelo.split(' ');
+                setCampo('id_marca_veiculo', partes.shift());
+                if (partes.length) setCampo('id_modelo_veiculo', partes.join(' '));
+            }
+            if (dados.veiculo_ano_fab || dados.veiculo_ano_mod) {
+                setCampo('id_ano', ((dados.veiculo_ano_fab || '') + '/' + (dados.veiculo_ano_mod || '')).replace(/^\/|\/$/g, ''));
+            }
+            preview(el, [
+                ['Placa', dados.veiculo_placa],
+                ['Marca/Modelo', dados.veiculo_marca_modelo],
+                ['Cor', dados.veiculo_cor],
+                ['Ano Fab./Mod.', (dados.veiculo_ano_fab || dados.veiculo_ano_mod) ? ((dados.veiculo_ano_fab || '') + '/' + (dados.veiculo_ano_mod || '')) : null],
+            ]);
+        });
+    });
+
+    document.getElementById('btnAvancarPasso2').addEventListener('click', function () { mostrarPasso(2); });
+    document.getElementById('btnPularCliente').addEventListener('click', function () { mostrarPasso(2); });
+    document.getElementById('btnVoltarPasso1').addEventListener('click', function () { mostrarPasso(1); });
+    document.getElementById('btnAvancarPasso3').addEventListener('click', function () { mostrarPasso(3); });
+    document.getElementById('btnPularVeiculo').addEventListener('click', function () { mostrarPasso(3); });
+    document.getElementById('btnVoltarPasso2').addEventListener('click', function () { mostrarPasso(2); });
+
+    // --- VERIFICAÇÃO DO COMPROVANTE COM IA (ANTES DE ENVIAR A VENDA) ---
+    const inputComprovante = document.getElementById('id_comprovante');
+    const modalPreviewEl = document.getElementById('modalPreviewComprovante');
+    if (inputComprovante && modalPreviewEl && typeof bootstrap !== 'undefined') {
+        const modalPreviewBody = document.getElementById('modalPreviewComprovanteBody');
+        const modalPreview = new bootstrap.Modal(modalPreviewEl);
+
+        inputComprovante.addEventListener('change', function () {
+            const arquivo = this.files && this.files[0];
+            if (!arquivo) return;
+
+            modalPreviewBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><div class="mt-3">Verificando comprovante com IA...</div></div>';
+            modalPreview.show();
+
+            const formData = new FormData();
+            formData.append('arquivo', arquivo);
+            formData.append('csrfmiddlewaretoken', getCookieLocal('csrftoken') || '');
+
+            fetch("{% url 'venda_produto_validar_comprovante_preview' %}", { method: 'POST', body: formData })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data.disponivel) {
+                        modalPreviewBody.innerHTML = '<div class="alert alert-secondary mb-0"><i class="fa fa-info-circle me-1"></i> Verificação automática indisponível no momento. O comprovante será enviado normalmente com a venda.</div>';
+                    } else if (data.valido) {
+                        modalPreviewBody.innerHTML = '<div class="alert alert-success mb-0"><i class="fa fa-check-circle me-1"></i> Comprovante parece válido.<br><span class="small">' + (data.motivo || '') + '</span></div>';
+                    } else {
+                        modalPreviewBody.innerHTML = '<div class="alert alert-danger mb-0"><i class="fa fa-times-circle me-1"></i> Comprovante pode ser inválido: ' + (data.motivo || 'motivo não informado') + '<div class="small text-muted mt-2">Você ainda pode enviar a venda normalmente; um gestor poderá validar manualmente o comprovante depois.</div></div>';
+                    }
+                })
+                .catch(function () {
+                    modalPreviewBody.innerHTML = '<div class="alert alert-secondary mb-0"><i class="fa fa-info-circle me-1"></i> Não foi possível verificar agora. O comprovante será enviado normalmente com a venda.</div>';
+                });
+        });
+    }
+
+    // --- Submit: converte valores mascarados e trava duplo envio ---
+    const vendaForm = document.getElementById('vendaIaForm');
+    let enviando = false;
+    vendaForm.addEventListener('submit', function (e) {
+        if (enviando) { e.preventDefault(); return; }
+        moneyInputs.forEach(function (input) { if (input.value) input.value = parseMonetary(input.value); });
+        enviando = true;
+        const btn = document.getElementById('btnFinalizarVenda');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Gerando...'; }
+    });
+
+    // Se o servidor retornou erros de validação, abre direto no passo 3.
+    if (temErros) {
+        mostrarPasso(3);
+    } else {
+        mostrarPasso(1);
+    }
+});
+</script>
+{% endblock %}

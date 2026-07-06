@@ -11,6 +11,7 @@
         </div>
         <div class="m3-toolbar">
             <a href="{% url 'venda_produto_create' %}" class="btn btn-success btn-sm"><i class="fa fa-plus"></i> Nova Venda</a>
+            <a href="{% url 'venda_produto_ia_wizard' %}" class="btn btn-outline-primary btn-sm"><i class="fa fa-robot"></i> Nova Venda com IA</a>
             {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
             <a href="{% url 'configuracao_comissao' %}" class="btn btn-outline-dark btn-sm">
                 <i class="fa fa-cogs me-2"></i> Configurações
