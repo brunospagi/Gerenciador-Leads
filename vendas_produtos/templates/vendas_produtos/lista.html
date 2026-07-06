@@ -164,7 +164,13 @@
                                 {% else %}<span class="m3-badge m3-badge-warning"><i class="fa fa-clock"></i> Pendente</span>{% endif %}
                             </td>
                             <td class="text-end">
-                                {% if item.comprovante %}<button class="btn btn-sm btn-info text-white" data-bs-toggle="modal" data-bs-target="#modalComprovante{{ item.pk }}" title="Ver Comprovante"><i class="fa fa-eye"></i></button>{% endif %}
+                                {% if item.comprovante %}
+                                    <button class="btn btn-sm btn-info text-white" data-bs-toggle="modal" data-bs-target="#modalComprovante{{ item.pk }}" title="Ver Comprovante"><i class="fa fa-eye"></i></button>
+                                    {% if item.comprovante_status_ia == 'VALIDO' %}<span class="m3-badge m3-badge-success" title="{{ item.comprovante_ia_observacao }}"><i class="fa fa-robot"></i> IA OK</span>
+                                    {% elif item.comprovante_status_ia == 'INVALIDO' %}<span class="m3-badge m3-badge-danger" title="{{ item.comprovante_ia_observacao }}"><i class="fa fa-robot"></i> IA: Suspeito</span>
+                                    {% elif item.comprovante_status_ia == 'MANUAL' %}<span class="m3-badge m3-badge-info" title="Validado manualmente por {{ item.comprovante_validado_manual_por }}"><i class="fa fa-user-check"></i> Manual</span>
+                                    {% endif %}
+                                {% endif %}
                                 <a href="{% url 'venda_produto_print' item.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Imprimir"><i class="fa fa-print"></i></a>
                                 <a href="{% url 'venda_produto_minuta' item.pk %}" target="_blank" class="btn btn-sm btn-outline-dark" title="Imprimir Minuta"><i class="fa fa-file-alt"></i></a>
                                 
@@ -265,7 +271,27 @@
                                     </div>
                                 </div>
 
-                                {% if item.comprovante %}<div class="modal fade" id="modalComprovante{{ item.pk }}" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Comprovante</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body text-center"><img src="{{ item.comprovante.url }}" class="img-fluid" style="max-height:500px"><div class="mt-2"><a href="{{ item.comprovante.url }}" target="_blank" class="btn btn-primary btn-sm">Baixar</a></div></div></div></div></div>{% endif %}
+                                {% if item.comprovante %}<div class="modal fade" id="modalComprovante{{ item.pk }}" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Comprovante</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body text-center">
+                                    <img src="{{ item.comprovante.url }}" class="img-fluid" style="max-height:500px">
+                                    {% if item.comprovante_status_ia == 'INVALIDO' %}
+                                        <div class="alert alert-danger mt-2 text-start small"><i class="fa fa-robot"></i> A IA sinalizou este comprovante como inválido: {{ item.comprovante_ia_observacao }}</div>
+                                    {% elif item.comprovante_status_ia == 'VALIDO' %}
+                                        <div class="alert alert-success mt-2 text-start small"><i class="fa fa-robot"></i> Comprovante validado automaticamente pela IA.</div>
+                                    {% elif item.comprovante_status_ia == 'MANUAL' %}
+                                        <div class="alert alert-info mt-2 text-start small"><i class="fa fa-user-check"></i> Validado manualmente por {{ item.comprovante_validado_manual_por.get_full_name|default:item.comprovante_validado_manual_por.username }} em {{ item.comprovante_validado_manual_em|date:"d/m/Y H:i" }}.</div>
+                                    {% endif %}
+                                    <div class="mt-2">
+                                        <a href="{{ item.comprovante.url }}" target="_blank" class="btn btn-primary btn-sm">Baixar</a>
+                                        {% if item.comprovante_status_ia == 'INVALIDO' %}
+                                            {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
+                                                <form action="{% url 'venda_produto_validar_comprovante_manual' item.pk %}" method="post" class="d-inline">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-outline-success btn-sm" onclick="return confirm('Confirma a validação manual deste comprovante, mesmo sinalizado pela IA?');"><i class="fa fa-user-check"></i> Validar Manualmente</button>
+                                                </form>
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </div></div></div></div>{% endif %}
                                 <div class="modal fade" id="modalRecusa{{ item.pk }}" tabindex="-1"><div class="modal-dialog"><form action="{% url 'venda_produto_reject' item.pk %}" method="post">{% csrf_token %}<div class="modal-content"><div class="modal-header bg-danger text-white"><h5 class="modal-title">Recusar</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><textarea name="motivo_recusa" class="form-control" rows="3" required placeholder="Motivo..."></textarea></div><div class="modal-footer"><button type="submit" class="btn btn-danger">Confirmar</button></div></div></form></div></div>
                             </td>
                         </tr>

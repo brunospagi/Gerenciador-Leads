@@ -15,6 +15,7 @@ from dateutil.relativedelta import relativedelta
 
 from .models import VendaProduto, FechamentoMensal, ParametrosComissao
 from .forms import VendaProdutoForm, ParametrosComissaoForm
+from .ai_validacao import validar_comprovante_com_gemini
 
 User = get_user_model()
 
@@ -46,6 +47,23 @@ def _parse_decimal_br(valor_str):
         return Decimal(limpo)
     except Exception:
         return None
+
+def _validar_comprovante_upload(venda, request):
+    resultado = validar_comprovante_com_gemini(venda.comprovante)
+    if resultado is None:
+        return
+
+    if resultado['valido']:
+        venda.comprovante_status_ia = 'VALIDO'
+    else:
+        venda.comprovante_status_ia = 'INVALIDO'
+        messages.warning(
+            request,
+            f"⚠️ Comprovante sinalizado como inválido pela IA: {resultado['motivo']}. "
+            "A venda foi registrada normalmente; um gestor pode validar manualmente o comprovante."
+        )
+    venda.comprovante_ia_observacao = resultado['motivo']
+    venda.save(update_fields=['comprovante_status_ia', 'comprovante_ia_observacao'])
 
 # --- NOVA VIEW: CONFIGURAÇÃO DE COMISSÃO (ADMIN ONLY) ---
 class ConfiguracaoComissaoView(LoginRequiredMixin, UpdateView):
@@ -181,7 +199,10 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
             return redirect('venda_produto_list')
 
         response = super().form_valid(form)
-        
+
+        if 'comprovante' in form.changed_data and main_venda.comprovante:
+            _validar_comprovante_upload(main_venda, self.request)
+
         if main_venda.tipo_produto == 'VENDA_VEICULO':
             total_extras = 0
             def processar_adicional(tipo_prod, check_field, valor_field, metodo_field, custo_field=None):
@@ -257,7 +278,12 @@ class VendaProdutoUpdateView(LoginRequiredMixin, UpdateView):
             form.instance.gerente = None
             form.instance.data_aprovacao = None
         messages.success(self.request, "Venda atualizada.")
-        return super().form_valid(form)
+        response = super().form_valid(form)
+
+        if 'comprovante' in form.changed_data and form.instance.comprovante:
+            _validar_comprovante_upload(form.instance, self.request)
+
+        return response
 
 class VendaProdutoDeleteView(LoginRequiredMixin, DeleteView):
     model = VendaProduto
@@ -613,6 +639,25 @@ def rejeitar_venda_produto(request, pk):
         venda.data_aprovacao = timezone.now()
         venda.save()
         messages.warning(request, "Venda REJEITADA.")
+    return redirect('venda_produto_list')
+
+@login_required
+@require_POST
+def validar_comprovante_manual(request, pk):
+    if not _is_gestor_financeiro(request.user):
+        messages.error(request, "Permissão negada.")
+        return redirect('venda_produto_list')
+
+    venda = get_object_or_404(VendaProduto, pk=pk)
+    if not venda.comprovante:
+        messages.error(request, "Esta venda não possui comprovante para validar.")
+        return redirect('venda_produto_list')
+
+    venda.comprovante_status_ia = 'MANUAL'
+    venda.comprovante_validado_manual_por = request.user
+    venda.comprovante_validado_manual_em = timezone.now()
+    venda.save(update_fields=['comprovante_status_ia', 'comprovante_validado_manual_por', 'comprovante_validado_manual_em'])
+    messages.success(request, "Comprovante validado manualmente.")
     return redirect('venda_produto_list')
 
 @login_required
