@@ -2,6 +2,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404, redirect
+from django.http import JsonResponse
 from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Sum, Q
@@ -16,6 +17,7 @@ from dateutil.relativedelta import relativedelta
 from .models import VendaProduto, FechamentoMensal, ParametrosComissao
 from .forms import VendaProdutoForm, ParametrosComissaoForm
 from .ai_validacao import validar_comprovante_com_gemini
+from notificacoes.utils import notificar_usuario
 
 User = get_user_model()
 
@@ -38,6 +40,12 @@ def _vendas_acessiveis(user):
     if _is_gestor_financeiro(user):
         return VendaProduto.objects.all()
     return VendaProduto.objects.filter(Q(vendedor=user) | Q(vendedor_ajudante=user))
+
+def _gestores_financeiros(exclude_user=None):
+    qs = User.objects.filter(Q(is_superuser=True) | Q(profile__nivel_acesso__in=['ADMIN', 'GERENTE'])).distinct()
+    if exclude_user:
+        qs = qs.exclude(pk=exclude_user.pk)
+    return qs
 
 def _parse_decimal_br(valor_str):
     if not valor_str:
@@ -62,8 +70,33 @@ def _validar_comprovante_upload(venda, request):
             f"⚠️ Comprovante sinalizado como inválido pela IA: {resultado['motivo']}. "
             "A venda foi registrada normalmente; um gestor pode validar manualmente o comprovante."
         )
+        for gestor in _gestores_financeiros(exclude_user=venda.vendedor):
+            notificar_usuario(
+                gestor,
+                f"Comprovante de {venda.cliente_nome} sinalizado como suspeito pela IA: {resultado['motivo']}",
+                url=reverse('venda_produto_list'),
+                titulo="Comprovante Suspeito",
+            )
     venda.comprovante_ia_observacao = resultado['motivo']
     venda.save(update_fields=['comprovante_status_ia', 'comprovante_ia_observacao'])
+
+@login_required
+@require_POST
+def validar_comprovante_preview(request):
+    """Verificação via AJAX no momento do upload, antes de enviar a venda."""
+    arquivo = request.FILES.get('arquivo')
+    if not arquivo:
+        return JsonResponse({'erro': 'Nenhum arquivo enviado.'}, status=400)
+
+    resultado = validar_comprovante_com_gemini(arquivo)
+    if resultado is None:
+        return JsonResponse({'disponivel': False})
+
+    return JsonResponse({
+        'disponivel': True,
+        'valido': resultado['valido'],
+        'motivo': resultado['motivo'],
+    })
 
 # --- NOVA VIEW: CONFIGURAÇÃO DE COMISSÃO (ADMIN ONLY) ---
 class ConfiguracaoComissaoView(LoginRequiredMixin, UpdateView):
@@ -240,6 +273,16 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
             else: messages.success(self.request, f"Venda registrada com sucesso{msg_autor}!")
         else:
             messages.success(self.request, "Lançamento registrado com sucesso!")
+
+        for gestor in _gestores_financeiros(exclude_user=main_venda.vendedor):
+            notificar_usuario(
+                gestor,
+                f"Nova venda de {main_venda.cliente_nome} registrada por "
+                f"{main_venda.vendedor.get_full_name() or main_venda.vendedor.username}, aguardando aprovação.",
+                url=reverse('venda_produto_list'),
+                titulo="Nova Venda Pendente",
+            )
+
         return response
 
 class VendaProdutoUpdateView(LoginRequiredMixin, UpdateView):
@@ -274,14 +317,24 @@ class VendaProdutoUpdateView(LoginRequiredMixin, UpdateView):
             form.instance.custo_base = venda_original.custo_base
 
         if not is_gestor:
+            reenviada = venda_original.status == 'REJEITADO'
             form.instance.status = 'PENDENTE'
             form.instance.gerente = None
             form.instance.data_aprovacao = None
-        messages.success(self.request, "Venda atualizada.")
+            form.instance.motivo_recusa = None
+            if reenviada:
+                messages.success(self.request, "Venda corrigida e reenviada para conferência.")
+            else:
+                messages.success(self.request, "Venda atualizada.")
+        else:
+            messages.success(self.request, "Venda atualizada.")
         response = super().form_valid(form)
 
-        if 'comprovante' in form.changed_data and form.instance.comprovante:
-            _validar_comprovante_upload(form.instance, self.request)
+        if 'comprovante' in form.changed_data:
+            if venda_original.comprovante:
+                venda_original.comprovante.delete(save=False)
+            if form.instance.comprovante:
+                _validar_comprovante_upload(form.instance, self.request)
 
         return response
 
@@ -588,10 +641,22 @@ def aprovar_venda_produto(request, pk):
         venda.gerente = request.user
         venda.data_aprovacao = timezone.now()
         
+        arquivo_apolice_antigo = venda.arquivo_apolice
         if numero_apolice: venda.numero_apolice = numero_apolice
         if arquivo_apolice: venda.arquivo_apolice = arquivo_apolice
-        
-        venda.save() 
+
+        venda.save()
+
+        if arquivo_apolice and arquivo_apolice_antigo:
+            arquivo_apolice_antigo.delete(save=False)
+
+        notificar_usuario(
+            venda.vendedor,
+            f"Sua venda de {venda.cliente_nome} foi aprovada.",
+            url=reverse('venda_produto_list'),
+            titulo="Venda Aprovada",
+        )
+
         messages.success(request, "Venda APROVADA.")
     return redirect(f"{reverse('venda_produto_minuta', kwargs={'pk': venda.pk})}?auto_print=1")
 
@@ -638,6 +703,14 @@ def rejeitar_venda_produto(request, pk):
         venda.gerente = request.user
         venda.data_aprovacao = timezone.now()
         venda.save()
+
+        notificar_usuario(
+            venda.vendedor,
+            f"Sua venda de {venda.cliente_nome} foi rejeitada: {venda.motivo_recusa}",
+            url=reverse('venda_produto_update', kwargs={'pk': venda.pk}),
+            titulo="Venda Rejeitada",
+        )
+
         messages.warning(request, "Venda REJEITADA.")
     return redirect('venda_produto_list')
 

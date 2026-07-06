@@ -11,6 +11,7 @@ from .views import (
     ajustar_custo_veiculo,
     rejeitar_venda_produto,
     validar_comprovante_manual,
+    validar_comprovante_preview,
     toggle_fechamento_mes,
     ConfiguracaoComissaoView,
 )
@@ -18,6 +19,7 @@ from .views import (
 urlpatterns = [
     path('', VendaProdutoListView.as_view(), name='venda_produto_list'),
     path('novo/', VendaProdutoCreateView.as_view(), name='venda_produto_create'),
+    path('comprovante/validar-preview/', validar_comprovante_preview, name='venda_produto_validar_comprovante_preview'),
     path('<int:pk>/editar/', VendaProdutoUpdateView.as_view(), name='venda_produto_update'),
     path('<int:pk>/excluir/', VendaProdutoDeleteView.as_view(), name='venda_produto_delete'),
     path('<int:pk>/comprovante/', VendaProdutoPrintView.as_view(), name='venda_produto_print'),

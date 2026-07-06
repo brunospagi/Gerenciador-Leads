@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 from webpush.models import PushInformation
 
@@ -19,6 +20,31 @@ def lista_notificacoes(request):
     Notificacao.objects.filter(usuario=request.user, lida=False).update(lida=True)
     notificacoes = Notificacao.objects.filter(usuario=request.user)
     return render(request, 'notificacoes/lista_notificacoes.html', {'notificacoes': notificacoes})
+
+
+@login_required
+def notificacoes_dropdown(request):
+    """Preview das últimas notificações para o sino da navbar (não marca como lida)."""
+    notificacoes = Notificacao.objects.filter(usuario=request.user)[:8]
+    count = Notificacao.objects.filter(usuario=request.user, lida=False).count()
+    items = [
+        {
+            'id': n.id,
+            'mensagem': n.mensagem,
+            'lida': n.lida,
+            'url': n.url or '',
+            'data': timezone.localtime(n.data_criacao).strftime('%d/%m %H:%M'),
+        }
+        for n in notificacoes
+    ]
+    return JsonResponse({'count': count, 'items': items})
+
+
+@login_required
+@require_POST
+def marcar_lida_notificacao(request, notificacao_id):
+    Notificacao.objects.filter(id=notificacao_id, usuario=request.user).update(lida=True)
+    return JsonResponse({'ok': True})
 
 
 @login_required

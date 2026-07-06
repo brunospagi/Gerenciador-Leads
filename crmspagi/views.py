@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.db.models import Sum, Q
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse, HttpResponse, JsonResponse
 from django.contrib.staticfiles import finders
 from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator
@@ -39,6 +39,13 @@ def service_worker(request):
     response['Service-Worker-Allowed'] = '/'
     response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return response
+
+@login_required
+@require_POST
+def dispensar_pendencias_admin(request):
+    """Suprime o modal de pendências administrativas pelo resto da sessão (até o próximo login)."""
+    request.session['pendencias_admin_dispensadas'] = True
+    return JsonResponse({'ok': True})
 
 @login_required
 def admin_dashboard(request):

@@ -297,7 +297,23 @@
         <div id="content-wrapper">
             <header class="top-navbar m3-topbar">
                 <button class="btn-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
-                
+
+                <div class="dropdown ms-auto me-2">
+                    <div class="position-relative" data-bs-toggle="dropdown" aria-expanded="false" style="cursor:pointer;" id="notificationBellToggle">
+                        <i class="fas fa-bell fs-5 text-secondary"></i>
+                        <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle {% if not unread_notifications_count %}d-none{% endif %}" id="notificationBadge" style="font-size:0.6rem;">{{ unread_notifications_count }}</span>
+                    </div>
+                    <div class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 rounded-3 p-0" style="width: 340px; max-height: 420px; overflow-y:auto;" id="notificationDropdownMenu">
+                        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-light">
+                            <strong class="small mb-0">Notificações</strong>
+                            <a href="{% url 'lista_notificacoes' %}" class="small">Ver todas</a>
+                        </div>
+                        <div id="notificationDropdownList">
+                            <div class="text-center text-muted small py-4">Carregando...</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="dropdown">
                     <div class="user-profile-nav" data-bs-toggle="dropdown" aria-expanded="false">
                         <div class="text-end d-none d-md-block">
@@ -523,6 +539,88 @@
                 alert('Erro ao ativar notificações: ' + error.message);
             }
         }
+    </script>
+
+    <script>
+        (function () {
+            function getCookieLocal(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str == null ? '' : String(str);
+                return div.innerHTML;
+            }
+
+            function renderNotificacoes(items) {
+                const list = document.getElementById('notificationDropdownList');
+                if (!list) return;
+                if (!items.length) {
+                    list.innerHTML = '<div class="text-center text-muted small py-4">Nenhuma notificação.</div>';
+                    return;
+                }
+                list.innerHTML = items.map(function (n) {
+                    const destino = n.url || "{% url 'lista_notificacoes' %}";
+                    return '<a href="' + destino + '" class="d-block px-3 py-2 border-bottom text-decoration-none text-dark notification-item" data-id="' + n.id + '">' +
+                        '<div class="small ' + (n.lida ? 'text-muted' : 'fw-bold') + '">' + escapeHtml(n.mensagem) + '</div>' +
+                        '<div class="text-muted" style="font-size:0.7rem;">' + escapeHtml(n.data) + '</div>' +
+                        '</a>';
+                }).join('');
+
+                list.querySelectorAll('.notification-item[data-id]').forEach(function (el) {
+                    el.addEventListener('click', function () {
+                        fetch('/notificacoes/' + this.dataset.id + '/marcar-lida/', {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': getCookieLocal('csrftoken') || '' },
+                        }).catch(function () {});
+                    });
+                });
+            }
+
+            function atualizarBadge(count) {
+                const badge = document.getElementById('notificationBadge');
+                if (!badge) return;
+                if (count > 0) {
+                    badge.textContent = count;
+                    badge.classList.remove('d-none');
+                } else {
+                    badge.classList.add('d-none');
+                }
+            }
+
+            function carregarNotificacoes(comLista) {
+                fetch("{% url 'notificacoes_dropdown' %}")
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        atualizarBadge(data.count);
+                        if (comLista) renderNotificacoes(data.items || []);
+                    })
+                    .catch(function () {});
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                const bellToggle = document.getElementById('notificationBellToggle');
+                const dropdownWrapper = bellToggle ? bellToggle.closest('.dropdown') : null;
+                if (dropdownWrapper) {
+                    dropdownWrapper.addEventListener('show.bs.dropdown', function () {
+                        carregarNotificacoes(true);
+                    });
+                }
+                setInterval(function () { carregarNotificacoes(false); }, 60000);
+            });
+        })();
     </script>
 
     {% block extra_js %}{% endblock %}

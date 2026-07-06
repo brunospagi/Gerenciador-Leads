@@ -83,6 +83,9 @@ def ponto_pendencias_context(request):
     if not is_admin:
         return {}
 
+    if request.session.get('pendencias_admin_dispensadas'):
+        return {}
+
     hoje = timezone.localdate()
     pendencias_qs = RegistroPonto.objects.filter(
         status_homologacao=RegistroPonto.StatusHomologacao.PENDENTE,

@@ -13,6 +13,7 @@ urlpatterns = [
     path('favicon.ico', RedirectView.as_view(url='/static/images/logo-spagi-192x192.png', permanent=True)),
     path('admin/', admin.site.urls),
     path('painel-admin/', views.admin_dashboard, name='admin_dashboard'),
+    path('painel-admin/dispensar-pendencias/', views.dispensar_pendencias_admin, name='dispensar_pendencias_admin'),
     path('painel-admin/backup/', views.gerar_backup_sistema, name='gerar_backup_sistema'),
     path('painel-admin/logs-auditoria/', views.logs_auditoria, name='logs_auditoria'),
     path('contas/', include('django.contrib.auth.urls')),
