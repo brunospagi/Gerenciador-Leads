@@ -323,10 +323,12 @@ class VendaIAWizardView(VendaProdutoCreateView):
 
     # Campos exibidos e editáveis no Passo 3. Os demais campos do form são
     # enviados ocultos (com seus valores padrão) para não quebrar validações.
+    # tipo_produto fica fora daqui de propósito: agora é escolhido no seu
+    # próprio passo do wizard (cards), não na grade de campos do passo final.
     CAMPOS_VISIVEIS = [
         'cliente_nome', 'cpfCNPJ_cliente', 'rgIE_cliente', 'dtnasc_cliente', 'telCel_cliente',
         'marca_veiculo', 'modelo_veiculo', 'placa', 'cor', 'ano', 'km_veiculo',
-        'tipo_produto', 'com_desconto', 'valor_venda', 'data_venda',
+        'com_desconto', 'valor_venda', 'data_venda',
         'pgto_pix', 'pgto_transferencia', 'pgto_debito', 'pgto_credito', 'pgto_financiamento',
         'banco_financiamento', 'numero_proposta', 'comprovante',
     ]

@@ -31,6 +31,9 @@
 
     .ia-secao-titulo { font-weight: 700; color: #2c3e50; border-bottom: 1px solid #eef0f2; padding-bottom: 6px; margin: 18px 0 12px; }
     .form-label-sm { font-size: 0.78rem; font-weight: 600; color: #6c757d; margin-bottom: 3px; }
+
+    .tipo-venda-card { border: 1px solid #e9ecef; }
+    .btn-check:checked + .tipo-venda-card { border-color: #3498db; background-color: #f1f9fe; color: #2980b9; }
 </style>
 
 <div class="container py-5" style="max-width: 900px;">
@@ -56,6 +59,11 @@
         <div class="line"></div>
         <div class="step" id="stepIndicator3">
             <div class="circle">3</div>
+            <div>Tipo<br>de Venda</div>
+        </div>
+        <div class="line"></div>
+        <div class="step" id="stepIndicator4">
+            <div class="circle">4</div>
             <div>Dados<br>da Venda</div>
         </div>
     </div>
@@ -101,12 +109,62 @@
         </div>
     </div>
 
-    {# --- PASSO 3: formulário real da venda (VendaProdutoForm) --- #}
+    {# --- PASSO 3: tipo de venda (cards, mesmo padrão visual do formulário normal) --- #}
     <div class="ia-step-panel" id="painelPasso3">
+        <div class="clean-card">
+            <div class="clean-header"><i class="fa fa-tag"></i>Passo 3 — Tipo de Venda</div>
+            <div class="clean-body">
+                <p class="text-muted small">Selecione o tipo de operação. Se a IA identificou o veículo no passo anterior, a opção já vem pré-selecionada — revise antes de continuar.</p>
+
+                <div class="row g-2 tipo-venda-grid">
+                    <div class="col-6 col-md-3">
+                        <input type="radio" class="btn-check" name="tipo_venda_escolha" id="tv_VENDA_VEICULO" autocomplete="off">
+                        <label class="btn btn-outline-secondary w-100 py-3 tipo-venda-card" for="tv_VENDA_VEICULO"><i class="fa fa-car fa-2x d-block mb-2 text-primary"></i><span class="fw-bold small">Venda de Veículo</span></label>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <input type="radio" class="btn-check" name="tipo_venda_escolha" id="tv_VENDA_MOTO" autocomplete="off">
+                        <label class="btn btn-outline-secondary w-100 py-3 tipo-venda-card" for="tv_VENDA_MOTO"><i class="fa fa-motorcycle fa-2x d-block mb-2 text-warning"></i><span class="fw-bold small">Venda de Moto</span></label>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <input type="radio" class="btn-check" name="tipo_venda_escolha" id="tv_CONSIGNACAO" autocomplete="off">
+                        <label class="btn btn-outline-secondary w-100 py-3 tipo-venda-card" for="tv_CONSIGNACAO"><i class="fa fa-tag fa-2x d-block mb-2 text-info"></i><span class="fw-bold small">Consignação</span></label>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <input type="radio" class="btn-check" name="tipo_venda_escolha" id="tv_COMPRA" autocomplete="off">
+                        <label class="btn btn-outline-secondary w-100 py-3 tipo-venda-card" for="tv_COMPRA"><i class="fa fa-money-bill-wave fa-2x d-block mb-2 text-danger"></i><span class="fw-bold small">Compra de Veículo</span></label>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <input type="radio" class="btn-check" name="tipo_venda_escolha" id="tv_GARANTIA" autocomplete="off">
+                        <label class="btn btn-outline-secondary w-100 py-3 tipo-venda-card" for="tv_GARANTIA"><i class="fa fa-shield-alt fa-2x d-block mb-2 text-secondary"></i><span class="fw-bold small">Seguro Garantia</span></label>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <input type="radio" class="btn-check" name="tipo_venda_escolha" id="tv_SEGURO" autocomplete="off">
+                        <label class="btn btn-outline-secondary w-100 py-3 tipo-venda-card" for="tv_SEGURO"><i class="fa fa-umbrella fa-2x d-block mb-2 text-primary"></i><span class="fw-bold small">Seguro Veículo</span></label>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <input type="radio" class="btn-check" name="tipo_venda_escolha" id="tv_TRANSFERENCIA" autocomplete="off">
+                        <label class="btn btn-outline-secondary w-100 py-3 tipo-venda-card" for="tv_TRANSFERENCIA"><i class="fa fa-file-contract fa-2x d-block mb-2 text-dark"></i><span class="fw-bold small">Transferência</span></label>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <input type="radio" class="btn-check" name="tipo_venda_escolha" id="tv_REFINANCIAMENTO" autocomplete="off">
+                        <label class="btn btn-outline-secondary w-100 py-3 tipo-venda-card" for="tv_REFINANCIAMENTO"><i class="fa fa-hand-holding-usd fa-2x d-block mb-2 text-success"></i><span class="fw-bold small">Refinanciamento</span></label>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <button type="button" class="btn btn-outline-secondary" id="btnVoltarPasso2"><i class="fa fa-arrow-left me-1"></i>Voltar</button>
+                    <button type="button" class="btn btn-success" id="btnAvancarPasso4">Avançar <i class="fa fa-arrow-right ms-1"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# --- PASSO 4: formulário real da venda (VendaProdutoForm) --- #}
+    <div class="ia-step-panel" id="painelPasso4">
         <form method="post" enctype="multipart/form-data" id="vendaIaForm">
             {% csrf_token %}
             <div class="clean-card">
-                <div class="clean-header"><i class="fa fa-file-invoice-dollar"></i>Passo 3 — Dados da Venda</div>
+                <div class="clean-header"><i class="fa fa-file-invoice-dollar"></i>Passo 4 — Dados da Venda</div>
                 <div class="clean-body">
 
                     {% if form.errors %}
@@ -142,9 +200,11 @@
                         <div class="col-md-4"><label class="form-label-sm">KM</label>{{ form.km_veiculo }}</div>
                     </div>
 
-                    <div class="ia-secao-titulo"><i class="fa fa-tag me-2 text-primary"></i>Venda</div>
+                    <div class="ia-secao-titulo d-flex align-items-center justify-content-between">
+                        <span><i class="fa fa-tag me-2 text-primary"></i>Venda</span>
+                        <span class="badge bg-primary-subtle text-primary-emphasis fw-normal" id="badgeTipoConfirmado"></span>
+                    </div>
                     <div class="row g-3">
-                        <div class="col-md-4"><label class="form-label-sm">Tipo de Operação</label>{{ form.tipo_produto }}</div>
                         <div class="col-md-4"><label class="form-label-sm">Deu Desconto?</label>{{ form.com_desconto }}</div>
                         <div class="col-md-4"><label class="form-label-sm">Valor Total (R$)</label>{{ form.valor_venda }}</div>
                         <div class="col-md-4"><label class="form-label-sm">Data da Venda</label>{{ form.data_venda }}</div>
@@ -179,7 +239,7 @@
                     </div>
 
                     <div class="d-flex justify-content-between mt-4">
-                        <button type="button" class="btn btn-outline-secondary" id="btnVoltarPasso2"><i class="fa fa-arrow-left me-1"></i>Voltar</button>
+                        <button type="button" class="btn btn-outline-secondary" id="btnVoltarPasso3"><i class="fa fa-arrow-left me-1"></i>Voltar</button>
                         <button type="submit" class="btn btn-success fw-bold" id="btnFinalizarVenda"><i class="fa fa-check me-1"></i>Finalizar Venda e Gerar Minuta</button>
                     </div>
                 </div>
@@ -271,21 +331,51 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- Navegação entre passos ---
     function mostrarPasso(n) {
-        [1, 2, 3].forEach(function (i) {
+        [1, 2, 3, 4].forEach(function (i) {
             document.getElementById('painelPasso' + i).classList.toggle('active', i === n);
             const ind = document.getElementById('stepIndicator' + i);
             ind.classList.toggle('active', i === n);
             ind.classList.toggle('done', i < n);
         });
+        if (n === 3) sincronizarCardTipoVenda();
+        if (n === 4) atualizarBadgeTipoConfirmado();
     }
 
+    // --- Passo 3: seleção do tipo de venda (cards) ---
+    const TIPO_PRODUTO_LABEL = {
+        VENDA_VEICULO: 'Venda de Veículo', VENDA_MOTO: 'Venda de Moto',
+        CONSIGNACAO: 'Consignação', COMPRA: 'Compra de Veículo',
+        GARANTIA: 'Seguro Garantia (Mecânica)', SEGURO: 'Seguro Veículo (Novo)',
+        TRANSFERENCIA: 'Transferência / Despachante', REFINANCIAMENTO: 'Refinanciamento de Veículo',
+    };
+
+    function sincronizarCardTipoVenda() {
+        const tipoAtual = document.getElementById('id_tipo_produto').value;
+        document.querySelectorAll('.tipo-venda-grid .btn-check').forEach(function (radio) {
+            radio.checked = (radio.id === 'tv_' + tipoAtual);
+        });
+    }
+
+    function atualizarBadgeTipoConfirmado() {
+        const tipoAtual = document.getElementById('id_tipo_produto').value;
+        const badge = document.getElementById('badgeTipoConfirmado');
+        if (badge) badge.textContent = TIPO_PRODUTO_LABEL[tipoAtual] || '';
+    }
+
+    document.querySelectorAll('.tipo-venda-grid .btn-check').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            if (!this.checked) return;
+            document.getElementById('id_tipo_produto').value = this.id.replace('tv_', '');
+        });
+    });
+
     // --- Extração de documento via IA ---
+    // Sempre resolve (nunca rejeita) para poder ser encadeada com o botão "Avançar".
     function extrairDocumento(inputId, url, resultadoId, onSucesso) {
         const input = document.getElementById(inputId);
         const arquivo = input.files && input.files[0];
         if (!arquivo) {
-            alert('Selecione um arquivo antes de extrair.');
-            return;
+            return Promise.resolve();
         }
         const resultadoEl = document.getElementById(resultadoId);
         resultadoEl.innerHTML = '<div class="text-muted small mt-2"><i class="fa fa-spinner fa-spin me-1"></i>Analisando documento com IA...</div>';
@@ -293,7 +383,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const formData = new FormData();
         formData.append('arquivo', arquivo);
 
-        fetch(url, { method: 'POST', body: formData, headers: { 'X-CSRFToken': getCookieLocal('csrftoken') || '' } })
+        return fetch(url, { method: 'POST', body: formData, headers: { 'X-CSRFToken': getCookieLocal('csrftoken') || '' } })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 if (!data.disponivel) {
@@ -307,6 +397,28 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
+    // Controla, por passo, qual arquivo já foi processado — evita extrair de
+    // novo (e gastar chamada de IA à toa) se o usuário já clicou "Extrair com
+    // IA" manualmente antes de clicar em "Avançar" com o mesmo arquivo.
+    let arquivoClienteProcessado = null;
+    let arquivoVeiculoProcessado = null;
+
+    function garantirExtracaoCliente() {
+        const input = document.getElementById('inputDocCliente');
+        const arquivo = input.files && input.files[0];
+        if (!arquivo || arquivo === arquivoClienteProcessado) return Promise.resolve();
+        arquivoClienteProcessado = arquivo;
+        return executarExtracaoCliente();
+    }
+
+    function garantirExtracaoVeiculo() {
+        const input = document.getElementById('inputDocVeiculo');
+        const arquivo = input.files && input.files[0];
+        if (!arquivo || arquivo === arquivoVeiculoProcessado) return Promise.resolve();
+        arquivoVeiculoProcessado = arquivo;
+        return executarExtracaoVeiculo();
+    }
+
     function preview(resultadoEl, linhas) {
         const filtradas = linhas.filter(function (l) { return l[1]; });
         if (!filtradas.length) {
@@ -318,8 +430,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }).join('') + '<div class="small text-success mt-2"><i class="fa fa-check-circle me-1"></i>Dados aplicados ao passo final.</div></div>';
     }
 
-    document.getElementById('btnExtrairCliente').addEventListener('click', function () {
-        extrairDocumento('inputDocCliente', "{% url 'venda_ia_extrair_cliente' %}", 'resultadoCliente', function (dados, el) {
+    function executarExtracaoCliente() {
+        return extrairDocumento('inputDocCliente', "{% url 'venda_ia_extrair_cliente' %}", 'resultadoCliente', function (dados, el) {
             setCampo('id_cliente_nome', dados.nome);
             setCampo('id_cpfCNPJ_cliente', dados.cpf);
             setCampo('id_rgIE_cliente', dados.rg);
@@ -331,10 +443,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 ['Data de Nascimento', dados.data_nascimento],
             ]);
         });
-    });
+    }
 
-    document.getElementById('btnExtrairVeiculo').addEventListener('click', function () {
-        extrairDocumento('inputDocVeiculo', "{% url 'venda_ia_extrair_veiculo' %}", 'resultadoVeiculo', function (dados, el) {
+    function executarExtracaoVeiculo() {
+        return extrairDocumento('inputDocVeiculo', "{% url 'venda_ia_extrair_veiculo' %}", 'resultadoVeiculo', function (dados, el) {
             setCampo('id_placa', dados.veiculo_placa);
             setCampo('id_cor', dados.veiculo_cor);
             const marcaModelo = (dados.veiculo_marca_modelo || '').trim();
@@ -346,21 +458,60 @@ document.addEventListener('DOMContentLoaded', function () {
             if (dados.veiculo_ano_fab || dados.veiculo_ano_mod) {
                 setCampo('id_ano', ((dados.veiculo_ano_fab || '') + '/' + (dados.veiculo_ano_mod || '')).replace(/^\/|\/$/g, ''));
             }
+
+            let tipoSugerido = null;
+            if (dados.veiculo_categoria === 'MOTO') tipoSugerido = 'VENDA_MOTO';
+            else if (dados.veiculo_categoria === 'CARRO') tipoSugerido = 'VENDA_VEICULO';
+            if (tipoSugerido) setCampo('id_tipo_produto', tipoSugerido);
+
             preview(el, [
                 ['Placa', dados.veiculo_placa],
                 ['Marca/Modelo', dados.veiculo_marca_modelo],
                 ['Cor', dados.veiculo_cor],
                 ['Ano Fab./Mod.', (dados.veiculo_ano_fab || dados.veiculo_ano_mod) ? ((dados.veiculo_ano_fab || '') + '/' + (dados.veiculo_ano_mod || '')) : null],
+                ['Tipo de Venda', tipoSugerido ? TIPO_PRODUTO_LABEL[tipoSugerido] : null],
             ]);
         });
+    }
+
+    document.getElementById('btnExtrairCliente').addEventListener('click', function () {
+        const input = document.getElementById('inputDocCliente');
+        if (!input.files || !input.files[0]) { alert('Selecione um arquivo antes de extrair.'); return; }
+        arquivoClienteProcessado = input.files[0];
+        executarExtracaoCliente();
     });
 
-    document.getElementById('btnAvancarPasso2').addEventListener('click', function () { mostrarPasso(2); });
+    document.getElementById('btnExtrairVeiculo').addEventListener('click', function () {
+        const input = document.getElementById('inputDocVeiculo');
+        if (!input.files || !input.files[0]) { alert('Selecione um arquivo antes de extrair.'); return; }
+        arquivoVeiculoProcessado = input.files[0];
+        executarExtracaoVeiculo();
+    });
+
+    // "Avançar" extrai automaticamente se houver arquivo ainda não processado.
+    function avancarComExtracao(garantirExtracao, btn, destino) {
+        const textoOriginal = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Analisando...';
+        garantirExtracao().finally(function () {
+            btn.disabled = false;
+            btn.innerHTML = textoOriginal;
+            mostrarPasso(destino);
+        });
+    }
+
+    document.getElementById('btnAvancarPasso2').addEventListener('click', function () {
+        avancarComExtracao(garantirExtracaoCliente, this, 2);
+    });
     document.getElementById('btnPularCliente').addEventListener('click', function () { mostrarPasso(2); });
     document.getElementById('btnVoltarPasso1').addEventListener('click', function () { mostrarPasso(1); });
-    document.getElementById('btnAvancarPasso3').addEventListener('click', function () { mostrarPasso(3); });
+    document.getElementById('btnAvancarPasso3').addEventListener('click', function () {
+        avancarComExtracao(garantirExtracaoVeiculo, this, 3);
+    });
     document.getElementById('btnPularVeiculo').addEventListener('click', function () { mostrarPasso(3); });
     document.getElementById('btnVoltarPasso2').addEventListener('click', function () { mostrarPasso(2); });
+    document.getElementById('btnAvancarPasso4').addEventListener('click', function () { mostrarPasso(4); });
+    document.getElementById('btnVoltarPasso3').addEventListener('click', function () { mostrarPasso(3); });
 
     // --- VERIFICAÇÃO DO COMPROVANTE COM IA (ANTES DE ENVIAR A VENDA) ---
     const inputComprovante = document.getElementById('id_comprovante');
@@ -408,9 +559,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Gerando...'; }
     });
 
-    // Se o servidor retornou erros de validação, abre direto no passo 3.
+    // Se o servidor retornou erros de validação, abre direto no passo 4.
     if (temErros) {
-        mostrarPasso(3);
+        mostrarPasso(4);
     } else {
         mostrarPasso(1);
     }
