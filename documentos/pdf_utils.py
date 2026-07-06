@@ -28,6 +28,9 @@ def extract_crlv_data_with_gemini(pdf_file):
             "- veiculo_ano_fab\n"
             "- veiculo_ano_mod\n"
             "- veiculo_cor\n"
+            "- veiculo_categoria (classifique como \"MOTO\" se o veículo for "
+            "motocicleta/motoneta/ciclomotor, ou \"CARRO\" para qualquer outro "
+            "caso - automóvel, caminhonete, utilitário, caminhão, etc.)\n"
             "- outorgante_nome\n"
             "- outorgante_documento\n"
         )
