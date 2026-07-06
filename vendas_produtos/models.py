@@ -154,12 +154,35 @@ class VendaProduto(models.Model):
 
     comprovante = models.FileField(
         upload_to=get_comprovante_upload_path,
-        storage=PublicMediaStorage(), 
-        blank=True, 
+        storage=PublicMediaStorage(),
+        blank=True,
         null=True,
         verbose_name="Comprovante de Pagamento"
     )
-    
+
+    COMPROVANTE_IA_CHOICES = [
+        ('NAO_VERIFICADO', 'Não verificado'),
+        ('VALIDO', 'Válido (IA)'),
+        ('INVALIDO', 'Inválido (IA)'),
+        ('MANUAL', 'Validado Manualmente'),
+    ]
+    comprovante_status_ia = models.CharField(
+        max_length=20,
+        choices=COMPROVANTE_IA_CHOICES,
+        default='NAO_VERIFICADO',
+        verbose_name="Status da Validação (IA)"
+    )
+    comprovante_ia_observacao = models.TextField(blank=True, null=True, verbose_name="Observação da IA")
+    comprovante_validado_manual_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='comprovantes_validados_manualmente',
+        verbose_name="Validado manualmente por"
+    )
+    comprovante_validado_manual_em = models.DateTimeField(null=True, blank=True, verbose_name="Validado manualmente em")
+
     banco_financiamento = models.CharField(max_length=100, blank=True, null=True, verbose_name="Banco Financiador")
     numero_proposta = models.CharField(max_length=50, blank=True, null=True, verbose_name="Nº da Proposta")
 

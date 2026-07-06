@@ -10,6 +10,7 @@ from .views import (
     aprovar_venda_produto,
     ajustar_custo_veiculo,
     rejeitar_venda_produto,
+    validar_comprovante_manual,
     toggle_fechamento_mes,
     ConfiguracaoComissaoView,
 )
@@ -25,6 +26,7 @@ urlpatterns = [
     path('<int:pk>/aprovar/', aprovar_venda_produto, name='venda_produto_approve'),
     path('<int:pk>/ajustar-custo/', ajustar_custo_veiculo, name='venda_produto_adjust_cost'),
     path('<int:pk>/rejeitar/', rejeitar_venda_produto, name='venda_produto_reject'),
+    path('<int:pk>/validar-comprovante-manual/', validar_comprovante_manual, name='venda_produto_validar_comprovante_manual'),
     path('fechamento/', toggle_fechamento_mes, name='venda_produto_fechamento'),
     path('configuracao/comissao/', ConfiguracaoComissaoView.as_view(), name='configuracao_comissao'),
 ]
