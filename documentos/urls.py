@@ -4,6 +4,7 @@ from .views import (
     ProcuracaoCreateView,
     ProcuracaoUpdateView,
     ProcuracaoDeleteView,
+    procuracao_extrair_crlv,
     gerar_procuracao_pdf,
     OutorgadoListView,
     OutorgadoCreateView,
@@ -15,6 +16,7 @@ urlpatterns = [
     # URLs de Procuração
     path('', ProcuracaoListView.as_view(), name='procuracao_list'),
     path('nova/', ProcuracaoCreateView.as_view(), name='procuracao_create'),
+    path('nova/extrair-crlv/', procuracao_extrair_crlv, name='procuracao_extrair_crlv'),
     path('<int:pk>/editar/', ProcuracaoUpdateView.as_view(), name='procuracao_update'),
     path('<int:pk>/excluir/', ProcuracaoDeleteView.as_view(), name='procuracao_delete'),
     path('<int:pk>/pdf/', gerar_procuracao_pdf, name='procuracao_pdf'),

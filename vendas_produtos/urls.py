@@ -12,6 +12,9 @@ from .views import (
     rejeitar_venda_produto,
     validar_comprovante_manual,
     validar_comprovante_preview,
+    VendaIAWizardView,
+    venda_ia_extrair_cliente,
+    venda_ia_extrair_veiculo,
     toggle_fechamento_mes,
     ConfiguracaoComissaoView,
 )
@@ -19,6 +22,9 @@ from .views import (
 urlpatterns = [
     path('', VendaProdutoListView.as_view(), name='venda_produto_list'),
     path('novo/', VendaProdutoCreateView.as_view(), name='venda_produto_create'),
+    path('novo-ia/', VendaIAWizardView.as_view(), name='venda_produto_ia_wizard'),
+    path('novo-ia/extrair-cliente/', venda_ia_extrair_cliente, name='venda_ia_extrair_cliente'),
+    path('novo-ia/extrair-veiculo/', venda_ia_extrair_veiculo, name='venda_ia_extrair_veiculo'),
     path('comprovante/validar-preview/', validar_comprovante_preview, name='venda_produto_validar_comprovante_preview'),
     path('<int:pk>/editar/', VendaProdutoUpdateView.as_view(), name='venda_produto_update'),
     path('<int:pk>/excluir/', VendaProdutoDeleteView.as_view(), name='venda_produto_delete'),

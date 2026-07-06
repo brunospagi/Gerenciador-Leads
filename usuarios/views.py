@@ -44,7 +44,8 @@ def profile_view(request):
 
     # No método GET (ou se o form for inválido), renderiza a página com o formulário
     context = {
-        'form': form
+        'form': form,
+        'dados_funcionais': getattr(request.user, 'dados_funcionais', None),
     }
     return render(request, 'usuarios/profile.html', context)
 

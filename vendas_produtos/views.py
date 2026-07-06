@@ -17,6 +17,8 @@ from dateutil.relativedelta import relativedelta
 from .models import VendaProduto, FechamentoMensal, ParametrosComissao
 from .forms import VendaProdutoForm, ParametrosComissaoForm
 from .ai_validacao import validar_comprovante_com_gemini
+from .ai_extracao import extrair_dados_cliente_com_gemini
+from documentos.pdf_utils import extract_crlv_data_with_gemini
 from notificacoes.utils import notificar_usuario
 
 User = get_user_model()
@@ -97,6 +99,33 @@ def validar_comprovante_preview(request):
         'valido': resultado['valido'],
         'motivo': resultado['motivo'],
     })
+
+# --- WIZARD: NOVA VENDA COM IA (endpoints de extração) ---
+@login_required
+@require_POST
+def venda_ia_extrair_cliente(request):
+    arquivo = request.FILES.get('arquivo')
+    if not arquivo:
+        return JsonResponse({'erro': 'Nenhum arquivo enviado.'}, status=400)
+
+    dados = extrair_dados_cliente_com_gemini(arquivo)
+    if dados is None:
+        return JsonResponse({'disponivel': False})
+
+    return JsonResponse({'disponivel': True, 'dados': dados})
+
+@login_required
+@require_POST
+def venda_ia_extrair_veiculo(request):
+    arquivo = request.FILES.get('arquivo')
+    if not arquivo:
+        return JsonResponse({'erro': 'Nenhum arquivo enviado.'}, status=400)
+
+    dados = extract_crlv_data_with_gemini(arquivo)
+    if not dados:
+        return JsonResponse({'disponivel': False})
+
+    return JsonResponse({'disponivel': True, 'dados': dados})
 
 # --- NOVA VIEW: CONFIGURAÇÃO DE COMISSÃO (ADMIN ONLY) ---
 class ConfiguracaoComissaoView(LoginRequiredMixin, UpdateView):
@@ -284,6 +313,38 @@ class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
             )
 
         return response
+
+# --- WIZARD: NOVA VENDA COM IA (fluxo completo em 3 passos) ---
+# Reutiliza toda a lógica de VendaProdutoCreateView (validação, cálculo de
+# comissão, guarda anti-duplo-envio, validação de comprovante por IA e
+# notificações aos gestores); muda apenas o template e o destino final.
+class VendaIAWizardView(VendaProdutoCreateView):
+    template_name = 'vendas_produtos/venda_ia_wizard.html'
+
+    # Campos exibidos e editáveis no Passo 3. Os demais campos do form são
+    # enviados ocultos (com seus valores padrão) para não quebrar validações.
+    CAMPOS_VISIVEIS = [
+        'cliente_nome', 'cpfCNPJ_cliente', 'rgIE_cliente', 'dtnasc_cliente', 'telCel_cliente',
+        'marca_veiculo', 'modelo_veiculo', 'placa', 'cor', 'ano', 'km_veiculo',
+        'tipo_produto', 'com_desconto', 'valor_venda', 'data_venda',
+        'pgto_pix', 'pgto_transferencia', 'pgto_debito', 'pgto_credito', 'pgto_financiamento',
+        'banco_financiamento', 'numero_proposta', 'comprovante',
+    ]
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial.setdefault('tipo_produto', 'VENDA_VEICULO')
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['campos_visiveis'] = self.CAMPOS_VISIVEIS
+        return context
+
+    def get_success_url(self):
+        if self.object:
+            return f"{reverse('venda_produto_minuta', kwargs={'pk': self.object.pk})}?auto_print=1"
+        return super().get_success_url()
 
 class VendaProdutoUpdateView(LoginRequiredMixin, UpdateView):
     model = VendaProduto
