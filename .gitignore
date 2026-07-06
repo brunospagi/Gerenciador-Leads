@@ -5,12 +5,14 @@ __pycache__/
 *.pot
 .env
 .venv/
+.venv_test/
 venv/
 env/
 # Django-specific
 db.sqlite3
 media/
 static_collected/
+staticfiles/
 local_settings.py
 # IDE-specific (e.g., PyCharm)
 .idea/
