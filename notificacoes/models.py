@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 class Notificacao(models.Model):
     usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notificacoes')
     mensagem = models.CharField(max_length=255)
+    url = models.CharField(max_length=500, blank=True, null=True)
     lida = models.BooleanField(default=False)
     data_criacao = models.DateTimeField(auto_now_add=True)
 

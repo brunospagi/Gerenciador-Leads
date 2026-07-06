@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.views.generic import CreateView, TemplateView, UpdateView
 
 from clientes.models import Cliente, Historico
+from notificacoes.utils import notificar_usuario
 from .forms import LeadEntradaForm
 from .logic import (
     criar_lead_evo_crm,
@@ -139,6 +140,13 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
                     'deal_id': evo_resultado.get('deal_id', ''),
                 }
 
+        notificar_usuario(
+            vendedor_selecionado,
+            f"Novo lead atribuído: {self.object.nome_cliente} ({self.object.whatsapp}).",
+            url=reverse('cliente_detail', kwargs={'pk': self.object.pk}),
+            titulo="Novo Lead Atribuído",
+        )
+
         enviar_webhook_n8n(self.object)
         return response
 
@@ -264,6 +272,13 @@ class RedistribuirLeadView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
         cliente.vendedor = novo_vendedor
         cliente.save()
+
+        notificar_usuario(
+            novo_vendedor,
+            f"Novo lead atribuído: {cliente.nome_cliente} ({cliente.whatsapp}).",
+            url=reverse('cliente_detail', kwargs={'pk': cliente.pk}),
+            titulo="Novo Lead Atribuído",
+        )
 
         try:
             enviar_webhook_n8n(cliente)

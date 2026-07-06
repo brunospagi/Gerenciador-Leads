@@ -31,6 +31,13 @@
 
     <form method="post" enctype="multipart/form-data" id="vendaForm">
         {% csrf_token %}
+        {% if form.instance.pk and form.instance.status == 'REJEITADO' %}
+            <div class="alert alert-danger rounded-3 mb-4 shadow-sm">
+                <div class="fw-bold mb-1"><i class="fa fa-times-circle me-2"></i>Esta venda foi rejeitada pelo gestor</div>
+                <div>{{ form.instance.motivo_recusa|default:"Nenhum motivo informado." }}</div>
+                <div class="small text-muted mt-1">Corrija os dados necessários e salve para reenviar automaticamente para conferência.</div>
+            </div>
+        {% endif %}
         {% if form.errors %}
             <div class="alert alert-danger rounded-3 mb-4 shadow-sm" id="alert-erros-formulario">
                 <div class="fw-bold mb-2"><i class="fa fa-exclamation-triangle me-2"></i>Corrija os campos abaixo antes de salvar:</div>
@@ -234,6 +241,16 @@
             </div>
         </div>
     </form>
+
+    <div class="modal fade" id="modalPreviewComprovante" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title"><i class="fa fa-robot me-2"></i>Verificação do Comprovante</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body" id="modalPreviewComprovanteBody"></div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button></div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -763,6 +780,46 @@ document.addEventListener('DOMContentLoaded', function() {
         ensureFinanciamentoDefaultZero();
         updateFinanceiroPadrao();
     }
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // --- VERIFICAÇÃO DO COMPROVANTE COM IA (ANTES DE ENVIAR A VENDA) ---
+    const inputComprovante = document.getElementById('id_comprovante');
+    const modalPreviewEl = document.getElementById('modalPreviewComprovante');
+    if (!inputComprovante || !modalPreviewEl || typeof bootstrap === 'undefined') return;
+
+    const modalPreviewBody = document.getElementById('modalPreviewComprovanteBody');
+    const modalPreview = new bootstrap.Modal(modalPreviewEl);
+
+    inputComprovante.addEventListener('change', function () {
+        const arquivo = this.files && this.files[0];
+        if (!arquivo) return;
+
+        modalPreviewBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><div class="mt-3">Verificando comprovante com IA...</div></div>';
+        modalPreview.show();
+
+        const tokenInput = document.querySelector('#vendaForm [name=csrfmiddlewaretoken]');
+        const formData = new FormData();
+        formData.append('arquivo', arquivo);
+        if (tokenInput) formData.append('csrfmiddlewaretoken', tokenInput.value);
+
+        fetch("{% url 'venda_produto_validar_comprovante_preview' %}", { method: 'POST', body: formData })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.disponivel) {
+                    modalPreviewBody.innerHTML = '<div class="alert alert-secondary mb-0"><i class="fa fa-info-circle me-1"></i> Verificação automática indisponível no momento. O comprovante será enviado normalmente com a venda.</div>';
+                } else if (data.valido) {
+                    modalPreviewBody.innerHTML = '<div class="alert alert-success mb-0"><i class="fa fa-check-circle me-1"></i> Comprovante parece válido.<br><span class="small">' + (data.motivo || '') + '</span></div>';
+                } else {
+                    modalPreviewBody.innerHTML = '<div class="alert alert-danger mb-0"><i class="fa fa-times-circle me-1"></i> Comprovante pode ser inválido: ' + (data.motivo || 'motivo não informado') + '<div class="small text-muted mt-2">Você ainda pode enviar a venda normalmente; um gestor poderá validar manualmente o comprovante depois.</div></div>';
+                }
+            })
+            .catch(function () {
+                modalPreviewBody.innerHTML = '<div class="alert alert-secondary mb-0"><i class="fa fa-info-circle me-1"></i> Não foi possível verificar agora. O comprovante será enviado normalmente com a venda.</div>';
+            });
+    });
 });
 </script>
 {% endblock %}
