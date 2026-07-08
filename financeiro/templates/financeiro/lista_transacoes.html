@@ -50,10 +50,14 @@
       <div class="m3-kpi-help">R$ {{ soma_efetivada|floatformat:2 }}</div>
     </article>
     <article class="m3-kpi-card">
-      <div class="m3-kpi-label">Saldo do período</div>
+      <div class="m3-kpi-label">Saldo líquido efetivado</div>
       <div class="m3-kpi-value">R$ {{ saldo_geral|floatformat:2 }}</div>
-      <div class="m3-kpi-help">Efetivado menos pendente.</div>
+      <div class="m3-kpi-help">Receitas efetivadas (R$ {{ receitas_efetivadas|floatformat:2 }}) menos despesas efetivadas (R$ {{ despesas_efetivadas|floatformat:2 }}).</div>
     </article>
+  </section>
+
+  <section class="m3-soft-note">
+    <i class="fas fa-info-circle me-1"></i>Esta lista filtra pela <strong>data de vencimento</strong>. O Relatório DRE usa a <strong>data de pagamento</strong> (o que foi de fato pago/recebido no mês) — por isso os dois podem divergir para contas pagas fora do mês de vencimento.
   </section>
 
   <section class="card m3-filter-card">

@@ -1,5 +1,6 @@
 from django import forms
 from decimal import Decimal
+from django.utils import timezone
 from core.money_utils import parse_valor_monetario
 from .models import TransacaoFinanceira
 
@@ -32,3 +33,15 @@ class TransacaoFinanceiraForm(forms.ModelForm):
         if resultado is None:
             raise forms.ValidationError('Informe um valor válido.')
         return resultado
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # Mesma regra que a ação em lote de "marcar efetivado"/"marcar
+        # pendente" já aplica (financeiro/views.py) — sem isso, dava pra
+        # marcar efetivado sem data_pagamento pelo formulário e a transação
+        # sumia silenciosamente do DRE (que filtra por data_pagamento).
+        if cleaned_data.get('efetivado') and not cleaned_data.get('data_pagamento'):
+            cleaned_data['data_pagamento'] = timezone.localdate()
+        elif not cleaned_data.get('efetivado'):
+            cleaned_data['data_pagamento'] = None
+        return cleaned_data
