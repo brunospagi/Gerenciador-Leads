@@ -1,24 +1,18 @@
-﻿{% extends 'base_portal.html' %}
+{% extends 'base_portal.html' %}
 
 {% block content %}
 <div class="container-fluid py-4 ponto-page">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
-            <h3 class="fw-bold mb-1"><i class="fas fa-exclamation-triangle text-warning me-2"></i>Ocorrências de Ponto</h3>
-            <small class="text-muted">Gestão de atrasos com homologação e histórico mensal.</small>
+            <h3 class="fw-bold mb-1"><i class="fas fa-user-check text-warning me-2"></i>Homologação de Ponto</h3>
+            <small class="text-muted">Aprovação de ocorrências (atraso ou validação manual) e fechamento de folha.</small>
         </div>
-        <div class="d-flex flex-wrap gap-2 d-print-none">
-            <a href="{% url 'controle_ponto:relatorio_mensal' %}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-1"></i>Espelho
-            </a>
-            <a href="{% url 'controle_ponto:homologacao_admin' %}" class="btn btn-outline-warning">
-                <i class="fas fa-user-check me-1"></i>Homologação
-            </a>
-            <button type="button" onclick="window.print()" class="btn btn-secondary">
-                <i class="fas fa-print me-1"></i>Imprimir
-            </button>
-        </div>
+        <button type="button" onclick="window.print()" class="btn btn-secondary d-print-none">
+            <i class="fas fa-print me-1"></i>Imprimir
+        </button>
     </div>
+
+    {% include 'controle_ponto/_nav_relatorios.html' %}
 
     <div class="row g-3 mb-4">
         <div class="col-12 col-md-6 col-xl-3">
@@ -102,82 +96,163 @@
         </div>
     </div>
 
-    <div class="card border-0">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead>
-                        <tr>
-                            <th>Data</th>
-                            <th>Funcionário</th>
-                            <th>Entrada</th>
-                            <th>Escala</th>
-                            <th>Atraso</th>
-                            <th>Justificativa</th>
-                            <th>Status</th>
-                            <th>Homologado por</th>
-                            <th class="d-print-none">Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for p in ocorrencias %}
-                        <tr>
-                            <td>{{ p.data|date:"d/m/Y" }}</td>
-                            <td>
-                                <div class="fw-semibold">{{ p.funcionario.nome_completo }}</div>
-                                <small class="text-muted">{{ p.funcionario.cargo|default:"-" }}</small>
-                            </td>
-                            <td>{{ p.entrada|time:"H:i"|default:"--" }}</td>
-                            <td>{{ p.horario_escala_entrada|time:"H:i"|default:"--" }}</td>
-                            <td><span class="m3-badge m3-badge-warning">{{ p.atraso_minutos }} min</span></td>
-                            <td class="text-break">{{ p.justificativa_atraso|default:"-" }}</td>
-                            <td>
-                                {% if p.status_homologacao == 'PENDENTE' %}
-                                <span class="m3-badge m3-badge-warning">Pendente</span>
-                                {% elif p.status_homologacao == 'ACEITO' %}
-                                <span class="m3-badge m3-badge-success">Aceito</span>
-                                {% elif p.status_homologacao == 'RECUSADO' %}
-                                <span class="m3-badge m3-badge-danger">Recusado</span>
-                                {% else %}
-                                <span class="m3-badge m3-badge-neutral">N/A</span>
-                                {% endif %}
-                            </td>
-                            <td>{% if p.homologado_por %}{{ p.homologado_por.get_full_name|default:p.homologado_por.username }}{% else %}-{% endif %}</td>
-                            <td class="d-print-none" style="min-width: 380px;">
-                                <div class="d-flex flex-column gap-2">
-                                    <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-camera me-1"></i>Auditoria visual
-                                    </a>
-                                    <form method="post" action="{% url 'controle_ponto:homologar_ocorrencia' p.id %}" class="row g-2 align-items-center">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="mes" value="{{ mes_atual }}">
-                                        <input type="hidden" name="ano" value="{{ ano_atual }}">
-                                        <input type="hidden" name="funcionario" value="{{ funcionario_selecionado }}">
-                                        <input type="hidden" name="status" value="{{ status_selecionado }}">
-                                        <div class="col-12">
-                                            <input type="text" name="observacao" class="form-control form-control-sm" placeholder="ObservAção da homologação">
-                                        </div>
-                                        <div class="col-6 d-grid">
-                                            <button type="submit" name="acao" value="aceitar" class="btn btn-sm btn-success">Aceitar</button>
-                                        </div>
-                                        <div class="col-6 d-grid">
-                                            <button type="submit" name="acao" value="recusar" class="btn btn-sm btn-danger">Recusar</button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="9" class="text-center py-5 text-muted">Nenhuma ocorrência encontrada para os filtros informados.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    {% if funcionario_selecionado_obj %}
+    <div class="card border-0 mb-4 d-print-none">
+        <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
+            <div>
+                <span class="fw-semibold me-2">{{ funcionario_selecionado_obj.nome_completo }} — {{ mes_atual|stringformat:"02d" }}/{{ ano_atual }}</span>
+                {% if fechamento and fechamento.fechada %}
+                <span class="badge text-bg-success">Folha fechada</span>
+                {% else %}
+                <span class="badge text-bg-secondary">Folha aberta</span>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+                {% if fechamento and fechamento.fechada %}
+                <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="funcionario" value="{{ funcionario_selecionado }}">
+                    <input type="hidden" name="mes" value="{{ mes_atual }}">
+                    <input type="hidden" name="ano" value="{{ ano_atual }}">
+                    <input type="hidden" name="status" value="{{ status_selecionado }}">
+                    <input type="hidden" name="acao" value="reabrir_folha">
+                    <button type="submit" class="btn btn-outline-warning btn-sm">Reabrir Folha</button>
+                </form>
+                {% else %}
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalFecharFolha">Fechar Folha</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" id="formOcorrencias">
+        {% csrf_token %}
+        <input type="hidden" name="mes" value="{{ mes_atual }}">
+        <input type="hidden" name="ano" value="{{ ano_atual }}">
+        <input type="hidden" name="funcionario" value="{{ funcionario_selecionado }}">
+        <input type="hidden" name="status" value="{{ status_selecionado }}">
+        <input type="hidden" id="ponto_id" value="">
+        <input type="hidden" id="campoAcao" value="">
+
+        <div class="card border-0">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 36px;" class="d-print-none"><input type="checkbox" id="checkAll"></th>
+                                <th>Data</th>
+                                <th>Funcionário</th>
+                                <th>Entrada</th>
+                                <th>Escala</th>
+                                <th>Atraso</th>
+                                <th>Justificativa</th>
+                                <th>Status</th>
+                                <th>Homologado por</th>
+                                <th class="d-print-none">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in ocorrencias %}
+                            <tr>
+                                <td class="d-print-none"><input type="checkbox" name="pontos" value="{{ p.id }}" class="check-item"></td>
+                                <td>{{ p.data|date:"d/m/Y" }}</td>
+                                <td>
+                                    <div class="fw-semibold">{{ p.funcionario.nome_completo }}</div>
+                                    <small class="text-muted">{{ p.funcionario.cargo|default:"-" }}</small>
+                                </td>
+                                <td>{{ p.entrada|time:"H:i"|default:"--" }}</td>
+                                <td>{{ p.horario_escala_entrada|time:"H:i"|default:"--" }}</td>
+                                <td><span class="m3-badge m3-badge-warning">{{ p.atraso_minutos }} min</span></td>
+                                <td class="text-break">{{ p.justificativa_atraso|default:"-" }}</td>
+                                <td>
+                                    {% if p.status_homologacao == 'PENDENTE' %}
+                                    <span class="m3-badge m3-badge-warning">Pendente</span>
+                                    {% elif p.status_homologacao == 'ACEITO' %}
+                                    <span class="m3-badge m3-badge-success">Aceito</span>
+                                    {% elif p.status_homologacao == 'RECUSADO' %}
+                                    <span class="m3-badge m3-badge-danger">Recusado</span>
+                                    {% else %}
+                                    <span class="m3-badge m3-badge-neutral">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td>{% if p.homologado_por %}{{ p.homologado_por.get_full_name|default:p.homologado_por.username }}{% else %}-{% endif %}</td>
+                                <td class="d-print-none">
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-sm btn-outline-success btn-homologar" data-ponto-id="{{ p.id }}" data-acao="aceitar">Aceitar</button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger btn-homologar" data-ponto-id="{{ p.id }}" data-acao="recusar">Recusar</button>
+                                        <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-camera"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="10" class="text-center py-5 text-muted">Nenhuma ocorrência encontrada para os filtros informados.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer d-flex flex-wrap gap-2 justify-content-end d-print-none">
+                <input type="text" name="observacao" id="observacaoLote" class="form-control" style="max-width: 360px;" placeholder="Observação (opcional)">
+                <button type="submit" name="acao" value="aprovar_lote" class="btn btn-success">Aceitar Selecionados</button>
+                <button type="submit" name="acao" value="recusar_lote" class="btn btn-danger">Recusar Selecionados</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="modal fade" id="modalHomologar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalHomologarTitulo">Homologar Ocorrência</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label small text-muted">Observação (opcional)</label>
+                <textarea class="form-control" id="observacaoModal" rows="3" placeholder="Ex.: justificativa aceita, trânsito comprovado..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnConfirmarHomologacao">Confirmar</button>
             </div>
         </div>
     </div>
 </div>
+
+{% if funcionario_selecionado_obj %}
+<div class="modal fade" id="modalFecharFolha" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="funcionario" value="{{ funcionario_selecionado }}">
+                <input type="hidden" name="mes" value="{{ mes_atual }}">
+                <input type="hidden" name="ano" value="{{ ano_atual }}">
+                <input type="hidden" name="status" value="{{ status_selecionado }}">
+                <input type="hidden" name="acao" value="fechar_folha">
+                <div class="modal-header">
+                    <h5 class="modal-title">Fechar Folha de Ponto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Confirmar fechamento da folha de ponto de {{ funcionario_selecionado_obj.nome_completo }} em {{ mes_atual|stringformat:"02d" }}/{{ ano_atual }}?</p>
+                    <textarea class="form-control" name="observacao" rows="3" placeholder="Observação do fechamento (opcional)"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Confirmar Fechamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <style>
     .ponto-page .card {
@@ -229,5 +304,46 @@
         }
     }
 </style>
-{% endblock %}
 
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const checkAll = document.getElementById('checkAll');
+    if (checkAll) {
+        checkAll.addEventListener('change', function () {
+            document.querySelectorAll('.check-item').forEach(function (el) { el.checked = checkAll.checked; });
+        });
+    }
+
+    const modalEl = document.getElementById('modalHomologar');
+    if (modalEl && typeof bootstrap !== 'undefined') {
+        const modal = new bootstrap.Modal(modalEl);
+        const modalTitulo = document.getElementById('modalHomologarTitulo');
+        const observacaoModal = document.getElementById('observacaoModal');
+        const form = document.getElementById('formOcorrencias');
+        const campoPontoId = document.getElementById('ponto_id');
+        const campoAcao = document.getElementById('campoAcao');
+        const campoObservacaoLote = document.getElementById('observacaoLote');
+
+        document.querySelectorAll('.btn-homologar').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                campoPontoId.value = this.dataset.pontoId;
+                campoAcao.value = this.dataset.acao;
+                modalTitulo.textContent = this.dataset.acao === 'aceitar' ? 'Aceitar Ocorrência' : 'Recusar Ocorrência';
+                observacaoModal.value = '';
+                modal.show();
+            });
+        });
+
+        document.getElementById('btnConfirmarHomologacao').addEventListener('click', function () {
+            campoObservacaoLote.value = observacaoModal.value;
+            // Só nomeia estes campos na hora de enviar (evita colidir com o
+            // name="acao" dos botões de ação em lote no rodapé da tabela).
+            campoPontoId.name = 'ponto_id';
+            campoAcao.name = 'acao';
+            modal.hide();
+            form.submit();
+        });
+    }
+});
+</script>
+{% endblock %}

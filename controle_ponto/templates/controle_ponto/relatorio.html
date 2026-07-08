@@ -7,30 +7,12 @@
             <h3 class="fw-bold mb-1"><i class="fas fa-calendar-check text-primary me-2"></i>Espelho de Ponto Mensal</h3>
             <small class="text-muted">Visão consolidada de registro, atraso e homologação.</small>
         </div>
-        <div class="d-flex flex-wrap gap-2 d-print-none">
-            <a href="{% url 'controle_ponto:ocorrencias_mensais' %}" class="btn btn-warning">
-                <i class="fas fa-exclamation-triangle me-1"></i>Ocorrências
-            </a>
-            <a href="{% url 'controle_ponto:homologacao_admin' %}" class="btn btn-outline-warning">
-                <i class="fas fa-user-check me-1"></i>Homologação
-            </a>
-            <a href="{% url 'controle_ponto:relatorio_entradas' %}" class="btn btn-outline-primary">
-                <i class="fas fa-user-clock me-1"></i>Entradas
-            </a>
-            <a href="{% url 'controle_ponto:relatorio_mensal_rh' %}" class="btn btn-outline-dark">
-                <i class="fas fa-users-cog me-1"></i>Relatório RH
-            </a>
-            <a href="{% url 'controle_ponto:relatorio_spagiid' %}" class="btn btn-outline-success">
-                <i class="fas fa-user-shield me-1"></i>SpagiID
-            </a>
-            <a href="{% url 'controle_ponto:mapa_pontos' %}" class="btn btn-outline-danger">
-                <i class="fas fa-map-marker-alt me-1"></i>Mapa
-            </a>
-            <button type="button" onclick="window.print()" class="btn btn-secondary">
-                <i class="fas fa-print me-1"></i>Imprimir
-            </button>
-        </div>
+        <button type="button" onclick="window.print()" class="btn btn-secondary d-print-none">
+            <i class="fas fa-print me-1"></i>Imprimir
+        </button>
     </div>
+
+    {% include 'controle_ponto/_nav_relatorios.html' %}
 
     <div class="row g-3 mb-4">
         <div class="col-12 col-md-6 col-xl-3">

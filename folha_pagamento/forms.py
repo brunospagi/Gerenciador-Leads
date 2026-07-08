@@ -1,33 +1,9 @@
-import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from django import forms
 from .models import Desconto, Credito, FolhaPagamento
 from django.utils import timezone
-
-
-def _parse_valor_monetario(valor_str):
-    """
-    Converte texto de um campo com máscara monetária para Decimal, aceitando
-    tanto o formato BR completo ("1.500,00") quanto um decimal simples
-    ("1500.00" ou "1500,00") — evita assumir um único formato, que causava
-    valores inflados quando o texto chegava sem os separadores de milhar
-    esperados (ex.: "1500.50" virando R$ 150.050,00).
-    """
-    s = re.sub(r'[^\d,.\-]', '', str(valor_str)).strip()
-    if not s:
-        return None
-    if ',' in s:
-        # Formato BR: 1.234.567,89 (ponto = milhar, vírgula = decimal)
-        s = s.replace('.', '').replace(',', '.')
-    else:
-        # Só ponto(s): 1234567.89 (decimal) ou 1.234.567 (milhar sem centavos)
-        if s.count('.') > 1:
-            s = s.replace('.', '')
-    try:
-        return Decimal(s)
-    except (InvalidOperation, ValueError):
-        return None
+from core.money_utils import parse_valor_monetario
 
 
 _VALOR_TOTAL_WIDGET = forms.TextInput(attrs={'class': 'form-control money-mask', 'placeholder': '0,00'})
@@ -40,7 +16,7 @@ class _ValorMonetarioMixin:
             return valor
         if valor in (None, ''):
             raise forms.ValidationError('Informe um valor total válido.')
-        resultado = _parse_valor_monetario(valor)
+        resultado = parse_valor_monetario(valor)
         if resultado is None or resultado <= 0:
             raise forms.ValidationError('Informe um valor total válido.')
         return resultado
