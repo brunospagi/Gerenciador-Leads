@@ -2,11 +2,13 @@ from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from vendas_produtos.models import VendaProduto
 
-from .models import TransacaoFinanceira, gerar_relatorio_DRE_mensal
+from .forms import TransacaoFinanceiraForm
+from .models import FechamentoMensalFinanceiro, TransacaoFinanceira, gerar_relatorio_DRE_mensal
 
 
 class DreMensalTests(TestCase):
@@ -83,3 +85,107 @@ class DreMensalTests(TestCase):
         self.assertEqual(relatorio['total_entradas'], Decimal('1000.00'))
         self.assertEqual(relatorio['total_saidas'], Decimal('800.00'))
         self.assertEqual(relatorio['saldo_liquido'], Decimal('200.00'))
+
+
+class TransacaoFinanceiraFormTests(TestCase):
+    def test_efetivado_sem_data_pagamento_preenche_automaticamente(self):
+        form = TransacaoFinanceiraForm(data={
+            'tipo': 'DESPESA', 'categoria': 'OUTROS', 'descricao': 'Teste',
+            'valor': '150,00', 'data_vencimento': '2026-03-10',
+            'efetivado': 'on', 'recorrente': '',
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['data_pagamento'], timezone.localdate())
+
+    def test_nao_efetivado_limpa_data_pagamento(self):
+        form = TransacaoFinanceiraForm(data={
+            'tipo': 'DESPESA', 'categoria': 'OUTROS', 'descricao': 'Teste',
+            'valor': '150,00', 'data_vencimento': '2026-03-10',
+            'data_pagamento': '2026-03-10', 'efetivado': '', 'recorrente': '',
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertIsNone(form.cleaned_data['data_pagamento'])
+
+
+class RecorrenteDuplicacaoTests(TestCase):
+    def test_alternar_efetivado_duas_vezes_nao_duplica_mes_seguinte(self):
+        transacao = TransacaoFinanceira.objects.create(
+            tipo='DESPESA', categoria='FIXA', descricao='Aluguel',
+            valor=Decimal('800.00'), data_vencimento=timezone.datetime(2026, 3, 10).date(),
+            recorrente=True, efetivado=False,
+        )
+        # Efetiva -> gera a copia de abril.
+        transacao.efetivado = True
+        transacao.data_pagamento = timezone.datetime(2026, 3, 10).date()
+        transacao.save()
+        self.assertEqual(
+            TransacaoFinanceira.objects.filter(recorrente=True, data_vencimento__month=4, data_vencimento__year=2026).count(),
+            1,
+        )
+
+        # Desfaz e refaz "efetivado" -> nao deve duplicar a copia de abril.
+        transacao.efetivado = False
+        transacao.save()
+        transacao.efetivado = True
+        transacao.save()
+
+        self.assertEqual(
+            TransacaoFinanceira.objects.filter(recorrente=True, data_vencimento__month=4, data_vencimento__year=2026).count(),
+            1,
+        )
+
+
+class MesFechadoTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username='admin_fin', password='123456')
+        self.admin.profile.nivel_acesso = 'ADMIN'
+        self.admin.profile.save()
+        self.transacao = TransacaoFinanceira.objects.create(
+            tipo='DESPESA', categoria='OUTROS', descricao='Conta de teste',
+            valor=Decimal('100.00'), data_vencimento=timezone.datetime(2026, 3, 10).date(),
+            data_pagamento=timezone.datetime(2026, 3, 10).date(), efetivado=True,
+        )
+        FechamentoMensalFinanceiro.objects.create(mes=3, ano=2026, fechado=True, fechado_por=self.admin)
+
+    def test_bloqueia_edicao_de_transacao_em_mes_fechado(self):
+        self.client.force_login(self.admin)
+        url = reverse('financeiro:editar_transacao', kwargs={'pk': self.transacao.pk})
+        response = self.client.get(url, follow=True)
+        self.assertRedirects(response, reverse('financeiro:lista_transacoes'))
+
+    def test_bloqueia_exclusao_de_transacao_em_mes_fechado(self):
+        self.client.force_login(self.admin)
+        url = reverse('financeiro:apagar_transacao', kwargs={'pk': self.transacao.pk})
+        response = self.client.get(url, follow=True)
+        self.assertRedirects(response, reverse('financeiro:lista_transacoes'))
+        self.assertTrue(TransacaoFinanceira.objects.filter(pk=self.transacao.pk).exists())
+
+    def test_permite_edicao_apos_reabrir_mes(self):
+        FechamentoMensalFinanceiro.objects.filter(mes=3, ano=2026).update(fechado=False)
+        self.client.force_login(self.admin)
+        url = reverse('financeiro:editar_transacao', kwargs={'pk': self.transacao.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+
+class SaldoListaTests(TestCase):
+    def test_saldo_separa_receita_de_despesa(self):
+        admin = User.objects.create_user(username='admin_saldo', password='123456')
+        admin.profile.nivel_acesso = 'ADMIN'
+        admin.profile.save()
+        data_ref = timezone.datetime(2026, 5, 15).date()
+        TransacaoFinanceira.objects.create(
+            tipo='RECEITA', categoria='OUTROS', descricao='Receita', valor=Decimal('1000.00'),
+            data_vencimento=data_ref, efetivado=True,
+        )
+        TransacaoFinanceira.objects.create(
+            tipo='DESPESA', categoria='OUTROS', descricao='Despesa', valor=Decimal('800.00'),
+            data_vencimento=data_ref, efetivado=True,
+        )
+
+        self.client.force_login(admin)
+        response = self.client.get(reverse('financeiro:lista_transacoes'), {'mes_ref': '2026-05'})
+
+        self.assertEqual(response.context['receitas_efetivadas'], Decimal('1000.00'))
+        self.assertEqual(response.context['despesas_efetivadas'], Decimal('800.00'))
+        self.assertEqual(response.context['saldo_geral'], Decimal('200.00'))

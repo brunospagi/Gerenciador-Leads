@@ -1,0 +1,22 @@
+{% with atual=request.resolver_match.url_name %}
+<div class="d-flex flex-wrap gap-2 mb-4 d-print-none">
+    <a href="{% url 'controle_ponto:ocorrencias_mensais' %}" class="btn btn-sm {% if atual == 'ocorrencias_mensais' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+        <i class="fas fa-user-check me-1"></i>Homologação
+    </a>
+    <a href="{% url 'controle_ponto:relatorio_mensal' %}" class="btn btn-sm {% if atual == 'relatorio_mensal' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="fas fa-calendar-check me-1"></i>Espelho
+    </a>
+    <a href="{% url 'controle_ponto:relatorio_entradas' %}" class="btn btn-sm {% if atual == 'relatorio_entradas' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="fas fa-user-clock me-1"></i>Entradas
+    </a>
+    <a href="{% url 'controle_ponto:relatorio_mensal_rh' %}" class="btn btn-sm {% if atual == 'relatorio_mensal_rh' %}btn-dark{% else %}btn-outline-dark{% endif %}">
+        <i class="fas fa-users-cog me-1"></i>Dashboard RH
+    </a>
+    <a href="{% url 'controle_ponto:relatorio_spagiid' %}" class="btn btn-sm {% if atual == 'relatorio_spagiid' %}btn-success{% else %}btn-outline-success{% endif %}">
+        <i class="fas fa-user-shield me-1"></i>Auditoria SpagiID
+    </a>
+    <a href="{% url 'controle_ponto:mapa_pontos' %}" class="btn btn-sm {% if atual == 'mapa_pontos' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+        <i class="fas fa-map-marker-alt me-1"></i>Mapa
+    </a>
+</div>
+{% endwith %}

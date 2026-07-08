@@ -146,6 +146,15 @@ def _is_admin_only(user):
     return bool(user.is_superuser or nivel == 'ADMIN')
 
 
+def _folha_fechada(ponto):
+    return FechamentoFolhaPonto.objects.filter(
+        funcionario=ponto.funcionario,
+        mes=ponto.data.month,
+        ano=ponto.data.year,
+        fechada=True,
+    ).exists()
+
+
 def _calcular_atraso_minutos(data_ref, horario_real, horario_escala):
     if not horario_real or not horario_escala:
         return 0
@@ -508,18 +517,89 @@ def relatorio_mensal(request):
 
 @login_required
 def ocorrencias_mensais(request):
+    """Tela única de homologação de ponto: lista todas as ocorrências do mês
+    (todos os colaboradores ou um específico), com ações individuais (modal),
+    em lote (checkbox) e fechamento/reabertura de folha por colaborador."""
     if not _is_gestor(request.user):
         messages.error(request, 'Acesso negado às ocorrências de ponto.')
         return redirect('/')
 
     hoje = timezone.now().date()
-    mes = _safe_int(request.GET.get('mes'), hoje.month, min_value=1, max_value=12)
-    ano = _safe_int(request.GET.get('ano'), hoje.year, min_value=hoje.year - 5, max_value=hoje.year + 5)
-    funcionario_id = request.GET.get('funcionario')
+    mes = _safe_int(request.GET.get('mes') or request.POST.get('mes'), hoje.month, min_value=1, max_value=12)
+    ano = _safe_int(request.GET.get('ano') or request.POST.get('ano'), hoje.year, min_value=hoje.year - 5, max_value=hoje.year + 5)
+    funcionario_id = (request.GET.get('funcionario') or request.POST.get('funcionario') or '').strip()
     status = request.GET.get('status', RegistroPonto.StatusHomologacao.PENDENTE)
 
+    def _redirecionar_com_filtros():
+        base_url = reverse_lazy('controle_ponto:ocorrencias_mensais')
+        params = [f'mes={mes}', f'ano={ano}']
+        if funcionario_id:
+            params.append(f'funcionario={funcionario_id}')
+        if status:
+            params.append(f'status={status}')
+        return redirect(f'{base_url}?{"&".join(params)}')
+
+    if request.method == 'POST':
+        acao = (request.POST.get('acao') or '').strip().lower()
+        observacao = (request.POST.get('observacao') or '').strip()
+
+        if acao in {'fechar_folha', 'reabrir_folha'}:
+            funcionario = Funcionario.objects.filter(pk=funcionario_id, ativo=True).first() if funcionario_id else None
+            if not funcionario:
+                messages.error(request, 'Selecione um colaborador para fechar/reabrir a folha.')
+                return _redirecionar_com_filtros()
+
+            if acao == 'fechar_folha':
+                fechamento, criado = FechamentoFolhaPonto.objects.get_or_create(
+                    funcionario=funcionario,
+                    mes=mes,
+                    ano=ano,
+                    defaults={'fechada': True, 'fechado_por': request.user, 'fechado_em': timezone.now(), 'observacao': observacao},
+                )
+                if not criado and not fechamento.fechada:
+                    fechamento.fechada = True
+                    fechamento.fechado_por = request.user
+                    fechamento.fechado_em = timezone.now()
+                    fechamento.observacao = observacao
+                    fechamento.save(update_fields=['fechada', 'fechado_por', 'fechado_em', 'observacao'])
+                messages.success(request, f'Folha de ponto fechada para {funcionario.nome_completo} ({mes:02d}/{ano}).')
+            else:
+                fechamento = FechamentoFolhaPonto.objects.filter(funcionario=funcionario, mes=mes, ano=ano).first()
+                if fechamento and fechamento.fechada:
+                    fechamento.fechada = False
+                    fechamento.save(update_fields=['fechada'])
+                    messages.success(request, f'Folha de ponto reaberta para {funcionario.nome_completo} ({mes:02d}/{ano}).')
+                else:
+                    messages.info(request, 'Esta folha de ponto já estava aberta.')
+            return _redirecionar_com_filtros()
+
+        if acao in {'aceitar', 'recusar', 'aprovar_lote', 'recusar_lote'}:
+            if acao in {'aceitar', 'recusar'}:
+                ids = [request.POST.get('ponto_id')]
+            else:
+                ids = request.POST.getlist('pontos')
+            ids = [i for i in ids if i]
+            if not ids:
+                messages.error(request, 'Selecione ao menos um registro para homologar.')
+                return _redirecionar_com_filtros()
+
+            aceitar = acao in {'aceitar', 'aprovar_lote'}
+            novo_status = RegistroPonto.StatusHomologacao.ACEITO if aceitar else RegistroPonto.StatusHomologacao.RECUSADO
+            texto = 'aceito(s)' if aceitar else 'recusado(s)'
+            updated = RegistroPonto.objects.filter(id__in=ids).update(
+                status_homologacao=novo_status,
+                homologado_por=request.user,
+                homologado_em=timezone.now(),
+                observacao_homologacao=observacao,
+            )
+            messages.success(request, f'{updated} ocorrência(s) {texto} com sucesso.')
+            return _redirecionar_com_filtros()
+
+        messages.error(request, 'Ação inválida de homologação.')
+        return _redirecionar_com_filtros()
+
     ocorrencias = (
-        RegistroPonto.objects.filter(data__month=mes, data__year=ano, atraso_minutos__gt=0)
+        RegistroPonto.objects.filter(data__month=mes, data__year=ano)
         .select_related('funcionario', 'homologado_por')
         .order_by('-data', 'funcionario__user__first_name')
     )
@@ -533,11 +613,21 @@ def ocorrencias_mensais(request):
     total_pendentes = ocorrencias.filter(status_homologacao=RegistroPonto.StatusHomologacao.PENDENTE).count()
     total_aceitas = ocorrencias.filter(status_homologacao=RegistroPonto.StatusHomologacao.ACEITO).count()
     total_recusadas = ocorrencias.filter(status_homologacao=RegistroPonto.StatusHomologacao.RECUSADO).count()
+
+    fechamento = None
+    funcionario_selecionado_obj = None
+    if funcionario_id:
+        funcionario_selecionado_obj = Funcionario.objects.filter(pk=funcionario_id).first()
+        if funcionario_selecionado_obj:
+            fechamento = FechamentoFolhaPonto.objects.filter(
+                funcionario=funcionario_selecionado_obj, mes=mes, ano=ano
+            ).first()
+
     context = {
         'ocorrencias': ocorrencias,
         'mes_atual': mes,
         'ano_atual': ano,
-        'funcionario_selecionado': int(funcionario_id) if funcionario_id else '',
+        'funcionario_selecionado': int(funcionario_id) if funcionario_id.isdigit() else '',
         'status_selecionado': status,
         'funcionarios': funcionarios_list,
         'total_ocorrencias': total_ocorrencias,
@@ -547,158 +637,10 @@ def ocorrencias_mensais(request):
         'status_choices': RegistroPonto.StatusHomologacao.choices,
         'meses': range(1, 13),
         'anos': range(hoje.year - 2, hoje.year + 2),
+        'fechamento': fechamento,
+        'funcionario_selecionado_obj': funcionario_selecionado_obj,
     }
     return render(request, 'controle_ponto/ocorrencias_mensais.html', context)
-
-
-@login_required
-@require_POST
-def homologar_ocorrencia(request, pk):
-    if not _is_gestor(request.user):
-        messages.error(request, 'Acesso negado para homologar ocorrência.')
-        return redirect('/')
-
-    ponto = get_object_or_404(RegistroPonto, pk=pk)
-    acao = (request.POST.get('acao') or '').strip().lower()
-    observacao = (request.POST.get('observacao') or '').strip()
-
-    if acao == 'aceitar':
-        ponto.status_homologacao = RegistroPonto.StatusHomologacao.ACEITO
-        messages.success(request, 'Ocorrência homologada como ACEITA.')
-    elif acao == 'recusar':
-        ponto.status_homologacao = RegistroPonto.StatusHomologacao.RECUSADO
-        messages.warning(request, 'Ocorrência homologada como RECUSADA.')
-    else:
-        messages.error(request, 'Ação inválida de homologação.')
-        return redirect('controle_ponto:ocorrencias_mensais')
-
-    ponto.homologado_por = request.user
-    ponto.homologado_em = timezone.now()
-    ponto.observacao_homologacao = observacao
-    ponto.save(update_fields=['status_homologacao', 'homologado_por', 'homologado_em', 'observacao_homologacao'])
-
-    mes = request.POST.get('mes')
-    ano = request.POST.get('ano')
-    funcionario = request.POST.get('funcionario')
-    status = request.POST.get('status')
-    base_url = reverse_lazy('controle_ponto:ocorrencias_mensais')
-    params = []
-    if mes:
-        params.append(f'mes={mes}')
-    if ano:
-        params.append(f'ano={ano}')
-    if funcionario:
-        params.append(f'funcionario={funcionario}')
-    if status:
-        params.append(f'status={status}')
-    if params:
-        return redirect(f'{base_url}?{"&".join(params)}')
-    return redirect(base_url)
-
-
-@login_required
-def homologacao_ponto_admin(request):
-    if not _is_gestor(request.user):
-        messages.error(request, 'Acesso negado à homologação de ponto.')
-        return redirect('/')
-
-    hoje = timezone.now().date()
-    mes = _safe_int(request.GET.get('mes') or request.POST.get('mes'), hoje.month, min_value=1, max_value=12)
-    ano = _safe_int(request.GET.get('ano') or request.POST.get('ano'), hoje.year, min_value=hoje.year - 5, max_value=hoje.year + 5)
-    funcionario_id = (request.GET.get('funcionario') or request.POST.get('funcionario') or '').strip()
-
-    funcionario = None
-    if funcionario_id:
-        funcionario = Funcionario.objects.filter(pk=funcionario_id, ativo=True).first()
-
-    if request.method == 'POST':
-        acao = (request.POST.get('acao') or '').strip().lower()
-        observacao = (request.POST.get('observacao') or '').strip()
-
-        if not funcionario:
-            messages.error(request, 'Selecione um colaborador para executar esta ação.')
-            return redirect(f"{reverse_lazy('controle_ponto:homologacao_admin')}?mes={mes}&ano={ano}")
-
-        if acao == 'fechar_folha':
-            fechamento, _ = FechamentoFolhaPonto.objects.get_or_create(
-                funcionario=funcionario,
-                mes=mes,
-                ano=ano,
-                defaults={'fechada': True, 'fechado_por': request.user, 'fechado_em': timezone.now(), 'observacao': observacao},
-            )
-            if not fechamento.fechada:
-                fechamento.fechada = True
-                fechamento.fechado_por = request.user
-                fechamento.fechado_em = timezone.now()
-                fechamento.observacao = observacao
-                fechamento.save(update_fields=['fechada', 'fechado_por', 'fechado_em', 'observacao'])
-            messages.success(request, f'Folha ponto fechada para {funcionario.nome_completo} ({mes:02d}/{ano}).')
-        elif acao == 'reabrir_folha':
-            fechamento = FechamentoFolhaPonto.objects.filter(funcionario=funcionario, mes=mes, ano=ano).first()
-            if fechamento and fechamento.fechada:
-                fechamento.fechada = False
-                fechamento.save(update_fields=['fechada'])
-                messages.success(request, f'Folha ponto reaberta para {funcionario.nome_completo} ({mes:02d}/{ano}).')
-            else:
-                messages.info(request, 'Esta folha ponto já estava aberta.')
-        else:
-            if acao in {'aprovar_um', 'recusar_um'}:
-                ids = [request.POST.get('ponto_id')]
-            else:
-                ids = request.POST.getlist('pontos')
-            ids = [i for i in ids if i]
-            if not ids:
-                messages.error(request, 'Selecione ao menos um registro para homologar.')
-                return redirect(f"{reverse_lazy('controle_ponto:homologacao_admin')}?mes={mes}&ano={ano}&funcionario={funcionario.id}")
-
-            qs = RegistroPonto.objects.filter(
-                id__in=ids,
-                funcionario=funcionario,
-                data__month=mes,
-                data__year=ano,
-            )
-            if acao in {'aprovar_um', 'aprovar_lote'}:
-                status = RegistroPonto.StatusHomologacao.ACEITO
-                texto = 'aceitos'
-            else:
-                status = RegistroPonto.StatusHomologacao.RECUSADO
-                texto = 'recusados'
-            updated = qs.update(
-                status_homologacao=status,
-                homologado_por=request.user,
-                homologado_em=timezone.now(),
-                observacao_homologacao=observacao,
-            )
-            messages.success(request, f'{updated} ocorrência(s) {texto} com sucesso.')
-
-        return redirect(f"{reverse_lazy('controle_ponto:homologacao_admin')}?mes={mes}&ano={ano}&funcionario={funcionario.id}")
-
-    pendencias = RegistroPonto.objects.none()
-    fechamento = None
-    if funcionario:
-        fechamento = FechamentoFolhaPonto.objects.filter(funcionario=funcionario, mes=mes, ano=ano).first()
-        pendencias = RegistroPonto.objects.filter(
-            funcionario=funcionario,
-            data__month=mes,
-            data__year=ano,
-            status_homologacao=RegistroPonto.StatusHomologacao.PENDENTE,
-        ).order_by('-data', '-entrada')
-
-    return render(
-        request,
-        'controle_ponto/homologacao_admin.html',
-        {
-            'mes_atual': mes,
-            'ano_atual': ano,
-            'funcionario_selecionado': int(funcionario_id) if funcionario_id.isdigit() else '',
-            'funcionarios': Funcionario.objects.filter(ativo=True).order_by('nome_completo'),
-            'pendencias': pendencias,
-            'fechamento': fechamento,
-            'meses': range(1, 13),
-            'anos': range(hoje.year - 2, hoje.year + 2),
-            'total_pendencias': pendencias.count(),
-        },
-    )
 
 
 @login_required
@@ -1015,6 +957,10 @@ class RegistroPontoUpdateView(LoginRequiredMixin, UpdateView):
         if not _is_gestor(request.user):
             messages.error(request, 'Acesso negado: apenas gestores podem alterar pontos manuais.')
             return redirect('/')
+        self.object = self.get_object()
+        if _folha_fechada(self.object):
+            messages.error(request, 'Este ponto pertence a uma folha já fechada. Reabra a folha (na tela de Homologação) antes de editar.')
+            return redirect('controle_ponto:relatorio_mensal')
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
@@ -1041,6 +987,10 @@ class RegistroPontoDeleteView(LoginRequiredMixin, DeleteView):
         if not _is_gestor(request.user):
             messages.error(request, 'Acesso negado: sem permissão para excluir pontos.')
             return redirect('/')
+        self.object = self.get_object()
+        if _folha_fechada(self.object):
+            messages.error(request, 'Este ponto pertence a uma folha já fechada. Reabra a folha (na tela de Homologação) antes de excluir.')
+            return redirect('controle_ponto:relatorio_mensal')
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):

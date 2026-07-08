@@ -66,19 +66,35 @@ class TransacaoFinanceira(models.Model):
             # Duplica a conta para o próximo mês se for recorrente e acabou de ser paga
             if not old_obj.efetivado and self.efetivado and self.recorrente:
                 nova_data_vencimento = self.data_vencimento + relativedelta(months=1)
-                TransacaoFinanceira.objects.create(
+                # Evita duplicar se já existe uma cópia do mês seguinte com a
+                # mesma assinatura (ex.: usuário desfez e refez "efetivado").
+                ja_existe = TransacaoFinanceira.objects.filter(
+                    recorrente=True,
                     tipo=self.tipo,
                     categoria=self.categoria,
                     descricao=self.descricao,
                     valor=self.valor,
-                    data_vencimento=nova_data_vencimento,
-                    efetivado=False,
-                    recorrente=True,
                     placa=self.placa,
                     modelo_veiculo=self.modelo_veiculo,
                     ano=self.ano,
-                    criado_por=self.criado_por # Mantém o autor na conta duplicada
-                )
+                    criado_por=self.criado_por,
+                    data_vencimento__month=nova_data_vencimento.month,
+                    data_vencimento__year=nova_data_vencimento.year,
+                ).exists()
+                if not ja_existe:
+                    TransacaoFinanceira.objects.create(
+                        tipo=self.tipo,
+                        categoria=self.categoria,
+                        descricao=self.descricao,
+                        valor=self.valor,
+                        data_vencimento=nova_data_vencimento,
+                        efetivado=False,
+                        recorrente=True,
+                        placa=self.placa,
+                        modelo_veiculo=self.modelo_veiculo,
+                        ano=self.ano,
+                        criado_por=self.criado_por # Mantém o autor na conta duplicada
+                    )
         super().save(*args, **kwargs)
 
     @classmethod
@@ -151,6 +167,33 @@ class TransacaoFinanceira(models.Model):
                 cursor = proximo_venc
 
         return criadas
+
+    @property
+    def mes_competencia(self):
+        """Mês/ano usado pra checar fechamento: data de pagamento se já
+        efetivada, senão a data de vencimento."""
+        data_ref = self.data_pagamento or self.data_vencimento
+        return data_ref.month, data_ref.year
+
+
+class FechamentoMensalFinanceiro(models.Model):
+    mes = models.PositiveSmallIntegerField()
+    ano = models.PositiveIntegerField()
+    fechado = models.BooleanField(default=False, verbose_name='Mês fechado?')
+    fechado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='fechamentos_financeiro')
+    fechado_em = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('mes', 'ano')
+        verbose_name = 'Fechamento Mensal Financeiro'
+        verbose_name_plural = 'Fechamentos Mensais Financeiros'
+
+    def __str__(self):
+        return f'{self.mes:02d}/{self.ano} - {"Fechado" if self.fechado else "Aberto"}'
+
+    @classmethod
+    def esta_fechado(cls, mes, ano):
+        return cls.objects.filter(mes=mes, ano=ano, fechado=True).exists()
 
 
 def gerar_relatorio_DRE_mensal(mes, ano):

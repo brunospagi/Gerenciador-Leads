@@ -241,7 +241,7 @@
                         {% if module_access.relatorios and user.is_superuser or module_access.relatorios and user.profile.nivel_acesso == 'ADMIN' or module_access.relatorios and user.profile.nivel_acesso == 'GERENTE' %}
                         <li><a href="{% url 'admin_dashboard' %}"><i class="fas fa-chart-line text-warning"></i> Dashboard Executivo</a></li>
                         <li><a href="{% url 'controle_ponto:relatorio_mensal' %}"><i class="fas fa-calendar-check"></i> Espelho de Ponto</a></li>
-                        <li><a href="{% url 'controle_ponto:homologacao_admin' %}"><i class="fas fa-user-check"></i> Homologação de Ponto</a></li>
+                        <li><a href="{% url 'controle_ponto:ocorrencias_mensais' %}"><i class="fas fa-user-check"></i> Homologação de Ponto</a></li>
                         {% endif %}
 
                         {% if module_access.rh %}
@@ -373,7 +373,7 @@
                 </div>
                 <div class="modal-footer">
                     {% if admin_tem_pendencias_ponto %}
-                    <a href="{% url 'controle_ponto:homologacao_admin' %}" class="btn btn-primary">Corrigir ponto</a>
+                    <a href="{% url 'controle_ponto:ocorrencias_mensais' %}" class="btn btn-primary">Corrigir ponto</a>
                     {% endif %}
                     {% if admin_tem_pendencias_vendas %}
                     <a href="{% url 'venda_produto_list' %}" class="btn btn-warning">Aprovar vendas</a>

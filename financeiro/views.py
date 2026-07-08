@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Sum
 from django.http import HttpResponseRedirect
+from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.generic import CreateView, DeleteView, ListView, TemplateView, UpdateView
@@ -9,7 +10,7 @@ from django.views.generic import CreateView, DeleteView, ListView, TemplateView,
 from usuarios.permissions import has_module_access
 
 from .forms import TransacaoFinanceiraForm
-from .models import TransacaoFinanceira, gerar_relatorio_DRE_mensal
+from .models import FechamentoMensalFinanceiro, TransacaoFinanceira, gerar_relatorio_DRE_mensal
 
 
 class AcessoFinanceiroMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -96,7 +97,13 @@ class TransacaoListView(AcessoFinanceiroMixin, ListView):
         context["total_efetivadas"] = qs.filter(efetivado=True).count()
         context["soma_pendente"] = qs.filter(efetivado=False).aggregate(total=Sum("valor"))["total"] or 0
         context["soma_efetivada"] = qs.filter(efetivado=True).aggregate(total=Sum("valor"))["total"] or 0
-        context["saldo_geral"] = context["soma_efetivada"] - context["soma_pendente"]
+        # Saldo precisa separar RECEITA de DESPESA antes de somar — receita e
+        # despesa juntas na mesma soma davam um número sem sentido contábil.
+        receitas_efetivadas = qs.filter(efetivado=True, tipo="RECEITA").aggregate(total=Sum("valor"))["total"] or 0
+        despesas_efetivadas = qs.filter(efetivado=True, tipo="DESPESA").aggregate(total=Sum("valor"))["total"] or 0
+        context["receitas_efetivadas"] = receitas_efetivadas
+        context["despesas_efetivadas"] = despesas_efetivadas
+        context["saldo_geral"] = receitas_efetivadas - despesas_efetivadas
         context["is_admin_financeiro"] = self._is_admin()
         context["mes_ref"] = self._get_mes_ref()[2]
         return context
@@ -116,6 +123,18 @@ class TransacaoListView(AcessoFinanceiroMixin, ListView):
 
         if not queryset.exists():
             messages.warning(request, "Nenhum lancamento valido foi encontrado para sua permissao.")
+            return self._redirect_with_mes()
+
+        # Nunca aplica ação em lote sobre transação de um mês já fechado.
+        meses_fechados = set(FechamentoMensalFinanceiro.objects.filter(fechado=True).values_list("mes", "ano"))
+        if meses_fechados:
+            ids_bloqueados = [t.id for t in queryset if t.mes_competencia in meses_fechados]
+            if ids_bloqueados:
+                queryset = queryset.exclude(id__in=ids_bloqueados)
+                messages.warning(request, f"{len(ids_bloqueados)} lancamento(s) de mes fechado foram ignorados.")
+
+        if not queryset.exists():
+            messages.warning(request, "Nenhum lancamento valido restou apos remover os de mes fechado.")
             return self._redirect_with_mes()
 
         if action == "marcar_efetivado":
@@ -159,14 +178,29 @@ class TransacaoCreateView(AcessoFinanceiroMixin, CreateView):
         return super().form_valid(form)
 
 
-class TransacaoUpdateView(AcessoAdminMixin, UpdateView):
+class _BloqueiaMesFechadoMixin:
+    """Impede editar/excluir uma transação cuja competência já foi fechada."""
+
+    def dispatch(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        mes, ano = self.object.mes_competencia
+        if FechamentoMensalFinanceiro.esta_fechado(mes, ano):
+            messages.error(
+                request,
+                f"Este lançamento pertence ao mês {mes:02d}/{ano}, já fechado. Reabra o mês (na tela do DRE) antes de alterar.",
+            )
+            return redirect("financeiro:lista_transacoes")
+        return super().dispatch(request, *args, **kwargs)
+
+
+class TransacaoUpdateView(AcessoAdminMixin, _BloqueiaMesFechadoMixin, UpdateView):
     model = TransacaoFinanceira
     form_class = TransacaoFinanceiraForm
     template_name = "financeiro/form_transacao.html"
     success_url = reverse_lazy("financeiro:lista_transacoes")
 
 
-class TransacaoDeleteView(AcessoAdminMixin, DeleteView):
+class TransacaoDeleteView(AcessoAdminMixin, _BloqueiaMesFechadoMixin, DeleteView):
     model = TransacaoFinanceira
     template_name = "financeiro/confirmar_delete.html"
     success_url = reverse_lazy("financeiro:lista_transacoes")
@@ -174,6 +208,33 @@ class TransacaoDeleteView(AcessoAdminMixin, DeleteView):
 
 class RelatorioDREView(AcessoAdminMixin, TemplateView):
     template_name = "financeiro/relatorio_dre.html"
+
+    def post(self, request, *args, **kwargs):
+        mes = int(request.POST.get("mes") or timezone.now().month)
+        ano = int(request.POST.get("ano") or timezone.now().year)
+        acao = (request.POST.get("acao") or "").strip().lower()
+
+        if acao == "fechar_mes":
+            fechamento, criado = FechamentoMensalFinanceiro.objects.get_or_create(
+                mes=mes, ano=ano,
+                defaults={"fechado": True, "fechado_por": request.user, "fechado_em": timezone.now()},
+            )
+            if not criado and not fechamento.fechado:
+                fechamento.fechado = True
+                fechamento.fechado_por = request.user
+                fechamento.fechado_em = timezone.now()
+                fechamento.save(update_fields=["fechado", "fechado_por", "fechado_em"])
+            messages.success(request, f"Mês {mes:02d}/{ano} fechado com sucesso.")
+        elif acao == "reabrir_mes":
+            fechamento = FechamentoMensalFinanceiro.objects.filter(mes=mes, ano=ano).first()
+            if fechamento and fechamento.fechado:
+                fechamento.fechado = False
+                fechamento.save(update_fields=["fechado"])
+                messages.success(request, f"Mês {mes:02d}/{ano} reaberto.")
+            else:
+                messages.info(request, "Este mês já estava aberto.")
+
+        return HttpResponseRedirect(f"{reverse_lazy('financeiro:relatorio_dre')}?mes={mes}&ano={ano}")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -193,6 +254,7 @@ class RelatorioDREView(AcessoAdminMixin, TemplateView):
         context["relatorio"] = gerar_relatorio_DRE_mensal(mes, ano)
         context["mes_atual"] = mes
         context["ano_atual"] = ano
+        context["fechamento"] = FechamentoMensalFinanceiro.objects.filter(mes=mes, ano=ano).first()
 
         if "print" in self.request.GET:
             self.template_name = "financeiro/relatorio_dre_print.html"

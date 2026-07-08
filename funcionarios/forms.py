@@ -1,8 +1,9 @@
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from django import forms
 from django.contrib.auth.models import User
 
+from core.money_utils import parse_valor_monetario
 from .models import Funcionario
 
 
@@ -39,6 +40,14 @@ class FuncionarioForm(forms.ModelForm):
         widget=forms.TextInput(attrs={'class': 'form-control money-mask', 'placeholder': 'R$ 0,00'}),
         label='Salário Base (R$)',
     )
+    # CharField explícito (não o DecimalField que o ModelForm geraria
+    # sozinho): o to_python() do DecimalField do Django rejeita valor com
+    # vírgula antes do clean_valor_diario_vt customizado rodar.
+    valor_diario_vt = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control money-mask', 'placeholder': '0,00'}),
+        label='Valor Diário VT (Ida+Volta)',
+    )
 
     class Meta:
         model = Funcionario
@@ -60,7 +69,6 @@ class FuncionarioForm(forms.ModelForm):
             'chave_pix': forms.TextInput(attrs={'class': 'form-control'}),
             'ativo': forms.CheckboxInput(attrs={'class': 'form-check-input', 'checked': True}),
             'opta_vt': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'valor_diario_vt': forms.TextInput(attrs={'class': 'form-control money-mask', 'placeholder': '0,00'}),
             'foto_biometria': forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
 
@@ -83,12 +91,10 @@ class FuncionarioForm(forms.ModelForm):
             return valor
         if valor in (None, ''):
             raise forms.ValidationError('Informe um salário válido.')
-
-        valor_str = str(valor).replace('R$', '').replace('.', '').replace(',', '.').strip()
-        try:
-            return Decimal(valor_str)
-        except (InvalidOperation, ValueError):
+        resultado = parse_valor_monetario(valor)
+        if resultado is None:
             raise forms.ValidationError('Informe um salário válido.')
+        return resultado
 
     def clean_valor_diario_vt(self):
         valor = self.cleaned_data.get('valor_diario_vt')
@@ -96,8 +102,7 @@ class FuncionarioForm(forms.ModelForm):
             return valor
         if valor in (None, ''):
             return Decimal('0.00')
-        valor_str = str(valor).replace('R$', '').replace('.', '').replace(',', '.').strip()
-        try:
-            return Decimal(valor_str)
-        except (InvalidOperation, ValueError):
+        resultado = parse_valor_monetario(valor)
+        if resultado is None:
             raise forms.ValidationError('Informe um valor diário de VT válido.')
+        return resultado

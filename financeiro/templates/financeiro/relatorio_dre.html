@@ -24,6 +24,29 @@
         </div>
     </div>
 
+    <div class="alert alert-secondary d-flex flex-wrap justify-content-between align-items-center gap-2 d-print-none">
+        <div>
+            <i class="fas fa-info-circle me-1"></i>Este relatório considera a <strong>data de pagamento</strong> (o que foi de fato efetivado no mês) — pode divergir da lista de lançamentos, que filtra pela data de vencimento.
+            {% if fechamento and fechamento.fechado %}
+            <span class="badge text-bg-success ms-2">Mês fechado</span>
+            {% else %}
+            <span class="badge text-bg-secondary ms-2">Mês aberto</span>
+            {% endif %}
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="mes" value="{{ mes_atual }}">
+            <input type="hidden" name="ano" value="{{ ano_atual }}">
+            {% if fechamento and fechamento.fechado %}
+            <input type="hidden" name="acao" value="reabrir_mes">
+            <button type="submit" class="btn btn-outline-warning btn-sm">Reabrir Mês</button>
+            {% else %}
+            <input type="hidden" name="acao" value="fechar_mes">
+            <button type="submit" class="btn btn-success btn-sm">Fechar Mês</button>
+            {% endif %}
+        </form>
+    </div>
+
     <h4 class="text-success fw-bold border-bottom border-success pb-2"><i class="fas fa-arrow-down"></i> Entradas e Receitas</h4>
     <div class="row mb-5">
         <div class="col-md-6">
