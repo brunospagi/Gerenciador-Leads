@@ -257,9 +257,9 @@
             {% endif %}
 
             {% if user.is_superuser %}
-            <a href="{% url 'user_module_permissions' %}" class="system-item" style="--item-color: #dc2626; --icon-bg: #fee2e2;">
-                <div><span class="system-name">Permissões por Módulo</span><span class="system-desc">Controle de acesso por área</span></div>
-                <div class="system-icon-wrapper"><i class="fas fa-user-shield"></i></div>
+            <a href="{% url 'configuracoes_home' %}" class="system-item" style="--item-color: #dc2626; --icon-bg: #fee2e2;">
+                <div><span class="system-name">Configurações</span><span class="system-desc">Webhooks, integrações e permissões</span></div>
+                <div class="system-icon-wrapper"><i class="fas fa-gear"></i></div>
             </a>
             {% endif %}
 

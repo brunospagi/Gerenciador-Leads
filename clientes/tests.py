@@ -6,9 +6,18 @@ from django.db.models import ProtectedError
 from django.test import TestCase
 from django.urls import reverse
 
+from configuracoes.models import ModuloSistema, PermissaoModulo
+
 from .forms import ClienteForm
 from .models import Cliente
 from .views import _mapear_status_negociacao_por_andamento
+
+
+def _liberar_modulo(user, slug, **acoes):
+    modulo = ModuloSistema.objects.get(slug=slug)
+    valores = {'pode_visualizar': True, 'pode_criar': True, 'pode_editar': True, 'pode_excluir': True}
+    valores.update(acoes)
+    PermissaoModulo.objects.update_or_create(user=user, modulo=modulo, defaults=valores)
 
 
 def _criar_cliente(vendedor, **kwargs):
@@ -137,6 +146,7 @@ class ClienteFormValorEstimadoTests(TestCase):
 class RegistrarAndamentoLeadTests(TestCase):
     def setUp(self):
         self.vendedor = User.objects.create_user(username='vendedor_andamento', password='123456')
+        _liberar_modulo(self.vendedor, 'clientes')
         self.client.force_login(self.vendedor)
         self.cliente = _criar_cliente(self.vendedor)
 

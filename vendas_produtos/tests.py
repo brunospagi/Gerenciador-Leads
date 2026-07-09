@@ -1,7 +1,9 @@
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.urls import reverse
 
 from .models import ParametrosComissao, VendaProduto
 
@@ -107,3 +109,63 @@ class ComissaoVendaProdutoTests(TestCase):
 
         self.assertEqual(venda.comissao_vendedor, Decimal('0.00'))
         self.assertEqual(venda.lucro_loja, Decimal('0.00'))
+
+
+class RejeitarVendaWhatsappTests(TestCase):
+    def setUp(self):
+        self.vendedor = User.objects.create_user(username='vendedor_rejeicao', password='123456')
+        self.vendedor.dados_funcionais.telefone = '41988887777'
+        self.vendedor.dados_funcionais.save()
+
+        # Admin que RECEBE a notificacao (distinto de quem rejeita, pra nao se autonotificar).
+        self.admin = User.objects.create_user(username='admin_rejeicao', password='123456')
+        self.admin.profile.nivel_acesso = 'ADMIN'
+        self.admin.profile.save()
+        self.admin.dados_funcionais.telefone = '41977776666'
+        self.admin.dados_funcionais.save()
+
+        # Quem executa a rejeicao (superuser: bypassa o middleware de modulo sem precisar
+        # de PermissaoModulo extra, e _is_gestor_financeiro aceita superuser).
+        self.gerente = User.objects.create_superuser(
+            username='gerente_rejeicao', password='123456', email='gerente@teste.com',
+        )
+
+        self.venda = VendaProduto.objects.create(
+            vendedor=self.vendedor,
+            cliente_nome='Cliente Rejeitado',
+            placa='REJ0001',
+            modelo_veiculo='Onix',
+            tipo_produto='VENDA_VEICULO',
+            valor_venda=Decimal('50000.00'),
+            custo_base=Decimal('40000.00'),
+        )
+
+    @patch('notificacoes.whatsapp.enviar_webhook')
+    def test_rejeitar_venda_dispara_whatsapp_pro_vendedor_e_admins(self, mock_enviar):
+        self.client.force_login(self.gerente)
+        self.client.post(
+            reverse('venda_produto_reject', kwargs={'pk': self.venda.pk}),
+            {'motivo_recusa': 'Comprovante inválido'},
+        )
+
+        self.venda.refresh_from_db()
+        self.assertEqual(self.venda.status, 'REJEITADO')
+        self.assertEqual(mock_enviar.call_count, 2)
+        telefones_notificados = {call.args[1]['telefone'] for call in mock_enviar.call_args_list}
+        self.assertEqual(telefones_notificados, {'41988887777', '41977776666'})
+
+    @patch('notificacoes.whatsapp.enviar_webhook')
+    def test_nao_dispara_whatsapp_se_vendedor_desativou_notificacao(self, mock_enviar):
+        self.vendedor.profile.notificacao_whatsapp = False
+        self.vendedor.profile.save()
+
+        self.client.force_login(self.gerente)
+        self.client.post(
+            reverse('venda_produto_reject', kwargs={'pk': self.venda.pk}),
+            {'motivo_recusa': 'Comprovante inválido'},
+        )
+
+        # So o admin recebe; vendedor desativou.
+        mock_enviar.assert_called_once()
+        args, _ = mock_enviar.call_args
+        self.assertEqual(args[1]['telefone'], '41977776666')

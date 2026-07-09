@@ -20,6 +20,9 @@ from django.core.files.base import ContentFile
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 
+from configuracoes.access import ModuleActionRequiredMixin, require_module_action
+from configuracoes.models import ServicoWebhook
+from configuracoes.resolver import enviar_webhook
 from funcionarios.models import Funcionario
 from vendas_produtos.models import VendaProduto
 
@@ -387,13 +390,7 @@ def relogio_ponto(request):
         _atualizar_avatar_com_foto_ponto(request.user, foto_base64)
 
         def disparar_webhook(dados_webhook):
-            try:
-                url_webhook = getattr(settings, 'WEBHOOK_PONTO_URL', None)
-                if not url_webhook:
-                    return
-                requests.post(url_webhook, json=dados_webhook, timeout=5)
-            except Exception:
-                return
+            enviar_webhook(ServicoWebhook.CONTROLE_PONTO, dados_webhook, timeout=5)
 
         payload = {
             'evento': 'novo_ponto',

@@ -8,6 +8,7 @@ from django.test.utils import override_settings
 from django.utils import timezone
 
 from clientes.models import Cliente
+from configuracoes.models import ModuloSistema, PermissaoModulo
 from controle_ponto.models import RegistroPonto
 from funcionarios.models import Funcionario
 from distribuicao.forms import LeadEntradaForm
@@ -186,8 +187,8 @@ class LeadEntradaFormDedupTests(TestCase):
 class VerificarDuplicidadeWhatsappViewTests(TestCase):
     def setUp(self):
         self.vendedor = User.objects.create_user(username='vendedor_ajax', password='123456')
-        self.vendedor.module_permissions.modulo_distribuicao = True
-        self.vendedor.module_permissions.save()
+        modulo_distribuicao = ModuloSistema.objects.get(slug='distribuicao')
+        PermissaoModulo.objects.create(user=self.vendedor, modulo=modulo_distribuicao, pode_visualizar=True)
         self.client.force_login(self.vendedor)
 
     def test_retorna_duplicado_true_quando_ja_existe(self):

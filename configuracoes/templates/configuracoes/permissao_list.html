@@ -1,0 +1,42 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container mt-4 m3-module-shell">
+  <section class="m3-page-header">
+    <div>
+      <h1 class="m3-page-title"><i class="fas fa-user-shield me-2"></i>Permissões de Acesso</h1>
+      <p class="m3-page-subtitle">Escolha um usuário para configurar Visualizar/Criar/Editar/Excluir por módulo.</p>
+    </div>
+    <div class="m3-toolbar">
+      <a href="{% url 'configuracoes_home' %}" class="btn btn-outline-secondary">Voltar</a>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Usuário</th>
+              <th>Nível de acesso</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in usuarios %}
+            <tr>
+              <td>{{ u.username }} {% if u.get_full_name %}<small class="text-muted">({{ u.get_full_name }})</small>{% endif %}</td>
+              <td>{{ u.profile.get_nivel_acesso_display|default:"-" }}</td>
+              <td>
+                <a href="{% url 'user_module_permissions_update' u.pk %}" class="btn btn-sm btn-primary">Configurar permissões</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

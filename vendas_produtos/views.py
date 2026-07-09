@@ -20,6 +20,7 @@ from .ai_validacao import validar_comprovante_com_gemini
 from .ai_extracao import extrair_dados_cliente_com_gemini
 from documentos.pdf_utils import extract_crlv_data_with_gemini
 from notificacoes.utils import notificar_usuario
+from notificacoes.whatsapp import notificar_whatsapp_venda_rejeitada
 
 User = get_user_model()
 
@@ -773,6 +774,7 @@ def rejeitar_venda_produto(request, pk):
             url=reverse('venda_produto_update', kwargs={'pk': venda.pk}),
             titulo="Venda Rejeitada",
         )
+        notificar_whatsapp_venda_rejeitada(venda)
 
         messages.warning(request, "Venda REJEITADA.")
     return redirect('venda_produto_list')
