@@ -3,7 +3,9 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Clientes com Contato Atrasado</h1>
+    {% if module_actions.clientes.criar %}
     <a href="{% url 'cliente_create' %}" class="btn btn-primary">Adicionar Cliente</a>
+    {% endif %}
 </div>
 
 <div class="alert alert-warning" role="alert">
@@ -38,7 +40,9 @@
                 <td><span class="badge bg-warning text-dark">{{ cliente.prioridade }}</span></td>
                 <td>
                     <a href="{% url 'cliente_detail' cliente.pk %}" class="btn btn-sm btn-secondary">Detalhes</a>
+                    {% if module_actions.clientes.editar %}
                     <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-sm btn-info">Editar</a>
+                    {% endif %}
                 </td>
             </tr>
             {% empty %}

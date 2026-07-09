@@ -20,6 +20,19 @@ MODULOS = [
 # via dispatch()), entao nao herdam pode_excluir=True automaticamente na migracao.
 MODULOS_EXCLUIR_RESTRITO = {'clientes', 'avaliacoes'}
 
+# financeiro: List/Create usam um gate mais frouxo (AcessoFinanceiroMixin: modulo_financeiro
+# OU pode_acessar_financeiro), mas Update/Delete/DRE sempre foram ADMIN-only (AcessoAdminMixin),
+# independente do boolean de modulo. Nao herdar editar/excluir do boolean evita conceder de
+# graca, na migracao, uma permissao que ninguem alem de ADMIN jamais teve (ADMIN continua
+# tendo acesso total via bypass em has_module_action, independente do que estiver aqui).
+MODULOS_EDITAR_EXCLUIR_RESTRITO = {'financeiro'}
+
+# credenciais: List sempre foi liberado a qualquer um com modulo_credenciais=True, mas
+# Create/Update/Delete sempre exigiram nivel_acesso ADMIN ou GERENTE (GestorPermissionMixin),
+# independente do boolean de modulo. Sem essa restricao, um usuario VENDEDOR com acesso
+# apenas de visualizacao a credenciais ganharia CRUD completo na migracao.
+MODULOS_EDITAR_EXCLUIR_RESTRITO_A_GESTOR = {'credenciais'}
+
 WEBHOOKS = [
     ('DISTRIBUICAO_LEADS', 'Distribuição de Leads', 'Disparado quando um novo lead é recebido/distribuído.'),
     ('CONTROLE_PONTO', 'Controle de Ponto', 'Disparado a cada nova batida de ponto registrada.'),
@@ -49,6 +62,7 @@ def seed_e_migra(apps, schema_editor):
     PermissaoModulo = apps.get_model('configuracoes', 'PermissaoModulo')
     WebhookIntegracao = apps.get_model('configuracoes', 'WebhookIntegracao')
     ModulePermission = apps.get_model('usuarios', 'ModulePermission')
+    Profile = apps.get_model('usuarios', 'Profile')
 
     modulos_por_slug = {}
     for slug, nome, ordem in MODULOS:
@@ -60,17 +74,31 @@ def seed_e_migra(apps, schema_editor):
             slug=slug, defaults={'nome': nome, 'descricao': descricao, 'sistema': True, 'ativo': True},
         )
 
+    niveis_gestor = {}
+    for profile in Profile.objects.all().only('user_id', 'nivel_acesso'):
+        niveis_gestor[profile.user_id] = profile.nivel_acesso in ('ADMIN', 'GERENTE')
+
     for permissao_antiga in ModulePermission.objects.all():
+        e_gestor = niveis_gestor.get(permissao_antiga.user_id, False)
         for slug, campo_antigo in MODULE_FIELD_MAP.items():
             tinha_acesso = bool(getattr(permissao_antiga, campo_antigo, False))
-            pode_excluir = tinha_acesso and slug not in MODULOS_EXCLUIR_RESTRITO
+            editar_excluir_restrito = slug in MODULOS_EDITAR_EXCLUIR_RESTRITO
+            restrito_a_gestor = slug in MODULOS_EDITAR_EXCLUIR_RESTRITO_A_GESTOR and not e_gestor
+            pode_editar = tinha_acesso and not editar_excluir_restrito and not restrito_a_gestor
+            pode_excluir = (
+                tinha_acesso
+                and slug not in MODULOS_EXCLUIR_RESTRITO
+                and not editar_excluir_restrito
+                and not restrito_a_gestor
+            )
+            pode_criar = tinha_acesso and not restrito_a_gestor
             PermissaoModulo.objects.update_or_create(
                 user_id=permissao_antiga.user_id,
                 modulo=modulos_por_slug[slug],
                 defaults={
                     'pode_visualizar': tinha_acesso,
-                    'pode_criar': tinha_acesso,
-                    'pode_editar': tinha_acesso,
+                    'pode_criar': pode_criar,
+                    'pode_editar': pode_editar,
                     'pode_excluir': pode_excluir,
                 },
             )

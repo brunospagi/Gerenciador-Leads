@@ -6,8 +6,7 @@ from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from .models import Procuracao, Outorgado
 from .forms import ProcuracaoForm, OutorgadoForm, CRLVUploadForm
 from .pdf_utils import extract_crlv_data_with_gemini as extract_crlv_data
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.contrib.auth.decorators import login_required
+from configuracoes.access import ModuleActionRequiredMixin, require_module_action
 from django.views.decorators.http import require_POST
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
@@ -24,7 +23,7 @@ from django.contrib import messages
 logger = logging.getLogger(__name__)
 
 
-@login_required
+@require_module_action('documentos', 'criar')
 @require_POST
 def procuracao_extrair_crlv(request):
     """Extração via AJAX do CRLV-e, usada no formulário de nova procuração."""
@@ -44,23 +43,18 @@ def procuracao_extrair_crlv(request):
     return JsonResponse({'disponivel': True, 'dados': dados})
 
 
-# --- Mixin para restringir acesso apenas a Admins ---
-class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
-    def test_func(self):
-        return self.request.user.is_superuser or \
-               (hasattr(self.request.user, 'profile') and self.request.user.profile.nivel_acesso == 'ADMIN')
+# --- Views para Gerenciar Outorgados ---
 
-    def handle_no_permission(self):
-        raise PermissionDenied("Acesso restrito a Administradores.")
-
-# --- Views para Gerenciar Outorgados (Apenas Admins) ---
-
-class OutorgadoListView(AdminRequiredMixin, ListView):
+class OutorgadoListView(ModuleActionRequiredMixin, ListView):
+    module_key = 'documentos'
+    module_action = 'visualizar'
     model = Outorgado
     template_name = 'documentos/outorgado_list.html'
     context_object_name = 'outorgados'
 
-class OutorgadoCreateView(AdminRequiredMixin, CreateView):
+class OutorgadoCreateView(ModuleActionRequiredMixin, CreateView):
+    module_key = 'documentos'
+    module_action = 'criar'
     model = Outorgado
     form_class = OutorgadoForm
     template_name = 'documentos/outorgado_form.html'
@@ -71,7 +65,9 @@ class OutorgadoCreateView(AdminRequiredMixin, CreateView):
         context['title'] = "Adicionar Novo Outorgado"
         return context
 
-class OutorgadoUpdateView(AdminRequiredMixin, UpdateView):
+class OutorgadoUpdateView(ModuleActionRequiredMixin, UpdateView):
+    module_key = 'documentos'
+    module_action = 'editar'
     model = Outorgado
     form_class = OutorgadoForm
     template_name = 'documentos/outorgado_form.html'
@@ -82,7 +78,9 @@ class OutorgadoUpdateView(AdminRequiredMixin, UpdateView):
         context['title'] = "Editar Outorgado"
         return context
 
-class OutorgadoDeleteView(AdminRequiredMixin, DeleteView):
+class OutorgadoDeleteView(ModuleActionRequiredMixin, DeleteView):
+    module_key = 'documentos'
+    module_action = 'excluir'
     model = Outorgado
     template_name = 'documentos/outorgado_confirm_delete.html'
     success_url = reverse_lazy('outorgado_list')
@@ -90,7 +88,9 @@ class OutorgadoDeleteView(AdminRequiredMixin, DeleteView):
 
 # --- Views de Procuração (Existentes) ---
 
-class ProcuracaoListView(LoginRequiredMixin, ListView):
+class ProcuracaoListView(ModuleActionRequiredMixin, ListView):
+    module_key = 'documentos'
+    module_action = 'visualizar'
     model = Procuracao
     template_name = 'documentos/procuracao_list.html'
     context_object_name = 'procuracoes'
@@ -102,7 +102,9 @@ class ProcuracaoListView(LoginRequiredMixin, ListView):
             return Procuracao.objects.all()
         return Procuracao.objects.filter(vendedor=user)
 
-class ProcuracaoCreateView(LoginRequiredMixin, CreateView):
+class ProcuracaoCreateView(ModuleActionRequiredMixin, CreateView):
+    module_key = 'documentos'
+    module_action = 'criar'
     model = Procuracao
     form_class = ProcuracaoForm
     template_name = 'documentos/procuracao_form.html'
@@ -118,7 +120,9 @@ class ProcuracaoCreateView(LoginRequiredMixin, CreateView):
         messages.success(self.request, "Procuração salva com sucesso!")
         return super().form_valid(form)
 
-class ProcuracaoUpdateView(LoginRequiredMixin, UpdateView):
+class ProcuracaoUpdateView(ModuleActionRequiredMixin, UpdateView):
+    module_key = 'documentos'
+    module_action = 'editar'
     model = Procuracao
     form_class = ProcuracaoForm
     template_name = 'documentos/procuracao_form.html'
@@ -131,7 +135,9 @@ class ProcuracaoUpdateView(LoginRequiredMixin, UpdateView):
             raise PermissionDenied("Você não tem permissão para editar este documento.")
         return obj
 
-class ProcuracaoDeleteView(LoginRequiredMixin, DeleteView):
+class ProcuracaoDeleteView(ModuleActionRequiredMixin, DeleteView):
+    module_key = 'documentos'
+    module_action = 'excluir'
     model = Procuracao
     template_name = 'documentos/procuracao_confirm_delete.html'
     success_url = reverse_lazy('procuracao_list')
@@ -183,6 +189,7 @@ def link_callback(uri, rel):
 
 # --- View de Geração de PDF (ATUALIZADA) ---
 
+@require_module_action('documentos', 'visualizar')
 def gerar_procuracao_pdf(request, pk):
     procuracao = get_object_or_404(Procuracao, pk=pk)
     

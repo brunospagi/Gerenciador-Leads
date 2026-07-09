@@ -2,8 +2,6 @@ import json
 import logging
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
@@ -11,13 +9,16 @@ from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, TemplateView, UpdateView
 
+from configuracoes.access import ModuleActionRequiredMixin, require_module_action
 from .forms import FichaForm
 from .models import Ficha
 
 logger = logging.getLogger(__name__)
 
 
-class KanbanView(LoginRequiredMixin, TemplateView):
+class KanbanView(ModuleActionRequiredMixin, TemplateView):
+    module_key = 'financiamentos'
+    module_action = 'visualizar'
     template_name = 'financiamentos/kanban.html'
 
     def get_context_data(self, **kwargs):
@@ -61,7 +62,9 @@ class KanbanView(LoginRequiredMixin, TemplateView):
         return context
 
 
-class FichaCreateView(LoginRequiredMixin, CreateView):
+class FichaCreateView(ModuleActionRequiredMixin, CreateView):
+    module_key = 'financiamentos'
+    module_action = 'criar'
     model = Ficha
     form_class = FichaForm
     template_name = 'financiamentos/form.html'
@@ -73,7 +76,9 @@ class FichaCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class FichaUpdateView(LoginRequiredMixin, UpdateView):
+class FichaUpdateView(ModuleActionRequiredMixin, UpdateView):
+    module_key = 'financiamentos'
+    module_action = 'editar'
     model = Ficha
     form_class = FichaForm
     template_name = 'financiamentos/form.html'
@@ -86,7 +91,7 @@ class FichaUpdateView(LoginRequiredMixin, UpdateView):
         return Ficha.objects.filter(vendedor=user)
 
 
-@login_required
+@require_module_action('financiamentos', 'editar')
 @require_POST
 def update_ficha_status(request):
     try:

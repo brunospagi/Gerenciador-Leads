@@ -1,5 +1,4 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Sum
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
@@ -7,37 +6,15 @@ from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.generic import CreateView, DeleteView, ListView, TemplateView, UpdateView
 
-from usuarios.permissions import has_module_access
+from configuracoes.access import ModuleActionRequiredMixin
 
 from .forms import TransacaoFinanceiraForm
 from .models import FechamentoMensalFinanceiro, TransacaoFinanceira, gerar_relatorio_DRE_mensal
 
 
-class AcessoFinanceiroMixin(LoginRequiredMixin, UserPassesTestMixin):
-    def test_func(self):
-        if self.request.user.is_superuser:
-            return True
-        profile = getattr(self.request.user, "profile", None)
-        if not profile:
-            return False
-        return (
-            profile.nivel_acesso == "ADMIN"
-            or profile.pode_acessar_financeiro
-            or has_module_access(self.request.user, "financeiro")
-        )
-
-
-class AcessoAdminMixin(LoginRequiredMixin, UserPassesTestMixin):
-    def test_func(self):
-        if self.request.user.is_superuser:
-            return True
-        profile = getattr(self.request.user, "profile", None)
-        if not profile:
-            return False
-        return profile.nivel_acesso == "ADMIN"
-
-
-class TransacaoListView(AcessoFinanceiroMixin, ListView):
+class TransacaoListView(ModuleActionRequiredMixin, ListView):
+    module_key = "financeiro"
+    module_action = "visualizar"
     model = TransacaoFinanceira
     template_name = "financeiro/lista_transacoes.html"
     context_object_name = "transacoes"
@@ -167,7 +144,9 @@ class TransacaoListView(AcessoFinanceiroMixin, ListView):
         return self._redirect_with_mes()
 
 
-class TransacaoCreateView(AcessoFinanceiroMixin, CreateView):
+class TransacaoCreateView(ModuleActionRequiredMixin, CreateView):
+    module_key = "financeiro"
+    module_action = "criar"
     model = TransacaoFinanceira
     form_class = TransacaoFinanceiraForm
     template_name = "financeiro/form_transacao.html"
@@ -193,20 +172,28 @@ class _BloqueiaMesFechadoMixin:
         return super().dispatch(request, *args, **kwargs)
 
 
-class TransacaoUpdateView(AcessoAdminMixin, _BloqueiaMesFechadoMixin, UpdateView):
+class TransacaoUpdateView(ModuleActionRequiredMixin, _BloqueiaMesFechadoMixin, UpdateView):
+    module_key = "financeiro"
+    module_action = "editar"
     model = TransacaoFinanceira
     form_class = TransacaoFinanceiraForm
     template_name = "financeiro/form_transacao.html"
     success_url = reverse_lazy("financeiro:lista_transacoes")
 
 
-class TransacaoDeleteView(AcessoAdminMixin, _BloqueiaMesFechadoMixin, DeleteView):
+class TransacaoDeleteView(ModuleActionRequiredMixin, _BloqueiaMesFechadoMixin, DeleteView):
+    module_key = "financeiro"
+    module_action = "excluir"
     model = TransacaoFinanceira
     template_name = "financeiro/confirmar_delete.html"
     success_url = reverse_lazy("financeiro:lista_transacoes")
 
 
-class RelatorioDREView(AcessoAdminMixin, TemplateView):
+class RelatorioDREView(ModuleActionRequiredMixin, TemplateView):
+    # 'editar' (não 'visualizar'): a view também processa fechar/reabrir mês via POST,
+    # uma ação administrativa que sempre foi ADMIN-only (AcessoAdminMixin antigo).
+    module_key = "financeiro"
+    module_action = "editar"
     template_name = "financeiro/relatorio_dre.html"
 
     def post(self, request, *args, **kwargs):

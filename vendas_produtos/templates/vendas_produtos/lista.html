@@ -10,8 +10,10 @@
             <p class="m3-page-subtitle">Acompanhe aprovações, margens e performance comercial do período.</p>
         </div>
         <div class="m3-toolbar">
+            {% if module_actions.vendas.criar %}
             <a href="{% url 'venda_produto_create' %}" class="btn btn-success btn-sm"><i class="fa fa-plus"></i> Nova Venda</a>
             <a href="{% url 'venda_produto_ia_wizard' %}" class="btn btn-outline-primary btn-sm"><i class="fa fa-robot"></i> Nova Venda com IA</a>
+            {% endif %}
             {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
             <a href="{% url 'configuracao_comissao' %}" class="btn btn-outline-dark btn-sm">
                 <i class="fa fa-cogs me-2"></i> Configurações
@@ -177,12 +179,16 @@
                                 
                                 {# Permite editar se não estiver aprovado, ou se for admin #}
                                 {% if item.status != 'APROVADO' or user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}
-                                    {% if item.status == 'REJEITADO' %}
-                                        <a href="{% url 'venda_produto_update' item.pk %}" class="btn btn-sm btn-warning text-dark fw-bold" title="Corrigir e reenviar para conferência"><i class="fa fa-redo me-1"></i>Corrigir</a>
-                                    {% else %}
-                                        <a href="{% url 'venda_produto_update' item.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fa fa-pencil-alt"></i></a>
+                                    {% if module_actions.vendas.editar %}
+                                        {% if item.status == 'REJEITADO' %}
+                                            <a href="{% url 'venda_produto_update' item.pk %}" class="btn btn-sm btn-warning text-dark fw-bold" title="Corrigir e reenviar para conferência"><i class="fa fa-redo me-1"></i>Corrigir</a>
+                                        {% else %}
+                                            <a href="{% url 'venda_produto_update' item.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fa fa-pencil-alt"></i></a>
+                                        {% endif %}
                                     {% endif %}
-                                    <a href="{% url 'venda_produto_delete' item.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fa fa-trash"></i></a>
+                                    {% if module_actions.vendas.excluir %}
+                                        <a href="{% url 'venda_produto_delete' item.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fa fa-trash"></i></a>
+                                    {% endif %}
                                 {% endif %}
 
                                 {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' %}

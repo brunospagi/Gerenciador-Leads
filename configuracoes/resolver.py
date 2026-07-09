@@ -70,3 +70,35 @@ def has_module_action(user, module_slug, action):
     if perm is None:
         return False
     return getattr(perm, f'pode_{action}', False)
+
+
+ACOES = ('visualizar', 'criar', 'editar', 'excluir')
+
+
+def obter_matriz_permissoes(user):
+    """Matriz {modulo_slug: {'visualizar':bool,'criar':bool,'editar':bool,'excluir':bool}}
+    pra todos os modulos, em no maximo 2 queries (evita N+1 nos templates/nav)."""
+    from .models import ModuloSistema, PermissaoModulo
+
+    modulos = list(ModuloSistema.objects.all())
+
+    if not getattr(user, 'is_authenticated', False):
+        return {m.slug: {acao: False for acao in ACOES} for m in modulos}
+
+    acesso_total = user.is_superuser
+    if not acesso_total:
+        profile = getattr(user, 'profile', None)
+        acesso_total = getattr(profile, 'nivel_acesso', '') == 'ADMIN'
+
+    if acesso_total:
+        return {m.slug: {acao: True for acao in ACOES} for m in modulos}
+
+    permissoes = {p.modulo_id: p for p in PermissaoModulo.objects.filter(user=user)}
+    resultado = {}
+    for modulo in modulos:
+        perm = permissoes.get(modulo.id)
+        resultado[modulo.slug] = {
+            acao: bool(perm and getattr(perm, f'pode_{acao}'))
+            for acao in ACOES
+        }
+    return resultado

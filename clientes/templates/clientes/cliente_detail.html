@@ -58,14 +58,16 @@
                 <div class="no-print">
                     <button onclick="window.print()" class="btn btn-info btn-sm"><i class="bi bi-printer-fill me-1"></i> Imprimir</button>
 
-                    {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' or user.profile.nivel_acesso == 'DISTRIBUIDOR' %}
+                    {% if module_actions.distribuicao.editar %}
                     <a href="{% url 'redistribuir-lead' cliente.pk %}" class="btn btn-outline-warning btn-sm text-white" title="Passar para outro vendedor (Rodizio)">
                         <i class="bi bi-arrow-repeat me-1"></i> Redistribuir
                     </a>
                     {% endif %}
 
+                    {% if module_actions.clientes.editar %}
                     <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square me-1"></i> Editar</a>
-                    {% if user.is_superuser %}
+                    {% endif %}
+                    {% if module_actions.clientes.excluir %}
                         <a href="{% url 'cliente_delete' cliente.pk %}" class="btn btn-danger btn-sm"><i class="bi bi-trash me-1"></i> Excluir</a>
                     {% endif %}
                 </div>

@@ -6,12 +6,11 @@ from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView
 from .models import Avaliacao, AvaliacaoFoto
 from .forms import AvaliacaoForm, FotoUploadForm
-from django.contrib.auth.mixins import LoginRequiredMixin
+from configuracoes.access import ModuleActionRequiredMixin, require_module_action
 from datetime import timedelta
 from django.utils import timezone
 from django.http import JsonResponse
 from django.db.models import Q
-from django.core.exceptions import PermissionDenied
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 import json 
@@ -271,7 +270,9 @@ def bulk_gerador_anuncio_view(request):
     return render(request, 'avaliacoes/bulk_gerador_anuncio_form.html', context)
 
 
-class AvaliacaoListView(LoginRequiredMixin, ListView):
+class AvaliacaoListView(ModuleActionRequiredMixin, ListView):
+    module_key = 'avaliacoes'
+    module_action = 'visualizar'
     model = Avaliacao
     template_name = 'avaliacoes/avaliacao_list.html'
     context_object_name = 'avaliacoes'
@@ -303,7 +304,9 @@ class AvaliacaoListView(LoginRequiredMixin, ListView):
         context['sort_order'] = self.request.GET.get('sort', 'novo')
         return context
 
-class AvaliacaoCreateView(LoginRequiredMixin, CreateView):
+class AvaliacaoCreateView(ModuleActionRequiredMixin, CreateView):
+    module_key = 'avaliacoes'
+    module_action = 'criar'
     model = Avaliacao
     form_class = AvaliacaoForm
     template_name = 'avaliacoes/avaliacao_form.html'
@@ -339,33 +342,35 @@ class AvaliacaoCreateView(LoginRequiredMixin, CreateView):
             logger.warning("Erro ao salvar arquivo de avaliacao: %s", e)
         return redirect(self.success_url)
 
-class AvaliacaoDetailView(LoginRequiredMixin, DetailView):
+class AvaliacaoDetailView(ModuleActionRequiredMixin, DetailView):
+    module_key = 'avaliacoes'
+    module_action = 'visualizar'
     model = Avaliacao
     template_name = 'avaliacoes/avaliacao_detail.html'
     context_object_name = 'avaliacao'
 
-class AvaliacaoUpdateView(LoginRequiredMixin, UpdateView):
+class AvaliacaoUpdateView(ModuleActionRequiredMixin, UpdateView):
+    module_key = 'avaliacoes'
+    module_action = 'editar'
     model = Avaliacao
     form_class = AvaliacaoForm
     template_name = 'avaliacoes/avaliacao_form.html'
     def get_success_url(self):
         return reverse_lazy('avaliacao_detail', kwargs={'pk': self.object.pk})
 
-class AvaliacaoDeleteView(LoginRequiredMixin, DeleteView):
+class AvaliacaoDeleteView(ModuleActionRequiredMixin, DeleteView):
+    module_key = 'avaliacoes'
+    module_action = 'excluir'
     model = Avaliacao
     template_name = 'avaliacoes/avaliacao_confirm_delete.html'
     success_url = reverse_lazy('avaliacao_list')
-
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_superuser:
-            raise PermissionDenied
-        return super().dispatch(request, *args, **kwargs)
 
 FIPE_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 }
 FIPE_TIMEOUT_SECONDS = 5
 
+@require_module_action('avaliacoes', 'visualizar')
 def get_fipe_marcas(request, tipo_veiculo):
     try:
         response = requests.get(
@@ -379,6 +384,7 @@ def get_fipe_marcas(request, tipo_veiculo):
         logger.warning("Erro FIPE Marcas: %s", e)
         return JsonResponse({'error': 'Erro ao buscar marcas'}, status=500)
 
+@require_module_action('avaliacoes', 'visualizar')
 def get_fipe_modelos(request, tipo_veiculo, marca_id):
     try:
         response = requests.get(
@@ -392,6 +398,7 @@ def get_fipe_modelos(request, tipo_veiculo, marca_id):
         logger.warning("Erro FIPE Modelos: %s", e)
         return JsonResponse({'error': 'Erro ao buscar modelos'}, status=500)
 
+@require_module_action('avaliacoes', 'visualizar')
 def get_fipe_anos(request, tipo_veiculo, marca_id, modelo_id):
     try:
         response = requests.get(
