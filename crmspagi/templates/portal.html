@@ -124,6 +124,18 @@
     </div>
     {% endif %}
 
+    {% if module_access.marketing_ia %}
+    <div class="mb-5">
+        <h4 class="section-title-dashboard"><i class="fas fa-bullhorn" style="color:#d946ef;"></i> Marketing IA</h4>
+        <div class="system-grid">
+            <a href="{% url 'marketing_veiculo_list' %}" class="system-item" style="--item-color: #d946ef; --icon-bg: #fae8ff;">
+                <div><span class="system-name">Estoque e Posts</span><span class="system-desc">Gerar fotos e legendas com IA</span></div>
+                <div class="system-icon-wrapper"><i class="fas fa-magic"></i></div>
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
     {% if module_access.financeiro %}
     <div class="mb-5">
         <h4 class="section-title-dashboard"><i class="fas fa-money-bill-wave text-success"></i> Gestão Financeira</h4>
