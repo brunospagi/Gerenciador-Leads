@@ -6,6 +6,7 @@ urlpatterns = [
     path('', views.veiculo_list, name='marketing_veiculo_list'),
     path('sincronizar/', views.iniciar_sincronizacao, name='marketing_iniciar_sincronizacao'),
     path('sincronizar/status/', views.status_sincronizacao, name='marketing_status_sincronizacao'),
+    path('provedor-imagem/', views.atualizar_provedor_imagem, name='marketing_atualizar_provedor_imagem'),
     path('lote/gerar/', views.iniciar_geracao_lote, name='marketing_iniciar_lote'),
     path('lote/<int:lote_id>/', views.revisao_lote, name='marketing_revisao_lote'),
     path('lote/<int:lote_id>/status/', views.status_lote, name='marketing_status_lote'),

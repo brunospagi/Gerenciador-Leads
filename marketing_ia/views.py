@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from configuracoes.access import require_module_action
-from configuracoes.models import WebhookIntegracao
+from configuracoes.models import ConfiguracaoIntegracoes, WebhookIntegracao
 
 from .models import EnvioWebhook, LoteGeracao, PostPromocional, SincronizacaoEstoque, VeiculoAnuncio
 from .services import GeracaoPostError, gerar_post_para_anuncio, gerar_posts_em_lote, sincronizar_estoque
@@ -91,8 +91,37 @@ def veiculo_list(request):
         'total_sem_post': VeiculoAnuncio.objects.filter(ativo=True, posts__isnull=True).distinct().count(),
         'lote_em_andamento': LoteGeracao.objects.filter(status='RODANDO').order_by('-criado_em').first(),
         'ultimo_lote': LoteGeracao.objects.exclude(status='RODANDO').order_by('-criado_em').first(),
+        'provedor_imagem_atual': ConfiguracaoIntegracoes.get_solo().provedor_imagem_ia,
+        'provedor_imagem_choices': ConfiguracaoIntegracoes.PROVEDOR_IMAGEM_CHOICES,
+        'pode_trocar_provedor_imagem': (
+            request.user.is_superuser
+            or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')
+        ),
     }
     return render(request, 'marketing_ia/veiculo_list.html', context)
+
+
+@require_module_action('marketing_ia', 'editar')
+@require_POST
+def atualizar_provedor_imagem(request):
+    is_admin = request.user.is_superuser or (
+        hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN'
+    )
+    if not is_admin:
+        messages.error(request, 'Só administradores podem trocar o provedor de IA de imagem.')
+        return redirect('marketing_veiculo_list')
+
+    novo_provedor = request.POST.get('provedor_imagem_ia')
+    if novo_provedor not in dict(ConfiguracaoIntegracoes.PROVEDOR_IMAGEM_CHOICES):
+        messages.error(request, 'Provedor inválido.')
+        return redirect('marketing_veiculo_list')
+
+    config = ConfiguracaoIntegracoes.get_solo()
+    config.provedor_imagem_ia = novo_provedor
+    config.atualizado_por = request.user
+    config.save(update_fields=['provedor_imagem_ia', 'atualizado_por', 'atualizado_em'])
+    messages.success(request, f'IA de imagem trocada para "{config.get_provedor_imagem_ia_display()}".')
+    return redirect('marketing_veiculo_list')
 
 
 @require_module_action('marketing_ia', 'criar')
