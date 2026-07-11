@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="bi bi-megaphone-fill me-2"></i>{{ anuncio.titulo }}</h1>
+    <a href="{% url 'marketing_veiculo_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-5">
+        {% if anuncio.foto_principal_url %}
+            <img src="{{ anuncio.foto_principal_url }}" class="img-fluid rounded shadow-sm" alt="{{ anuncio.titulo }}">
+        {% endif %}
+    </div>
+    <div class="col-md-7">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <p class="fs-4 mb-1"><strong>{% if anuncio.preco %}R$ {{ anuncio.preco }}{% else %}Consulte{% endif %}</strong></p>
+                <p class="text-muted mb-3">{{ anuncio.marca }} {{ anuncio.modelo }} · {{ anuncio.get_tipo_display }}</p>
+                <ul class="list-unstyled row mb-3">
+                    <li class="col-6 mb-1"><strong>Ano:</strong> {{ anuncio.ano|default:"-" }}</li>
+                    <li class="col-6 mb-1"><strong>KM:</strong> {{ anuncio.km|default:"-" }}</li>
+                    <li class="col-6 mb-1"><strong>Cor:</strong> {{ anuncio.cor|default:"-" }}</li>
+                    <li class="col-6 mb-1"><strong>Câmbio:</strong> {{ anuncio.cambio|default:"-" }}</li>
+                    <li class="col-6 mb-1"><strong>Combustível:</strong> {{ anuncio.combustivel|default:"-" }}</li>
+                    <li class="col-6 mb-1"><strong>Carroceria:</strong> {{ anuncio.carroceria|default:"-" }}</li>
+                </ul>
+                <a href="{{ anuncio.url }}" target="_blank" rel="noopener" class="link-secondary small">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Ver anúncio original no site
+                </a>
+            </div>
+        </div>
+
+        <form method="post" action="{% url 'marketing_gerar_post' anuncio.pk %}" class="mt-3">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary" {% if not anuncio.fotos_urls %}disabled{% endif %}>
+                <i class="bi bi-magic me-1"></i>Gerar novo post com IA
+            </button>
+            {% if not anuncio.fotos_urls %}
+                <small class="text-danger d-block mt-1">Este anúncio não tem fotos coletadas.</small>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<h4 class="mb-3">Posts gerados ({{ posts.count }})</h4>
+<div class="row">
+    {% for post in posts %}
+    <div class="col-lg-6 mb-4">
+        <div class="card h-100 shadow-sm">
+            <img src="{{ post.imagem.url }}" class="card-img-top" alt="Post gerado" style="max-height:360px;object-fit:contain;background:#f5f5f5;">
+            <div class="card-body">
+                <span class="badge {% if post.status == 'PUBLICADO' %}bg-success{% elif post.status == 'APROVADO' %}bg-primary{% elif post.status == 'DESCARTADO' %}bg-secondary{% else %}bg-warning text-dark{% endif %} mb-2">
+                    {{ post.get_status_display }}
+                </span>
+                <p class="card-text" style="white-space: pre-line;">{{ post.legenda }}</p>
+                {% if post.hashtags %}<p class="text-muted small">{{ post.hashtags }}</p>{% endif %}
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <a href="{{ post.imagem.url }}" download class="btn btn-sm btn-outline-dark">
+                        <i class="bi bi-download me-1"></i>Baixar imagem
+                    </a>
+                    {% if post.status != 'APROVADO' %}
+                    <form method="post" action="{% url 'marketing_post_status' post.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="APROVADO">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Aprovar</button>
+                    </form>
+                    {% endif %}
+                    {% if post.status != 'PUBLICADO' %}
+                    <form method="post" action="{% url 'marketing_post_status' post.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="PUBLICADO">
+                        <button type="submit" class="btn btn-sm btn-outline-success">Marcar como publicado</button>
+                    </form>
+                    {% endif %}
+                    {% if post.status != 'DESCARTADO' %}
+                    <form method="post" action="{% url 'marketing_post_status' post.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="DESCARTADO">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Descartar</button>
+                    </form>
+                    {% endif %}
+                </div>
+
+                {% if webhooks_ativos %}
+                <form method="post" action="{% url 'marketing_post_enviar_webhook' post.pk %}" class="d-flex gap-2 mt-3">
+                    {% csrf_token %}
+                    <select name="webhook_id" class="form-select form-select-sm" required>
+                        {% for webhook in webhooks_ativos %}
+                        <option value="{{ webhook.pk }}">{{ webhook.nome }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-info text-white text-nowrap">
+                        <i class="bi bi-send-fill me-1"></i>Enviar
+                    </button>
+                </form>
+                {% else %}
+                <p class="text-muted small mt-3 mb-0">Nenhum webhook cadastrado. <a href="{% url 'admin:marketing_ia_webhook_add' %}" target="_blank">Cadastrar no admin</a>.</p>
+                {% endif %}
+
+                {% with ultimo_envio=post.envios.first %}
+                {% if ultimo_envio %}
+                <p class="small mt-2 mb-0 {% if ultimo_envio.sucesso %}text-success{% else %}text-danger{% endif %}">
+                    <i class="bi {% if ultimo_envio.sucesso %}bi-check-circle{% else %}bi-x-circle{% endif %} me-1"></i>
+                    {% if ultimo_envio.sucesso %}Enviado{% else %}Falhou o envio{% endif %} para "{{ ultimo_envio.webhook.nome|default:"webhook removido" }}" em {{ ultimo_envio.enviado_em|date:"d/m/Y H:i" }}
+                </p>
+                {% endif %}
+                {% endwith %}
+
+                <p class="text-muted small mt-2 mb-0">Gerado em {{ post.gerado_em|date:"d/m/Y H:i" }}{% if post.gerado_por %} por {{ post.gerado_por.username }}{% endif %}</p>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-info">Nenhum post gerado ainda para este veículo.</div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

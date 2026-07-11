@@ -17,6 +17,7 @@ MODULE_FIELD_MAP = {
     'relatorios': 'modulo_relatorios',
     'usuarios_admin': 'modulo_admin_usuarios',
     'credenciais': 'modulo_credenciais',
+    'marketing_ia': 'modulo_marketing_ia',
 }
 
 

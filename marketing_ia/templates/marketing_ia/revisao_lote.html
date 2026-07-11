@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="bi bi-collection-fill me-2"></i>Revisão do Lote #{{ lote.pk }}</h1>
+    <a href="{% url 'marketing_veiculo_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
+</div>
+
+<div id="lote-status" class="alert {% if lote.status == 'ERRO' %}alert-danger{% elif lote.status == 'RODANDO' %}alert-info{% else %}alert-success{% endif %} d-flex align-items-center"
+     data-status="{{ lote.status }}">
+    <div class="spinner-border spinner-border-sm me-2 {% if lote.status != 'RODANDO' %}d-none{% endif %}" role="status"></div>
+    <span>
+        {% if lote.status == 'RODANDO' %}
+            Gerando posts com IA para {{ lote.total_alvo }} veículo(s) — isso pode levar alguns minutos. A página atualiza sozinha quando terminar.
+        {% elif lote.status == 'ERRO' %}
+            Falha ao processar o lote: {{ lote.erro }}
+        {% else %}
+            Concluído: {{ lote.total_gerado }} post(s) gerado(s) de {{ lote.total_alvo }} veículo(s){% if lote.total_falhas %}, {{ lote.total_falhas }} falha(s){% endif %}.
+        {% endif %}
+    </span>
+</div>
+
+{% if posts %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <p class="text-muted mb-0">{{ posts|length }} post(s) neste lote</p>
+    <form method="post" action="{% url 'marketing_aprovar_lote' lote.pk %}" onsubmit="return confirm('Salvar (aprovar) todos os posts em rascunho deste lote?');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success"><i class="bi bi-check2-all me-1"></i>Salvar todas</button>
+    </form>
+</div>
+
+<div class="row">
+    {% for post in posts %}
+    <div class="col-lg-4 col-md-6 mb-4">
+        <div class="card h-100 shadow-sm">
+            <img src="{{ post.imagem.url }}" class="card-img-top" alt="Post gerado" style="height:220px;object-fit:cover;">
+            <div class="card-body d-flex flex-column">
+                <h6 class="card-title">{{ post.anuncio.titulo }}</h6>
+                <span class="badge {% if post.status == 'PUBLICADO' %}bg-success{% elif post.status == 'APROVADO' %}bg-primary{% elif post.status == 'DESCARTADO' %}bg-secondary{% else %}bg-warning text-dark{% endif %} mb-2 align-self-start">
+                    {{ post.get_status_display }}
+                </span>
+                <p class="card-text small" style="white-space: pre-line;">{{ post.legenda|truncatewords:40 }}</p>
+                <div class="mt-auto pt-2">
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <a href="{% url 'marketing_veiculo_detail' post.anuncio_id %}" class="btn btn-sm btn-outline-dark">Ver veículo</a>
+                        <a href="{{ post.imagem.url }}" download class="btn btn-sm btn-outline-dark"><i class="bi bi-download"></i></a>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% if post.status != 'APROVADO' %}
+                        <form method="post" action="{% url 'marketing_post_status' post.pk %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="status" value="APROVADO">
+                            <button type="submit" class="btn btn-sm btn-primary">Salvar</button>
+                        </form>
+                        {% endif %}
+                        {% if post.status != 'DESCARTADO' %}
+                        <form method="post" action="{% url 'marketing_post_status' post.pk %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="status" value="DESCARTADO">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Descartar</button>
+                        </form>
+                        {% endif %}
+                    </div>
+
+                    {% if webhooks_ativos %}
+                    <form method="post" action="{% url 'marketing_post_enviar_webhook' post.pk %}" class="d-flex gap-2 mt-2">
+                        {% csrf_token %}
+                        <select name="webhook_id" class="form-select form-select-sm" required>
+                            {% for webhook in webhooks_ativos %}
+                            <option value="{{ webhook.pk }}">{{ webhook.nome }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-info text-white text-nowrap">
+                            <i class="bi bi-send-fill me-1"></i>Enviar
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    {% with ultimo_envio=post.envios.first %}
+                    {% if ultimo_envio %}
+                    <p class="small mt-2 mb-0 {% if ultimo_envio.sucesso %}text-success{% else %}text-danger{% endif %}">
+                        <i class="bi {% if ultimo_envio.sucesso %}bi-check-circle{% else %}bi-x-circle{% endif %} me-1"></i>
+                        {% if ultimo_envio.sucesso %}Enviado{% else %}Falhou{% endif %} para "{{ ultimo_envio.webhook.nome|default:"webhook removido" }}"
+                    </p>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% elif lote.status != 'RODANDO' %}
+<div class="alert alert-warning">Nenhum post foi gerado neste lote.</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var banner = document.getElementById('lote-status');
+    if (!banner || banner.dataset.status !== 'RODANDO') {
+        return;
+    }
+    var intervalo = setInterval(function () {
+        fetch("{% url 'marketing_status_lote' lote.pk %}")
+            .then(function (resp) { return resp.json(); })
+            .then(function (data) {
+                if (data.status !== 'RODANDO') {
+                    clearInterval(intervalo);
+                    window.location.reload();
+                }
+            })
+            .catch(function () { clearInterval(intervalo); });
+    }, 5000);
+})();
+</script>
+{% endblock %}
