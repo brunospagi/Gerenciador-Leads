@@ -52,6 +52,20 @@ def _headers(api_key):
     }
 
 
+def _verificar_resposta(resp, contexto):
+    """
+    Substitui resp.raise_for_status(): em erro, inclui o corpo da resposta
+    na exceção (a API do Leonardo normalmente explica o motivo do 400/422
+    ali, e esse texto é o que vai aparecer pro admin/no log — sem ele fica
+    impossível saber o que ajustar no request).
+    """
+    if resp.ok:
+        return
+    raise LeonardoError(
+        f'{contexto}: HTTP {resp.status_code} — {resp.text[:800]}'
+    )
+
+
 def _upload_foto_referencia(api_key, foto_bytes, mime_type):
     extensao = (mimetypes.guess_extension(mime_type) or '.jpg').lstrip('.')
     if extensao == 'jpe':
@@ -63,7 +77,7 @@ def _upload_foto_referencia(api_key, foto_bytes, mime_type):
         headers=_headers(api_key),
         timeout=TIMEOUT_REQUEST,
     )
-    resp.raise_for_status()
+    _verificar_resposta(resp, 'Falha ao pedir URL de upload (/init-image)')
     dados = resp.json().get('uploadInitImage') or {}
     image_id = dados.get('id')
     upload_url = dados.get('url')
@@ -110,7 +124,7 @@ def _criar_generation(api_key, prompt, init_image_id):
         headers=_headers(api_key),
         timeout=TIMEOUT_REQUEST,
     )
-    resp.raise_for_status()
+    _verificar_resposta(resp, 'Falha ao criar a geração (/generations)')
     dados = resp.json()
     generation_id = (
         dados.get('generationId')
@@ -141,7 +155,7 @@ def _aguardar_e_baixar(api_key, generation_id):
             headers=_headers(api_key),
             timeout=TIMEOUT_REQUEST,
         )
-        resp.raise_for_status()
+        _verificar_resposta(resp, 'Falha ao consultar o status da geração (/generations/{id})')
         dados = resp.json()
         status, urls = _extrair_status_e_urls(dados)
 
@@ -149,7 +163,7 @@ def _aguardar_e_baixar(api_key, generation_id):
             raise LeonardoError(f'Geração falhou no Leonardo.Ai: {resp.text[:500]}')
         if status in ('COMPLETE', 'COMPLETED') and urls:
             imagem_resp = requests.get(urls[0], timeout=TIMEOUT_REQUEST)
-            imagem_resp.raise_for_status()
+            _verificar_resposta(imagem_resp, 'Falha ao baixar a imagem gerada')
             mime_saida = imagem_resp.headers.get('Content-Type', 'image/jpeg').split(';')[0]
             return imagem_resp.content, mime_saida
 
