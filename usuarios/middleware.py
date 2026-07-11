@@ -21,6 +21,7 @@ class ModulePermissionMiddleware:
         ('/funcionarios/', 'rh'),
         ('/usuarios/', 'usuarios_admin'),
         ('/acessos/', 'credenciais'),
+        ('/marketing-ia/', 'marketing_ia'),
         ('/administracao/dashboard/', 'relatorios'),
         ('/painel-admin/', 'relatorios'),
     ]

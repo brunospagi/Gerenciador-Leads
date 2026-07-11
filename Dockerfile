@@ -10,13 +10,20 @@ ENV PYTHONUNBUFFERED=1
 # - cron: para as tarefas agendadas
 # - libfreetype6-dev: para a compilação do xhtml2pdf
 # - gosu: para o entrypoint largar privilegio de root antes de subir o gunicorn
+# - chromium/chromium-driver: usados pelo Selenium no scraping do marketing_ia
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     cron \
     libfreetype6-dev \
     gosu \
+    chromium \
+    chromium-driver \
     && rm -rf /var/lib/apt/lists/*
+
+# Aponta o Selenium para os binários instalados via apt (evita download em runtime)
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMEDRIVER_BIN=/usr/bin/chromedriver
 
 # Usuario nao-root que vai rodar o processo da aplicacao (gunicorn)
 RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /usr/sbin/nologin appuser

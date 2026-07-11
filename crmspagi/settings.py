@@ -152,10 +152,11 @@ INSTALLED_APPS = [
     'mozilla_django_oidc',
     'distribuicao',
     'credenciais',
-    'funcionarios',  
+    'funcionarios',
     'folha_pagamento',
     'financeiro',
     'controle_ponto',
+    'marketing_ia',
     'configuracoes',
 ]
 
@@ -174,7 +175,9 @@ MIDDLEWARE = [
 ]
 
 #--- ConfiguraÃ§Ã£o da API Gemini (LIDA DO .ENV) ---
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') 
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+# Modelo do Gemini com suporte a geraÃ§Ã£o/ediÃ§Ã£o de imagem, usado pelo marketing_ia
+GEMINI_IMAGE_MODEL = os.getenv('GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image')
 
 # ConfiguraÃ§Ãµes do OIDC (Lidas do .ENV)
 OIDC_RP_CLIENT_ID = os.getenv('OIDC_RP_CLIENT_ID')

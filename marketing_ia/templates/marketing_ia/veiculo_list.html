@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1 class="mb-0"><i class="bi bi-megaphone-fill me-2"></i>Marketing IA — Estoque</h1>
+    <div class="d-flex gap-2">
+        <form method="post" action="{% url 'marketing_iniciar_sincronizacao' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-primary" {% if sincronizacao.status == 'RODANDO' %}disabled{% endif %}>
+                <i class="bi bi-arrow-repeat me-1"></i>
+                {% if sincronizacao.status == 'RODANDO' %}Sincronizando...{% else %}Atualizar estoque do site{% endif %}
+            </button>
+        </form>
+        <form method="post" action="{% url 'marketing_iniciar_lote' %}"
+              onsubmit="return confirm('Gerar posts com IA para {{ total_sem_post }} veículo(s) sem post ainda? Isso vai gastar chamadas de API.');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary" {% if lote_em_andamento or not total_sem_post %}disabled{% endif %}>
+                <i class="bi bi-magic me-1"></i>
+                {% if lote_em_andamento %}Gerando em lote...{% else %}Gerar para todos sem post ({{ total_sem_post }}){% endif %}
+            </button>
+        </form>
+    </div>
+</div>
+
+<div id="sincronizacao-status" class="alert {% if sincronizacao.status == 'ERRO' %}alert-danger{% elif sincronizacao.status == 'RODANDO' %}alert-info{% elif sincronizacao.status == 'CONCLUIDO' %}alert-success{% else %}alert-secondary{% endif %} d-flex align-items-center"
+     data-status="{{ sincronizacao.status }}"
+     {% if sincronizacao.status != 'RODANDO' %}style="display:none;"{% endif %}>
+    <div class="spinner-border spinner-border-sm me-2 {% if sincronizacao.status != 'RODANDO' %}d-none{% endif %}" id="sincronizacao-spinner" role="status"></div>
+    <span id="sincronizacao-texto">
+        {% if sincronizacao.status == 'RODANDO' %}
+            Raspando o estoque de spagimotors.com.br/search em segundo plano — isso pode levar alguns minutos. A página atualiza sozinha quando terminar.
+        {% elif sincronizacao.resultado %}
+            {{ sincronizacao.resultado }}
+        {% endif %}
+    </span>
+</div>
+
+{% if lote_em_andamento %}
+<div id="lote-status" class="alert alert-info d-flex align-items-center" data-status="RODANDO" data-lote-id="{{ lote_em_andamento.pk }}">
+    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+    <span>Gerando posts com IA para {{ lote_em_andamento.total_alvo }} veículo(s) em segundo plano — isso pode levar alguns minutos.</span>
+</div>
+{% elif ultimo_lote %}
+<div class="alert alert-success d-flex justify-content-between align-items-center">
+    <span>Último lote: {{ ultimo_lote.total_gerado }} post(s) gerado(s) de {{ ultimo_lote.total_alvo }}{% if ultimo_lote.total_falhas %}, {{ ultimo_lote.total_falhas }} falha(s){% endif %}.</span>
+    <a href="{% url 'marketing_revisao_lote' ultimo_lote.pk %}" class="btn btn-sm btn-success">Ver / Salvar posts</a>
+</div>
+{% endif %}
+
+<div class="card card-body mb-4 shadow-sm">
+    <form method="get" class="row g-3 align-items-center">
+        <div class="col-md-4">
+            <select name="tipo" class="form-select" onchange="this.form.submit()">
+                <option value="" {% if not tipo_filtro %}selected{% endif %}>Todos os tipos</option>
+                <option value="CARRO" {% if tipo_filtro == 'CARRO' %}selected{% endif %}>Carros</option>
+                <option value="MOTO" {% if tipo_filtro == 'MOTO' %}selected{% endif %}>Motos</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="sem_post" value="1" id="semPostCheck"
+                       {% if sem_post_filtro %}checked{% endif %} onchange="this.form.submit()">
+                <label class="form-check-label" for="semPostCheck">Só sem post gerado</label>
+            </div>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <small class="text-muted">{{ total_anuncios }} veículo(s) no estoque · {{ total_posts }} post(s) gerado(s)</small>
+        </div>
+    </form>
+</div>
+
+<div class="row">
+    {% for anuncio in veiculos %}
+    <div class="col-lg-4 col-md-6 mb-4">
+        <div class="card h-100 shadow-sm">
+            {% if anuncio.foto_principal_url %}
+                <img src="{{ anuncio.foto_principal_url }}" class="card-img-top" alt="{{ anuncio.titulo }}" style="height:180px;object-fit:cover;">
+            {% else %}
+                <div class="d-flex align-items-center justify-content-center bg-light text-muted" style="height:180px;">
+                    <i class="bi bi-image-alt fs-1"></i>
+                </div>
+            {% endif %}
+            <div class="card-body d-flex flex-column">
+                <h6 class="card-title">{{ anuncio.titulo }}</h6>
+                <p class="card-text mb-1">
+                    <strong>{% if anuncio.preco %}R$ {{ anuncio.preco }}{% else %}Consulte{% endif %}</strong>
+                </p>
+                <p class="card-text mb-2">
+                    <small class="text-muted">{{ anuncio.ano|default:"-" }} · {{ anuncio.km|default:"-" }} km</small>
+                </p>
+                <span class="badge {% if anuncio.num_posts %}bg-success{% else %}bg-secondary{% endif %} mb-2 align-self-start">
+                    {% if anuncio.num_posts %}{{ anuncio.num_posts }} post(s) gerado(s){% else %}Sem post ainda{% endif %}
+                </span>
+                <div class="mt-auto pt-2">
+                    <a href="{% url 'marketing_veiculo_detail' anuncio.pk %}" class="btn btn-dark w-100">Ver / Gerar Post</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-info text-center">
+            <p class="mb-0">Nenhum veículo coletado ainda. Clique em "Atualizar estoque do site" para raspar o estoque.</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if is_paginated %}
+<nav aria-label="Navegação das páginas">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page=1&tipo={{ tipo_filtro }}">&laquo;&laquo;</a></li>
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&tipo={{ tipo_filtro }}">&laquo;</a></li>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item"><a class="page-link" href="?page={{ num }}&tipo={{ tipo_filtro }}">{{ num }}</a></li>
+            {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&tipo={{ tipo_filtro }}">&raquo;</a></li>
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&tipo={{ tipo_filtro }}">&raquo;&raquo;</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var banner = document.getElementById('sincronizacao-status');
+    if (!banner || banner.dataset.status !== 'RODANDO') {
+        return;
+    }
+    var intervalo = setInterval(function () {
+        fetch("{% url 'marketing_status_sincronizacao' %}")
+            .then(function (resp) { return resp.json(); })
+            .then(function (data) {
+                if (data.status !== 'RODANDO') {
+                    clearInterval(intervalo);
+                    window.location.reload();
+                }
+            })
+            .catch(function () { clearInterval(intervalo); });
+    }, 5000);
+})();
+</script>
+{% if lote_em_andamento %}
+<script>
+(function () {
+    var intervalo = setInterval(function () {
+        fetch("{% url 'marketing_status_lote' lote_em_andamento.pk %}")
+            .then(function (resp) { return resp.json(); })
+            .then(function (data) {
+                if (data.status !== 'RODANDO') {
+                    clearInterval(intervalo);
+                    window.location.href = "{% url 'marketing_revisao_lote' lote_em_andamento.pk %}";
+                }
+            })
+            .catch(function () { clearInterval(intervalo); });
+    }, 5000);
+})();
+</script>
+{% endif %}
+{% endblock %}

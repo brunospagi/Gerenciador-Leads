@@ -247,6 +247,10 @@
                     {% if module_access.avaliacoes %}
                     <li><a href="{% url 'avaliacao_list' %}"><i class="fas fa-car"></i> Avaliações</a></li>
                     {% endif %}
+
+                    {% if module_access.marketing_ia %}
+                    <li><a href="{% url 'marketing_veiculo_list' %}"><i class="fas fa-bullhorn"></i> Marketing IA</a></li>
+                    {% endif %}
                 </ul>
 
                 {% if module_access.financeiro %}
