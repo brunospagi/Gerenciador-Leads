@@ -16,6 +16,7 @@ real, o parsing das respostas foi escrito de forma defensiva (tenta os campos
 documentados e loga o JSON bruto se não encontrar) — se o formato de resposta
 tiver mudado, o log deixa claro o que ajustar.
 """
+import json
 import logging
 import mimetypes
 import time
@@ -67,6 +68,17 @@ def _upload_foto_referencia(api_key, foto_bytes, mime_type):
     image_id = dados.get('id')
     upload_url = dados.get('url')
     campos_upload = dados.get('fields') or {}
+    # A API às vezes devolve `fields` como uma string JSON em vez de objeto já
+    # parseado — se mandarmos essa string direto como `data=` do requests junto
+    # com `files=`, ele recusa com "Data must not be a string.".
+    if isinstance(campos_upload, str):
+        try:
+            campos_upload = json.loads(campos_upload) if campos_upload else {}
+        except (TypeError, ValueError):
+            logger.warning('Não foi possível decodificar uploadInitImage.fields: %r', campos_upload)
+            campos_upload = {}
+    if not isinstance(campos_upload, dict):
+        campos_upload = {}
     if not image_id or not upload_url:
         raise LeonardoError(f'Resposta inesperada de /init-image: {resp.text[:500]}')
 
