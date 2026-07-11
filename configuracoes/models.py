@@ -55,6 +55,16 @@ class ConfiguracaoIntegracoes(models.Model):
     evo_crm_pipeline_id = models.CharField(max_length=100, blank=True, verbose_name="EVO CRM - Pipeline ID")
     evo_crm_pipeline_stage_id = models.CharField(max_length=100, blank=True, verbose_name="EVO CRM - Stage ID")
 
+    PROVEDOR_IMAGEM_CHOICES = [
+        ('GEMINI', 'Gemini (Google)'),
+        ('LEONARDO', 'Leonardo.Ai'),
+    ]
+    provedor_imagem_ia = models.CharField(
+        max_length=20, choices=PROVEDOR_IMAGEM_CHOICES, default='GEMINI',
+        verbose_name="Provedor de geração de imagem (Marketing IA)",
+    )
+    leonardo_api_key = models.CharField(max_length=255, blank=True, verbose_name="Leonardo.Ai - Chave da API")
+
     atualizado_em = models.DateTimeField(auto_now=True)
     atualizado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,

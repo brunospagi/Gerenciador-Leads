@@ -8,6 +8,9 @@ import requests
 from django.conf import settings
 
 from avaliacoes.ai_runtime import get_gemini_runtime
+from configuracoes.resolver import obter_integracao
+
+from . import leonardo_client
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +33,16 @@ PROMPT_IMAGEM = (
     "entardecer), com reflexo sutil no chão, aparência profissional de anúncio "
     "publicitário para redes sociais, formato quadrado (1:1), alta qualidade "
     "fotorrealista. Não inclua nenhum texto, logotipo ou marca d'água na imagem."
+)
+
+# O Leonardo.Ai não aceita a foto embutida na mesma chamada (ela vai como
+# init_image_id, separado) — por isso o prompt aqui é só a descrição textual da
+# cena desejada, sem "use a foto enviada como referência".
+PROMPT_IMAGEM_LEONARDO = (
+    "Professional automotive advertisement photo, the vehicle placed in a modern, "
+    "well-lit showroom (or an elegant outdoor lot at dusk), subtle floor reflection, "
+    "photorealistic, high quality, social media ad style, square composition. "
+    "No text, no logo, no watermark."
 )
 
 
@@ -83,9 +96,40 @@ def gerar_legenda(anuncio):
 
 def gerar_imagem_promocional(anuncio, foto_bytes, mime_type, max_tentativas=3):
     """
-    Envia a foto real do veículo + prompt para o modelo de imagem do Gemini e
-    retorna (imagem_bytes, mime_type_saida, modelo_usado) ou (None, None, None).
+    Gera a imagem promocional usando o provedor configurado em
+    Configurações > Integrações Externas (padrão: Gemini). Retorna
+    (imagem_bytes, mime_type_saida, modelo_usado) ou (None, None, None) se a
+    IA estiver indisponível ou falhar — o caller deve tratar isso como uma
+    falha esperada, não uma exceção.
     """
+    from configuracoes.models import ConfiguracaoIntegracoes
+
+    provedor = ConfiguracaoIntegracoes.get_solo().provedor_imagem_ia
+    if provedor == 'LEONARDO':
+        return _gerar_imagem_leonardo(anuncio, foto_bytes, mime_type)
+    return _gerar_imagem_gemini(anuncio, foto_bytes, mime_type, max_tentativas=max_tentativas)
+
+
+def _gerar_imagem_leonardo(anuncio, foto_bytes, mime_type):
+    api_key = obter_integracao('leonardo_api_key')
+    if not api_key:
+        logger.warning('Leonardo.Ai indisponível: chave da API não configurada (Admin/.env).')
+        return None, None, None
+
+    try:
+        imagem_bytes, mime_saida = leonardo_client.gerar_imagem_leonardo(
+            PROMPT_IMAGEM_LEONARDO, foto_bytes, mime_type, api_key,
+        )
+        return imagem_bytes, mime_saida, f'leonardo:{leonardo_client.MODEL_ID_PADRAO}'
+    except leonardo_client.LeonardoError as exc:
+        logger.warning('Erro ao gerar imagem promocional com Leonardo.Ai: %s', exc)
+        return None, None, None
+    except Exception as exc:
+        logger.warning('Erro inesperado ao chamar o Leonardo.Ai: %s', exc)
+        return None, None, None
+
+
+def _gerar_imagem_gemini(anuncio, foto_bytes, mime_type, max_tentativas=3):
     client, _, erro = get_gemini_runtime()
     if erro or not client:
         logger.warning('Gemini indisponível para gerar imagem promocional: %s', erro)

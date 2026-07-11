@@ -27,5 +27,10 @@ class ConfiguracaoIntegracoesForm(forms.ModelForm):
         fields = [
             'evolution_api_url', 'evolution_api_key', 'evolution_instance',
             'evo_crm_api_url', 'evo_crm_api_token', 'evo_crm_pipeline_id', 'evo_crm_pipeline_stage_id',
+            'provedor_imagem_ia', 'leonardo_api_key',
         ]
-        widgets = {field: forms.TextInput(attrs={'class': 'form-control'}) for field in fields}
+        widgets = {
+            field: forms.TextInput(attrs={'class': 'form-control'})
+            for field in fields if field != 'provedor_imagem_ia'
+        }
+        widgets['provedor_imagem_ia'] = forms.Select(attrs={'class': 'form-select'})

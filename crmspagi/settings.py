@@ -36,6 +36,9 @@ EVO_CRM_API_TOKEN = os.getenv('EVO_CRM_API_TOKEN', '')
 EVO_CRM_PIPELINE_ID = os.getenv('EVO_CRM_PIPELINE_ID', '')
 EVO_CRM_PIPELINE_STAGE_ID = os.getenv('EVO_CRM_PIPELINE_STAGE_ID', '')
 EVO_CRM_TIMEOUT_SECONDS = _env_to_int('EVO_CRM_TIMEOUT_SECONDS', 4)
+# Fallback quando o painel Configuracoes > Integracoes Externas nao tiver a chave preenchida.
+LEONARDO_API_KEY = os.getenv('LEONARDO_API_KEY', '')
+LEONARDO_MODEL_ID = os.getenv('LEONARDO_MODEL_ID', '')
 APP_BUILD_NUMBER = os.getenv('APP_BUILD_NUMBER', '0')
 APP_BUILD_SHA = (
     os.getenv('APP_BUILD_SHA')
