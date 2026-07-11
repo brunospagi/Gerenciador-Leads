@@ -1,0 +1,70 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container mt-4 m3-module-shell">
+  <section class="m3-page-header">
+    <div>
+      <h1 class="m3-page-title"><i class="fas fa-link me-2"></i>Webhooks n8n</h1>
+      <p class="m3-page-subtitle">Cada linha aponta pra um fluxo do n8n. Deixe a URL em branco pra usar a variável de ambiente padrão.</p>
+    </div>
+    <div class="m3-toolbar">
+      <a href="{% url 'webhook_create' %}" class="btn btn-primary"><i class="fas fa-plus me-1"></i>Adicionar webhook</a>
+      <a href="{% url 'configuracoes_home' %}" class="btn btn-outline-secondary">Voltar</a>
+    </div>
+  </section>
+
+  {% if messages %}
+  <section>
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} mb-2">{{ message }}</div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <section class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Nome</th>
+              <th>Identificador</th>
+              <th>URL</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for webhook in webhooks %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ webhook.nome }}</div>
+                {% if webhook.descricao %}<small class="text-muted">{{ webhook.descricao }}</small>{% endif %}
+                {% if webhook.sistema %}<span class="badge bg-secondary ms-1">Nativo</span>{% endif %}
+              </td>
+              <td><code>{{ webhook.slug }}</code></td>
+              <td>{{ webhook.url|default:"(usa variável de ambiente)" }}</td>
+              <td>
+                {% if webhook.ativo %}
+                <span class="badge bg-success">Ativo</span>
+                {% else %}
+                <span class="badge bg-secondary">Inativo</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{% url 'webhook_update' webhook.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fas fa-edit"></i></a>
+                {% if not webhook.sistema %}
+                <a href="{% url 'webhook_delete' webhook.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></a>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-muted py-4">Nenhum webhook cadastrado.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container mt-4 m3-module-shell">
+  <section class="m3-page-header">
+    <div>
+      <h1 class="m3-page-title"><i class="fas fa-user-shield me-2"></i>Permissões de {{ target_user.username }}</h1>
+      <p class="m3-page-subtitle">Marque as ações liberadas em cada módulo. Administradores sempre têm acesso total, independente desta tela.</p>
+    </div>
+    <div class="m3-toolbar">
+      <a href="{% url 'user_module_permissions' %}" class="btn btn-outline-secondary">Voltar</a>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-body p-0">
+      <form method="post">
+        {% csrf_token %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Módulo</th>
+                {% for campo, label in acoes %}
+                <th class="text-center">{{ label }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for linha in linhas %}
+              <tr>
+                <td class="fw-semibold">{{ linha.modulo.nome }}</td>
+                {% for campo, valor in linha.campos %}
+                <td class="text-center">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="modulo_{{ linha.modulo.slug }}_{{ campo }}"
+                    {% if valor %}checked{% endif %}
+                  >
+                </td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="card-body">
+          <button type="submit" class="btn btn-primary">Salvar permissões</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -12,6 +12,7 @@ from decimal import Decimal
 from dateutil.relativedelta import relativedelta
 from django.views.decorators.http import require_POST
 from django.urls import reverse
+from configuracoes.access import require_module_action
 from .models import FolhaPagamento, Desconto, ParcelaDesconto, Credito, ParcelaCredito
 from funcionarios.models import Funcionario
 from vendas_produtos.models import VendaProduto
@@ -38,7 +39,7 @@ def _recalcular_folhas_abertas_por_referencias(funcionario, referencias):
         if not folha.fechada:
             folha.calcular_folha()
 
-@login_required
+@require_module_action('rh', 'editar')
 @user_passes_test(is_admin_financeiro)
 def dashboard_rh(request):
     funcionarios = Funcionario.objects.filter(ativo=True)
@@ -146,7 +147,7 @@ def dashboard_rh(request):
         'nav_proximo_ano': mes_proximo.year,
     })
 
-@login_required
+@require_module_action('rh', 'criar')
 @user_passes_test(is_admin_financeiro)
 def lancar_desconto(request):
     if request.method == 'POST':
@@ -167,7 +168,7 @@ def lancar_desconto(request):
         'btn_label': 'Confirmar Desconto'
     })
 
-@login_required
+@require_module_action('rh', 'editar')
 @user_passes_test(is_admin_financeiro)
 def editar_desconto(request, pk):
     desconto = get_object_or_404(
@@ -215,7 +216,7 @@ def editar_desconto(request, pk):
         'cancel_url': reverse('rh_lista_lancamentos'),
     })
 
-@login_required
+@require_module_action('rh', 'excluir')
 @user_passes_test(is_admin_financeiro)
 def excluir_desconto(request, pk):
     desconto = get_object_or_404(
@@ -249,7 +250,7 @@ def excluir_desconto(request, pk):
         'bloqueado': bloqueado,
     })
 
-@login_required
+@require_module_action('rh', 'criar')
 @user_passes_test(is_admin_financeiro)
 def lancar_credito(request):
     if request.method == 'POST':
@@ -271,7 +272,7 @@ def lancar_credito(request):
         'btn_label': 'Confirmar Crédito'
     })
 
-@login_required
+@require_module_action('rh', 'visualizar')
 @user_passes_test(is_admin_financeiro)
 def lista_lancamentos_manuais(request):
     # Filtro de Data
@@ -569,7 +570,7 @@ def detalhe_folha(request, pk):
         'holerite_hash': holerite_hash,
     })
 
-@login_required
+@require_module_action('rh', 'editar')
 @user_passes_test(is_admin_financeiro)
 @require_POST
 def fechar_folha(request, pk):

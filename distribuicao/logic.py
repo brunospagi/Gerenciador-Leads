@@ -1,6 +1,5 @@
 from datetime import datetime, time
 import logging
-import os
 import re
 
 import requests
@@ -8,14 +7,13 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from configuracoes.models import ServicoWebhook
+from configuracoes.resolver import enviar_webhook, obter_integracao
 from .models import VendedorRodizio
 from controle_ponto.models import RegistroPonto
 
 
 logger = logging.getLogger(__name__)
-
-# ADICIONE A URL DO SEU WEBHOOK AQUI
-N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "https://seu-n8n-webhook-url-aqui")
 
 
 def encontrar_cliente_por_whatsapp(whatsapp):
@@ -122,11 +120,7 @@ def enviar_webhook_n8n(cliente):
         "data_entrada": cliente.data_primeiro_contato.strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    try:
-        # Timeout curto para nao travar o painel se o n8n demorar
-        requests.post(N8N_WEBHOOK_URL, json=payload, timeout=2)
-    except Exception as e:
-        logger.warning("Falha no Webhook n8n para cliente %s: %s", cliente.pk, e)
+    enviar_webhook(ServicoWebhook.DISTRIBUICAO_LEADS, payload, timeout=2)
 
 
 def _normalizar_telefone_evo(telefone):
@@ -151,10 +145,11 @@ def _montar_payload_evo_crm(cliente):
         contato["phone_number"] = telefone
 
     deal = {
-        "pipeline_id": settings.EVO_CRM_PIPELINE_ID,
+        "pipeline_id": obter_integracao('evo_crm_pipeline_id'),
     }
-    if settings.EVO_CRM_PIPELINE_STAGE_ID:
-        deal["stage_id"] = settings.EVO_CRM_PIPELINE_STAGE_ID
+    stage_id = obter_integracao('evo_crm_pipeline_stage_id')
+    if stage_id:
+        deal["stage_id"] = stage_id
 
     return {
         "contact": contato,
@@ -214,15 +209,17 @@ def criar_lead_evo_crm(cliente):
     if cliente.evo_crm_lead_id and cliente.evo_crm_deal_id:
         return {"success": True, "skipped": True, "reason": "already_synced", "configured": True}
 
-    if not settings.EVO_CRM_API_TOKEN or not settings.EVO_CRM_PIPELINE_ID:
+    evo_crm_api_token = obter_integracao('evo_crm_api_token')
+    evo_crm_pipeline_id = obter_integracao('evo_crm_pipeline_id')
+    if not evo_crm_api_token or not evo_crm_pipeline_id:
         return {"success": False, "skipped": True, "reason": "not_configured", "configured": False}
 
-    base_url = (settings.EVO_CRM_API_URL or "https://api.evoai.app").rstrip("/")
+    base_url = (obter_integracao('evo_crm_api_url') or "https://api.evoai.app").rstrip("/")
     endpoint = f"{base_url}/public/api/v1/leads"
     payload = _montar_payload_evo_crm(cliente)
     headers = {
         "Content-Type": "application/json",
-        "api_access_token": settings.EVO_CRM_API_TOKEN,
+        "api_access_token": evo_crm_api_token,
     }
 
     try:
@@ -241,7 +238,7 @@ def criar_lead_evo_crm(cliente):
         lead_id, deal_id, retorno = _extrair_ids_evo_crm(data)
 
         if not lead_id or not deal_id:
-            cliente.evo_crm_pipeline_id = settings.EVO_CRM_PIPELINE_ID
+            cliente.evo_crm_pipeline_id = evo_crm_pipeline_id
             cliente.save(update_fields=["evo_crm_pipeline_id", "data_ultimo_contato"])
             logger.info(
                 "Lead do cliente %s criado no Evo CRM sem IDs de retorno. resposta=%s payload=%s",
@@ -259,7 +256,7 @@ def criar_lead_evo_crm(cliente):
 
         cliente.evo_crm_lead_id = lead_id
         cliente.evo_crm_deal_id = deal_id
-        cliente.evo_crm_pipeline_id = settings.EVO_CRM_PIPELINE_ID
+        cliente.evo_crm_pipeline_id = evo_crm_pipeline_id
         cliente.save(update_fields=["evo_crm_lead_id", "evo_crm_deal_id", "evo_crm_pipeline_id", "data_ultimo_contato"])
 
         return {
@@ -277,7 +274,7 @@ def criar_lead_evo_crm(cliente):
             corpo_resposta = ""
 
         if getattr(exc.response, "status_code", None) == 422 and _resposta_indica_jornada_ativa(corpo_resposta):
-            cliente.evo_crm_pipeline_id = settings.EVO_CRM_PIPELINE_ID
+            cliente.evo_crm_pipeline_id = evo_crm_pipeline_id
             cliente.save(update_fields=["evo_crm_pipeline_id", "data_ultimo_contato"])
             logger.info(
                 "Contato do cliente %s ja possui jornada ativa no pipeline do Evo CRM. body=%s",

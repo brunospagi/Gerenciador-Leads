@@ -146,8 +146,12 @@
                             <td class="d-print-none">
                                 <div class="d-flex gap-1">
                                     <a href="{% url 'controle_ponto:detalhe_ponto' p.id %}" class="btn btn-sm btn-outline-info" title="Auditoria"><i class="fas fa-eye"></i></a>
+                                    {% if module_actions.ponto.editar %}
                                     <a href="{% url 'controle_ponto:editar_ponto' p.id %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fas fa-edit"></i></a>
+                                    {% endif %}
+                                    {% if module_actions.ponto.excluir %}
                                     <a href="{% url 'controle_ponto:excluir_ponto' p.id %}" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></a>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>

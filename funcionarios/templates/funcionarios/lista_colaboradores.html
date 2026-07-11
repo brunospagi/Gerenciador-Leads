@@ -6,9 +6,11 @@
             <h3 class="fw-bold text-primary mb-0"><i class="fa fa-users me-2"></i> Gestão de Equipe</h3>
             <p class="text-muted small mb-0">Painel de colaboradores ativos e inativos</p>
         </div>
+        {% if module_actions.rh.criar %}
         <a href="{% url 'funcionario_create' %}" class="btn btn-success shadow-sm">
             <i class="fa fa-user-plus me-2"></i> Novo Colaborador
         </a>
+        {% endif %}
     </div>
 
     <div class="row g-3 mb-4">
@@ -103,9 +105,11 @@
                                 {% endif %}
                             </td>
                             <td class="text-end pe-4">
+                                {% if module_actions.rh.editar %}
                                 <a href="{% url 'funcionario_update' func.pk %}" class="btn btn-sm btn-outline-primary" title="Editar colaborador">
                                     <i class="fa fa-pen"></i>
                                 </a>
+                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}

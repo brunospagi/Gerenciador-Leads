@@ -33,6 +33,7 @@ urlpatterns = [
     path('funcionarios/', include('funcionarios.urls')),
     path('financeiro/', include('financeiro.urls')),
     path('ponto/', include('controle_ponto.urls')),
+    path('configuracoes/', include('configuracoes.urls')),
     path('erro/503/', views.error_503, name='erro_503'),
 ]
 

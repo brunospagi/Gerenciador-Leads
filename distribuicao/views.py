@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
@@ -11,6 +10,7 @@ from django.utils import timezone
 from django.views.generic import CreateView, TemplateView, UpdateView
 
 from clientes.models import Cliente, Historico
+from configuracoes.access import ModuleActionRequiredMixin, require_module_action
 from notificacoes.utils import notificar_usuario
 from .forms import LeadEntradaForm
 from .logic import (
@@ -24,7 +24,7 @@ from .logic import (
 logger = logging.getLogger(__name__)
 
 
-@login_required
+@require_module_action('distribuicao', 'visualizar')
 def verificar_duplicidade_whatsapp(request):
     """Checa em tempo real (via AJAX) se ja existe um lead com este whatsapp."""
     whatsapp = request.GET.get('whatsapp', '')
@@ -41,25 +41,13 @@ def verificar_duplicidade_whatsapp(request):
     })
 
 
-class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
+class PainelDistribuicaoView(ModuleActionRequiredMixin, CreateView):
+    module_key = 'distribuicao'
+    module_action = 'criar'
     model = Cliente
     form_class = LeadEntradaForm
     template_name = 'distribuicao/painel_entrada.html'
     success_url = reverse_lazy('painel-distribuicao')
-
-    def test_func(self):
-        user_profile = getattr(self.request.user, 'profile', None)
-        if self.request.user.is_superuser:
-            return True
-        if user_profile and user_profile.nivel_acesso in ['DISTRIBUIDOR', 'ADMIN', 'GERENTE']:
-            return True
-        if user_profile and user_profile.pode_distribuir_leads:
-            return True
-        return False
-
-    def handle_no_permission(self):
-        messages.error(self.request, 'Acesso negado. Voce nao tem permissao para distribuir leads.')
-        return redirect('portal')
 
     def form_valid(self, form):
         def _nome_usuario(user):
@@ -157,27 +145,15 @@ class PainelDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, CreateView
         return context
 
 
-class RelatorioDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+class RelatorioDistribuicaoView(ModuleActionRequiredMixin, TemplateView):
+    module_key = 'distribuicao'
+    module_action = 'visualizar'
     template_name = 'distribuicao/relatorio_distribuicao.html'
 
     def get_template_names(self):
         if self.request.GET.get('print') == '1':
             return ['distribuicao/relatorio_distribuicao_print.html']
         return [self.template_name]
-
-    def test_func(self):
-        user_profile = getattr(self.request.user, 'profile', None)
-        if self.request.user.is_superuser:
-            return True
-        if user_profile and user_profile.nivel_acesso in ['ADMIN', 'GERENTE', 'DISTRIBUIDOR']:
-            return True
-        if user_profile and user_profile.pode_distribuir_leads:
-            return True
-        return False
-
-    def handle_no_permission(self):
-        messages.error(self.request, 'Acesso restrito a perfis com permissao de distribuicao.')
-        return redirect('portal')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -241,22 +217,12 @@ class RelatorioDistribuicaoView(LoginRequiredMixin, UserPassesTestMixin, Templat
         return context
 
 
-class RedistribuirLeadView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+class RedistribuirLeadView(ModuleActionRequiredMixin, UpdateView):
+    module_key = 'distribuicao'
+    module_action = 'editar'
     model = Cliente
     template_name = 'distribuicao/redistribuir_confirm.html'
     fields = []
-
-    def test_func(self):
-        user_profile = getattr(self.request.user, 'profile', None)
-        if self.request.user.is_superuser:
-            return True
-        if user_profile and user_profile.nivel_acesso in ['ADMIN', 'GERENTE', 'DISTRIBUIDOR']:
-            return True
-        return False
-
-    def handle_no_permission(self):
-        messages.error(self.request, 'Voce nao tem permissao para redistribuir leads.')
-        return redirect('portal')
 
     def form_valid(self, form):
         def _nome_usuario(user):

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Profile, UserLoginActivity, ModulePermission
+from .models import Profile, UserLoginActivity
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
@@ -28,32 +28,3 @@ class UserLoginActivityAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
-
-
-@admin.register(ModulePermission)
-class ModulePermissionAdmin(admin.ModelAdmin):
-    list_display = (
-        'user',
-        'modulo_clientes',
-        'modulo_vendas',
-        'modulo_financeiro',
-        'modulo_distribuicao',
-        'modulo_rh',
-        'modulo_relatorios',
-        'modulo_admin_usuarios',
-        'modulo_credenciais',
-    )
-    list_display_links = ('user',)
-    list_editable = (
-        'modulo_clientes',
-        'modulo_vendas',
-        'modulo_financeiro',
-        'modulo_distribuicao',
-        'modulo_rh',
-        'modulo_relatorios',
-        'modulo_admin_usuarios',
-        'modulo_credenciais',
-    )
-    list_filter = ('modulo_financeiro', 'modulo_distribuicao', 'modulo_rh', 'modulo_relatorios', 'modulo_credenciais')
-    search_fields = ('user__username', 'user__email', 'user__first_name')
-    autocomplete_fields = ('user',)

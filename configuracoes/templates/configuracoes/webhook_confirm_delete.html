@@ -1,0 +1,22 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container mt-4 m3-module-shell">
+  <section class="m3-page-header">
+    <div>
+      <h1 class="m3-page-title"><i class="fas fa-trash me-2"></i>Excluir Webhook</h1>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-body">
+      <p>Tem certeza que deseja excluir o webhook <strong>{{ object.nome }}</strong> (<code>{{ object.slug }}</code>)?</p>
+      <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Excluir</button>
+        <a href="{% url 'webhook_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -3,7 +3,6 @@ from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, DeleteView, TemplateView
 from .models import Cliente, Historico, LeadAndamento
 from .forms import ClienteForm, HistoricoForm, LeadAndamentoForm
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
@@ -15,8 +14,9 @@ from xhtml2pdf import pisa
 import json
 from django.contrib.auth.models import User
 from collections import defaultdict
-from django.contrib import messages 
+from django.contrib import messages
 from core.audit import create_audit_log, get_client_ip
+from configuracoes.access import ModuleActionRequiredMixin, require_module_action
 
 CLOSED_STATUSES = [Cliente.StatusNegociacao.FINALIZADO, Cliente.StatusNegociacao.VENDIDO]
 
@@ -35,7 +35,9 @@ def _mapear_status_negociacao_por_andamento(status_contato, etapa_funil):
     return Cliente.StatusNegociacao.EM_ATENDIMENTO
 
 
-class CalendarioView(LoginRequiredMixin, TemplateView):
+class CalendarioView(ModuleActionRequiredMixin, TemplateView):
+    module_key = 'clientes'
+    module_action = 'visualizar'
     template_name = 'clientes/calendario.html'
 
     def get_context_data(self, **kwargs):
@@ -71,7 +73,9 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
         
         return context
 
-class ClienteListView(LoginRequiredMixin, ListView):
+class ClienteListView(ModuleActionRequiredMixin, ListView):
+    module_key = 'clientes'
+    module_action = 'visualizar'
     model = Cliente
     template_name = 'clientes/cliente_list.html'
     context_object_name = 'clientes'
@@ -117,7 +121,9 @@ class ClienteListView(LoginRequiredMixin, ListView):
         return context
 
 
-class ClienteDetailView(LoginRequiredMixin, DetailView):
+class ClienteDetailView(ModuleActionRequiredMixin, DetailView):
+    module_key = 'clientes'
+    module_action = 'visualizar'
     model = Cliente
     template_name = 'clientes/cliente_detail.html'
     context_object_name = 'cliente'
@@ -140,7 +146,9 @@ class ClienteDetailView(LoginRequiredMixin, DetailView):
         context['andamentos'] = self.object.andamentos.select_related('usuario').all()
         return context
 
-class ClienteCreateView(LoginRequiredMixin, CreateView):
+class ClienteCreateView(ModuleActionRequiredMixin, CreateView):
+    module_key = 'clientes'
+    module_action = 'criar'
     model = Cliente
     form_class = ClienteForm
     template_name = 'clientes/cliente_form.html'
@@ -243,7 +251,9 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
 # --- FIM DA VIEW DE CRIAÇÃO ---
 
 
-class ClienteUpdateView(LoginRequiredMixin, UpdateView):
+class ClienteUpdateView(ModuleActionRequiredMixin, UpdateView):
+    module_key = 'clientes'
+    module_action = 'editar'
     model = Cliente
     form_class = ClienteForm
     template_name = 'clientes/cliente_form.html'
@@ -272,7 +282,7 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
         return redirect(self.get_success_url())
 
 
-@login_required
+@require_module_action('clientes', 'editar')
 def adicionar_historico(request, pk):
     cliente = get_object_or_404(Cliente, pk=pk)
     if not request.user.is_superuser and cliente.vendedor != request.user:
@@ -295,7 +305,7 @@ def adicionar_historico(request, pk):
     return redirect('cliente_detail', pk=cliente.pk)
 
 
-@login_required
+@require_module_action('clientes', 'editar')
 def registrar_andamento_lead(request, pk):
     cliente = get_object_or_404(Cliente, pk=pk)
     if not request.user.is_superuser and cliente.vendedor != request.user:
@@ -378,7 +388,9 @@ def registrar_andamento_lead(request, pk):
     return redirect('cliente_detail', pk=cliente.pk)
 
 
-class PainelComercialLeadsView(LoginRequiredMixin, TemplateView):
+class PainelComercialLeadsView(ModuleActionRequiredMixin, TemplateView):
+    module_key = 'clientes'
+    module_action = 'visualizar'
     template_name = 'clientes/painel_comercial.html'
 
     def get_context_data(self, **kwargs):
@@ -435,7 +447,9 @@ class PainelComercialLeadsView(LoginRequiredMixin, TemplateView):
 
 
 # ... (Restante do arquivo como relatorios, delete, etc. permanece o mesmo)
-class ClienteAtrasadoListView(LoginRequiredMixin, ListView):
+class ClienteAtrasadoListView(ModuleActionRequiredMixin, ListView):
+    module_key = 'clientes'
+    module_action = 'visualizar'
     model = Cliente
     template_name = 'clientes/cliente_atrasado_list.html'
     context_object_name = 'clientes'
@@ -447,7 +461,9 @@ class ClienteAtrasadoListView(LoginRequiredMixin, ListView):
         queryset = queryset.order_by('data_proximo_contato')
         return queryset.exclude(status_negociacao__in=CLOSED_STATUSES)
 
-class ClienteFinalizadoListView(LoginRequiredMixin, ListView):
+class ClienteFinalizadoListView(ModuleActionRequiredMixin, ListView):
+    module_key = 'clientes'
+    module_action = 'visualizar'
     model = Cliente
     template_name = 'clientes/cliente_finalizado_list.html'
     context_object_name = 'clientes'
@@ -637,15 +653,12 @@ def exportar_relatorio_pdf(request):
        return HttpResponse('Ocorreram alguns erros <pre>' + html + '</pre>')
     return response
 
-class ClienteDeleteView(LoginRequiredMixin, DeleteView):
+class ClienteDeleteView(ModuleActionRequiredMixin, DeleteView):
+    module_key = 'clientes'
+    module_action = 'excluir'
     model = Cliente
     template_name = 'clientes/cliente_confirm_delete.html'
     success_url = reverse_lazy('cliente_list')
-
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_superuser:
-            raise PermissionDenied
-        return super().dispatch(request, *args, **kwargs)
 
 def offline_view(request):
     return render(request, "clientes/offline.html")

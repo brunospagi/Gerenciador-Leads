@@ -1,14 +1,16 @@
 from django.views.generic import ListView, CreateView, DetailView, UpdateView
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.urls import reverse_lazy
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django.contrib import messages
+from configuracoes.access import ModuleActionRequiredMixin
 from .models import Autorizacao
 from .forms import AutorizacaoForm
 
 # Lista de Autorizações (Vendedor vê as suas, Gerente vê todas ou filtra)
-class AutorizacaoListView(LoginRequiredMixin, ListView):
+class AutorizacaoListView(ModuleActionRequiredMixin, ListView):
+    module_key = 'autorizacoes'
+    module_action = 'visualizar'
     model = Autorizacao
     template_name = 'autorizacoes/lista.html'
     context_object_name = 'autorizacoes'
@@ -22,7 +24,9 @@ class AutorizacaoListView(LoginRequiredMixin, ListView):
         return Autorizacao.objects.filter(vendedor=user)
 
 # Criar Nova Solicitação
-class AutorizacaoCreateView(LoginRequiredMixin, CreateView):
+class AutorizacaoCreateView(ModuleActionRequiredMixin, CreateView):
+    module_key = 'autorizacoes'
+    module_action = 'criar'
     model = Autorizacao
     form_class = AutorizacaoForm
     template_name = 'autorizacoes/form.html'
@@ -34,7 +38,9 @@ class AutorizacaoCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
 # Visualização para Impressão (Sem menus, focada no papel)
-class AutorizacaoPrintView(LoginRequiredMixin, DetailView):
+class AutorizacaoPrintView(ModuleActionRequiredMixin, DetailView):
+    module_key = 'autorizacoes'
+    module_action = 'visualizar'
     model = Autorizacao
     template_name = 'autorizacoes/print_document.html'
     context_object_name = 'item'
