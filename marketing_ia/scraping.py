@@ -93,7 +93,11 @@ def _extrair_cards_da_pagina_atual(driver):
             except NoSuchElementException:
                 features_texto = ''
             try:
-                foto_url = card.find_element(By.CSS_SELECTOR, '.card__image').get_attribute('src')
+                img_el = card.find_element(By.CSS_SELECTOR, '.card__image')
+                # O site usa lazy-load: só os cards já visíveis na tela no momento
+                # do carregamento têm o atributo `src` preenchido — os demais só
+                # têm a URL real em `data-src`, até o usuário rolar a página.
+                foto_url = img_el.get_attribute('src') or img_el.get_attribute('data-src')
             except NoSuchElementException:
                 foto_url = None
 
