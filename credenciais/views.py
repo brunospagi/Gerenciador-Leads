@@ -1,34 +1,22 @@
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.urls import reverse_lazy
 from django.contrib import messages
+from configuracoes.access import ModuleActionRequiredMixin
 from .models import Credencial
 from .forms import CredencialForm
 
-# Mixin de Permissão: Apenas Admin ou Gerente pode editar/criar
-class GestorPermissionMixin(UserPassesTestMixin):
-    def test_func(self):
-        user = self.request.user
-        # Superusuário sempre pode
-        if user.is_superuser:
-            return True
-        # Verifica perfil
-        if hasattr(user, 'profile'):
-            return user.profile.nivel_acesso in ['ADMIN', 'GERENTE']
-        return False
-    
-    def handle_no_permission(self):
-        messages.error(self.request, "Você não tem permissão para realizar esta ação.")
-        return super().handle_no_permission()
-
-# Listagem: Todos podem ver
-class CredencialListView(LoginRequiredMixin, ListView):
+# Listagem: qualquer um com acesso ao módulo
+class CredencialListView(ModuleActionRequiredMixin, ListView):
+    module_key = 'credenciais'
+    module_action = 'visualizar'
     model = Credencial
     template_name = 'credenciais/lista.html'
     context_object_name = 'credenciais'
 
-# Create: Apenas Gestores
-class CredencialCreateView(LoginRequiredMixin, GestorPermissionMixin, CreateView):
+# Create: apenas quem tem a ação "criar" liberada
+class CredencialCreateView(ModuleActionRequiredMixin, CreateView):
+    module_key = 'credenciais'
+    module_action = 'criar'
     model = Credencial
     form_class = CredencialForm
     template_name = 'credenciais/form.html'
@@ -39,8 +27,10 @@ class CredencialCreateView(LoginRequiredMixin, GestorPermissionMixin, CreateView
         messages.success(self.request, "Acesso cadastrado com sucesso!")
         return super().form_valid(form)
 
-# Update: Apenas Gestores
-class CredencialUpdateView(LoginRequiredMixin, GestorPermissionMixin, UpdateView):
+# Update: apenas quem tem a ação "editar" liberada
+class CredencialUpdateView(ModuleActionRequiredMixin, UpdateView):
+    module_key = 'credenciais'
+    module_action = 'editar'
     model = Credencial
     form_class = CredencialForm
     template_name = 'credenciais/form.html'
@@ -51,8 +41,10 @@ class CredencialUpdateView(LoginRequiredMixin, GestorPermissionMixin, UpdateView
         messages.success(self.request, "Dados de acesso atualizados!")
         return super().form_valid(form)
 
-# Delete: Apenas Gestores
-class CredencialDeleteView(LoginRequiredMixin, GestorPermissionMixin, DeleteView):
+# Delete: apenas quem tem a ação "excluir" liberada
+class CredencialDeleteView(ModuleActionRequiredMixin, DeleteView):
+    module_key = 'credenciais'
+    module_action = 'excluir'
     model = Credencial
     template_name = 'credenciais/delete_confirm.html'
     success_url = reverse_lazy('credencial_list')

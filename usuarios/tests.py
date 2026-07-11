@@ -1,41 +1,35 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from usuarios.models import ModulePermission
+from configuracoes.models import ModuloSistema, PermissaoModulo
 from usuarios.permissions import has_module_access
 
 
 class HasModuleAccessTests(TestCase):
-    def test_respeita_permissao_explicita_do_modulo(self):
+    def setUp(self):
+        # Os modulos de sistema ja vem semeados pela migration 0002 do app configuracoes.
+        self.modulo_financeiro = ModuloSistema.objects.get(slug='financeiro')
+        self.modulo_clientes = ModuloSistema.objects.get(slug='clientes')
+
+    def test_sem_permissao_cadastrada_nega_acesso(self):
         user = User.objects.create_user(username='vendedor_padrao', password='123456')
-
-        # Default do ModulePermission: modulo_financeiro=False, modulo_clientes=True.
         self.assertFalse(has_module_access(user, 'financeiro'))
-        self.assertTrue(has_module_access(user, 'clientes'))
-
-        user.module_permissions.modulo_financeiro = True
-        user.module_permissions.save()
-        self.assertTrue(has_module_access(user, 'financeiro'))
-
-    def test_admin_revoga_modulo_e_permanece_revogado(self):
-        user = User.objects.create_user(username='vendedor_revogado', password='123456')
-        user.module_permissions.modulo_clientes = False
-        user.module_permissions.save()
-
         self.assertFalse(has_module_access(user, 'clientes'))
 
-    def test_registro_ausente_nao_libera_acesso_amplo(self):
-        user = User.objects.create_user(username='vendedor_sem_registro', password='123456')
-        ModulePermission.objects.filter(user=user).delete()
-        # Rebusca o usuario para descartar o cache do reverse o2o (populado pelo
-        # signal na criacao), simulando de fato um registro ausente no banco.
-        user = User.objects.get(pk=user.pk)
+    def test_respeita_permissao_explicita_do_modulo(self):
+        user = User.objects.create_user(username='vendedor_com_acesso', password='123456')
+        PermissaoModulo.objects.create(user=user, modulo=self.modulo_financeiro, pode_visualizar=True)
 
-        # Sem registro, deve autocurar com os defaults do model (nao liberar tudo por padrao).
-        self.assertFalse(has_module_access(user, 'financeiro'))
-        self.assertFalse(has_module_access(user, 'distribuicao'))
+        self.assertTrue(has_module_access(user, 'financeiro'))
+        self.assertFalse(has_module_access(user, 'clientes'))
+
+    def test_admin_tem_acesso_total_mesmo_sem_permissao_cadastrada(self):
+        user = User.objects.create_user(username='admin_teste', password='123456')
+        user.profile.nivel_acesso = 'ADMIN'
+        user.profile.save()
+
+        self.assertTrue(has_module_access(user, 'financeiro'))
         self.assertTrue(has_module_access(user, 'clientes'))
-        self.assertTrue(ModulePermission.objects.filter(user=user).exists())
 
     def test_modulo_desconhecido_nega_acesso(self):
         user = User.objects.create_user(username='vendedor_modulo_invalido', password='123456')

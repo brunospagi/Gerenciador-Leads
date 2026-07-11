@@ -1,0 +1,63 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container mt-4 m3-module-shell">
+  <section class="m3-page-header">
+    <div>
+      <h1 class="m3-page-title"><i class="fas fa-gear me-2"></i>Configurações</h1>
+      <p class="m3-page-subtitle">Webhooks, integrações externas e permissões de acesso do sistema.</p>
+    </div>
+  </section>
+
+  {% if messages %}
+  <section>
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} mb-2">{{ message }}</div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <div class="row g-3">
+    <div class="col-md-6 col-lg-4">
+      <a href="{% url 'webhook_list' %}" class="card text-decoration-none h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-link me-2"></i>Webhooks n8n</h5>
+          <p class="card-text text-muted mb-0">Aponte/edite as URLs de cada fluxo do n8n e cadastre webhooks para outras funções do sistema.</p>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <a href="{% url 'integracoes_form' %}" class="card text-decoration-none h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-plug me-2"></i>Integrações Externas</h5>
+          <p class="card-text text-muted mb-0">Credenciais da Evolution API e do EVO CRM.</p>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <a href="{% url 'user_module_permissions' %}" class="card text-decoration-none h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-user-shield me-2"></i>Permissões de Acesso</h5>
+          <p class="card-text text-muted mb-0">Matriz de Visualizar/Criar/Editar/Excluir por usuário e por módulo.</p>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <a href="/admin/core/bannersistema/" class="card text-decoration-none h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-image me-2"></i>Banner do Sistema</h5>
+          <p class="card-text text-muted mb-0">Logo/banner exibido no sistema.</p>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <a href="{% url 'configuracao_comissao' %}" class="card text-decoration-none h-100 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-percent me-2"></i>Parâmetros de Comissão</h5>
+          <p class="card-text text-muted mb-0">Percentuais de comissão de vendas.</p>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

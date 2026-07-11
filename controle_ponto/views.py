@@ -9,7 +9,6 @@ import requests
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Avg, Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
@@ -20,6 +19,9 @@ from django.core.files.base import ContentFile
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 
+from configuracoes.access import ModuleActionRequiredMixin
+from configuracoes.models import ServicoWebhook
+from configuracoes.resolver import enviar_webhook
 from funcionarios.models import Funcionario
 from vendas_produtos.models import VendaProduto
 
@@ -387,13 +389,7 @@ def relogio_ponto(request):
         _atualizar_avatar_com_foto_ponto(request.user, foto_base64)
 
         def disparar_webhook(dados_webhook):
-            try:
-                url_webhook = getattr(settings, 'WEBHOOK_PONTO_URL', None)
-                if not url_webhook:
-                    return
-                requests.post(url_webhook, json=dados_webhook, timeout=5)
-            except Exception:
-                return
+            enviar_webhook(ServicoWebhook.CONTROLE_PONTO, dados_webhook, timeout=5)
 
         payload = {
             'evento': 'novo_ponto',
@@ -947,7 +943,9 @@ def relatorio_spagiid(request):
     return render(request, 'controle_ponto/relatorio_spagiid.html', context)
 
 
-class RegistroPontoUpdateView(LoginRequiredMixin, UpdateView):
+class RegistroPontoUpdateView(ModuleActionRequiredMixin, UpdateView):
+    module_key = 'ponto'
+    module_action = 'editar'
     model = RegistroPonto
     form_class = RegistroPontoForm
     template_name = 'controle_ponto/form_ponto.html'
@@ -978,7 +976,9 @@ class RegistroPontoUpdateView(LoginRequiredMixin, UpdateView):
         return super().form_valid(form)
 
 
-class RegistroPontoDeleteView(LoginRequiredMixin, DeleteView):
+class RegistroPontoDeleteView(ModuleActionRequiredMixin, DeleteView):
+    module_key = 'ponto'
+    module_action = 'excluir'
     model = RegistroPonto
     template_name = 'controle_ponto/delete_ponto.html'
     success_url = reverse_lazy('controle_ponto:relatorio_mensal')

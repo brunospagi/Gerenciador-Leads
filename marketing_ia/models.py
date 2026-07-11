@@ -157,28 +157,16 @@ class SincronizacaoEstoque(models.Model):
         return obj
 
 
-class Webhook(models.Model):
-    """Destino externo (n8n, Evolution API etc) para onde um post pode ser enviado."""
-
-    nome = models.CharField(max_length=100, verbose_name='Nome do webhook')
-    url = models.URLField(max_length=500)
-    ativo = models.BooleanField(default=True)
-    criado_em = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        verbose_name = 'Webhook'
-        verbose_name_plural = 'Webhooks'
-        ordering = ['nome']
-
-    def __str__(self):
-        return self.nome
-
-
 class EnvioWebhook(models.Model):
-    """Registro de cada tentativa de envio de um post para um webhook."""
+    """
+    Registro de cada tentativa de envio de um post para um webhook.
+    Reaproveita o cadastro de webhooks de configuracoes.WebhookIntegracao
+    (mesma tela usada pelos demais eventos do sistema) em vez de manter uma
+    lista de destinos própria.
+    """
 
     post = models.ForeignKey(PostPromocional, on_delete=models.CASCADE, related_name='envios')
-    webhook = models.ForeignKey(Webhook, on_delete=models.SET_NULL, null=True)
+    webhook = models.ForeignKey('configuracoes.WebhookIntegracao', on_delete=models.SET_NULL, null=True)
     enviado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     sucesso = models.BooleanField(default=False)
     status_code = models.PositiveSmallIntegerField(null=True, blank=True)

@@ -20,6 +20,8 @@ from .ai_validacao import validar_comprovante_com_gemini
 from .ai_extracao import extrair_dados_cliente_com_gemini
 from documentos.pdf_utils import extract_crlv_data_with_gemini
 from notificacoes.utils import notificar_usuario
+from notificacoes.whatsapp import notificar_whatsapp_venda_rejeitada
+from configuracoes.access import ModuleActionRequiredMixin
 
 User = get_user_model()
 
@@ -148,7 +150,9 @@ class ConfiguracaoComissaoView(LoginRequiredMixin, UpdateView):
         return super().form_valid(form)
 
 # --- VIEWS EXISTENTES ---
-class VendaProdutoListView(LoginRequiredMixin, ListView):
+class VendaProdutoListView(ModuleActionRequiredMixin, ListView):
+    module_key = 'vendas'
+    module_action = 'visualizar'
     model = VendaProduto
     template_name = 'vendas_produtos/lista.html'
     context_object_name = 'vendas'
@@ -215,7 +219,9 @@ class VendaProdutoListView(LoginRequiredMixin, ListView):
         context['minha_comissao'] = total_minha or 0
         return context
 
-class VendaProdutoCreateView(LoginRequiredMixin, CreateView):
+class VendaProdutoCreateView(ModuleActionRequiredMixin, CreateView):
+    module_key = 'vendas'
+    module_action = 'criar'
     model = VendaProduto
     form_class = VendaProdutoForm
     template_name = 'vendas_produtos/form.html'
@@ -348,7 +354,9 @@ class VendaIAWizardView(VendaProdutoCreateView):
             return f"{reverse('venda_produto_minuta', kwargs={'pk': self.object.pk})}?auto_print=1"
         return super().get_success_url()
 
-class VendaProdutoUpdateView(LoginRequiredMixin, UpdateView):
+class VendaProdutoUpdateView(ModuleActionRequiredMixin, UpdateView):
+    module_key = 'vendas'
+    module_action = 'editar'
     model = VendaProduto
     form_class = VendaProdutoForm
     template_name = 'vendas_produtos/form.html'
@@ -401,7 +409,9 @@ class VendaProdutoUpdateView(LoginRequiredMixin, UpdateView):
 
         return response
 
-class VendaProdutoDeleteView(LoginRequiredMixin, DeleteView):
+class VendaProdutoDeleteView(ModuleActionRequiredMixin, DeleteView):
+    module_key = 'vendas'
+    module_action = 'excluir'
     model = VendaProduto
     template_name = 'vendas_produtos/delete_confirm.html'
     success_url = reverse_lazy('venda_produto_list')
@@ -424,7 +434,9 @@ class VendaProdutoDeleteView(LoginRequiredMixin, DeleteView):
         messages.success(self.request, "Venda excluída.")
         return super().form_valid(form)
 
-class VendaProdutoPrintView(LoginRequiredMixin, DetailView):
+class VendaProdutoPrintView(ModuleActionRequiredMixin, DetailView):
+    module_key = 'vendas'
+    module_action = 'visualizar'
     model = VendaProduto
     template_name = 'vendas_produtos/comprovante.html'
     context_object_name = 'venda'
@@ -432,7 +444,9 @@ class VendaProdutoPrintView(LoginRequiredMixin, DetailView):
     def get_queryset(self):
         return _vendas_acessiveis(self.request.user)
 
-class VendaProdutoMinutaPrintView(LoginRequiredMixin, DetailView):
+class VendaProdutoMinutaPrintView(ModuleActionRequiredMixin, DetailView):
+    module_key = 'vendas'
+    module_action = 'visualizar'
     model = VendaProduto
     template_name = 'vendas_produtos/minuta.html'
     context_object_name = 'venda'
@@ -773,6 +787,7 @@ def rejeitar_venda_produto(request, pk):
             url=reverse('venda_produto_update', kwargs={'pk': venda.pk}),
             titulo="Venda Rejeitada",
         )
+        notificar_whatsapp_venda_rejeitada(venda)
 
         messages.warning(request, "Venda REJEITADA.")
     return redirect('venda_produto_list')

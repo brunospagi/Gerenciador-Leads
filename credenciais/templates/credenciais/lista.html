@@ -7,7 +7,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="fw-bold text-dark"><i class="fa fa-key me-2 text-warning"></i> Acessos Bancários</h2>
         
-        {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
+        {% if module_actions.credenciais.criar %}
         <a href="{% url 'credencial_create' %}" class="btn btn-primary fw-bold shadow-sm">
             <i class="fa fa-plus me-2"></i> Novo Acesso
         </a>
@@ -21,14 +21,18 @@
                 <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-start">
                     <h5 class="fw-bold text-primary mb-0">{{ item.nome }}</h5>
                     
-                    {% if user.is_superuser or user.profile.nivel_acesso == 'ADMIN' or user.profile.nivel_acesso == 'GERENTE' %}
+                    {% if module_actions.credenciais.editar or module_actions.credenciais.excluir %}
                     <div class="dropdown">
                         <button class="btn btn-light btn-sm rounded-circle" type="button" data-bs-toggle="dropdown">
                             <i class="fa fa-ellipsis-v text-muted"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
+                            {% if module_actions.credenciais.editar %}
                             <li><a class="dropdown-item" href="{% url 'credencial_update' item.pk %}"><i class="fa fa-edit me-2"></i> Editar</a></li>
+                            {% endif %}
+                            {% if module_actions.credenciais.excluir %}
                             <li><a class="dropdown-item text-danger" href="{% url 'credencial_delete' item.pk %}"><i class="fa fa-trash me-2"></i> Excluir</a></li>
+                            {% endif %}
                         </ul>
                     </div>
                     {% endif %}

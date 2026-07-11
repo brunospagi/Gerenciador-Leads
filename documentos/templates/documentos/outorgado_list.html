@@ -3,7 +3,9 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="mb-0 h2"><i class="bi bi-person-badge-fill me-2"></i>Gerenciar Outorgados</h1>
+    {% if module_actions.documentos.criar %}
     <a href="{% url 'outorgado_create' %}" class="btn btn-primary rounded-pill px-3"><i class="bi bi-plus-lg me-1"></i>Adicionar Outorgado</a>
+    {% endif %}
 </div>
 <div class="alert alert-info">
     Esta é a lista de pessoas da empresa que aparecerão no campo "Outorgados" das procurações.
@@ -26,8 +28,12 @@
                         <td><strong>{{ outorgado.nome }}</strong></td>
                         <td>{{ outorgado.cpf }}</td>
                         <td class="text-center actions-btn">
+                            {% if module_actions.documentos.editar %}
                             <a href="{% url 'outorgado_update' outorgado.pk %}" class="btn btn-sm btn-outline-primary rounded-circle" style="width: 32px; height: 32px; line-height: 1.5;" title="Editar"><i class="bi bi-pencil"></i></a>
+                            {% endif %}
+                            {% if module_actions.documentos.excluir %}
                             <a href="{% url 'outorgado_delete' outorgado.pk %}" class="btn btn-sm btn-outline-danger rounded-circle" style="width: 32px; height: 32px; line-height: 1.5;" title="Excluir"><i class="bi bi-trash"></i></a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}

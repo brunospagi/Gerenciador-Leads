@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import EnvioWebhook, LoteGeracao, PostPromocional, VeiculoAnuncio, Webhook
+from .models import EnvioWebhook, LoteGeracao, PostPromocional, VeiculoAnuncio
 
 
 @admin.register(VeiculoAnuncio)
@@ -39,13 +39,6 @@ class PostPromocionalAdmin(admin.ModelAdmin):
             return '-'
         return format_html('<img src="{}" style="max-height:400px;border-radius:8px;" />', obj.imagem.url)
     preview_grande.short_description = 'Prévia'
-
-
-@admin.register(Webhook)
-class WebhookAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'url', 'ativo', 'criado_em')
-    list_filter = ('ativo',)
-    search_fields = ('nome', 'url')
 
 
 @admin.register(EnvioWebhook)

@@ -10,8 +10,10 @@
             <p class="text-muted small mb-0">Gestão de Créditos e Débitos na Folha</p>
         </div>
         <div>
+            {% if module_actions.rh.criar %}
             <a href="{% url 'rh_lancar_credito' %}" class="btn btn-success btn-sm fw-bold"><i class="fa fa-plus-circle"></i> Novo Crédito</a>
             <a href="{% url 'rh_lancar_desconto' %}" class="btn btn-danger btn-sm fw-bold ms-2"><i class="fa fa-minus-circle"></i> Novo Desconto</a>
+            {% endif %}
             <a href="{% url 'rh_dashboard' %}" class="btn btn-outline-secondary btn-sm ms-2">Voltar Dashboard</a>
         </div>
     </div>
@@ -92,12 +94,16 @@
                                     {% if item.processada_na_folha %}
                                         <span class="badge bg-secondary">Processado</span>
                                     {% else %}
+                                        {% if module_actions.rh.editar %}
                                         <a href="{% url 'rh_editar_desconto' item.desconto_pai.pk %}" class="btn btn-outline-warning btn-sm" title="Editar desconto/vale">
                                             <i class="fa fa-edit"></i>
                                         </a>
+                                        {% endif %}
+                                        {% if module_actions.rh.excluir %}
                                         <a href="{% url 'rh_excluir_desconto' item.desconto_pai.pk %}" class="btn btn-outline-danger btn-sm ms-1" title="Excluir desconto/vale">
                                             <i class="fa fa-trash"></i>
                                         </a>
+                                        {% endif %}
                                     {% endif %}
                                 </td>
                             </tr>

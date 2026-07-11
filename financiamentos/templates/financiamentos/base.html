@@ -7,9 +7,11 @@
             <li class="nav-item">
                 <a class="nav-link ps-5" href="{% url 'financiamentos_kanban' %}">Mesa (Kanban)</a>
             </li>
+            {% if module_actions.financiamentos.criar %}
             <li class="nav-item">
                 <a class="nav-link ps-5" href="{% url 'financiamentos_create' %}">Nova Ficha</a>
             </li>
+            {% endif %}
         </ul>
     </div>
 </li>

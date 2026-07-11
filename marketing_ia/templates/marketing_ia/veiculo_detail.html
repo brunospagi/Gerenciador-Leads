@@ -95,7 +95,7 @@
                     </button>
                 </form>
                 {% else %}
-                <p class="text-muted small mt-3 mb-0">Nenhum webhook cadastrado. <a href="{% url 'admin:marketing_ia_webhook_add' %}" target="_blank">Cadastrar no admin</a>.</p>
+                <p class="text-muted small mt-3 mb-0">Nenhum webhook cadastrado. <a href="{% url 'webhook_create' %}" target="_blank">Cadastrar em Configurações</a>.</p>
                 {% endif %}
 
                 {% with ultimo_envio=post.envios.first %}

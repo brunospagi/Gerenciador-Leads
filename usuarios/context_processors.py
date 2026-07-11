@@ -1,25 +1,11 @@
-from .permissions import has_module_access
+from configuracoes.resolver import obter_matriz_permissoes
 
 
 def module_access_context(request):
     user = getattr(request, 'user', None)
     if not user or not user.is_authenticated:
-        return {'module_access': {}}
+        return {'module_access': {}, 'module_actions': {}}
 
-    module_access = {
-        'clientes': has_module_access(user, 'clientes'),
-        'vendas': has_module_access(user, 'vendas'),
-        'financiamentos': has_module_access(user, 'financiamentos'),
-        'ponto': has_module_access(user, 'ponto'),
-        'avaliacoes': has_module_access(user, 'avaliacoes'),
-        'financeiro': has_module_access(user, 'financeiro'),
-        'distribuicao': has_module_access(user, 'distribuicao'),
-        'rh': has_module_access(user, 'rh'),
-        'documentos': has_module_access(user, 'documentos'),
-        'autorizacoes': has_module_access(user, 'autorizacoes'),
-        'relatorios': has_module_access(user, 'relatorios'),
-        'usuarios_admin': has_module_access(user, 'usuarios_admin'),
-        'credenciais': has_module_access(user, 'credenciais'),
-        'marketing_ia': has_module_access(user, 'marketing_ia'),
-    }
-    return {'module_access': module_access}
+    matriz = obter_matriz_permissoes(user)
+    module_access = {slug: acoes['visualizar'] for slug, acoes in matriz.items()}
+    return {'module_access': module_access, 'module_actions': matriz}

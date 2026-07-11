@@ -5,8 +5,10 @@
     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
         <h4 class="mb-0"><i class="bi bi-card-list me-2"></i>{{ avaliacao.marca }} {{ avaliacao.modelo }} - ({{ avaliacao.placa }})</h4>
         <div>
+            {% if module_actions.avaliacoes.editar %}
             <a href="{% url 'avaliacao_update' avaliacao.pk %}" class="btn btn-warning btn-sm"><i class="bi bi-pencil-fill me-1"></i>Editar</a>
-            {% if user.is_superuser %}
+            {% endif %}
+            {% if module_actions.avaliacoes.excluir %}
             <a href="{% url 'avaliacao_delete' avaliacao.pk %}" class="btn btn-danger btn-sm"><i class="bi bi-trash-fill me-1"></i>Excluir</a>
             {% endif %}
         </div>

@@ -9,8 +9,10 @@
       <p class="m3-page-subtitle">Fechamento mensal, controle de créditos e governança de pagamentos.</p>
     </div>
     <div class="m3-toolbar">
+      {% if module_actions.rh.criar %}
       <a href="{% url 'rh_lancar_desconto' %}" class="btn btn-outline-danger"><i class="fa fa-minus-circle me-1"></i>Desconto</a>
       <a href="{% url 'rh_lancar_credito' %}" class="btn btn-outline-success"><i class="fa fa-plus-circle me-1"></i>Crédito</a>
+      {% endif %}
       <a href="{% url 'rh_lista_lancamentos' %}" class="btn btn-outline-primary"><i class="fa fa-list-alt me-1"></i>Lançamentos</a>
     </div>
   </section>

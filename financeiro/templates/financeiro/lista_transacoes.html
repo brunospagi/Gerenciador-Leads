@@ -8,14 +8,16 @@
       <p class="m3-page-subtitle">Controle operacional de receitas, despesas e conciliação do caixa.</p>
     </div>
     <div class="m3-toolbar">
-      {% if is_admin_financeiro %}
+      {% if module_actions.financeiro.editar %}
       <a href="{% url 'financeiro:relatorio_dre' %}" class="btn btn-info">
         <i class="fas fa-chart-line me-1"></i>Relatório DRE
       </a>
       {% endif %}
+      {% if module_actions.financeiro.criar %}
       <a href="{% url 'financeiro:nova_transacao' %}" class="btn btn-primary">
         <i class="fas fa-plus me-1"></i>Novo lançamento
       </a>
+      {% endif %}
     </div>
   </section>
 
@@ -149,10 +151,13 @@
                   {% endif %}
                 </td>
                 <td>
-                  {% if is_admin_financeiro %}
+                  {% if module_actions.financeiro.editar %}
                   <a href="{% url 'financeiro:editar_transacao' transacao.pk %}" class="btn btn-sm btn-outline-primary" title="Editar"><i class="fas fa-edit"></i></a>
+                  {% endif %}
+                  {% if module_actions.financeiro.excluir %}
                   <a href="{% url 'financeiro:apagar_transacao' transacao.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir"><i class="fas fa-trash"></i></a>
-                  {% else %}
+                  {% endif %}
+                  {% if not module_actions.financeiro.editar and not module_actions.financeiro.excluir %}
                   <span class="text-muted small">Sem permissão</span>
                   {% endif %}
                 </td>

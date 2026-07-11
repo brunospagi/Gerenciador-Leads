@@ -1,9 +1,10 @@
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.decorators import user_passes_test
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
+from configuracoes.access import require_module_action
 from .forms import FuncionarioForm, UserRegistrationForm, UserUpdateForm
 from .models import Funcionario
 
@@ -19,7 +20,7 @@ def _rh_back_url(user):
     return 'rh_dashboard' if (user.is_superuser or getattr(user.profile, 'nivel_acesso', '') == 'ADMIN') else 'lista_funcionarios'
 
 
-@login_required
+@require_module_action('rh', 'visualizar')
 @user_passes_test(is_gestor_pessoal)
 def lista_funcionarios(request):
     """Gestão de equipe com visão ativa/inativa e filtros."""
@@ -64,7 +65,7 @@ def lista_funcionarios(request):
     )
 
 
-@login_required
+@require_module_action('rh', 'criar')
 @user_passes_test(is_gestor_pessoal)
 def cadastrar_funcionario(request):
     if request.method == 'POST':
@@ -106,7 +107,7 @@ def cadastrar_funcionario(request):
     )
 
 
-@login_required
+@require_module_action('rh', 'editar')
 @user_passes_test(is_gestor_pessoal)
 def editar_funcionario(request, pk):
     funcionario = get_object_or_404(Funcionario.objects.select_related('user'), pk=pk)

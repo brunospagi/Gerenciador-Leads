@@ -7,25 +7,11 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+        ('configuracoes', '0001_initial'),
         ('marketing_ia', '0003_lotegeracao_postpromocional_lote'),
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='Webhook',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('nome', models.CharField(max_length=100, verbose_name='Nome do webhook')),
-                ('url', models.URLField(max_length=500)),
-                ('ativo', models.BooleanField(default=True)),
-                ('criado_em', models.DateTimeField(auto_now_add=True)),
-            ],
-            options={
-                'verbose_name': 'Webhook',
-                'verbose_name_plural': 'Webhooks',
-                'ordering': ['nome'],
-            },
-        ),
         migrations.CreateModel(
             name='EnvioWebhook',
             fields=[
@@ -36,7 +22,7 @@ class Migration(migrations.Migration):
                 ('enviado_em', models.DateTimeField(auto_now_add=True)),
                 ('enviado_por', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
                 ('post', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='envios', to='marketing_ia.postpromocional')),
-                ('webhook', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='marketing_ia.webhook')),
+                ('webhook', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='configuracoes.webhookintegracao')),
             ],
             options={
                 'verbose_name': 'Envio de Webhook',

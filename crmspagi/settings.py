@@ -27,6 +27,7 @@ def _split_csv(value):
 
 # ConfiguraÃ§Ãµes do Webhook do Ponto (Lida do .ENV)
 WEBHOOK_PONTO_URL = os.getenv('WEBHOOK_PONTO_URL')
+N8N_WHATSAPP_WEBHOOK_URL = os.getenv('N8N_WHATSAPP_WEBHOOK_URL', '')
 EVOLUTION_API_URL = os.getenv('EVOLUTION_API_URL', '')
 EVOLUTION_API_KEY = os.getenv('EVOLUTION_API_KEY', '')
 EVOLUTION_INSTANCE = os.getenv('EVOLUTION_INSTANCE', '')
@@ -156,6 +157,7 @@ INSTALLED_APPS = [
     'financeiro',
     'controle_ponto',
     'marketing_ia',
+    'configuracoes',
 ]
 
 MIDDLEWARE = [

@@ -1,7 +1,6 @@
 import threading
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import connection
 from django.db.models import Count
@@ -10,7 +9,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import EnvioWebhook, LoteGeracao, PostPromocional, SincronizacaoEstoque, VeiculoAnuncio, Webhook
+from configuracoes.access import require_module_action
+from configuracoes.models import WebhookIntegracao
+
+from .models import EnvioWebhook, LoteGeracao, PostPromocional, SincronizacaoEstoque, VeiculoAnuncio
 from .services import GeracaoPostError, gerar_post_para_anuncio, gerar_posts_em_lote, sincronizar_estoque
 from .webhooks import enviar_post_webhook
 
@@ -58,7 +60,7 @@ def _executar_lote_em_background(lote_id):
         connection.close()
 
 
-@login_required
+@require_module_action('marketing_ia', 'visualizar')
 def veiculo_list(request):
     veiculos = VeiculoAnuncio.objects.filter(ativo=True)
 
@@ -93,7 +95,7 @@ def veiculo_list(request):
     return render(request, 'marketing_ia/veiculo_list.html', context)
 
 
-@login_required
+@require_module_action('marketing_ia', 'criar')
 @require_POST
 def iniciar_sincronizacao(request):
     sync = SincronizacaoEstoque.load()
@@ -115,7 +117,7 @@ def iniciar_sincronizacao(request):
     return redirect('marketing_veiculo_list')
 
 
-@login_required
+@require_module_action('marketing_ia', 'visualizar')
 def status_sincronizacao(request):
     sync = SincronizacaoEstoque.load()
     return JsonResponse({
@@ -126,19 +128,19 @@ def status_sincronizacao(request):
     })
 
 
-@login_required
+@require_module_action('marketing_ia', 'visualizar')
 def veiculo_detail(request, pk):
     anuncio = get_object_or_404(VeiculoAnuncio, pk=pk)
     posts = anuncio.posts.order_by('-gerado_em')
     context = {
         'anuncio': anuncio,
         'posts': posts,
-        'webhooks_ativos': Webhook.objects.filter(ativo=True),
+        'webhooks_ativos': WebhookIntegracao.objects.filter(ativo=True),
     }
     return render(request, 'marketing_ia/veiculo_detail.html', context)
 
 
-@login_required
+@require_module_action('marketing_ia', 'criar')
 @require_POST
 def gerar_post(request, pk):
     anuncio = get_object_or_404(VeiculoAnuncio, pk=pk)
@@ -150,7 +152,7 @@ def gerar_post(request, pk):
     return redirect('marketing_veiculo_detail', pk=anuncio.pk)
 
 
-@login_required
+@require_module_action('marketing_ia', 'editar')
 @require_POST
 def post_atualizar_status(request, pk):
     post = get_object_or_404(PostPromocional, pk=pk)
@@ -167,7 +169,7 @@ def post_atualizar_status(request, pk):
     return redirect('marketing_veiculo_detail', pk=post.anuncio_id)
 
 
-@login_required
+@require_module_action('marketing_ia', 'criar')
 @require_POST
 def iniciar_geracao_lote(request):
     if LoteGeracao.objects.filter(status='RODANDO').exists():
@@ -196,7 +198,7 @@ def iniciar_geracao_lote(request):
     return redirect('marketing_veiculo_list')
 
 
-@login_required
+@require_module_action('marketing_ia', 'visualizar')
 def status_lote(request, lote_id):
     lote = get_object_or_404(LoteGeracao, pk=lote_id)
     return JsonResponse({
@@ -208,19 +210,19 @@ def status_lote(request, lote_id):
     })
 
 
-@login_required
+@require_module_action('marketing_ia', 'visualizar')
 def revisao_lote(request, lote_id):
     lote = get_object_or_404(LoteGeracao, pk=lote_id)
     posts = lote.posts.select_related('anuncio').order_by('-gerado_em')
     context = {
         'lote': lote,
         'posts': posts,
-        'webhooks_ativos': Webhook.objects.filter(ativo=True),
+        'webhooks_ativos': WebhookIntegracao.objects.filter(ativo=True),
     }
     return render(request, 'marketing_ia/revisao_lote.html', context)
 
 
-@login_required
+@require_module_action('marketing_ia', 'editar')
 @require_POST
 def aprovar_lote(request, lote_id):
     lote = get_object_or_404(LoteGeracao, pk=lote_id)
@@ -229,11 +231,11 @@ def aprovar_lote(request, lote_id):
     return redirect('marketing_revisao_lote', lote_id=lote.pk)
 
 
-@login_required
+@require_module_action('marketing_ia', 'editar')
 @require_POST
 def enviar_post_webhook_view(request, pk):
     post = get_object_or_404(PostPromocional, pk=pk)
-    webhook = get_object_or_404(Webhook, pk=request.POST.get('webhook_id'), ativo=True)
+    webhook = get_object_or_404(WebhookIntegracao, pk=request.POST.get('webhook_id'), ativo=True)
 
     resultado = enviar_post_webhook(post, webhook)
     EnvioWebhook.objects.create(

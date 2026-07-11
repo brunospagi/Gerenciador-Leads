@@ -1,0 +1,61 @@
+{% extends 'base_portal.html' %}
+
+{% block content %}
+<div class="container mt-4 m3-module-shell">
+  <section class="m3-page-header">
+    <div>
+      <h1 class="m3-page-title"><i class="fas fa-plug me-2"></i>Integrações Externas</h1>
+      <p class="m3-page-subtitle">Campos em branco usam a variável de ambiente correspondente.</p>
+    </div>
+    <div class="m3-toolbar">
+      <a href="{% url 'configuracoes_home' %}" class="btn btn-outline-secondary">Voltar</a>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <h5 class="mb-3">Evolution API</h5>
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <label class="form-label">{{ form.evolution_api_url.label }}</label>
+            {{ form.evolution_api_url }}
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label">{{ form.evolution_api_key.label }}</label>
+            {{ form.evolution_api_key }}
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label">{{ form.evolution_instance.label }}</label>
+            {{ form.evolution_instance }}
+          </div>
+        </div>
+
+        <hr>
+        <h5 class="mb-3">EVO CRM</h5>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">{{ form.evo_crm_api_url.label }}</label>
+            {{ form.evo_crm_api_url }}
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">{{ form.evo_crm_api_token.label }}</label>
+            {{ form.evo_crm_api_token }}
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">{{ form.evo_crm_pipeline_id.label }}</label>
+            {{ form.evo_crm_pipeline_id }}
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">{{ form.evo_crm_pipeline_stage_id.label }}</label>
+            {{ form.evo_crm_pipeline_stage_id }}
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Salvar</button>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}
