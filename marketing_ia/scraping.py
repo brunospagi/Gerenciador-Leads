@@ -92,12 +92,17 @@ def _extrair_cards_da_pagina_atual(driver):
                 features_texto = _texto(card.find_element(By.CSS_SELECTOR, '.card__features'))
             except NoSuchElementException:
                 features_texto = ''
+            try:
+                foto_url = card.find_element(By.CSS_SELECTOR, '.card__image').get_attribute('src')
+            except NoSuchElementException:
+                foto_url = None
 
             itens.append({
                 'url': url,
                 'titulo': titulo,
                 'preco': _parse_preco(preco_texto),
                 'tipo': _classificar_tipo(features_texto),
+                'foto_url': foto_url,
             })
         except NoSuchElementException:
             continue
@@ -174,10 +179,16 @@ def _campo_tecnico(driver, rotulo):
     return None
 
 
-def extrair_detalhes_anuncio(driver, url, espera=8):
+def extrair_detalhes_anuncio(driver, url, foto_url=None, espera=8):
     """
-    Abre a página de detalhe de um anúncio e extrai todos os campos relevantes,
-    incluindo as URLs das fotos em alta resolução (data-src-hd).
+    Abre a página de detalhe de um anúncio e extrai os campos relevantes
+    (specs, opcionais, descrição). A foto NÃO é lida do carrossel desta
+    página: o carrossel usa Glide.js e reaproveitamos a mesma sessão do
+    Selenium entre veículos, então o `data-src-hd` às vezes ainda reflete o
+    slide do veículo anterior quando lemos logo após o `driver.get()`,
+    resultando em foto trocada. A miniatura já coletada na listagem
+    (`foto_url`, vindo de `.card__image` em /search) é confiável e usada
+    como foto principal.
     """
     wait = WebDriverWait(driver, espera)
     driver.get(url)
@@ -218,17 +229,7 @@ def extrair_detalhes_anuncio(driver, url, espera=8):
     except NoSuchElementException:
         descricao = ''
 
-    fotos_urls = []
-    for img in driver.find_elements(By.CSS_SELECTOR, '.carousel__slide[data-src-hd]'):
-        src_hd = img.get_attribute('data-src-hd')
-        if src_hd and src_hd not in fotos_urls:
-            fotos_urls.append(src_hd)
-    if not fotos_urls:
-        # Fallback: usa as imagens exibidas mesmo que não tenham a versão HD.
-        for img in driver.find_elements(By.CSS_SELECTOR, '.carousel__slide'):
-            src = img.get_attribute('src')
-            if src and src not in fotos_urls:
-                fotos_urls.append(src)
+    fotos_urls = [foto_url] if foto_url else []
 
     features_texto = f"{marca_modelo} {titulo}"
 
@@ -278,7 +279,7 @@ def scrape_estoque(max_paginas=None, tipo=None, limit=None, incluir_detalhes=Tru
         total = len(links)
         for indice, item in enumerate(links, start=1):
             try:
-                detalhes = extrair_detalhes_anuncio(driver, item['url'])
+                detalhes = extrair_detalhes_anuncio(driver, item['url'], foto_url=item.get('foto_url'))
                 detalhados.append(detalhes)
             except (TimeoutException, NoSuchElementException, WebDriverException) as exc:
                 logger.warning('Falha ao extrair detalhes de %s: %s', item['url'], exc)
