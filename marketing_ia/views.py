@@ -73,8 +73,10 @@ def veiculo_list(request):
         veiculos = veiculos.filter(posts__isnull=True)
 
     # annotate por último: evita contar errado quando o filtro "sem_post" acima
-    # já usou um join na mesma relação 'posts'.
-    veiculos = veiculos.distinct().annotate(num_posts=Count('posts'))
+    # já usou um join na mesma relação 'posts'. order_by explícito porque
+    # annotate+distinct faz o Django não confiar mais no Meta.ordering do
+    # model pra paginação.
+    veiculos = veiculos.distinct().annotate(num_posts=Count('posts')).order_by('-atualizado_em')
 
     paginator = Paginator(veiculos, 12)
     page_obj = paginator.get_page(request.GET.get('page'))
