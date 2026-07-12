@@ -5,6 +5,7 @@ from .models import ConfiguracaoIntegracoes, WebhookIntegracao
 _CAMPOS_SELECT_INTEGRACOES = (
     'provedor_imagem_ia', 'gemini_image_model', 'leonardo_model_id',
     'openai_image_model', 'openai_image_quality',
+    'template_imagem_overlay', 'resolucao_imagem_overlay',
 )
 _CAMPOS_TEXTAREA_INTEGRACOES = ('prompt_imagem', 'prompt_imagem_leonardo')
 
@@ -37,6 +38,7 @@ class ConfiguracaoIntegracoesForm(forms.ModelForm):
             'gemini_image_model',
             'leonardo_api_key', 'leonardo_model_id', 'prompt_imagem_leonardo',
             'openai_api_key', 'openai_image_model', 'openai_image_quality',
+            'template_imagem_overlay', 'resolucao_imagem_overlay',
         ]
         widgets = {
             field: forms.TextInput(attrs={'class': 'form-control'})

@@ -11,6 +11,7 @@ from avaliacoes.ai_runtime import get_gemini_runtime
 from configuracoes.models import PROMPT_IMAGEM_PADRAO, PROMPT_IMAGEM_LEONARDO_PADRAO
 from configuracoes.resolver import obter_integracao
 
+from . import image_overlay
 from . import leonardo_client
 from . import openai_client
 
@@ -27,6 +28,16 @@ SYSTEM_INSTRUCTION_LEGENDA = (
     "liste de 5 a 8 hashtags relevantes separadas por espaço, prefixadas com '#'. "
     "Retorne apenas JSON válido com as chaves 'legenda' e 'hashtags' (string única)."
 )
+
+SYSTEM_INSTRUCTION_CHAMADA = (
+    "Você é o social media da SPAGI Motors, uma revenda de carros e motos seminovos. "
+    "A partir dos dados do veículo abaixo, escreva só UMA frase bem curta e chamativa "
+    "(no máximo 5 palavras) para estampar em cima da foto do anúncio, tipo "
+    "'OPORTUNIDADE ÚNICA', 'SAIU MAIS BARATO' ou 'ACEITA TROCA'. Sem emoji, sem "
+    "pontuação no final, sem aspas. Responda só com a frase, nada mais."
+)
+
+CHAMADA_FALLBACK = "OPORTUNIDADE IMPERDÍVEL"
 
 
 def _dados_veiculo_para_prompt(anuncio):
@@ -77,13 +88,42 @@ def gerar_legenda(anuncio):
         return None, None, None
 
 
-def gerar_imagem_promocional(anuncio, foto_bytes, mime_type, max_tentativas=3):
+def gerar_chamada_ia(anuncio):
+    """
+    Gera só a frase curta de destaque (ex: "OPORTUNIDADE ÚNICA") pro banner da
+    imagem sem IA de geração (provedor OVERLAY) — usa o Gemini só pra texto,
+    nenhum custo de geração de imagem. Sempre retorna uma frase (cai pro
+    fallback fixo se a IA estiver indisponível ou falhar).
+    """
+    client, model_name, erro = get_gemini_runtime()
+    if erro or not client:
+        logger.warning('Gemini indisponível para gerar chamada: %s', erro)
+        return CHAMADA_FALLBACK
+
+    try:
+        response = client.models.generate_content(
+            model=model_name,
+            contents=[{"text": _dados_veiculo_para_prompt(anuncio)}],
+            config={"system_instruction": SYSTEM_INSTRUCTION_CHAMADA},
+        )
+        texto = (response.text or '').strip().strip('"').strip("'")
+        return texto or CHAMADA_FALLBACK
+    except Exception as exc:
+        logger.warning('Erro ao gerar chamada com Gemini: %s', exc)
+        return CHAMADA_FALLBACK
+
+
+def gerar_imagem_promocional(anuncio, foto_bytes, mime_type, max_tentativas=3, template_overlay=None, resolucao_overlay=None):
     """
     Gera a imagem promocional usando o provedor configurado em
     Configurações > Integrações Externas (padrão: Gemini). Retorna
     (imagem_bytes, mime_type_saida, modelo_usado, prompt_usado) ou
     (None, None, None, None) se a IA estiver indisponível ou falhar — o
     caller deve tratar isso como uma falha esperada, não uma exceção.
+
+    template_overlay/resolucao_overlay: só valem pro provedor OVERLAY — permitem
+    a tela de prévia sobrepor o template/resolução padrão configurados, sem
+    precisar alterar a configuração global.
     """
     from configuracoes.models import ConfiguracaoIntegracoes
 
@@ -92,7 +132,29 @@ def gerar_imagem_promocional(anuncio, foto_bytes, mime_type, max_tentativas=3):
         return _gerar_imagem_leonardo(anuncio, foto_bytes, mime_type)
     if provedor == 'OPENAI':
         return _gerar_imagem_openai(anuncio, foto_bytes, mime_type)
+    if provedor == 'OVERLAY':
+        return _gerar_imagem_overlay(anuncio, foto_bytes, mime_type, template_overlay, resolucao_overlay)
     return _gerar_imagem_gemini(anuncio, foto_bytes, mime_type, max_tentativas=max_tentativas)
+
+
+def _gerar_imagem_overlay(anuncio, foto_bytes, mime_type, template_overlay=None, resolucao_overlay=None):
+    """Provedor 'sem IA de imagem': usa a foto real como está, só desenha o
+    texto por cima (Pillow). O Gemini entra só pra gerar a frase de destaque —
+    se ele falhar, cai pro fallback fixo em vez de travar a geração inteira."""
+    chamada = gerar_chamada_ia(anuncio)
+    template = template_overlay or obter_integracao('template_imagem_overlay') or image_overlay.TEMPLATE_PADRAO
+    resolucao = resolucao_overlay or obter_integracao('resolucao_imagem_overlay') or image_overlay.RESOLUCAO_PADRAO
+    try:
+        imagem_bytes, mime_saida = image_overlay.montar_imagem_overlay(
+            foto_bytes, anuncio, chamada, template=template, resolucao=resolucao,
+        )
+        return imagem_bytes, mime_saida, f'overlay:pillow:{template}:{resolucao}', chamada
+    except image_overlay.ImageOverlayError as exc:
+        logger.warning('Erro ao montar imagem com overlay: %s', exc)
+        return None, None, None, None
+    except Exception as exc:
+        logger.warning('Erro inesperado ao montar imagem com overlay: %s', exc)
+        return None, None, None, None
 
 
 def _gerar_imagem_leonardo(anuncio, foto_bytes, mime_type):

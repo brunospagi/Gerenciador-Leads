@@ -4,16 +4,20 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import connection
 from django.db.models import Count
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from configuracoes.access import require_module_action
 from configuracoes.models import ConfiguracaoIntegracoes, WebhookIntegracao
 
-from .models import EnvioWebhook, LoteGeracao, PostPromocional, SincronizacaoEstoque, VeiculoAnuncio
-from .services import GeracaoPostError, gerar_post_para_anuncio, gerar_posts_em_lote, sincronizar_estoque
+from .models import EnvioWebhook, LoteGeracao, PostPromocional, PreviewPost, SincronizacaoEstoque, VeiculoAnuncio
+from .services import (
+    GeracaoPostError, gerar_posts_em_lote, gerar_preview_post,
+    salvar_preview_como_post, sincronizar_estoque,
+)
 from .webhooks import enviar_post_webhook
 
 
@@ -163,24 +167,82 @@ def status_sincronizacao(request):
 def veiculo_detail(request, pk):
     anuncio = get_object_or_404(VeiculoAnuncio, pk=pk)
     posts = anuncio.posts.order_by('-gerado_em')
+    config = ConfiguracaoIntegracoes.get_solo()
     context = {
         'anuncio': anuncio,
         'posts': posts,
         'webhooks_ativos': WebhookIntegracao.objects.filter(ativo=True),
+        'provedor_imagem_atual': config.provedor_imagem_ia,
+        'template_imagem_overlay_choices': ConfiguracaoIntegracoes.TEMPLATE_IMAGEM_CHOICES,
+        'resolucao_imagem_overlay_choices': ConfiguracaoIntegracoes.RESOLUCAO_IMAGEM_CHOICES,
     }
     return render(request, 'marketing_ia/veiculo_detail.html', context)
 
 
 @require_module_action('marketing_ia', 'criar')
 @require_POST
-def gerar_post(request, pk):
+def gerar_preview(request, pk):
+    """Gera uma prévia (não grava no S3, só no banco) para o usuário conferir
+    antes de publicar — a confirmação/descarte de fato acontecem em
+    confirmar_preview/descartar_preview."""
     anuncio = get_object_or_404(VeiculoAnuncio, pk=pk)
+    config = ConfiguracaoIntegracoes.get_solo()
+    template_overlay = request.POST.get('template_overlay') or None
+    resolucao_overlay = request.POST.get('resolucao_overlay') or None
+    if template_overlay not in dict(ConfiguracaoIntegracoes.TEMPLATE_IMAGEM_CHOICES):
+        template_overlay = None
+    if resolucao_overlay not in dict(ConfiguracaoIntegracoes.RESOLUCAO_IMAGEM_CHOICES):
+        resolucao_overlay = None
+
     try:
-        gerar_post_para_anuncio(anuncio, usuario=request.user)
-        messages.success(request, f'Post promocional gerado para "{anuncio.titulo}".')
+        preview = gerar_preview_post(
+            anuncio, usuario=request.user,
+            template_overlay=template_overlay, resolucao_overlay=resolucao_overlay,
+        )
     except GeracaoPostError as exc:
-        messages.error(request, str(exc))
-    return redirect('marketing_veiculo_detail', pk=anuncio.pk)
+        return JsonResponse({'ok': False, 'erro': str(exc)}, status=400)
+
+    return JsonResponse({
+        'ok': True,
+        'preview_id': preview.pk,
+        'imagem_url': reverse('marketing_preview_imagem', args=[preview.pk]),
+        'legenda': preview.legenda,
+        'hashtags': preview.hashtags,
+        'modelo_ia_imagem': preview.modelo_ia_imagem,
+        'mostrar_overlay_opcoes': config.provedor_imagem_ia == 'OVERLAY',
+    })
+
+
+@require_module_action('marketing_ia', 'visualizar')
+def preview_imagem(request, preview_id):
+    """Serve os bytes da imagem de uma prévia direto do banco (nunca vai pro S3
+    até ser confirmada)."""
+    preview = get_object_or_404(PreviewPost, pk=preview_id)
+    return HttpResponse(bytes(preview.imagem_bytes), content_type=preview.imagem_mime_type)
+
+
+@require_module_action('marketing_ia', 'criar')
+@require_POST
+def confirmar_preview(request, preview_id):
+    """Publica a prévia: grava a imagem no S3 como PostPromocional de verdade
+    e apaga a prévia."""
+    preview = get_object_or_404(PreviewPost, pk=preview_id)
+    anuncio_pk = preview.anuncio_id
+    salvar_preview_como_post(preview)
+    messages.success(request, 'Post promocional salvo com sucesso.')
+    return redirect('marketing_veiculo_detail', pk=anuncio_pk)
+
+
+@require_module_action('marketing_ia', 'criar')
+@require_POST
+def descartar_preview(request, preview_id):
+    """Descarta a prévia sem nunca ter gravado nada no S3."""
+    preview = get_object_or_404(PreviewPost, pk=preview_id)
+    anuncio_pk = preview.anuncio_id
+    preview.delete()
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'ok': True})
+    return redirect('marketing_veiculo_detail', pk=anuncio_pk)
 
 
 @require_module_action('marketing_ia', 'editar')

@@ -31,15 +31,67 @@
             </div>
         </div>
 
-        <form method="post" action="{% url 'marketing_gerar_post' anuncio.pk %}" class="mt-3">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-primary" {% if not anuncio.fotos_urls %}disabled{% endif %}>
+        <div class="mt-3">
+            {% if provedor_imagem_atual == 'OVERLAY' %}
+            <div class="row g-2 mb-2">
+                <div class="col-sm-6">
+                    <label class="form-label small mb-1">Template</label>
+                    <select id="preview-template" class="form-select form-select-sm">
+                        {% for valor, rotulo in template_imagem_overlay_choices %}
+                        <option value="{{ valor }}">{{ rotulo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-6">
+                    <label class="form-label small mb-1">Resolução</label>
+                    <select id="preview-resolucao" class="form-select form-select-sm">
+                        {% for valor, rotulo in resolucao_imagem_overlay_choices %}
+                        <option value="{{ valor }}">{{ rotulo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            {% endif %}
+            <button type="button" id="btn-gerar-preview" class="btn btn-primary" data-anuncio-pk="{{ anuncio.pk }}"
+                    {% if not anuncio.fotos_urls %}disabled{% endif %}>
                 <i class="bi bi-magic me-1"></i>Gerar novo post com IA
             </button>
             {% if not anuncio.fotos_urls %}
                 <small class="text-danger d-block mt-1">Este anúncio não tem fotos coletadas.</small>
             {% endif %}
-        </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalPreviewPost" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-eye me-2"></i>Prévia do post</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar" onclick="descartarPreviewAtual()"></button>
+            </div>
+            <div class="modal-body">
+                <div id="preview-loading" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted mb-0">Gerando prévia...</p>
+                </div>
+                <div id="preview-conteudo" class="d-none">
+                    <img id="preview-imagem" src="" class="img-fluid rounded shadow-sm mb-3" alt="Prévia do post" style="max-height:420px;object-fit:contain;background:#f5f5f5;width:100%;">
+                    <p id="preview-legenda" style="white-space: pre-line;"></p>
+                    <p id="preview-hashtags" class="text-muted small"></p>
+                </div>
+                <div id="preview-erro" class="alert alert-danger d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" onclick="descartarPreviewAtual()">Cancelar</button>
+                <button type="button" class="btn btn-outline-primary" id="btn-gerar-outra">
+                    <i class="bi bi-arrow-repeat me-1"></i>Gerar outra
+                </button>
+                <button type="button" class="btn btn-success" id="btn-usar-imagem" disabled>
+                    <i class="bi bi-check-lg me-1"></i>Usar esta imagem
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -117,4 +169,134 @@
     </div>
     {% endfor %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    function getCookieLocal(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    const btnGerar = document.getElementById('btn-gerar-preview');
+    if (!btnGerar) return;
+
+    const anuncioPk = btnGerar.dataset.anuncioPk;
+    const modalEl = document.getElementById('modalPreviewPost');
+    const modal = new bootstrap.Modal(modalEl);
+    const loadingEl = document.getElementById('preview-loading');
+    const conteudoEl = document.getElementById('preview-conteudo');
+    const erroEl = document.getElementById('preview-erro');
+    const imgEl = document.getElementById('preview-imagem');
+    const legendaEl = document.getElementById('preview-legenda');
+    const hashtagsEl = document.getElementById('preview-hashtags');
+    const btnUsar = document.getElementById('btn-usar-imagem');
+    const btnOutra = document.getElementById('btn-gerar-outra');
+    const selectTemplate = document.getElementById('preview-template');
+    const selectResolucao = document.getElementById('preview-resolucao');
+
+    let previewIdAtual = null;
+
+    function descartarSilenciosamente() {
+        if (!previewIdAtual) return;
+        const id = previewIdAtual;
+        previewIdAtual = null;
+        fetch(`/marketing-ia/preview/${id}/descartar/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookieLocal('csrftoken') || '',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        }).catch(function () {});
+    }
+
+    window.descartarPreviewAtual = function () {
+        descartarSilenciosamente();
+        modal.hide();
+    };
+
+    function gerarPreview() {
+        loadingEl.classList.remove('d-none');
+        conteudoEl.classList.add('d-none');
+        erroEl.classList.add('d-none');
+        btnUsar.disabled = true;
+        btnOutra.disabled = true;
+
+        const body = new URLSearchParams();
+        if (selectTemplate) body.set('template_overlay', selectTemplate.value);
+        if (selectResolucao) body.set('resolucao_overlay', selectResolucao.value);
+
+        fetch(`/marketing-ia/${anuncioPk}/gerar-preview/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookieLocal('csrftoken') || '',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: body.toString(),
+        })
+            .then(function (resp) { return resp.json().then(function (data) { return { status: resp.status, data: data }; }); })
+            .then(function (result) {
+                loadingEl.classList.add('d-none');
+                btnOutra.disabled = false;
+                if (!result.data.ok) {
+                    erroEl.textContent = result.data.erro || 'Falha ao gerar a prévia.';
+                    erroEl.classList.remove('d-none');
+                    return;
+                }
+                previewIdAtual = result.data.preview_id;
+                imgEl.src = result.data.imagem_url;
+                legendaEl.textContent = result.data.legenda || '';
+                hashtagsEl.textContent = result.data.hashtags || '';
+                conteudoEl.classList.remove('d-none');
+                btnUsar.disabled = false;
+            })
+            .catch(function () {
+                loadingEl.classList.add('d-none');
+                btnOutra.disabled = false;
+                erroEl.textContent = 'Falha ao gerar a prévia. Tente novamente.';
+                erroEl.classList.remove('d-none');
+            });
+    }
+
+    btnGerar.addEventListener('click', function () {
+        modal.show();
+        gerarPreview();
+    });
+
+    btnOutra.addEventListener('click', function () {
+        descartarSilenciosamente();
+        gerarPreview();
+    });
+
+    btnUsar.addEventListener('click', function () {
+        if (!previewIdAtual) return;
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/marketing-ia/preview/${previewIdAtual}/confirmar/`;
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = getCookieLocal('csrftoken') || '';
+        form.appendChild(csrfInput);
+        document.body.appendChild(form);
+        previewIdAtual = null;
+        form.submit();
+    });
+
+    modalEl.addEventListener('hidden.bs.modal', function () {
+        descartarSilenciosamente();
+    });
+})();
+</script>
 {% endblock %}

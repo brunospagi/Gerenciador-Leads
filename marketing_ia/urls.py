@@ -13,6 +13,9 @@ urlpatterns = [
     path('lote/<int:lote_id>/salvar-todas/', views.aprovar_lote, name='marketing_aprovar_lote'),
     path('post/<int:pk>/status/', views.post_atualizar_status, name='marketing_post_status'),
     path('post/<int:pk>/enviar-webhook/', views.enviar_post_webhook_view, name='marketing_post_enviar_webhook'),
+    path('preview/<int:preview_id>/imagem/', views.preview_imagem, name='marketing_preview_imagem'),
+    path('preview/<int:preview_id>/confirmar/', views.confirmar_preview, name='marketing_confirmar_preview'),
+    path('preview/<int:preview_id>/descartar/', views.descartar_preview, name='marketing_descartar_preview'),
     path('<int:pk>/', views.veiculo_detail, name='marketing_veiculo_detail'),
-    path('<int:pk>/gerar-post/', views.gerar_post, name='marketing_gerar_post'),
+    path('<int:pk>/gerar-preview/', views.gerar_preview, name='marketing_gerar_preview'),
 ]
