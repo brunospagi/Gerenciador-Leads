@@ -40,6 +40,7 @@
     {% else %}
     <span class="badge bg-secondary">{{ provedor_imagem_atual }}</span>
     {% endif %}
+    <a href="{% url 'marketing_layout_list' %}" class="small ms-2"><i class="bi bi-palette me-1"></i>Layouts de overlay</a>
 </div>
 
 <div id="sincronizacao-status" class="alert {% if sincronizacao.status == 'ERRO' %}alert-danger{% elif sincronizacao.status == 'RODANDO' %}alert-info{% elif sincronizacao.status == 'CONCLUIDO' %}alert-success{% else %}alert-secondary{% endif %} d-flex align-items-center"

@@ -16,6 +16,13 @@ urlpatterns = [
     path('preview/<int:preview_id>/imagem/', views.preview_imagem, name='marketing_preview_imagem'),
     path('preview/<int:preview_id>/confirmar/', views.confirmar_preview, name='marketing_confirmar_preview'),
     path('preview/<int:preview_id>/descartar/', views.descartar_preview, name='marketing_descartar_preview'),
+    path('layouts/', views.layout_list, name='marketing_layout_list'),
+    path('layouts/novo/', views.layout_editor, name='marketing_layout_novo'),
+    path('layouts/salvar/', views.layout_salvar, name='marketing_layout_salvar'),
+    path('layouts/preview/', views.layout_preview, name='marketing_layout_preview'),
+    path('layouts/<int:pk>/editar/', views.layout_editor, name='marketing_layout_editar'),
+    path('layouts/<int:pk>/salvar/', views.layout_salvar, name='marketing_layout_atualizar'),
+    path('layouts/<int:pk>/excluir/', views.layout_excluir, name='marketing_layout_excluir'),
     path('<int:pk>/', views.veiculo_detail, name='marketing_veiculo_detail'),
     path('<int:pk>/gerar-preview/', views.gerar_preview, name='marketing_gerar_preview'),
 ]

@@ -332,6 +332,160 @@ _TEMPLATES = {
     'CARTAO_CENTRAL': _template_cartao_central,
 }
 
+# Aproximação dos 3 templates fixos em formato de camadas (usado pelo editor
+# drag-and-drop como ponto de partida ao "clonar" um template existente pra
+# customizar). O selo diagonal do SELO_DIAGONAL não tem equivalente livre — vira
+# uma pill reta no topo, como a chamada do CARTAO_CENTRAL.
+ELEMENTOS_BASE = {
+    'FAIXA_INFERIOR': [
+        {'tipo': 'forma', 'x': 0, 'y': 0.68, 'largura': 1, 'altura': 0.32,
+         'cor_fundo': '#0f172a', 'opacidade': 0.92, 'arredondado': 0},
+        {'tipo': 'texto', 'campo': 'chamada', 'x': 0.06, 'y': 0.715, 'largura': 0.65,
+         'tamanho_fonte': 0.055, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'titulo', 'x': 0.06, 'y': 0.80, 'largura': 0.88,
+         'tamanho_fonte': 0.045, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'preco', 'x': 0.06, 'y': 0.88, 'largura': 0.88,
+         'tamanho_fonte': 0.07, 'cor_texto': '#4ade80', 'alinhamento': 'esquerda', 'maiusculas': False},
+        {'tipo': 'logo', 'x': 0.80, 'y': 0.705, 'altura': 0.07},
+    ],
+    'SELO_DIAGONAL': [
+        {'tipo': 'forma', 'x': 0, 'y': 0.76, 'largura': 1, 'altura': 0.24,
+         'cor_fundo': '#0f172a', 'opacidade': 0.92, 'arredondado': 0},
+        {'tipo': 'forma', 'x': 0.06, 'y': 0.04, 'largura': 0.55, 'altura': 0.06,
+         'cor_fundo': '#c52b30', 'opacidade': 1, 'arredondado': 0.03},
+        {'tipo': 'texto', 'campo': 'chamada', 'x': 0.08, 'y': 0.052, 'largura': 0.5,
+         'tamanho_fonte': 0.04, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'titulo', 'x': 0.06, 'y': 0.80, 'largura': 0.88,
+         'tamanho_fonte': 0.045, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'preco', 'x': 0.06, 'y': 0.89, 'largura': 0.88,
+         'tamanho_fonte': 0.07, 'cor_texto': '#4ade80', 'alinhamento': 'esquerda', 'maiusculas': False},
+        {'tipo': 'logo', 'x': 0.80, 'y': 0.785, 'altura': 0.06},
+    ],
+    'CARTAO_CENTRAL': [
+        {'tipo': 'forma', 'x': 0.06, 'y': 0.58, 'largura': 0.88, 'altura': 0.37,
+         'cor_fundo': '#0f172a', 'opacidade': 0.92, 'arredondado': 0.04},
+        {'tipo': 'forma', 'x': 0.11, 'y': 0.615, 'largura': 0.4, 'altura': 0.06,
+         'cor_fundo': '#c52b30', 'opacidade': 1, 'arredondado': 0.03},
+        {'tipo': 'texto', 'campo': 'chamada', 'x': 0.13, 'y': 0.628, 'largura': 0.35,
+         'tamanho_fonte': 0.04, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'titulo', 'x': 0.11, 'y': 0.71, 'largura': 0.78,
+         'tamanho_fonte': 0.05, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'preco', 'x': 0.11, 'y': 0.82, 'largura': 0.78,
+         'tamanho_fonte': 0.07, 'cor_texto': '#4ade80', 'alinhamento': 'esquerda', 'maiusculas': False},
+        {'tipo': 'logo', 'x': 0.78, 'y': 0.60, 'altura': 0.05},
+    ],
+}
+
+
+def _cor_de_hex(hex_cor, opacidade=1.0):
+    """Converte '#rrggbb' (formato do <input type=color>) pra tupla RGBA
+    0-255, aplicando a opacidade (0-1) no canal alfa."""
+    hex_cor = (hex_cor or '').lstrip('#')
+    if len(hex_cor) != 6:
+        hex_cor = '0f172a'
+    r, g, b = (int(hex_cor[i:i + 2], 16) for i in (0, 2, 4))
+    alfa = max(0, min(255, int(float(opacidade if opacidade is not None else 1.0) * 255)))
+    return (r, g, b, alfa)
+
+
+def _texto_do_elemento(elemento, anuncio, chamada):
+    campo = elemento.get('campo', 'fixo')
+    if campo == 'chamada':
+        texto = chamada or ''
+    elif campo == 'titulo':
+        texto = _titulo_veiculo(anuncio)
+    elif campo == 'preco':
+        texto = _formatar_preco(anuncio.preco)
+    else:
+        texto = elemento.get('texto_fixo') or ''
+    if elemento.get('maiusculas', True):
+        texto = texto.upper()
+    return texto
+
+
+def _desenhar_elemento_forma(draw, elemento, largura, altura):
+    x = int(float(elemento.get('x', 0)) * largura)
+    y = int(float(elemento.get('y', 0)) * altura)
+    w = max(int(float(elemento.get('largura', 0.2)) * largura), 1)
+    h = max(int(float(elemento.get('altura', 0.1)) * altura), 1)
+    cor = _cor_de_hex(elemento.get('cor_fundo'), elemento.get('opacidade', 0.9))
+    raio = float(elemento.get('arredondado') or 0)
+    if raio > 0:
+        draw.rounded_rectangle([(x, y), (x + w, y + h)], radius=int(raio * largura), fill=cor)
+    else:
+        draw.rectangle([(x, y), (x + w, y + h)], fill=cor)
+
+
+def _desenhar_elemento_texto(draw, elemento, anuncio, chamada, largura, altura):
+    texto = _texto_do_elemento(elemento, anuncio, chamada)
+    if not texto:
+        return
+    x = int(float(elemento.get('x', 0)) * largura)
+    y = int(float(elemento.get('y', 0)) * altura)
+    w = max(int(float(elemento.get('largura', 0.8)) * largura), 10)
+    tamanho_fonte = max(int(float(elemento.get('tamanho_fonte', 0.05)) * largura), 10)
+    fonte = _fonte(tamanho_fonte)
+    cor_texto = _cor_de_hex(elemento.get('cor_texto'), 1.0) if elemento.get('cor_texto') else COR_TEXTO_PRINCIPAL
+    alinhamento = elemento.get('alinhamento', 'esquerda')
+
+    linhas = _quebrar_linhas(texto, fonte, draw, w) or [texto]
+    espaco_linha = int(tamanho_fonte * 1.25)
+    linha_y = y
+    for linha in linhas:
+        linha_x = x
+        if alinhamento == 'centro':
+            linha_largura = draw.textlength(linha, font=fonte)
+            linha_x = x + max(int((w - linha_largura) / 2), 0)
+        _texto_com_contorno(draw, (linha_x, linha_y), linha, fonte, cor_texto)
+        linha_y += espaco_linha
+
+
+def _desenhar_elemento_logo(overlay, elemento, largura, altura):
+    logo = _carregar_logo()
+    if logo is None:
+        return
+    x = int(float(elemento.get('x', 0)) * largura)
+    y = int(float(elemento.get('y', 0)) * altura)
+    altura_logo = max(int(float(elemento.get('altura', 0.06)) * altura), 1)
+    largura_logo = max(int(logo.width * (altura_logo / logo.height)), 1)
+    logo_redimensionado = logo.resize((largura_logo, altura_logo), Image.LANCZOS)
+    overlay.alpha_composite(logo_redimensionado, (x, y))
+
+
+def montar_imagem_layout(foto_bytes, anuncio, chamada, elementos, resolucao=None):
+    """
+    Renderiza a partir de uma lista de elementos livremente posicionados (o
+    editor drag-and-drop de LayoutOverlay), em vez de um dos 3 templates fixos.
+    Cada elemento é uma camada (desenhada na ordem da lista — os de baixo
+    ficam por cima) com posição/tamanho em frações 0-1 do canvas. Um elemento
+    com dado inválido é pulado (loga e segue pros próximos) em vez de derrubar
+    a imagem inteira. Retorna (bytes, mime_type) ou levanta ImageOverlayError.
+    """
+    tamanho_saida = RESOLUCOES.get(resolucao, RESOLUCOES[RESOLUCAO_PADRAO])
+    base = _preparar_foto(foto_bytes, tamanho_saida).convert('RGBA')
+    largura, altura = base.size
+
+    overlay = Image.new('RGBA', base.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    for elemento in (elementos or []):
+        tipo = elemento.get('tipo') if isinstance(elemento, dict) else None
+        try:
+            if tipo == 'forma':
+                _desenhar_elemento_forma(draw, elemento, largura, altura)
+            elif tipo == 'texto':
+                _desenhar_elemento_texto(draw, elemento, anuncio, chamada, largura, altura)
+            elif tipo == 'logo':
+                _desenhar_elemento_logo(overlay, elemento, largura, altura)
+        except Exception as exc:
+            logger.warning('Erro ao desenhar elemento "%s" do layout customizado: %s', tipo, exc)
+            continue
+
+    final = Image.alpha_composite(base, overlay).convert('RGB')
+    saida = io.BytesIO()
+    final.save(saida, format='JPEG', quality=90)
+    return saida.getvalue(), 'image/jpeg'
+
 
 def montar_imagem_overlay(foto_bytes, anuncio, chamada, template=None, resolucao=None):
     """

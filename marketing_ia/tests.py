@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -16,7 +17,7 @@ from . import leonardo_client
 from . import openai_client
 from . import scraping
 from . import services
-from .models import PostPromocional, PreviewPost, VeiculoAnuncio
+from .models import LayoutOverlay, PostPromocional, PreviewPost, VeiculoAnuncio
 
 User = get_user_model()
 
@@ -510,3 +511,180 @@ class VeiculoListFiltroVantagensTests(TestCase):
         from .models import LoteGeracao
         lote = LoteGeracao.objects.latest('criado_em')
         self.assertEqual(lote.alvo_ids, [self.com_ipva.pk])
+
+
+class MontarImagemLayoutTests(TestCase):
+    def _anuncio_fake(self, **overrides):
+        dados = {'marca': 'Toyota', 'modelo': 'Corolla', 'ano': '2022', 'preco': Decimal('98500.00')}
+        dados.update(overrides)
+        return SimpleNamespace(**dados)
+
+    def test_renderiza_forma_texto_e_logo(self):
+        elementos = [
+            {'tipo': 'forma', 'x': 0, 'y': 0.7, 'largura': 1, 'altura': 0.3,
+             'cor_fundo': '#0f172a', 'opacidade': 0.9, 'arredondado': 0},
+            {'tipo': 'texto', 'campo': 'titulo', 'x': 0.06, 'y': 0.75, 'largura': 0.8,
+             'tamanho_fonte': 0.05, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda'},
+            {'tipo': 'texto', 'campo': 'preco', 'x': 0.06, 'y': 0.85, 'largura': 0.8,
+             'tamanho_fonte': 0.06, 'cor_texto': '#4ade80'},
+            {'tipo': 'texto', 'campo': 'fixo', 'texto_fixo': 'Vem com garantia', 'x': 0.06, 'y': 0.05, 'largura': 0.5},
+            {'tipo': 'logo', 'x': 0.75, 'y': 0.72, 'altura': 0.08},
+        ]
+
+        imagem_bytes, mime_type = image_overlay.montar_imagem_layout(
+            _foto_fake_bytes(), self._anuncio_fake(), 'SUPER OFERTA', elementos,
+        )
+
+        self.assertEqual(mime_type, 'image/jpeg')
+        resultado = Image.open(io.BytesIO(imagem_bytes))
+        self.assertEqual(resultado.format, 'JPEG')
+        self.assertEqual(resultado.size, image_overlay.RESOLUCOES[image_overlay.RESOLUCAO_PADRAO])
+
+    def test_elemento_invalido_e_pulado_sem_quebrar(self):
+        elementos = [
+            {'tipo': 'forma', 'x': 0, 'y': 0, 'largura': 'nao-e-numero', 'altura': 0.1},
+            {'tipo': 'texto', 'campo': 'titulo', 'x': 0.1, 'y': 0.1, 'largura': 0.5},
+        ]
+        imagem_bytes, _ = image_overlay.montar_imagem_layout(
+            _foto_fake_bytes(), self._anuncio_fake(), 'chamada', elementos,
+        )
+        self.assertTrue(imagem_bytes)
+
+    def test_lista_vazia_gera_so_a_foto(self):
+        imagem_bytes, mime_type = image_overlay.montar_imagem_layout(
+            _foto_fake_bytes(), self._anuncio_fake(), 'chamada', [],
+        )
+        self.assertEqual(mime_type, 'image/jpeg')
+        self.assertTrue(imagem_bytes)
+
+    def test_todas_as_resolucoes_funcionam(self):
+        elemento = [{'tipo': 'texto', 'campo': 'preco', 'x': 0.1, 'y': 0.1, 'largura': 0.5}]
+        for chave, tamanho in image_overlay.RESOLUCOES.items():
+            imagem_bytes, _ = image_overlay.montar_imagem_layout(
+                _foto_fake_bytes(), self._anuncio_fake(), 'chamada', elemento, resolucao=chave,
+            )
+            resultado = Image.open(io.BytesIO(imagem_bytes))
+            self.assertEqual(resultado.size, tamanho)
+
+
+class LayoutOverlayModelTests(TestCase):
+    def test_chave_template_usa_prefixo_custom(self):
+        layout = LayoutOverlay.objects.create(nome='Meu layout', elementos=[])
+        self.assertEqual(layout.chave_template, f'CUSTOM:{layout.pk}')
+
+
+class GerarImagemOverlayComLayoutCustomTests(TestCase):
+    def _anuncio(self, **overrides):
+        dados = dict(
+            external_id='ext-layout-1', url='https://spagimotors.com.br/x', tipo='CARRO',
+            marca='Toyota', modelo='Corolla', titulo='Toyota Corolla 2022', preco=Decimal('98500'),
+            fotos_urls=['https://cdn.exemplo.com/foto.jpg'], foto_principal_url='https://cdn.exemplo.com/foto.jpg',
+        )
+        dados.update(overrides)
+        return VeiculoAnuncio.objects.create(**dados)
+
+    @patch('marketing_ia.ai_promocional.gerar_chamada_ia', return_value='SUPER OFERTA')
+    def test_usa_layout_customizado_quando_prefixo_custom(self, mock_chamada):
+        layout = LayoutOverlay.objects.create(nome='Layout teste', elementos=[
+            {'tipo': 'texto', 'campo': 'preco', 'x': 0.1, 'y': 0.8, 'largura': 0.6},
+        ])
+        anuncio = self._anuncio()
+
+        imagem_bytes, mime_type, modelo, chamada = ai_promocional._gerar_imagem_overlay(
+            anuncio, _foto_fake_bytes(), 'image/jpeg', template_overlay=layout.chave_template,
+        )
+
+        self.assertTrue(imagem_bytes)
+        self.assertEqual(mime_type, 'image/jpeg')
+        self.assertIn(f'custom:{layout.pk}', modelo)
+
+    @patch('marketing_ia.ai_promocional.gerar_chamada_ia', return_value='SUPER OFERTA')
+    def test_layout_inexistente_cai_pro_padrao(self, mock_chamada):
+        anuncio = self._anuncio(external_id='ext-layout-2')
+
+        imagem_bytes, mime_type, modelo, chamada = ai_promocional._gerar_imagem_overlay(
+            anuncio, _foto_fake_bytes(), 'image/jpeg', template_overlay='CUSTOM:99999',
+        )
+
+        self.assertTrue(imagem_bytes)
+        self.assertIn(image_overlay.TEMPLATE_PADRAO, modelo)
+
+
+class LayoutEditorViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser('admin_layout', 'admin_layout@teste.com', 'senha12345')
+        self.client.login(username='admin_layout', password='senha12345')
+
+    def test_layout_list_carrega(self):
+        resp = self.client.get(reverse('marketing_layout_list'))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_editor_novo_sem_base_comeca_vazio(self):
+        resp = self.client.get(reverse('marketing_layout_novo'))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_editor_novo_com_base_clona_elementos_do_template_fixo(self):
+        resp = self.client.get(reverse('marketing_layout_novo'), {'base': 'FAIXA_INFERIOR'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(b'cor_fundo', resp.content)
+
+    def test_salvar_cria_novo_layout(self):
+        resp = self.client.post(
+            reverse('marketing_layout_salvar'),
+            data=json.dumps({'nome': 'Meu novo layout', 'elementos': [{'tipo': 'logo', 'x': 0.1, 'y': 0.1, 'altura': 0.05}]}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data['ok'])
+        self.assertTrue(LayoutOverlay.objects.filter(pk=data['pk']).exists())
+
+    def test_salvar_sem_nome_retorna_erro(self):
+        resp = self.client.post(
+            reverse('marketing_layout_salvar'),
+            data=json.dumps({'nome': '', 'elementos': []}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(resp.json()['ok'])
+
+    def test_atualizar_layout_existente(self):
+        layout = LayoutOverlay.objects.create(nome='Original', elementos=[])
+        resp = self.client.post(
+            reverse('marketing_layout_atualizar', args=[layout.pk]),
+            data=json.dumps({
+                'nome': 'Renomeado',
+                'elementos': [{'tipo': 'forma', 'x': 0, 'y': 0, 'largura': 0.5, 'altura': 0.5}],
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        layout.refresh_from_db()
+        self.assertEqual(layout.nome, 'Renomeado')
+        self.assertEqual(len(layout.elementos), 1)
+
+    def test_excluir_layout(self):
+        layout = LayoutOverlay.objects.create(nome='Pra excluir', elementos=[])
+        resp = self.client.post(reverse('marketing_layout_excluir', args=[layout.pk]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(LayoutOverlay.objects.filter(pk=layout.pk).exists())
+
+    def test_preview_sem_anuncio_usa_foto_sintetica(self):
+        resp = self.client.post(
+            reverse('marketing_layout_preview'),
+            data=json.dumps({
+                'elementos': [{'tipo': 'texto', 'campo': 'preco', 'x': 0.1, 'y': 0.8, 'largura': 0.6}],
+                'resolucao': '1080x1080',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp['Content-Type'], 'image/jpeg')
+
+    def test_preview_com_elementos_invalidos_retorna_400(self):
+        resp = self.client.post(
+            reverse('marketing_layout_preview'),
+            data=json.dumps({'elementos': 'nao-e-uma-lista'}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 400)

@@ -156,15 +156,35 @@ def gerar_imagem_promocional(anuncio, foto_bytes, mime_type, max_tentativas=3, t
 def _gerar_imagem_overlay(anuncio, foto_bytes, mime_type, template_overlay=None, resolucao_overlay=None):
     """Provedor 'sem IA de imagem': usa a foto real como está, só desenha o
     texto por cima (Pillow). O Gemini entra só pra gerar a frase de destaque —
-    se ele falhar, cai pro fallback fixo em vez de travar a geração inteira."""
+    se ele falhar, cai pro fallback fixo em vez de travar a geração inteira.
+
+    template pode ser um dos 3 fixos (FAIXA_INFERIOR/SELO_DIAGONAL/CARTAO_CENTRAL)
+    ou "CUSTOM:<id>", apontando pra um LayoutOverlay criado no editor visual."""
     chamada = gerar_chamada_ia(anuncio)
     template = template_overlay or obter_integracao('template_imagem_overlay') or image_overlay.TEMPLATE_PADRAO
     resolucao = resolucao_overlay or obter_integracao('resolucao_imagem_overlay') or image_overlay.RESOLUCAO_PADRAO
     try:
-        imagem_bytes, mime_saida = image_overlay.montar_imagem_overlay(
-            foto_bytes, anuncio, chamada, template=template, resolucao=resolucao,
-        )
-        return imagem_bytes, mime_saida, f'overlay:pillow:{template}:{resolucao}', chamada
+        if isinstance(template, str) and template.startswith('CUSTOM:'):
+            from .models import LayoutOverlay
+            layout_id = template.split(':', 1)[1]
+            layout = LayoutOverlay.objects.filter(pk=layout_id).first()
+            if not layout:
+                logger.warning('Layout customizado #%s não encontrado, usando o padrão.', layout_id)
+                imagem_bytes, mime_saida = image_overlay.montar_imagem_overlay(
+                    foto_bytes, anuncio, chamada, resolucao=resolucao,
+                )
+                modelo_usado = f'overlay:pillow:{image_overlay.TEMPLATE_PADRAO}:{resolucao}'
+            else:
+                imagem_bytes, mime_saida = image_overlay.montar_imagem_layout(
+                    foto_bytes, anuncio, chamada, layout.elementos, resolucao=resolucao,
+                )
+                modelo_usado = f'overlay:pillow:custom:{layout_id}:{resolucao}'
+        else:
+            imagem_bytes, mime_saida = image_overlay.montar_imagem_overlay(
+                foto_bytes, anuncio, chamada, template=template, resolucao=resolucao,
+            )
+            modelo_usado = f'overlay:pillow:{template}:{resolucao}'
+        return imagem_bytes, mime_saida, modelo_usado, chamada
     except image_overlay.ImageOverlayError as exc:
         logger.warning('Erro ao montar imagem com overlay: %s', exc)
         return None, None, None, None

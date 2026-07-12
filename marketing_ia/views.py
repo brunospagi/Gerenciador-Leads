@@ -1,4 +1,8 @@
+import io
+import json
 import threading
+from decimal import Decimal
+from types import SimpleNamespace
 
 from django.contrib import messages
 from django.core.paginator import Paginator
@@ -13,7 +17,11 @@ from django.views.decorators.http import require_POST
 from configuracoes.access import require_module_action
 from configuracoes.models import ConfiguracaoIntegracoes, WebhookIntegracao
 
-from .models import EnvioWebhook, LoteGeracao, PostPromocional, PreviewPost, SincronizacaoEstoque, VeiculoAnuncio
+from . import image_overlay
+from .ai_promocional import baixar_foto
+from .models import (
+    EnvioWebhook, LayoutOverlay, LoteGeracao, PostPromocional, PreviewPost, SincronizacaoEstoque, VeiculoAnuncio,
+)
 from .services import (
     GeracaoPostError, gerar_posts_em_lote, gerar_preview_post,
     salvar_preview_como_post, sincronizar_estoque,
@@ -191,12 +199,15 @@ def veiculo_detail(request, pk):
     anuncio = get_object_or_404(VeiculoAnuncio, pk=pk)
     posts = anuncio.posts.order_by('-gerado_em')
     config = ConfiguracaoIntegracoes.get_solo()
+    template_choices = list(ConfiguracaoIntegracoes.TEMPLATE_IMAGEM_CHOICES) + [
+        (layout.chave_template, f'Customizado: {layout.nome}') for layout in LayoutOverlay.objects.all()
+    ]
     context = {
         'anuncio': anuncio,
         'posts': posts,
         'webhooks_ativos': WebhookIntegracao.objects.filter(ativo=True),
         'provedor_imagem_atual': config.provedor_imagem_ia,
-        'template_imagem_overlay_choices': ConfiguracaoIntegracoes.TEMPLATE_IMAGEM_CHOICES,
+        'template_imagem_overlay_choices': template_choices,
         'resolucao_imagem_overlay_choices': ConfiguracaoIntegracoes.RESOLUCAO_IMAGEM_CHOICES,
     }
     return render(request, 'marketing_ia/veiculo_detail.html', context)
@@ -212,7 +223,11 @@ def gerar_preview(request, pk):
     config = ConfiguracaoIntegracoes.get_solo()
     template_overlay = request.POST.get('template_overlay') or None
     resolucao_overlay = request.POST.get('resolucao_overlay') or None
-    if template_overlay not in dict(ConfiguracaoIntegracoes.TEMPLATE_IMAGEM_CHOICES):
+    template_valido = template_overlay in dict(ConfiguracaoIntegracoes.TEMPLATE_IMAGEM_CHOICES) or (
+        template_overlay and template_overlay.startswith('CUSTOM:')
+        and LayoutOverlay.objects.filter(pk=template_overlay.split(':', 1)[1]).exists()
+    )
+    if not template_valido:
         template_overlay = None
     if resolucao_overlay not in dict(ConfiguracaoIntegracoes.RESOLUCAO_IMAGEM_CHOICES):
         resolucao_overlay = None
@@ -373,3 +388,134 @@ def enviar_post_webhook_view(request, pk):
     if post.lote_id:
         return redirect('marketing_revisao_lote', lote_id=post.lote_id)
     return redirect('marketing_veiculo_detail', pk=post.anuncio_id)
+
+
+_ANUNCIO_EXEMPLO_LAYOUT = SimpleNamespace(
+    marca='Toyota', modelo='Corolla', ano='2022', motorizacao='2.0',
+    preco=Decimal('98500.00'),
+)
+_CHAMADA_EXEMPLO_LAYOUT = 'SUPER OFERTA'
+
+
+def _foto_exemplo_layout():
+    """Foto sintética (não depende de nenhum anúncio já cadastrado) só pra
+    servir de fundo na prévia do editor de layout quando nenhum veículo com
+    foto foi escolhido."""
+    from PIL import Image, ImageDraw
+
+    img = Image.new('RGB', (1600, 1067), color=(96, 116, 148))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([120, 480, 1480, 880], fill=(235, 235, 240))
+    draw.ellipse([260, 800, 500, 980], fill=(20, 20, 20))
+    draw.ellipse([1100, 800, 1340, 980], fill=(20, 20, 20))
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG')
+    return buf.getvalue()
+
+
+@require_module_action('marketing_ia', 'visualizar')
+def layout_list(request):
+    context = {
+        'layouts': LayoutOverlay.objects.all(),
+        'templates_fixos': ConfiguracaoIntegracoes.TEMPLATE_IMAGEM_CHOICES,
+    }
+    return render(request, 'marketing_ia/layout_list.html', context)
+
+
+@require_module_action('marketing_ia', 'criar')
+def layout_editor(request, pk=None):
+    layout = get_object_or_404(LayoutOverlay, pk=pk) if pk else None
+    elementos_iniciais = layout.elementos if layout else []
+
+    base = request.GET.get('base')
+    if not layout and base in image_overlay.ELEMENTOS_BASE:
+        elementos_iniciais = image_overlay.ELEMENTOS_BASE[base]
+
+    context = {
+        'layout': layout,
+        'elementos_iniciais_json': json.dumps(elementos_iniciais),
+        'veiculos_com_foto': (
+            VeiculoAnuncio.objects.filter(ativo=True).exclude(foto_principal_url='').order_by('-atualizado_em')[:30]
+        ),
+        'resolucao_choices': ConfiguracaoIntegracoes.RESOLUCAO_IMAGEM_CHOICES,
+    }
+    return render(request, 'marketing_ia/layout_editor.html', context)
+
+
+@require_module_action('marketing_ia', 'criar')
+@require_POST
+def layout_salvar(request, pk=None):
+    try:
+        dados = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'ok': False, 'erro': 'JSON inválido.'}, status=400)
+
+    nome = (dados.get('nome') or '').strip()
+    elementos = dados.get('elementos')
+    if not nome:
+        return JsonResponse({'ok': False, 'erro': 'Dê um nome pro layout.'}, status=400)
+    if not isinstance(elementos, list):
+        return JsonResponse({'ok': False, 'erro': 'Elementos inválidos.'}, status=400)
+
+    if pk:
+        layout = get_object_or_404(LayoutOverlay, pk=pk)
+        layout.nome = nome
+        layout.elementos = elementos
+        layout.save(update_fields=['nome', 'elementos', 'atualizado_em'])
+    else:
+        layout = LayoutOverlay.objects.create(nome=nome, elementos=elementos, criado_por=request.user)
+
+    return JsonResponse({'ok': True, 'pk': layout.pk, 'chave_template': layout.chave_template})
+
+
+@require_module_action('marketing_ia', 'editar')
+@require_POST
+def layout_excluir(request, pk):
+    layout = get_object_or_404(LayoutOverlay, pk=pk)
+    nome = layout.nome
+    layout.delete()
+    messages.success(request, f'Layout "{nome}" excluído.')
+    return redirect('marketing_layout_list')
+
+
+@require_module_action('marketing_ia', 'visualizar')
+@require_POST
+def layout_preview(request):
+    """Renderiza (sem gravar nada em lugar nenhum) uma prévia do layout sendo
+    editado — usa a foto de um anúncio real se indicado, ou uma foto de
+    exemplo sintética, com dados fictícios de veículo, só pra mostrar
+    visualmente onde cada elemento cai na imagem final."""
+    try:
+        dados = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError):
+        return JsonResponse({'erro': 'JSON inválido.'}, status=400)
+
+    elementos = dados.get('elementos')
+    resolucao = dados.get('resolucao')
+    anuncio_pk = dados.get('anuncio_pk')
+
+    if not isinstance(elementos, list):
+        return JsonResponse({'erro': 'Elementos inválidos.'}, status=400)
+
+    anuncio = _ANUNCIO_EXEMPLO_LAYOUT
+    foto_bytes = None
+    if anuncio_pk:
+        anuncio_real = VeiculoAnuncio.objects.filter(pk=anuncio_pk).first()
+        if anuncio_real and (anuncio_real.foto_principal_url or anuncio_real.fotos_urls):
+            anuncio = anuncio_real
+            try:
+                foto_bytes, _ = baixar_foto(anuncio_real.foto_principal_url or anuncio_real.fotos_urls[0])
+            except Exception:
+                foto_bytes = None
+
+    if not foto_bytes:
+        foto_bytes = _foto_exemplo_layout()
+
+    try:
+        imagem_bytes, mime_type = image_overlay.montar_imagem_layout(
+            foto_bytes, anuncio, _CHAMADA_EXEMPLO_LAYOUT, elementos, resolucao=resolucao,
+        )
+    except image_overlay.ImageOverlayError as exc:
+        return JsonResponse({'erro': str(exc)}, status=400)
+
+    return HttpResponse(imagem_bytes, content_type=mime_type)
