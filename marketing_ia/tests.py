@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+from datetime import timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -9,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from PIL import Image
 
 from . import ai_promocional
@@ -688,3 +690,160 @@ class LayoutEditorViewTests(TestCase):
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 400)
+
+
+class DerivarVeiculoCompletoTests(TestCase):
+    def test_detecta_completo_com_os_tres_opcionais(self):
+        self.assertTrue(scraping._derivar_veiculo_completo(
+            ['Ar Condicionado', 'Direção Hidráulica', 'Vidros Elétricos'],
+        ))
+
+    def test_variacoes_de_grafia_tambem_contam(self):
+        self.assertTrue(scraping._derivar_veiculo_completo(
+            ['ar-condicionado', 'direcao eletrica', 'vidro eletrico'],
+        ))
+
+    def test_faltando_um_opcional_nao_marca_completo(self):
+        self.assertFalse(scraping._derivar_veiculo_completo(['Ar Condicionado', 'Direção Hidráulica']))
+
+    def test_lista_vazia_nao_marca_completo(self):
+        self.assertFalse(scraping._derivar_veiculo_completo([]))
+
+
+class TextoElementoCamposNovosTests(TestCase):
+    def _anuncio(self, **overrides):
+        dados = {'marca': 'Toyota', 'modelo': 'Corolla', 'ano': '2022', 'preco': Decimal('98500'),
+                 'opcionais': ['Ar condicionado', 'Airbag', 'ABS', 'Vidro elétrico', 'Trava elétrica'],
+                 'veiculo_completo': True}
+        dados.update(overrides)
+        return SimpleNamespace(**dados)
+
+    def test_campo_opcionais_junta_so_os_4_primeiros(self):
+        elemento = {'campo': 'opcionais', 'maiusculas': False}
+        texto = image_overlay._texto_do_elemento(elemento, self._anuncio(), 'chamada')
+        self.assertEqual(texto, 'Ar condicionado, Airbag, ABS, Vidro elétrico')
+
+    def test_campo_veiculo_completo_mostra_texto_quando_marcado(self):
+        elemento = {'campo': 'veiculo_completo', 'maiusculas': False}
+        texto = image_overlay._texto_do_elemento(elemento, self._anuncio(veiculo_completo=True), 'chamada')
+        self.assertEqual(texto, 'Veículo Completo')
+
+    def test_campo_veiculo_completo_vazio_quando_nao_marcado(self):
+        elemento = {'campo': 'veiculo_completo', 'maiusculas': False}
+        texto = image_overlay._texto_do_elemento(elemento, self._anuncio(veiculo_completo=False), 'chamada')
+        self.assertEqual(texto, '')
+
+
+class DesenharElementoFormaCirculoTests(TestCase):
+    def test_forma_circulo_nao_quebra_e_gera_imagem_valida(self):
+        elementos = [
+            {'tipo': 'forma', 'formato': 'circulo', 'x': 0.1, 'y': 0.1, 'largura': 0.2, 'altura': 0.2, 'cor_fundo': '#c52b30'},
+        ]
+        anuncio = SimpleNamespace(marca='Fiat', modelo='Palio', ano='2012', preco=Decimal('26900'))
+        imagem_bytes, mime_type = image_overlay.montar_imagem_layout(_foto_fake_bytes(), anuncio, 'chamada', elementos)
+        self.assertEqual(mime_type, 'image/jpeg')
+        self.assertTrue(imagem_bytes)
+
+
+class DesenharElementoEmojiTests(TestCase):
+    def test_emoji_e_desenhado_sem_quebrar(self):
+        elementos = [{'tipo': 'emoji', 'emoji': '🔥', 'x': 0.1, 'y': 0.1, 'altura': 0.1}]
+        anuncio = SimpleNamespace(marca='Fiat', modelo='Palio', ano='2012', preco=Decimal('26900'))
+        imagem_bytes, mime_type = image_overlay.montar_imagem_layout(_foto_fake_bytes(), anuncio, 'chamada', elementos)
+        self.assertEqual(mime_type, 'image/jpeg')
+        self.assertTrue(imagem_bytes)
+
+    def test_emoji_vazio_e_ignorado(self):
+        elementos = [{'tipo': 'emoji', 'emoji': '', 'x': 0.1, 'y': 0.1, 'altura': 0.1}]
+        anuncio = SimpleNamespace(marca='Fiat', modelo='Palio', ano='2012', preco=Decimal('26900'))
+        imagem_bytes, _ = image_overlay.montar_imagem_layout(_foto_fake_bytes(), anuncio, 'chamada', elementos)
+        self.assertTrue(imagem_bytes)
+
+
+class FonteComAcentuacaoTests(TestCase):
+    def test_fonte_padrao_nao_e_mais_o_default_do_pillow_sem_acento(self):
+        # regressão do bug: ImageFont.load_default() (fonte Aileron embutida do
+        # Pillow) não tem glifos de á/ã/ç/õ etc — troquei pra Poppins (arquivo
+        # de verdade em static/fonts/), que tem cobertura completa de Latin Extended.
+        fonte = image_overlay._fonte(40)
+        self.assertNotEqual(fonte.getname()[0], 'Aileron')
+
+    def test_todas_as_fontes_do_editor_carregam_sem_erro(self):
+        for chave, _ in image_overlay.FONTE_CHOICES:
+            fonte = image_overlay._fonte(40, chave)
+            self.assertIsNotNone(fonte)
+
+
+class SincronizacaoTimeoutTests(TestCase):
+    def test_sincronizacao_travada_por_muito_tempo_e_marcada_como_erro(self):
+        
+        from marketing_ia.models import SincronizacaoEstoque
+        sync = SincronizacaoEstoque.load()
+        sync.status = 'RODANDO'
+        sync.iniciado_em = timezone.now() - timedelta(minutes=SincronizacaoEstoque.TIMEOUT_MINUTOS + 5)
+        sync.save()
+
+        sync_recarregada = SincronizacaoEstoque.load()
+
+        self.assertEqual(sync_recarregada.status, 'ERRO')
+        self.assertIn('interrompida', sync_recarregada.resultado)
+
+    def test_sincronizacao_recente_nao_e_afetada(self):
+        
+        from marketing_ia.models import SincronizacaoEstoque
+        sync = SincronizacaoEstoque.load()
+        sync.status = 'RODANDO'
+        sync.iniciado_em = timezone.now() - timedelta(minutes=2)
+        sync.save()
+
+        sync_recarregada = SincronizacaoEstoque.load()
+
+        self.assertEqual(sync_recarregada.status, 'RODANDO')
+
+
+class CancelarSincronizacaoViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser('admin_sync', 'admin_sync@teste.com', 'senha12345')
+        self.client.login(username='admin_sync', password='senha12345')
+
+    def test_cancela_sincronizacao_rodando(self):
+        from marketing_ia.models import SincronizacaoEstoque
+        sync = SincronizacaoEstoque.load()
+        sync.status = 'RODANDO'
+        sync.iniciado_em = timezone.now()
+        sync.save()
+
+        resp = self.client.post(reverse('marketing_cancelar_sincronizacao'))
+
+        self.assertEqual(resp.status_code, 302)
+        sync.refresh_from_db()
+        self.assertEqual(sync.status, 'ERRO')
+
+    def test_nao_faz_nada_se_nao_estiver_rodando(self):
+        from marketing_ia.models import SincronizacaoEstoque
+        sync = SincronizacaoEstoque.load()
+        self.assertEqual(sync.status, 'OCIOSO')
+
+        resp = self.client.post(reverse('marketing_cancelar_sincronizacao'))
+
+        self.assertEqual(resp.status_code, 302)
+        sync.refresh_from_db()
+        self.assertEqual(sync.status, 'OCIOSO')
+
+
+class ContarLoteViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser('admin_contar', 'admin_contar@teste.com', 'senha12345')
+        self.client.login(username='admin_contar', password='senha12345')
+        _anuncio_persistido(external_id='completo-1', veiculo_completo=True)
+        _anuncio_persistido(external_id='incompleto-1', veiculo_completo=False)
+
+    def test_conta_apenas_veiculo_completo_quando_filtrado(self):
+        resp = self.client.get(reverse('marketing_contar_lote'), {'veiculo_completo': '1'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()['total'], 1)
+
+    def test_conta_todos_sem_post_sem_filtro(self):
+        resp = self.client.get(reverse('marketing_contar_lote'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()['total'], 2)

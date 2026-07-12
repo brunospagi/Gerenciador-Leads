@@ -30,6 +30,23 @@
     {% endfor %}
 </div>
 
+<h5 class="mb-3">Datas comemorativas</h5>
+<div class="row mb-4">
+    {% for valor, rotulo in datas_comemorativas %}
+    <div class="col-md-4 mb-3">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+                <h6 class="card-title">{{ rotulo }}</h6>
+                <p class="text-muted small flex-grow-1">Layout temático já com cores, fonte e emoji do tema — só ajustar.</p>
+                <a href="{% url 'marketing_layout_novo' %}?base={{ valor }}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-pencil-square me-1"></i>Editar uma cópia
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h5 class="mb-0">Meus layouts customizados ({{ layouts.count }})</h5>
     <a href="{% url 'marketing_layout_novo' %}" class="btn btn-primary btn-sm">

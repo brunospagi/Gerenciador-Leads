@@ -1,0 +1,8 @@
+Fontes desta pasta (Poppins, Bebas Neue, Oswald, Baloo 2, Noto Emoji) são
+distribuídas sob a SIL Open Font License 1.1, que permite uso, redistribuição
+e modificação livremente, inclusive em produtos comerciais. Fonte oficial:
+https://github.com/google/fonts (pasta ofl/), mantida pelo Google Fonts.
+
+Usadas no overlay de imagens do Marketing IA (marketing_ia/image_overlay.py)
+para substituir a fonte padrão embutida do Pillow, que não tem glifos de
+acentuação do português (á, ã, ç, õ etc. apareciam como "tofu").

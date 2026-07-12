@@ -44,6 +44,7 @@ def sincronizar_estoque(max_paginas=None, tipo=None, limit=None):
                 'condicoes': dados['condicoes'],
                 'ipva_pago': dados['ipva_pago'],
                 'aceita_troca': dados['aceita_troca'],
+                'veiculo_completo': dados['veiculo_completo'],
                 'opcionais': dados['opcionais'],
                 'descricao': dados['descricao'],
                 'foto_principal_url': dados['foto_principal_url'],

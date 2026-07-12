@@ -30,9 +30,10 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-4 d-flex gap-2 justify-content-md-end">
+        <div class="col-md-4 d-flex gap-2 justify-content-md-end flex-wrap">
             <button type="button" class="btn btn-outline-dark btn-sm" id="btn-add-forma"><i class="bi bi-square me-1"></i>Forma</button>
             <button type="button" class="btn btn-outline-dark btn-sm" id="btn-add-texto"><i class="bi bi-fonts me-1"></i>Texto</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="btn-add-emoji"><i class="bi bi-emoji-smile me-1"></i>Emoji</button>
             <button type="button" class="btn btn-outline-dark btn-sm" id="btn-add-logo"><i class="bi bi-badge-tm me-1"></i>Logo</button>
             <button type="button" class="btn btn-success btn-sm" id="btn-salvar"><i class="bi bi-check-lg me-1"></i>Salvar</button>
         </div>
@@ -93,7 +94,11 @@
         chamada: 'SUPER OFERTA',
         titulo: 'TOYOTA COROLLA 2.0 2022',
         preco: 'R$ 98.500,00',
+        opcionais: 'Ar condicionado, Direção elétrica, Vidros elétricos',
+        veiculo_completo: 'Veículo Completo',
     };
+    const EMOJIS_DISPONIVEIS = ['🔥', '🚗', '💰', '✅', '🎉', '🏷️', '⭐', '💯', '👍', '🎁', '🎄', '💐', '📢', '🔧', '⚡', '🚀'];
+    const FONTE_CHOICES = {{ fonte_choices|safe }};
 
     let elementos = {{ elementos_iniciais_json|safe }};
     let selecionadoId = null;
@@ -110,6 +115,11 @@
     const previewLoading = document.getElementById('preview-real-loading');
     const msgEl = document.getElementById('layout-msg');
 
+    // mapa id -> <div> já criado, pra mover/redimensionar sem recriar o DOM
+    // inteiro a cada pixel (isso é o que causava a tela "piscando"/dando
+    // refresh visual toda hora durante o arrastar).
+    const divsPorId = {};
+
     function ajustarAlturaCanvas() {
         const [w, h] = RESOLUCOES[selectResolucao.value];
         const largura = canvas.parentElement.clientWidth;
@@ -124,78 +134,6 @@
         return texto;
     }
 
-    function renderElementos() {
-        canvas.querySelectorAll('.layout-elemento').forEach(function (n) { n.remove(); });
-
-        elementos.forEach(function (el) {
-            const div = document.createElement('div');
-            div.className = 'layout-elemento position-absolute';
-            div.dataset.id = el._id;
-            div.style.left = (el.x * 100) + '%';
-            div.style.top = (el.y * 100) + '%';
-            div.style.cursor = 'move';
-            div.style.userSelect = 'none';
-            div.style.boxSizing = 'border-box';
-
-            if (el._id === selecionadoId) {
-                div.style.outline = '2px dashed #0d6efd';
-            }
-
-            if (el.tipo === 'forma') {
-                div.style.width = (el.largura * 100) + '%';
-                div.style.height = (el.altura * 100) + '%';
-                div.style.background = hexParaRgba(el.cor_fundo || '#0f172a', el.opacidade != null ? el.opacidade : 0.9);
-                div.style.borderRadius = ((el.arredondado || 0) * 100 * 4) + 'px';
-            } else if (el.tipo === 'texto') {
-                div.style.width = (el.largura * 100) + '%';
-                div.style.minHeight = '1.4em';
-                div.style.color = el.cor_texto || '#ffffff';
-                div.style.fontSize = Math.max((el.tamanho_fonte || 0.05) * canvas.clientWidth, 10) + 'px';
-                div.style.textAlign = el.alinhamento === 'centro' ? 'center' : 'left';
-                div.style.textShadow = '1px 1px 2px rgba(0,0,0,.8)';
-                div.style.fontWeight = 'bold';
-                div.style.wordBreak = 'break-word';
-                div.textContent = textoDoElemento(el);
-            } else if (el.tipo === 'logo') {
-                div.style.width = 'auto';
-                div.style.height = ((el.altura || 0.06) * 100) + '%';
-                const img = document.createElement('img');
-                img.src = "{% static 'images/logo-spagi-motors.webp' %}";
-                img.style.height = '100%';
-                img.style.background = 'rgba(15,23,42,.5)';
-                img.style.pointerEvents = 'none';
-                div.appendChild(img);
-            }
-
-            const handle = document.createElement('div');
-            handle.className = 'resize-handle';
-            handle.style.position = 'absolute';
-            handle.style.right = '-6px';
-            handle.style.bottom = '-6px';
-            handle.style.width = '14px';
-            handle.style.height = '14px';
-            handle.style.background = '#0d6efd';
-            handle.style.borderRadius = '50%';
-            handle.style.cursor = 'nwse-resize';
-            if (el.tipo !== 'logo') {
-                div.appendChild(handle);
-            }
-
-            div.addEventListener('mousedown', function (ev) {
-                if (ev.target === handle) {
-                    iniciarResize(ev, el);
-                } else {
-                    selecionar(el);
-                    iniciarDrag(ev, el);
-                }
-                ev.stopPropagation();
-                ev.preventDefault();
-            });
-
-            canvas.appendChild(div);
-        });
-    }
-
     function hexParaRgba(hex, opacidade) {
         hex = (hex || '#0f172a').replace('#', '');
         const r = parseInt(hex.substring(0, 2), 16) || 0;
@@ -204,7 +142,116 @@
         return `rgba(${r},${g},${b},${opacidade})`;
     }
 
+    // Aplica posição/tamanho/conteúdo num <div> JÁ existente — usado tanto na
+    // criação quanto durante o drag/resize, pra nunca precisar destruir e
+    // recriar os elementos (isso é a causa raiz do "fica dando refresh").
+    function atualizarEstiloElemento(div, el) {
+        div.style.left = (el.x * 100) + '%';
+        div.style.top = (el.y * 100) + '%';
+        div.style.outline = (el._id === selecionadoId) ? '2px dashed #0d6efd' : 'none';
+
+        if (el.tipo === 'forma') {
+            div.style.width = (el.largura * 100) + '%';
+            div.style.height = (el.altura * 100) + '%';
+            div.style.background = hexParaRgba(el.cor_fundo || '#0f172a', el.opacidade != null ? el.opacidade : 0.9);
+            div.style.borderRadius = el.formato === 'circulo' ? '50%' : (((el.arredondado || 0) * 100 * 4) + 'px');
+        } else if (el.tipo === 'texto') {
+            div.style.width = (el.largura * 100) + '%';
+            div.style.color = el.cor_texto || '#ffffff';
+            div.style.fontSize = Math.max((el.tamanho_fonte || 0.05) * canvas.clientWidth, 10) + 'px';
+            div.style.textAlign = el.alinhamento === 'centro' ? 'center' : 'left';
+            div.querySelector('.conteudo-texto').textContent = textoDoElemento(el);
+        } else if (el.tipo === 'emoji') {
+            const tamanhoEmoji = Math.max((el.altura || 0.08) * canvas.clientHeight, 12);
+            div.style.fontSize = tamanhoEmoji + 'px';
+            div.style.color = el.cor || '#ffffff';
+            div.style.lineHeight = '1';
+            div.querySelector('.conteudo-texto').textContent = el.emoji || '🔥';
+        } else if (el.tipo === 'logo') {
+            div.style.height = ((el.altura || 0.06) * 100) + '%';
+        }
+    }
+
+    function criarElementoDiv(el) {
+        const div = document.createElement('div');
+        div.className = 'layout-elemento position-absolute';
+        div.dataset.id = el._id;
+        div.style.cursor = 'move';
+        div.style.userSelect = 'none';
+        div.style.boxSizing = 'border-box';
+
+        if (el.tipo === 'texto') {
+            const span = document.createElement('span');
+            span.className = 'conteudo-texto';
+            span.style.textShadow = '1px 1px 2px rgba(0,0,0,.8)';
+            span.style.fontWeight = 'bold';
+            span.style.wordBreak = 'break-word';
+            div.appendChild(span);
+        } else if (el.tipo === 'emoji') {
+            const span = document.createElement('span');
+            span.className = 'conteudo-texto';
+            div.appendChild(span);
+        } else if (el.tipo === 'logo') {
+            div.style.width = 'auto';
+            const img = document.createElement('img');
+            img.src = "{% static 'images/logo-spagi-motors.webp' %}";
+            img.style.height = '100%';
+            img.style.background = 'rgba(15,23,42,.5)';
+            img.style.pointerEvents = 'none';
+            div.appendChild(img);
+        }
+
+        const handle = document.createElement('div');
+        handle.className = 'resize-handle';
+        handle.style.position = 'absolute';
+        handle.style.right = '-6px';
+        handle.style.bottom = '-6px';
+        handle.style.width = '14px';
+        handle.style.height = '14px';
+        handle.style.background = '#0d6efd';
+        handle.style.borderRadius = '50%';
+        handle.style.cursor = 'nwse-resize';
+        if (el.tipo !== 'logo') {
+            div.appendChild(handle);
+        }
+
+        div.addEventListener('mousedown', function (ev) {
+            if (ev.target === handle) {
+                iniciarResize(ev, el);
+            } else {
+                selecionar(el);
+                iniciarDrag(ev, el);
+            }
+            ev.stopPropagation();
+            ev.preventDefault();
+        });
+
+        return div;
+    }
+
+    // Reconcilia o DOM com o array `elementos`: cria só os divs que faltam e
+    // remove só os que sumiram — nunca recria tudo do zero (full teardown a
+    // cada mousemove era o que deixava o arrastar "piscando"/travado).
+    function renderElementos() {
+        const idsAtuais = new Set(elementos.map(function (el) { return el._id; }));
+        Object.keys(divsPorId).forEach(function (id) {
+            if (!idsAtuais.has(Number(id))) {
+                divsPorId[id].remove();
+                delete divsPorId[id];
+            }
+        });
+        elementos.forEach(function (el) {
+            if (!divsPorId[el._id]) {
+                const div = criarElementoDiv(el);
+                divsPorId[el._id] = div;
+                canvas.appendChild(div);
+            }
+            atualizarEstiloElemento(divsPorId[el._id], el);
+        });
+    }
+
     function iniciarDrag(ev, el) {
+        const div = divsPorId[el._id];
         const inicioX = ev.clientX;
         const inicioY = ev.clientY;
         const elX = el.x;
@@ -217,7 +264,9 @@
             const dy = (e.clientY - inicioY) / canvas.clientHeight;
             el.x = Math.min(Math.max(elX + dx, 0), 1 - Math.min(largura, 1));
             el.y = Math.min(Math.max(elY + dy, 0), 1 - Math.min(altura, 1));
-            renderElementos();
+            // só move o próprio elemento (sem recriar/re-renderizar os outros).
+            div.style.left = (el.x * 100) + '%';
+            div.style.top = (el.y * 100) + '%';
         }
         function soltar() {
             document.removeEventListener('mousemove', mover);
@@ -229,6 +278,7 @@
     }
 
     function iniciarResize(ev, el) {
+        const div = divsPorId[el._id];
         const inicioX = ev.clientX;
         const inicioY = ev.clientY;
         const largInicial = el.largura || 0.2;
@@ -241,12 +291,12 @@
                 el.altura = Math.min(Math.max(altInicial + dy, 0.02), 1 - el.y);
             }
             el.largura = Math.min(Math.max(largInicial + dx, 0.05), 1 - el.x);
-            renderElementos();
-            atualizarPainel();
+            atualizarEstiloElemento(div, el);
         }
         function soltar() {
             document.removeEventListener('mousemove', mover);
             document.removeEventListener('mouseup', soltar);
+            atualizarPainel();
             agendarPreviewReal();
         }
         document.addEventListener('mousemove', mover);
@@ -255,13 +305,15 @@
 
     function selecionar(el) {
         selecionadoId = el._id;
-        renderElementos();
+        Object.keys(divsPorId).forEach(function (id) {
+            divsPorId[id].style.outline = (Number(id) === selecionadoId) ? '2px dashed #0d6efd' : 'none';
+        });
         atualizarPainel();
     }
 
     canvas.addEventListener('mousedown', function () {
         selecionadoId = null;
-        renderElementos();
+        Object.keys(divsPorId).forEach(function (id) { divsPorId[id].style.outline = 'none'; });
         atualizarPainel();
     });
 
@@ -309,6 +361,57 @@
         return wrap;
     }
 
+    function campoSelect(label, opcoes, valorAtual, onChange) {
+        const wrap = document.createElement('div');
+        wrap.className = 'mb-2';
+        const lbl = document.createElement('label');
+        lbl.className = 'form-label small mb-1';
+        lbl.textContent = label;
+        const select = document.createElement('select');
+        select.className = 'form-select form-select-sm';
+        opcoes.forEach(function (opt) {
+            const option = document.createElement('option');
+            option.value = opt[0]; option.textContent = opt[1];
+            if (valorAtual === opt[0]) option.selected = true;
+            select.appendChild(option);
+        });
+        select.addEventListener('change', function () {
+            onChange(select.value);
+            renderElementos();
+            agendarPreviewReal();
+        });
+        wrap.appendChild(lbl);
+        wrap.appendChild(select);
+        return wrap;
+    }
+
+    function campoEmojiPicker(elementoAtual) {
+        const wrap = document.createElement('div');
+        wrap.className = 'mb-2';
+        const lbl = document.createElement('label');
+        lbl.className = 'form-label small mb-1 d-block';
+        lbl.textContent = 'Emoji';
+        wrap.appendChild(lbl);
+        const grade = document.createElement('div');
+        grade.className = 'd-flex flex-wrap gap-1';
+        EMOJIS_DISPONIVEIS.forEach(function (emoji) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = emoji;
+            btn.className = 'btn btn-outline-secondary btn-sm' + (elementoAtual.emoji === emoji ? ' active' : '');
+            btn.style.fontSize = '1.1rem';
+            btn.addEventListener('click', function () {
+                elementoAtual.emoji = emoji;
+                renderElementos();
+                atualizarPainel();
+                agendarPreviewReal();
+            });
+            grade.appendChild(btn);
+        });
+        wrap.appendChild(grade);
+        return wrap;
+    }
+
     function atualizarPainel() {
         const el = elementoSelecionado();
         painelConteudo.innerHTML = '';
@@ -319,9 +422,16 @@
         painel.classList.remove('d-none');
 
         if (el.tipo === 'forma') {
+            painelConteudo.appendChild(campoSelect('Formato', [['retangulo', 'Retângulo'], ['circulo', 'Círculo']], el.formato || 'retangulo', function (v) { el.formato = v; }));
             painelConteudo.appendChild(campoCor('Cor de fundo', el.cor_fundo, function (v) { el.cor_fundo = v; }));
             painelConteudo.appendChild(campoNumero('Opacidade', el.opacidade != null ? el.opacidade : 0.9, 0, 1, 0.05, function (v) { el.opacidade = v; }));
-            painelConteudo.appendChild(campoNumero('Cantos arredondados', el.arredondado || 0, 0, 0.1, 0.005, function (v) { el.arredondado = v; }));
+            if (el.formato !== 'circulo') {
+                painelConteudo.appendChild(campoNumero('Cantos arredondados', el.arredondado || 0, 0, 0.1, 0.005, function (v) { el.arredondado = v; }));
+            }
+        } else if (el.tipo === 'emoji') {
+            painelConteudo.appendChild(campoEmojiPicker(el));
+            painelConteudo.appendChild(campoCor('Cor', el.cor, function (v) { el.cor = v; }));
+            painelConteudo.appendChild(campoNumero('Tamanho', el.altura || 0.08, 0.02, 0.3, 0.01, function (v) { el.altura = v; }));
         } else if (el.tipo === 'texto') {
             const wrapCampo = document.createElement('div');
             wrapCampo.className = 'mb-2';
@@ -330,7 +440,9 @@
             lbl.textContent = 'Conteúdo';
             const select = document.createElement('select');
             select.className = 'form-select form-select-sm';
-            [['chamada', 'Chamada (gerada por IA)'], ['titulo', 'Título do veículo'], ['preco', 'Preço'], ['fixo', 'Texto fixo']].forEach(function (opt) {
+            [['chamada', 'Chamada (gerada por IA)'], ['titulo', 'Título do veículo'], ['preco', 'Preço'],
+             ['opcionais', 'Opcionais do veículo'], ['veiculo_completo', '"Veículo Completo" (se marcado)'],
+             ['fixo', 'Texto fixo']].forEach(function (opt) {
                 const option = document.createElement('option');
                 option.value = opt[0]; option.textContent = opt[1];
                 if (el.campo === opt[0]) option.selected = true;
@@ -362,6 +474,7 @@
                 painelConteudo.appendChild(wrapTexto);
             }
 
+            painelConteudo.appendChild(campoSelect('Fonte', FONTE_CHOICES, el.fonte || 'poppins', function (v) { el.fonte = v; }));
             painelConteudo.appendChild(campoCor('Cor do texto', el.cor_texto, function (v) { el.cor_texto = v; }));
             painelConteudo.appendChild(campoNumero('Tamanho da fonte', el.tamanho_fonte || 0.05, 0.02, 0.12, 0.005, function (v) { el.tamanho_fonte = v; }));
 
@@ -397,23 +510,24 @@
         agendarPreviewReal();
     });
 
-    document.getElementById('btn-add-forma').addEventListener('click', function () {
-        const el = { _id: proximoId++, tipo: 'forma', x: 0.1, y: 0.1, largura: 0.35, altura: 0.15, cor_fundo: '#0f172a', opacidade: 0.9, arredondado: 0 };
+    function adicionarElemento(el) {
         elementos.push(el);
+        renderElementos();
         selecionar(el);
         agendarPreviewReal();
+    }
+
+    document.getElementById('btn-add-forma').addEventListener('click', function () {
+        adicionarElemento({ _id: proximoId++, tipo: 'forma', x: 0.1, y: 0.1, largura: 0.35, altura: 0.15, cor_fundo: '#0f172a', opacidade: 0.9, arredondado: 0 });
     });
     document.getElementById('btn-add-texto').addEventListener('click', function () {
-        const el = { _id: proximoId++, tipo: 'texto', campo: 'fixo', texto_fixo: 'Texto', x: 0.1, y: 0.1, largura: 0.4, tamanho_fonte: 0.05, cor_texto: '#ffffff', alinhamento: 'esquerda', maiusculas: true };
-        elementos.push(el);
-        selecionar(el);
-        agendarPreviewReal();
+        adicionarElemento({ _id: proximoId++, tipo: 'texto', campo: 'fixo', texto_fixo: 'Texto', x: 0.1, y: 0.1, largura: 0.4, tamanho_fonte: 0.05, cor_texto: '#ffffff', fonte: 'poppins', alinhamento: 'esquerda', maiusculas: true });
+    });
+    document.getElementById('btn-add-emoji').addEventListener('click', function () {
+        adicionarElemento({ _id: proximoId++, tipo: 'emoji', emoji: '🔥', x: 0.75, y: 0.05, altura: 0.1, cor: '#ffffff' });
     });
     document.getElementById('btn-add-logo').addEventListener('click', function () {
-        const el = { _id: proximoId++, tipo: 'logo', x: 0.75, y: 0.05, altura: 0.08 };
-        elementos.push(el);
-        selecionar(el);
-        agendarPreviewReal();
+        adicionarElemento({ _id: proximoId++, tipo: 'logo', x: 0.75, y: 0.05, altura: 0.08 });
     });
 
     let previewTimeout = null;

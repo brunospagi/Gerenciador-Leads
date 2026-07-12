@@ -15,6 +15,7 @@ automotivo pra Instagram/Facebook.
 import io
 import logging
 import math
+from functools import lru_cache
 
 from django.conf import settings
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
@@ -23,6 +24,32 @@ logger = logging.getLogger(__name__)
 
 LOGO_PATH = settings.BASE_DIR / 'static' / 'images' / 'logo-spagi-motors.webp'
 _logo_cache = None
+
+FONTS_DIR = settings.BASE_DIR / 'static' / 'fonts'
+
+# Fontes de verdade (Google Fonts, licença OFL) pra desenhar texto — o
+# ImageFont.load_default() do Pillow (fonte "Aileron" embutida) NÃO tem glifos
+# de acentuação do português: á, ã, ç, õ etc. saíam como "tofu" (quadradinho
+# vazio) em toda imagem gerada. Poppins é a mesma fonte já usada na
+# identidade visual do sistema (app_m3.css); as demais são variações de
+# estilo oferecidas no editor de layouts.
+FONTES = {
+    'poppins': FONTS_DIR / 'Poppins-Bold.ttf',
+    'poppins_regular': FONTS_DIR / 'Poppins-Regular.ttf',
+    'bebas': FONTS_DIR / 'BebasNeue-Regular.ttf',
+    'oswald': FONTS_DIR / 'Oswald-Bold.ttf',
+    'baloo': FONTS_DIR / 'Baloo2-Bold.ttf',
+}
+FONTE_PADRAO = 'poppins'
+FONTE_EMOJI_PATH = FONTS_DIR / 'NotoEmoji-Regular.ttf'
+
+FONTE_CHOICES = [
+    ('poppins', 'Poppins Bold (padrão)'),
+    ('poppins_regular', 'Poppins Regular'),
+    ('bebas', 'Bebas Neue (impacto/condensada)'),
+    ('oswald', 'Oswald (condensada)'),
+    ('baloo', 'Baloo 2 (arredondada/divertida)'),
+]
 
 # Resoluções válidas pra redes sociais (Instagram/Facebook). Todas em 1080px
 # de largura (padrão da plataforma) variando só a altura pro formato.
@@ -46,10 +73,20 @@ class ImageOverlayError(Exception):
     """Erro esperado ao montar a imagem com overlay (foto corrompida, etc)."""
 
 
-def _fonte(tamanho):
-    # Pillow >= 10.1 empacota uma fonte TrueType escalável (Aileron) acessível via
-    # load_default(size=...) — não precisamos empacotar nenhum arquivo .ttf à parte.
-    return ImageFont.load_default(size=max(int(tamanho), 10))
+@lru_cache(maxsize=256)
+def _carregar_fonte_truetype(caminho, tamanho, negrito_se_variavel=True):
+    fonte = ImageFont.truetype(str(caminho), tamanho)
+    if negrito_se_variavel:
+        try:
+            fonte.set_variation_by_name('Bold')  # só funciona em fontes variáveis; ignora nas estáticas
+        except Exception:
+            pass
+    return fonte
+
+
+def _fonte(tamanho, fonte_id=None):
+    caminho = FONTES.get(fonte_id, FONTES[FONTE_PADRAO])
+    return _carregar_fonte_truetype(caminho, max(int(tamanho), 10))
 
 
 def _preparar_foto(foto_bytes, tamanho_saida):
@@ -376,6 +413,81 @@ ELEMENTOS_BASE = {
     ],
 }
 
+# Pontos de partida temáticos pra datas comemorativas — mesma ideia do
+# ELEMENTOS_BASE (clonar e ajustar), só que com cores/fontes/emoji do tema em
+# vez de replicar um template neutro. Aparecem como opção extra em "Criar a
+# partir de um template pronto" na listagem de layouts.
+ELEMENTOS_DATAS_COMEMORATIVAS = {
+    'NATAL': [
+        {'tipo': 'forma', 'x': 0, 'y': 0.7, 'largura': 1, 'altura': 0.3,
+         'cor_fundo': '#165b33', 'opacidade': 0.93, 'arredondado': 0},
+        {'tipo': 'emoji', 'emoji': '🎄', 'x': 0.04, 'y': 0.03, 'altura': 0.12},
+        {'tipo': 'texto', 'campo': 'fixo', 'texto_fixo': 'FELIZ NATAL', 'x': 0.06, 'y': 0.725, 'largura': 0.7,
+         'tamanho_fonte': 0.06, 'cor_texto': '#f8b229', 'fonte': 'bebas', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'titulo', 'x': 0.06, 'y': 0.81, 'largura': 0.88,
+         'tamanho_fonte': 0.045, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'preco', 'x': 0.06, 'y': 0.89, 'largura': 0.88,
+         'tamanho_fonte': 0.07, 'cor_texto': '#f8b229', 'alinhamento': 'esquerda', 'maiusculas': False},
+        {'tipo': 'logo', 'x': 0.80, 'y': 0.71, 'altura': 0.06},
+    ],
+    'ANO_NOVO': [
+        {'tipo': 'forma', 'x': 0, 'y': 0.7, 'largura': 1, 'altura': 0.3,
+         'cor_fundo': '#0b0b0f', 'opacidade': 0.93, 'arredondado': 0},
+        {'tipo': 'emoji', 'emoji': '🎉', 'x': 0.04, 'y': 0.03, 'altura': 0.12},
+        {'tipo': 'texto', 'campo': 'fixo', 'texto_fixo': 'ANO NOVO, CARRO NOVO', 'x': 0.06, 'y': 0.725, 'largura': 0.85,
+         'tamanho_fonte': 0.05, 'cor_texto': '#d4af37', 'fonte': 'oswald', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'titulo', 'x': 0.06, 'y': 0.81, 'largura': 0.88,
+         'tamanho_fonte': 0.045, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'preco', 'x': 0.06, 'y': 0.89, 'largura': 0.88,
+         'tamanho_fonte': 0.07, 'cor_texto': '#d4af37', 'alinhamento': 'esquerda', 'maiusculas': False},
+        {'tipo': 'logo', 'x': 0.80, 'y': 0.71, 'altura': 0.06},
+    ],
+    'BLACK_FRIDAY': [
+        {'tipo': 'forma', 'x': 0, 'y': 0.7, 'largura': 1, 'altura': 0.3,
+         'cor_fundo': '#000000', 'opacidade': 0.94, 'arredondado': 0},
+        {'tipo': 'emoji', 'emoji': '🔥', 'x': 0.04, 'y': 0.03, 'altura': 0.12},
+        {'tipo': 'texto', 'campo': 'fixo', 'texto_fixo': 'BLACK FRIDAY', 'x': 0.06, 'y': 0.72, 'largura': 0.85,
+         'tamanho_fonte': 0.065, 'cor_texto': '#ffcc00', 'fonte': 'bebas', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'titulo', 'x': 0.06, 'y': 0.81, 'largura': 0.88,
+         'tamanho_fonte': 0.045, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'preco', 'x': 0.06, 'y': 0.89, 'largura': 0.88,
+         'tamanho_fonte': 0.07, 'cor_texto': '#ffcc00', 'alinhamento': 'esquerda', 'maiusculas': False},
+        {'tipo': 'logo', 'x': 0.80, 'y': 0.71, 'altura': 0.06},
+    ],
+    'DIA_DAS_MAES': [
+        {'tipo': 'forma', 'x': 0, 'y': 0.7, 'largura': 1, 'altura': 0.3,
+         'cor_fundo': '#7a3b69', 'opacidade': 0.9, 'arredondado': 0},
+        {'tipo': 'emoji', 'emoji': '💐', 'x': 0.04, 'y': 0.03, 'altura': 0.12},
+        {'tipo': 'texto', 'campo': 'fixo', 'texto_fixo': 'DIA DAS MÃES', 'x': 0.06, 'y': 0.725, 'largura': 0.7,
+         'tamanho_fonte': 0.06, 'cor_texto': '#ffd6ec', 'fonte': 'baloo', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'titulo', 'x': 0.06, 'y': 0.81, 'largura': 0.88,
+         'tamanho_fonte': 0.045, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'preco', 'x': 0.06, 'y': 0.89, 'largura': 0.88,
+         'tamanho_fonte': 0.07, 'cor_texto': '#4ade80', 'alinhamento': 'esquerda', 'maiusculas': False},
+        {'tipo': 'logo', 'x': 0.80, 'y': 0.71, 'altura': 0.06},
+    ],
+    'DIA_DOS_PAIS': [
+        {'tipo': 'forma', 'x': 0, 'y': 0.7, 'largura': 1, 'altura': 0.3,
+         'cor_fundo': '#0b3d66', 'opacidade': 0.92, 'arredondado': 0},
+        {'tipo': 'emoji', 'emoji': '🎁', 'x': 0.04, 'y': 0.03, 'altura': 0.12},
+        {'tipo': 'texto', 'campo': 'fixo', 'texto_fixo': 'DIA DOS PAIS', 'x': 0.06, 'y': 0.725, 'largura': 0.7,
+         'tamanho_fonte': 0.06, 'cor_texto': '#7ec8ff', 'fonte': 'oswald', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'titulo', 'x': 0.06, 'y': 0.81, 'largura': 0.88,
+         'tamanho_fonte': 0.045, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'preco', 'x': 0.06, 'y': 0.89, 'largura': 0.88,
+         'tamanho_fonte': 0.07, 'cor_texto': '#4ade80', 'alinhamento': 'esquerda', 'maiusculas': False},
+        {'tipo': 'logo', 'x': 0.80, 'y': 0.71, 'altura': 0.06},
+    ],
+}
+
+DATA_COMEMORATIVA_CHOICES = [
+    ('NATAL', 'Natal'),
+    ('ANO_NOVO', 'Ano Novo'),
+    ('BLACK_FRIDAY', 'Black Friday'),
+    ('DIA_DAS_MAES', 'Dia das Mães'),
+    ('DIA_DOS_PAIS', 'Dia dos Pais'),
+]
+
 
 def _cor_de_hex(hex_cor, opacidade=1.0):
     """Converte '#rrggbb' (formato do <input type=color>) pra tupla RGBA
@@ -396,6 +508,14 @@ def _texto_do_elemento(elemento, anuncio, chamada):
         texto = _titulo_veiculo(anuncio)
     elif campo == 'preco':
         texto = _formatar_preco(anuncio.preco)
+    elif campo == 'opcionais':
+        # só os primeiros itens, pra não virar uma parede de texto na imagem.
+        opcionais = getattr(anuncio, 'opcionais', None) or []
+        texto = ', '.join(opcionais[:4])
+    elif campo == 'veiculo_completo':
+        # texto vazio quando a flag não está marcada — o elemento simplesmente
+        # não aparece na imagem (mesmo comportamento de qualquer texto vazio).
+        texto = 'Veículo Completo' if getattr(anuncio, 'veiculo_completo', False) else ''
     else:
         texto = elemento.get('texto_fixo') or ''
     if elemento.get('maiusculas', True):
@@ -409,6 +529,10 @@ def _desenhar_elemento_forma(draw, elemento, largura, altura):
     w = max(int(float(elemento.get('largura', 0.2)) * largura), 1)
     h = max(int(float(elemento.get('altura', 0.1)) * altura), 1)
     cor = _cor_de_hex(elemento.get('cor_fundo'), elemento.get('opacidade', 0.9))
+    formato = elemento.get('formato', 'retangulo')
+    if formato == 'circulo':
+        draw.ellipse([(x, y), (x + w, y + h)], fill=cor)
+        return
     raio = float(elemento.get('arredondado') or 0)
     if raio > 0:
         draw.rounded_rectangle([(x, y), (x + w, y + h)], radius=int(raio * largura), fill=cor)
@@ -424,7 +548,7 @@ def _desenhar_elemento_texto(draw, elemento, anuncio, chamada, largura, altura):
     y = int(float(elemento.get('y', 0)) * altura)
     w = max(int(float(elemento.get('largura', 0.8)) * largura), 10)
     tamanho_fonte = max(int(float(elemento.get('tamanho_fonte', 0.05)) * largura), 10)
-    fonte = _fonte(tamanho_fonte)
+    fonte = _fonte(tamanho_fonte, elemento.get('fonte'))
     cor_texto = _cor_de_hex(elemento.get('cor_texto'), 1.0) if elemento.get('cor_texto') else COR_TEXTO_PRINCIPAL
     alinhamento = elemento.get('alinhamento', 'esquerda')
 
@@ -452,6 +576,22 @@ def _desenhar_elemento_logo(overlay, elemento, largura, altura):
     overlay.alpha_composite(logo_redimensionado, (x, y))
 
 
+def _desenhar_elemento_emoji(overlay, elemento, largura, altura):
+    """Emoji como um 'adesivo' separado (fonte NotoEmoji, monocromática — o
+    Pillow não renderiza emoji colorido sem suporte especial de libraqm, mas
+    o traço/silhueta já fica bem reconhecível)."""
+    emoji = (elemento.get('emoji') or '').strip()
+    if not emoji:
+        return
+    tamanho = max(int(float(elemento.get('altura', 0.08)) * altura), 10)
+    fonte = _carregar_fonte_truetype(FONTE_EMOJI_PATH, tamanho, negrito_se_variavel=False)
+    x = int(float(elemento.get('x', 0)) * largura)
+    y = int(float(elemento.get('y', 0)) * altura)
+    cor = _cor_de_hex(elemento.get('cor'), 1.0) if elemento.get('cor') else COR_TEXTO_PRINCIPAL
+    draw = ImageDraw.Draw(overlay)
+    draw.text((x, y), emoji, font=fonte, fill=cor)
+
+
 def montar_imagem_layout(foto_bytes, anuncio, chamada, elementos, resolucao=None):
     """
     Renderiza a partir de uma lista de elementos livremente posicionados (o
@@ -477,6 +617,8 @@ def montar_imagem_layout(foto_bytes, anuncio, chamada, elementos, resolucao=None
                 _desenhar_elemento_texto(draw, elemento, anuncio, chamada, largura, altura)
             elif tipo == 'logo':
                 _desenhar_elemento_logo(overlay, elemento, largura, altura)
+            elif tipo == 'emoji':
+                _desenhar_elemento_emoji(overlay, elemento, largura, altura)
         except Exception as exc:
             logger.warning('Erro ao desenhar elemento "%s" do layout customizado: %s', tipo, exc)
             continue

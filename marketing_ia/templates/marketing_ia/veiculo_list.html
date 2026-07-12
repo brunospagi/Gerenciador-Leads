@@ -11,16 +11,58 @@
                 {% if sincronizacao.status == 'RODANDO' %}Sincronizando...{% else %}Atualizar estoque do site{% endif %}
             </button>
         </form>
-        <form method="post" action="{% url 'marketing_iniciar_lote' %}"
-              onsubmit="return confirm('Gerar posts com IA para {{ total_sem_post }} veículo(s) sem post ainda (considerando os filtros selecionados)? Isso vai gastar chamadas de API.');">
+        {% if sincronizacao.status == 'RODANDO' %}
+        <form method="post" action="{% url 'marketing_cancelar_sincronizacao' %}"
+              onsubmit="return confirm('Cancelar a sincronização em andamento? Só faça isso se ela parece travada.');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger" title="Use se a sincronização parece travada (ex: mais de 30 min sem terminar)">
+                <i class="bi bi-x-circle me-1"></i>Cancelar
+            </button>
+        </form>
+        {% endif %}
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalGerarLote"
+                {% if lote_em_andamento or not total_sem_post %}disabled{% endif %}>
+            <i class="bi bi-magic me-1"></i>
+            {% if lote_em_andamento %}Gerando em lote...{% else %}Gerar para todos sem post ({{ total_sem_post }}){% endif %}
+        </button>
+    </div>
+</div>
+
+<div class="modal fade" id="modalGerarLote" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="post" action="{% url 'marketing_iniciar_lote' %}" id="form-gerar-lote">
             {% csrf_token %}
             <input type="hidden" name="tipo" value="{{ tipo_filtro }}">
-            <input type="hidden" name="ipva_pago" value="{% if ipva_pago_filtro %}1{% endif %}">
-            <input type="hidden" name="aceita_troca" value="{% if aceita_troca_filtro %}1{% endif %}">
-            <button type="submit" class="btn btn-primary" {% if lote_em_andamento or not total_sem_post %}disabled{% endif %}>
-                <i class="bi bi-magic me-1"></i>
-                {% if lote_em_andamento %}Gerando em lote...{% else %}Gerar para todos sem post ({{ total_sem_post }}){% endif %}
-            </button>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-magic me-2"></i>Gerar posts em lote</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">Escolha quais veículos sem post entram no lote antes de gerar — isso vai gastar chamadas de API.</p>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="ipva_pago" value="1" id="modalIpvaPago" {% if ipva_pago_filtro %}checked{% endif %}>
+                        <label class="form-check-label" for="modalIpvaPago">Só IPVA pago</label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="aceita_troca" value="1" id="modalAceitaTroca" {% if aceita_troca_filtro %}checked{% endif %}>
+                        <label class="form-check-label" for="modalAceitaTroca">Só aceita troca</label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="veiculo_completo" value="1" id="modalVeiculoCompleto" {% if veiculo_completo_filtro %}checked{% endif %}>
+                        <label class="form-check-label" for="modalVeiculoCompleto">Só veículo completo</label>
+                    </div>
+                    <div class="alert alert-secondary mb-0">
+                        <strong id="modal-lote-contagem">{{ total_sem_post }}</strong> veículo(s) sem post vão entrar no lote com esses filtros.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="btn-confirmar-lote">
+                        <i class="bi bi-magic me-1"></i>Gerar agora
+                    </button>
+                </div>
+            </div>
         </form>
     </div>
 </div>
@@ -98,6 +140,11 @@
                        {% if aceita_troca_filtro %}checked{% endif %} onchange="this.form.submit()">
                 <label class="form-check-label" for="aceitaTrocaCheck">Aceita troca</label>
             </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="veiculo_completo" value="1" id="veiculoCompletoCheck"
+                       {% if veiculo_completo_filtro %}checked{% endif %} onchange="this.form.submit()">
+                <label class="form-check-label" for="veiculoCompletoCheck">Veículo completo</label>
+            </div>
         </div>
     </form>
 </div>
@@ -127,6 +174,7 @@
                     </span>
                     {% if anuncio.ipva_pago %}<span class="badge bg-info text-dark">IPVA pago</span>{% endif %}
                     {% if anuncio.aceita_troca %}<span class="badge bg-info text-dark">Aceita troca</span>{% endif %}
+                    {% if anuncio.veiculo_completo %}<span class="badge bg-info text-dark">Veículo completo</span>{% endif %}
                 </div>
                 <div class="mt-auto pt-2">
                     <a href="{% url 'marketing_veiculo_detail' anuncio.pk %}" class="btn btn-dark w-100">Ver / Gerar Post</a>
@@ -167,6 +215,28 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+(function () {
+    var form = document.getElementById('form-gerar-lote');
+    var contagemEl = document.getElementById('modal-lote-contagem');
+    if (!form || !contagemEl) return;
+
+    function atualizarContagem() {
+        var params = new URLSearchParams(new FormData(form));
+        fetch("{% url 'marketing_contar_lote' %}?" + params.toString())
+            .then(function (resp) { return resp.json(); })
+            .then(function (data) {
+                contagemEl.textContent = data.total;
+                document.getElementById('btn-confirmar-lote').disabled = !data.total;
+            })
+            .catch(function () {});
+    }
+
+    form.querySelectorAll('input[type=checkbox]').forEach(function (input) {
+        input.addEventListener('change', atualizarContagem);
+    });
+})();
+</script>
 <script>
 (function () {
     var banner = document.getElementById('sincronizacao-status');
