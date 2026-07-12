@@ -396,6 +396,44 @@ def aprovar_lote(request, lote_id):
 
 @require_module_action('marketing_ia', 'editar')
 @require_POST
+def enviar_lote_webhook(request, lote_id):
+    """Envia TODOS os posts do lote (exceto os descartados) pro webhook
+    escolhido de uma vez, em vez de precisar clicar 'Enviar' post por post —
+    pensado pro fluxo de 'gerar em massa e mandar tudo de uma vez'."""
+    lote = get_object_or_404(LoteGeracao, pk=lote_id)
+    webhook = get_object_or_404(WebhookIntegracao, pk=request.POST.get('webhook_id'), ativo=True)
+
+    posts = lote.posts.exclude(status='DESCARTADO')
+    sucessos, falhas = 0, 0
+    for post in posts:
+        resultado = enviar_post_webhook(post, webhook)
+        EnvioWebhook.objects.create(
+            post=post,
+            webhook=webhook,
+            enviado_por=request.user,
+            sucesso=resultado['sucesso'],
+            status_code=resultado['status_code'],
+            erro=resultado['erro'],
+        )
+        if resultado['sucesso']:
+            sucessos += 1
+        else:
+            falhas += 1
+
+    if not posts:
+        messages.warning(request, 'Não há posts pra enviar neste lote (todos foram descartados).')
+    elif falhas:
+        messages.warning(
+            request,
+            f'{sucessos} post(s) enviado(s) para "{webhook.nome}", {falhas} falharam — confira abaixo.',
+        )
+    else:
+        messages.success(request, f'{sucessos} post(s) enviado(s) para "{webhook.nome}" com sucesso.')
+    return redirect('marketing_revisao_lote', lote_id=lote.pk)
+
+
+@require_module_action('marketing_ia', 'editar')
+@require_POST
 def enviar_post_webhook_view(request, pk):
     post = get_object_or_404(PostPromocional, pk=pk)
     webhook = get_object_or_404(WebhookIntegracao, pk=request.POST.get('webhook_id'), ativo=True)

@@ -13,6 +13,7 @@ arredondado central) — layouts recorrentes em templates do setor
 automotivo pra Instagram/Facebook.
 """
 import io
+import itertools
 import logging
 import math
 from functools import lru_cache
@@ -26,6 +27,7 @@ LOGO_PATH = settings.BASE_DIR / 'static' / 'images' / 'logo-spagi-motors.webp'
 _logo_cache = None
 
 FONTS_DIR = settings.BASE_DIR / 'static' / 'fonts'
+EMOJI_PNG_DIR = settings.BASE_DIR / 'static' / 'emoji'
 
 # Fontes de verdade (Google Fonts, licença OFL) pra desenhar texto — o
 # ImageFont.load_default() do Pillow (fonte "Aileron" embutida) NÃO tem glifos
@@ -50,6 +52,34 @@ FONTE_CHOICES = [
     ('oswald', 'Oswald (condensada)'),
     ('baloo', 'Baloo 2 (arredondada/divertida)'),
 ]
+
+# Faixas Unicode que cobrem a esmagadora maioria dos emoji comuns — usado pra
+# detectar, dentro de um texto normal (ex: "PROMOÇÃO DE VERÃO 🏖️" digitado no
+# "texto fixo" do editor), quais caracteres precisam da fonte de emoji em vez
+# da fonte de texto escolhida (Poppins/Bebas/etc não têm glifo de emoji e
+# mostravam um "tofu" quebrado no lugar).
+FAIXAS_EMOJI = (
+    (0x1F300, 0x1FAFF),  # símbolos/pictogramas (a maior faixa, cobre quase tudo)
+    (0x2600, 0x27BF),    # símbolos diversos + dingbats (☀️ ✅ etc)
+    (0x2B00, 0x2BFF),    # setas/estrelas diversas (⭐ etc)
+    (0x1F1E6, 0x1F1FF),  # bandeiras (pares de letra regional)
+)
+SELETORES_VARIACAO = ('︎', '️')  # dizem "mostra como texto/emoji" — não têm glifo próprio
+
+
+def _eh_emoji(caractere):
+    codepoint = ord(caractere)
+    return any(inicio <= codepoint <= fim for inicio, fim in FAIXAS_EMOJI)
+
+
+def _limpar_selecionadores_variacao(texto):
+    """Remove U+FE0E/U+FE0F — são modificadores invisíveis (não têm glifo
+    próprio) que vêm colados em alguns emoji (ex: 🏖️, 🏷️); a fonte de emoji
+    usada aqui não os trata como zero-width, e sobrava um "tofu" extra do lado
+    do emoji ao colar esse tipo de caractere."""
+    for seletor in SELETORES_VARIACAO:
+        texto = texto.replace(seletor, '')
+    return texto
 
 # Resoluções válidas pra redes sociais (Instagram/Facebook). Todas em 1080px
 # de largura (padrão da plataforma) variando só a altura pro formato.
@@ -87,6 +117,29 @@ def _carregar_fonte_truetype(caminho, tamanho, negrito_se_variavel=True):
 def _fonte(tamanho, fonte_id=None):
     caminho = FONTES.get(fonte_id, FONTES[FONTE_PADRAO])
     return _carregar_fonte_truetype(caminho, max(int(tamanho), 10))
+
+
+def _arquivo_png_emoji(emoji_texto):
+    """Nome do PNG colorido do Twemoji (codepoints em hex, sem seletor de
+    variação, separados por hífen) pro emoji informado, se tivermos ele
+    bundlado em static/emoji/. Emoji fora desse conjunto caem no fallback de
+    fonte vetorial (_desenhar_texto_misto/_desenhar_elemento_emoji) — assim
+    QUALQUER emoji colado funciona, só que sem cor quando não bundlado."""
+    codepoints = '-'.join(format(ord(c), 'x') for c in emoji_texto if ord(c) != 0xFE0F)
+    if not codepoints:
+        return None
+    caminho = EMOJI_PNG_DIR / f'{codepoints}.png'
+    return caminho if caminho.exists() else None
+
+
+@lru_cache(maxsize=128)
+def _carregar_emoji_png_original(caminho):
+    return Image.open(caminho).convert('RGBA')
+
+
+def _carregar_emoji_png(caminho, tamanho):
+    original = _carregar_emoji_png_original(caminho)
+    return original.resize((max(int(tamanho), 1), max(int(tamanho), 1)), Image.LANCZOS)
 
 
 def _preparar_foto(foto_bytes, tamanho_saida):
@@ -185,6 +238,36 @@ def _texto_com_contorno(draw, posicao, texto, fonte, cor_texto, espessura=2):
             if dx or dy:
                 draw.text((x + dx, y + dy), texto, font=fonte, fill=COR_CONTORNO)
     draw.text((x, y), texto, font=fonte, fill=cor_texto)
+
+
+def _desenhar_texto_misto(overlay, draw, posicao, texto, fonte_texto, tamanho_fonte, cor_texto):
+    """Desenha uma linha alternando entre a fonte de texto escolhida e emoji
+    conforme o caractere — permite colar emoji no meio de texto normal (ex:
+    "PROMOÇÃO DE VERÃO 🏖️" no campo de texto fixo do editor) sem virar um
+    retângulo vazio, já que Poppins/Bebas/Oswald/Baloo não têm glifo de
+    emoji. Cada emoji tenta primeiro o PNG colorido do Twemoji (bundlado em
+    static/emoji/); se não tiver esse emoji específico bundlado, cai pro
+    contorno vetorial da fonte NotoEmoji — assim QUALQUER emoji colado
+    funciona, não só os que estão no teclado do editor."""
+    x, y = posicao
+    fonte_emoji = None
+    for eh_emoji, grupo in itertools.groupby(texto, key=_eh_emoji):
+        trecho = ''.join(grupo)
+        if not eh_emoji:
+            _texto_com_contorno(draw, (x, y), trecho, fonte_texto, cor_texto)
+            x += draw.textlength(trecho, font=fonte_texto)
+            continue
+        for caractere in trecho:
+            caminho_png = _arquivo_png_emoji(caractere)
+            if caminho_png:
+                emoji_img = _carregar_emoji_png(caminho_png, tamanho_fonte)
+                overlay.alpha_composite(emoji_img, (int(x), int(y)))
+                x += tamanho_fonte
+            else:
+                if fonte_emoji is None:
+                    fonte_emoji = _carregar_fonte_truetype(FONTE_EMOJI_PATH, tamanho_fonte, negrito_se_variavel=False)
+                draw.text((x, y), caractere, font=fonte_emoji, fill=cor_texto)
+                x += draw.textlength(caractere, font=fonte_emoji)
 
 
 def _template_faixa_inferior(overlay, draw, largura, altura, anuncio, chamada):
@@ -478,6 +561,66 @@ ELEMENTOS_DATAS_COMEMORATIVAS = {
          'tamanho_fonte': 0.07, 'cor_texto': '#4ade80', 'alinhamento': 'esquerda', 'maiusculas': False},
         {'tipo': 'logo', 'x': 0.80, 'y': 0.71, 'altura': 0.06},
     ],
+    'CARNAVAL': [
+        {'tipo': 'forma', 'x': 0, 'y': 0.7, 'largura': 1, 'altura': 0.3,
+         'cor_fundo': '#6a1b9a', 'opacidade': 0.9, 'arredondado': 0},
+        {'tipo': 'emoji', 'emoji': '🎭', 'x': 0.04, 'y': 0.03, 'altura': 0.12},
+        {'tipo': 'texto', 'campo': 'fixo', 'texto_fixo': 'FOLIA NO CARNAVAL', 'x': 0.06, 'y': 0.72, 'largura': 0.85,
+         'tamanho_fonte': 0.05, 'cor_texto': '#ffd600', 'fonte': 'baloo', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'titulo', 'x': 0.06, 'y': 0.81, 'largura': 0.88,
+         'tamanho_fonte': 0.045, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'preco', 'x': 0.06, 'y': 0.89, 'largura': 0.88,
+         'tamanho_fonte': 0.07, 'cor_texto': '#ffd600', 'alinhamento': 'esquerda', 'maiusculas': False},
+        {'tipo': 'logo', 'x': 0.80, 'y': 0.71, 'altura': 0.06},
+    ],
+    'PASCOA': [
+        {'tipo': 'forma', 'x': 0, 'y': 0.7, 'largura': 1, 'altura': 0.3,
+         'cor_fundo': '#7a4a1e', 'opacidade': 0.9, 'arredondado': 0},
+        {'tipo': 'emoji', 'emoji': '🐰', 'x': 0.04, 'y': 0.03, 'altura': 0.12},
+        {'tipo': 'texto', 'campo': 'fixo', 'texto_fixo': 'FELIZ PÁSCOA', 'x': 0.06, 'y': 0.725, 'largura': 0.7,
+         'tamanho_fonte': 0.06, 'cor_texto': '#ffe0b2', 'fonte': 'baloo', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'titulo', 'x': 0.06, 'y': 0.81, 'largura': 0.88,
+         'tamanho_fonte': 0.045, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'preco', 'x': 0.06, 'y': 0.89, 'largura': 0.88,
+         'tamanho_fonte': 0.07, 'cor_texto': '#4ade80', 'alinhamento': 'esquerda', 'maiusculas': False},
+        {'tipo': 'logo', 'x': 0.80, 'y': 0.71, 'altura': 0.06},
+    ],
+    'DIA_DOS_NAMORADOS': [
+        {'tipo': 'forma', 'x': 0, 'y': 0.7, 'largura': 1, 'altura': 0.3,
+         'cor_fundo': '#8e0038', 'opacidade': 0.9, 'arredondado': 0},
+        {'tipo': 'emoji', 'emoji': '❤️', 'x': 0.04, 'y': 0.03, 'altura': 0.12},
+        {'tipo': 'texto', 'campo': 'fixo', 'texto_fixo': 'DIA DOS NAMORADOS', 'x': 0.06, 'y': 0.725, 'largura': 0.85,
+         'tamanho_fonte': 0.05, 'cor_texto': '#ff8fab', 'fonte': 'baloo', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'titulo', 'x': 0.06, 'y': 0.81, 'largura': 0.88,
+         'tamanho_fonte': 0.045, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'preco', 'x': 0.06, 'y': 0.89, 'largura': 0.88,
+         'tamanho_fonte': 0.07, 'cor_texto': '#ff8fab', 'alinhamento': 'esquerda', 'maiusculas': False},
+        {'tipo': 'logo', 'x': 0.80, 'y': 0.71, 'altura': 0.06},
+    ],
+    'FESTA_JUNINA': [
+        {'tipo': 'forma', 'x': 0, 'y': 0.7, 'largura': 1, 'altura': 0.3,
+         'cor_fundo': '#5a3921', 'opacidade': 0.92, 'arredondado': 0},
+        {'tipo': 'emoji', 'emoji': '🎆', 'x': 0.04, 'y': 0.03, 'altura': 0.12},
+        {'tipo': 'texto', 'campo': 'fixo', 'texto_fixo': 'ARRAIÁ DE OFERTAS', 'x': 0.06, 'y': 0.72, 'largura': 0.85,
+         'tamanho_fonte': 0.05, 'cor_texto': '#ff6f00', 'fonte': 'bebas', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'titulo', 'x': 0.06, 'y': 0.81, 'largura': 0.88,
+         'tamanho_fonte': 0.045, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'preco', 'x': 0.06, 'y': 0.89, 'largura': 0.88,
+         'tamanho_fonte': 0.07, 'cor_texto': '#ff6f00', 'alinhamento': 'esquerda', 'maiusculas': False},
+        {'tipo': 'logo', 'x': 0.80, 'y': 0.71, 'altura': 0.06},
+    ],
+    'DIA_DAS_CRIANCAS': [
+        {'tipo': 'forma', 'x': 0, 'y': 0.7, 'largura': 1, 'altura': 0.3,
+         'cor_fundo': '#0277bd', 'opacidade': 0.9, 'arredondado': 0},
+        {'tipo': 'emoji', 'emoji': '🎈', 'x': 0.04, 'y': 0.03, 'altura': 0.12},
+        {'tipo': 'texto', 'campo': 'fixo', 'texto_fixo': 'DIA DAS CRIANÇAS', 'x': 0.06, 'y': 0.725, 'largura': 0.85,
+         'tamanho_fonte': 0.05, 'cor_texto': '#ffeb3b', 'fonte': 'baloo', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'titulo', 'x': 0.06, 'y': 0.81, 'largura': 0.88,
+         'tamanho_fonte': 0.045, 'cor_texto': '#ffffff', 'alinhamento': 'esquerda', 'maiusculas': True},
+        {'tipo': 'texto', 'campo': 'preco', 'x': 0.06, 'y': 0.89, 'largura': 0.88,
+         'tamanho_fonte': 0.07, 'cor_texto': '#ffeb3b', 'alinhamento': 'esquerda', 'maiusculas': False},
+        {'tipo': 'logo', 'x': 0.80, 'y': 0.71, 'altura': 0.06},
+    ],
 }
 
 DATA_COMEMORATIVA_CHOICES = [
@@ -486,6 +629,11 @@ DATA_COMEMORATIVA_CHOICES = [
     ('BLACK_FRIDAY', 'Black Friday'),
     ('DIA_DAS_MAES', 'Dia das Mães'),
     ('DIA_DOS_PAIS', 'Dia dos Pais'),
+    ('CARNAVAL', 'Carnaval'),
+    ('PASCOA', 'Páscoa'),
+    ('DIA_DOS_NAMORADOS', 'Dia dos Namorados'),
+    ('FESTA_JUNINA', 'Festa Junina'),
+    ('DIA_DAS_CRIANCAS', 'Dia das Crianças'),
 ]
 
 
@@ -520,7 +668,7 @@ def _texto_do_elemento(elemento, anuncio, chamada):
         texto = elemento.get('texto_fixo') or ''
     if elemento.get('maiusculas', True):
         texto = texto.upper()
-    return texto
+    return _limpar_selecionadores_variacao(texto)
 
 
 def _desenhar_elemento_forma(draw, elemento, largura, altura):
@@ -540,7 +688,7 @@ def _desenhar_elemento_forma(draw, elemento, largura, altura):
         draw.rectangle([(x, y), (x + w, y + h)], fill=cor)
 
 
-def _desenhar_elemento_texto(draw, elemento, anuncio, chamada, largura, altura):
+def _desenhar_elemento_texto(overlay, draw, elemento, anuncio, chamada, largura, altura):
     texto = _texto_do_elemento(elemento, anuncio, chamada)
     if not texto:
         return
@@ -560,7 +708,7 @@ def _desenhar_elemento_texto(draw, elemento, anuncio, chamada, largura, altura):
         if alinhamento == 'centro':
             linha_largura = draw.textlength(linha, font=fonte)
             linha_x = x + max(int((w - linha_largura) / 2), 0)
-        _texto_com_contorno(draw, (linha_x, linha_y), linha, fonte, cor_texto)
+        _desenhar_texto_misto(overlay, draw, (linha_x, linha_y), linha, fonte, tamanho_fonte, cor_texto)
         linha_y += espaco_linha
 
 
@@ -577,16 +725,25 @@ def _desenhar_elemento_logo(overlay, elemento, largura, altura):
 
 
 def _desenhar_elemento_emoji(overlay, elemento, largura, altura):
-    """Emoji como um 'adesivo' separado (fonte NotoEmoji, monocromática — o
-    Pillow não renderiza emoji colorido sem suporte especial de libraqm, mas
-    o traço/silhueta já fica bem reconhecível)."""
-    emoji = (elemento.get('emoji') or '').strip()
+    """Emoji como um 'adesivo' separado. Tenta primeiro o PNG colorido do
+    Twemoji (bundlado em static/emoji/ — visual "de verdade", não só um
+    contorno); se esse emoji específico não estiver bundlado, cai pro
+    contorno vetorial da fonte NotoEmoji, que cobre praticamente qualquer
+    emoji Unicode (sem cor, mas sem virar "tofu" também)."""
+    emoji = _limpar_selecionadores_variacao((elemento.get('emoji') or '').strip())
     if not emoji:
         return
     tamanho = max(int(float(elemento.get('altura', 0.08)) * altura), 10)
-    fonte = _carregar_fonte_truetype(FONTE_EMOJI_PATH, tamanho, negrito_se_variavel=False)
     x = int(float(elemento.get('x', 0)) * largura)
     y = int(float(elemento.get('y', 0)) * altura)
+
+    caminho_png = _arquivo_png_emoji(emoji)
+    if caminho_png:
+        emoji_img = _carregar_emoji_png(caminho_png, tamanho)
+        overlay.alpha_composite(emoji_img, (x, y))
+        return
+
+    fonte = _carregar_fonte_truetype(FONTE_EMOJI_PATH, tamanho, negrito_se_variavel=False)
     cor = _cor_de_hex(elemento.get('cor'), 1.0) if elemento.get('cor') else COR_TEXTO_PRINCIPAL
     draw = ImageDraw.Draw(overlay)
     draw.text((x, y), emoji, font=fonte, fill=cor)
@@ -614,7 +771,7 @@ def montar_imagem_layout(foto_bytes, anuncio, chamada, elementos, resolucao=None
             if tipo == 'forma':
                 _desenhar_elemento_forma(draw, elemento, largura, altura)
             elif tipo == 'texto':
-                _desenhar_elemento_texto(draw, elemento, anuncio, chamada, largura, altura)
+                _desenhar_elemento_texto(overlay, draw, elemento, anuncio, chamada, largura, altura)
             elif tipo == 'logo':
                 _desenhar_elemento_logo(overlay, elemento, largura, altura)
             elif tipo == 'emoji':

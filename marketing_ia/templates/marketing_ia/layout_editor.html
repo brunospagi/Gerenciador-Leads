@@ -52,7 +52,7 @@
     <div class="col-lg-5 mb-3">
         <p class="text-muted small mb-1">Prévia real (atualiza sozinha após parar de mexer)</p>
         <div class="border rounded shadow-sm d-flex align-items-center justify-content-center bg-light" style="min-height:200px;">
-            <img id="preview-real-img" src="" alt="Prévia real" class="img-fluid d-none">
+            <img id="preview-real-img" src="" alt="Prévia real" class="img-fluid d-none" style="transition: opacity .15s;">
             <div id="preview-real-loading" class="text-muted small p-4">Ajuste algo pra gerar a prévia...</div>
         </div>
 
@@ -97,7 +97,18 @@
         opcionais: 'Ar condicionado, Direção elétrica, Vidros elétricos',
         veiculo_completo: 'Veículo Completo',
     };
-    const EMOJIS_DISPONIVEIS = ['🔥', '🚗', '💰', '✅', '🎉', '🏷️', '⭐', '💯', '👍', '🎁', '🎄', '💐', '📢', '🔧', '⚡', '🚀'];
+    // "Teclado" de emoji organizado por categoria — os emoji marcados aqui têm
+    // PNG colorido bundlado (static/emoji/) no lado do Python; qualquer OUTRO
+    // emoji colado no campo de busca/texto livre também funciona, só que sem
+    // cor (cai no contorno vetorial da fonte NotoEmoji).
+    const EMOJI_CATEGORIAS = {
+        'Ofertas & carros': ['🔥', '🚗', '🚙', '🏍️', '🛻', '💰', '💵', '💳', '🏷️', '✅', '📉', '📈', '🔑', '⛽', '🅿️', '🚦', '🔧', '🚀'],
+        'Comemoração': ['🎉', '🎁', '🎄', '🎆', '🎈', '🎭', '🏆', '👏', '🙌', '✨', '🎯'],
+        'Reações': ['😍', '😀', '😎', '🤩', '👍', '👌', '💯'],
+        'Amor': ['❤️', '💐', '💖'],
+        'Natureza': ['⭐', '⚡', '☀️', '🌧️', '🐰'],
+        'Avisos': ['📢', '📱', '☎️', '📍', '🔔', '🚨', '📅'],
+    };
     const FONTE_CHOICES = {{ fonte_choices|safe }};
 
     let elementos = {{ elementos_iniciais_json|safe }};
@@ -388,27 +399,54 @@
     function campoEmojiPicker(elementoAtual) {
         const wrap = document.createElement('div');
         wrap.className = 'mb-2';
-        const lbl = document.createElement('label');
-        lbl.className = 'form-label small mb-1 d-block';
-        lbl.textContent = 'Emoji';
-        wrap.appendChild(lbl);
-        const grade = document.createElement('div');
-        grade.className = 'd-flex flex-wrap gap-1';
-        EMOJIS_DISPONIVEIS.forEach(function (emoji) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.textContent = emoji;
-            btn.className = 'btn btn-outline-secondary btn-sm' + (elementoAtual.emoji === emoji ? ' active' : '');
-            btn.style.fontSize = '1.1rem';
-            btn.addEventListener('click', function () {
-                elementoAtual.emoji = emoji;
-                renderElementos();
-                atualizarPainel();
-                agendarPreviewReal();
-            });
-            grade.appendChild(btn);
+
+        const lblTexto = document.createElement('label');
+        lblTexto.className = 'form-label small mb-1 d-block';
+        lblTexto.textContent = 'Cole ou digite qualquer emoji (não precisa ser um destes abaixo)';
+        wrap.appendChild(lblTexto);
+
+        const inputLivre = document.createElement('input');
+        inputLivre.type = 'text';
+        inputLivre.className = 'form-control form-control-sm mb-2';
+        inputLivre.value = elementoAtual.emoji || '';
+        inputLivre.placeholder = '🏖️';
+        inputLivre.addEventListener('input', function () {
+            elementoAtual.emoji = inputLivre.value.trim();
+            renderElementos();
+            agendarPreviewReal();
         });
-        wrap.appendChild(grade);
+        wrap.appendChild(inputLivre);
+
+        const lblGrade = document.createElement('label');
+        lblGrade.className = 'form-label small mb-1 d-block';
+        lblGrade.textContent = 'Ou escolha do teclado rápido';
+        wrap.appendChild(lblGrade);
+
+        Object.keys(EMOJI_CATEGORIAS).forEach(function (categoria) {
+            const tituloCategoria = document.createElement('div');
+            tituloCategoria.className = 'text-muted small mt-1 mb-1';
+            tituloCategoria.textContent = categoria;
+            wrap.appendChild(tituloCategoria);
+
+            const grade = document.createElement('div');
+            grade.className = 'd-flex flex-wrap gap-1 mb-1';
+            EMOJI_CATEGORIAS[categoria].forEach(function (emoji) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = emoji;
+                btn.className = 'btn btn-outline-secondary btn-sm' + (elementoAtual.emoji === emoji ? ' active' : '');
+                btn.style.fontSize = '1.1rem';
+                btn.addEventListener('click', function () {
+                    elementoAtual.emoji = emoji;
+                    renderElementos();
+                    atualizarPainel();
+                    agendarPreviewReal();
+                });
+                grade.appendChild(btn);
+            });
+            wrap.appendChild(grade);
+        });
+
         return wrap;
     }
 
@@ -543,9 +581,17 @@
     }
 
     function gerarPreviewReal() {
-        previewLoading.textContent = 'Gerando prévia...';
-        previewLoading.classList.remove('d-none');
-        previewImg.classList.add('d-none');
+        // Se já existe uma prévia na tela, mantém ela visível (só meio
+        // transparente, indicando "atualizando") em vez de esconder e mostrar
+        // "Gerando..." toda hora — isso é o que fazia a tela "piscar"/parecer
+        // que estava dando refresh a cada mudancinha (cor, slider, texto etc).
+        const jaTemImagem = !previewImg.classList.contains('d-none');
+        if (jaTemImagem) {
+            previewImg.style.opacity = '0.5';
+        } else {
+            previewLoading.textContent = 'Gerando prévia...';
+            previewLoading.classList.remove('d-none');
+        }
 
         fetch("{% url 'marketing_layout_preview' %}", {
             method: 'POST',
@@ -561,11 +607,17 @@
                 return resp.blob();
             })
             .then(function (blob) {
-                previewImg.src = URL.createObjectURL(blob);
+                const urlAntiga = previewImg.dataset.blobUrl;
+                const novaUrl = URL.createObjectURL(blob);
+                previewImg.src = novaUrl;
+                previewImg.dataset.blobUrl = novaUrl;
+                previewImg.style.opacity = '1';
                 previewImg.classList.remove('d-none');
                 previewLoading.classList.add('d-none');
+                if (urlAntiga) URL.revokeObjectURL(urlAntiga);
             })
             .catch(function (err) {
+                previewImg.style.opacity = '1';
                 previewLoading.textContent = err.message || 'Falha ao gerar prévia.';
                 previewLoading.classList.remove('d-none');
                 previewImg.classList.add('d-none');
