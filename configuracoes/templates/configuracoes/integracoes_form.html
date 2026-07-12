@@ -59,14 +59,49 @@
           <div class="col-md-4 mb-3">
             <label class="form-label">{{ form.provedor_imagem_ia.label }}</label>
             {{ form.provedor_imagem_ia }}
+            <div class="form-text">Só os campos do provedor selecionado valem — os outros ficam ocultos abaixo.</div>
           </div>
-          <div class="col-md-4 mb-3">
-            <label class="form-label">{{ form.leonardo_api_key.label }}</label>
-            {{ form.leonardo_api_key }}
+        </div>
+
+        <div class="provedor-imagem-grupo border rounded p-3 mb-3 bg-light-subtle" data-provedor-grupo="GEMINI">
+          <div class="fw-bold small text-uppercase text-muted mb-2">Gemini (Google)</div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.gemini_image_model.label }}</label>
+              {{ form.gemini_image_model }}
+            </div>
           </div>
-          <div class="col-md-4 mb-3">
-            <label class="form-label">{{ form.openai_api_key.label }}</label>
-            {{ form.openai_api_key }}
+        </div>
+
+        <div class="provedor-imagem-grupo border rounded p-3 mb-3 bg-light-subtle" data-provedor-grupo="LEONARDO">
+          <div class="fw-bold small text-uppercase text-muted mb-2">Leonardo.Ai</div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.leonardo_api_key.label }}</label>
+              {{ form.leonardo_api_key }}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.leonardo_model_id.label }}</label>
+              {{ form.leonardo_model_id }}
+            </div>
+          </div>
+        </div>
+
+        <div class="provedor-imagem-grupo border rounded p-3 mb-3 bg-light-subtle" data-provedor-grupo="OPENAI">
+          <div class="fw-bold small text-uppercase text-muted mb-2">OpenAI</div>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">{{ form.openai_api_key.label }}</label>
+              {{ form.openai_api_key }}
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">{{ form.openai_image_model.label }}</label>
+              {{ form.openai_image_model }}
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">{{ form.openai_image_quality.label }}</label>
+              {{ form.openai_image_quality }}
+            </div>
           </div>
         </div>
 
@@ -75,4 +110,24 @@
     </div>
   </section>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var selectProvedor = document.getElementById('id_provedor_imagem_ia');
+    var grupos = document.querySelectorAll('.provedor-imagem-grupo');
+    if (!selectProvedor) return;
+
+    function atualizarGruposVisiveis() {
+        var atual = selectProvedor.value;
+        grupos.forEach(function (grupo) {
+            grupo.style.display = (grupo.dataset.provedorGrupo === atual) ? 'block' : 'none';
+        });
+    }
+
+    selectProvedor.addEventListener('change', atualizarGruposVisiveis);
+    atualizarGruposVisiveis();
+});
+</script>
 {% endblock %}

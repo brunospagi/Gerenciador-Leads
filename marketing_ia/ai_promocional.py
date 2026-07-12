@@ -119,11 +119,12 @@ def _gerar_imagem_leonardo(anuncio, foto_bytes, mime_type):
         logger.warning('Leonardo.Ai indisponível: chave da API não configurada (Admin/.env).')
         return None, None, None
 
+    model_id = obter_integracao('leonardo_model_id') or leonardo_client.MODEL_ID_PADRAO
     try:
         imagem_bytes, mime_saida = leonardo_client.gerar_imagem_leonardo(
-            PROMPT_IMAGEM_LEONARDO, foto_bytes, mime_type, api_key,
+            PROMPT_IMAGEM_LEONARDO, foto_bytes, mime_type, api_key, model_id=model_id,
         )
-        return imagem_bytes, mime_saida, f'leonardo:{leonardo_client.MODEL_ID_PADRAO}'
+        return imagem_bytes, mime_saida, f'leonardo:{model_id}'
     except leonardo_client.LeonardoError as exc:
         logger.warning('Erro ao gerar imagem promocional com Leonardo.Ai: %s', exc)
         return None, None, None
@@ -138,11 +139,13 @@ def _gerar_imagem_openai(anuncio, foto_bytes, mime_type):
         logger.warning('OpenAI indisponível: chave da API não configurada (Admin/.env).')
         return None, None, None
 
+    model_id = obter_integracao('openai_image_model') or openai_client.MODEL_ID_PADRAO
+    quality = obter_integracao('openai_image_quality') or 'medium'
     try:
         imagem_bytes, mime_saida = openai_client.gerar_imagem_openai(
-            PROMPT_IMAGEM, foto_bytes, mime_type, api_key,
+            PROMPT_IMAGEM, foto_bytes, mime_type, api_key, model_id=model_id, quality=quality,
         )
-        return imagem_bytes, mime_saida, f'openai:{openai_client.MODEL_ID_PADRAO}'
+        return imagem_bytes, mime_saida, f'openai:{model_id}:{quality}'
     except openai_client.OpenAIImageError as exc:
         logger.warning('Erro ao gerar imagem promocional com OpenAI: %s', exc)
         return None, None, None
@@ -157,6 +160,7 @@ def _gerar_imagem_gemini(anuncio, foto_bytes, mime_type, max_tentativas=3):
         logger.warning('Gemini indisponível para gerar imagem promocional: %s', erro)
         return None, None, None
 
+    modelo = obter_integracao('gemini_image_model') or IMAGE_MODEL
     contents = [
         {"text": PROMPT_IMAGEM},
         {"inline_data": {"mime_type": mime_type, "data": base64.b64encode(foto_bytes).decode('utf-8')}},
@@ -164,7 +168,7 @@ def _gerar_imagem_gemini(anuncio, foto_bytes, mime_type, max_tentativas=3):
 
     for tentativa in range(1, max_tentativas + 1):
         try:
-            response = client.models.generate_content(model=IMAGE_MODEL, contents=contents)
+            response = client.models.generate_content(model=modelo, contents=contents)
             for candidate in response.candidates or []:
                 for part in candidate.content.parts or []:
                     inline_data = getattr(part, 'inline_data', None)
@@ -172,7 +176,7 @@ def _gerar_imagem_gemini(anuncio, foto_bytes, mime_type, max_tentativas=3):
                         dados = inline_data.data
                         if isinstance(dados, str):
                             dados = base64.b64decode(dados)
-                        return dados, inline_data.mime_type or 'image/png', IMAGE_MODEL
+                        return dados, inline_data.mime_type or 'image/png', modelo
             logger.warning('Resposta da Gemini não trouxe imagem para %s', anuncio.titulo)
             return None, None, None
         except Exception as exc:

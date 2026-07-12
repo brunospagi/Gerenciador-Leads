@@ -28,12 +28,13 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = 'https://cloud.leonardo.ai/api/rest/v1'
 
-# ID de modelo verificado no exemplo oficial da documentação do Leonardo.Ai
-# (docs.leonardo.ai/recipes/generate-with-image-to-image-guidance-using-uploaded-images).
-# Não há garantia de que seja o melhor modelo para fotos de veículo — o ideal é o
-# admin pegar o ID de um modelo fotorrealista (ex: "Lucid Realism", "Phoenix") em
-# app.leonardo.ai e configurar LEONARDO_MODEL_ID no .env, sem precisar mexer no código.
-MODEL_ID_PADRAO = getattr(settings, 'LEONARDO_MODEL_ID', None) or '1e60896f-3c26-4296-8ecc-53e2afecc132'
+# Fallback final se nada for configurado nem no painel (Configurações > Integrações,
+# ConfiguracaoIntegracoes.leonardo_model_id) nem no .env (LEONARDO_MODEL_ID). Lucid
+# Realism é o modelo que a própria Leonardo recomenda para fotografia realista de
+# produto/comercial (ver docs.leonardo.ai/docs/commonly-used-api-values) - o valor
+# antigo aqui (Leonardo Diffusion XL) era um modelo generico/antigo que gerava
+# imagens de qualidade ruim para fotos de veículo.
+MODEL_ID_PADRAO = getattr(settings, 'LEONARDO_MODEL_ID', None) or '05ce0082-2d80-4a2d-8653-4d1c85e2418e'
 
 TIMEOUT_REQUEST = 15
 TIMEOUT_POLLING_SEGUNDOS = 90
@@ -108,10 +109,10 @@ def _upload_foto_referencia(api_key, foto_bytes, mime_type):
     return image_id
 
 
-def _criar_generation(api_key, prompt, init_image_id):
+def _criar_generation(api_key, prompt, init_image_id, model_id):
     payload = {
         'prompt': prompt,
-        'modelId': MODEL_ID_PADRAO,
+        'modelId': model_id,
         'width': 1024,
         'height': 1024,
         'num_images': 1,
@@ -170,12 +171,12 @@ def _aguardar_e_baixar(api_key, generation_id):
     raise LeonardoError('Tempo esgotado esperando a geração no Leonardo.Ai.')
 
 
-def gerar_imagem_leonardo(prompt, foto_bytes, mime_type, api_key):
+def gerar_imagem_leonardo(prompt, foto_bytes, mime_type, api_key, model_id=None):
     """
     Gera a imagem promocional usando a foto real do veículo como referência.
     Retorna (bytes, mime_type) ou levanta LeonardoError com uma mensagem
     amigável — o caller (ai_promocional.py) decide como logar/propagar.
     """
     image_id = _upload_foto_referencia(api_key, foto_bytes, mime_type)
-    generation_id = _criar_generation(api_key, prompt, image_id)
+    generation_id = _criar_generation(api_key, prompt, image_id, model_id or MODEL_ID_PADRAO)
     return _aguardar_e_baixar(api_key, generation_id)

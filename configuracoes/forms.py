@@ -2,6 +2,11 @@ from django import forms
 
 from .models import ConfiguracaoIntegracoes, WebhookIntegracao
 
+_CAMPOS_SELECT_INTEGRACOES = (
+    'provedor_imagem_ia', 'gemini_image_model', 'leonardo_model_id',
+    'openai_image_model', 'openai_image_quality',
+)
+
 
 class WebhookIntegracaoForm(forms.ModelForm):
     class Meta:
@@ -27,10 +32,16 @@ class ConfiguracaoIntegracoesForm(forms.ModelForm):
         fields = [
             'evolution_api_url', 'evolution_api_key', 'evolution_instance',
             'evo_crm_api_url', 'evo_crm_api_token', 'evo_crm_pipeline_id', 'evo_crm_pipeline_stage_id',
-            'provedor_imagem_ia', 'leonardo_api_key', 'openai_api_key',
+            'provedor_imagem_ia',
+            'gemini_image_model',
+            'leonardo_api_key', 'leonardo_model_id',
+            'openai_api_key', 'openai_image_model', 'openai_image_quality',
         ]
         widgets = {
             field: forms.TextInput(attrs={'class': 'form-control'})
-            for field in fields if field != 'provedor_imagem_ia'
+            for field in fields if field not in _CAMPOS_SELECT_INTEGRACOES
         }
-        widgets['provedor_imagem_ia'] = forms.Select(attrs={'class': 'form-select'})
+        widgets.update({
+            field: forms.Select(attrs={'class': 'form-select'})
+            for field in _CAMPOS_SELECT_INTEGRACOES
+        })
