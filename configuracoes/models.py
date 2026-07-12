@@ -58,12 +58,14 @@ class ConfiguracaoIntegracoes(models.Model):
     PROVEDOR_IMAGEM_CHOICES = [
         ('GEMINI', 'Gemini (Google)'),
         ('LEONARDO', 'Leonardo.Ai'),
+        ('OPENAI', 'OpenAI (GPT Image)'),
     ]
     provedor_imagem_ia = models.CharField(
         max_length=20, choices=PROVEDOR_IMAGEM_CHOICES, default='GEMINI',
         verbose_name="Provedor de geração de imagem (Marketing IA)",
     )
     leonardo_api_key = models.CharField(max_length=255, blank=True, verbose_name="Leonardo.Ai - Chave da API")
+    openai_api_key = models.CharField(max_length=255, blank=True, verbose_name="OpenAI - Chave da API")
 
     atualizado_em = models.DateTimeField(auto_now=True)
     atualizado_por = models.ForeignKey(
