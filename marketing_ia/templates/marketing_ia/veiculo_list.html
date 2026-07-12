@@ -113,37 +113,41 @@
 <div class="card card-body mb-4 shadow-sm">
     <form method="get" class="row g-3 align-items-center">
         <div class="col-md-4">
+            <label class="form-label small text-muted mb-1">Tipo</label>
             <select name="tipo" class="form-select" onchange="this.form.submit()">
                 <option value="" {% if not tipo_filtro %}selected{% endif %}>Todos os tipos</option>
                 <option value="CARRO" {% if tipo_filtro == 'CARRO' %}selected{% endif %}>Carros</option>
                 <option value="MOTO" {% if tipo_filtro == 'MOTO' %}selected{% endif %}>Motos</option>
             </select>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-5 d-flex align-items-end">
             <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="sem_post" value="1" id="semPostCheck"
                        {% if sem_post_filtro %}checked{% endif %} onchange="this.form.submit()">
                 <label class="form-check-label" for="semPostCheck">Só sem post gerado</label>
             </div>
         </div>
-        <div class="col-md-4 text-md-end">
-            <small class="text-muted">{{ total_anuncios }} veículo(s) no estoque · {{ total_posts }} post(s) gerado(s)</small>
+        <div class="col-md-3 text-md-end align-self-end">
+            <small class="text-muted d-block">{{ total_anuncios }} veículo(s) no estoque · {{ total_posts }} post(s) gerado(s)</small>
+            {% if tipo_filtro or sem_post_filtro or ipva_pago_filtro or aceita_troca_filtro or veiculo_completo_filtro %}
+            <a href="{% url 'marketing_veiculo_list' %}" class="small"><i class="bi bi-x-circle me-1"></i>Limpar filtros</a>
+            {% endif %}
         </div>
-        <div class="col-md-12 d-flex gap-3">
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="ipva_pago" value="1" id="ipvaPagoCheck"
-                       {% if ipva_pago_filtro %}checked{% endif %} onchange="this.form.submit()">
-                <label class="form-check-label" for="ipvaPagoCheck">IPVA pago</label>
-            </div>
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="aceita_troca" value="1" id="aceitaTrocaCheck"
-                       {% if aceita_troca_filtro %}checked{% endif %} onchange="this.form.submit()">
-                <label class="form-check-label" for="aceitaTrocaCheck">Aceita troca</label>
-            </div>
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="veiculo_completo" value="1" id="veiculoCompletoCheck"
-                       {% if veiculo_completo_filtro %}checked{% endif %} onchange="this.form.submit()">
-                <label class="form-check-label" for="veiculoCompletoCheck">Veículo completo</label>
+        <div class="col-md-12">
+            <hr class="my-1">
+            <div class="d-flex align-items-center flex-wrap gap-2 mt-2">
+                <span class="text-muted small me-1">Vantagens:</span>
+                <input type="checkbox" class="btn-check" name="ipva_pago" value="1" id="ipvaPagoCheck"
+                       {% if ipva_pago_filtro %}checked{% endif %} onchange="this.form.submit()" autocomplete="off">
+                <label class="btn btn-sm btn-outline-info" for="ipvaPagoCheck"><i class="bi bi-check-circle me-1"></i>IPVA pago</label>
+
+                <input type="checkbox" class="btn-check" name="aceita_troca" value="1" id="aceitaTrocaCheck"
+                       {% if aceita_troca_filtro %}checked{% endif %} onchange="this.form.submit()" autocomplete="off">
+                <label class="btn btn-sm btn-outline-info" for="aceitaTrocaCheck"><i class="bi bi-arrow-left-right me-1"></i>Aceita troca</label>
+
+                <input type="checkbox" class="btn-check" name="veiculo_completo" value="1" id="veiculoCompletoCheck"
+                       {% if veiculo_completo_filtro %}checked{% endif %} onchange="this.form.submit()" autocomplete="off">
+                <label class="btn btn-sm btn-outline-info" for="veiculoCompletoCheck"><i class="bi bi-stars me-1"></i>Veículo completo</label>
             </div>
         </div>
     </form>

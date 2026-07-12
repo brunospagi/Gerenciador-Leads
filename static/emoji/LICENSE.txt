@@ -1,0 +1,10 @@
+Emoji desta pasta são gráficos do Twemoji (https://github.com/jdecked/twemoji),
+copyright Twitter/X e colaboradores, distribuídos sob a licença CC-BY 4.0
+(https://creativecommons.org/licenses/by/4.0/). Arquivos nomeados pelo
+codepoint Unicode em hexadecimal (ex: 1f525.png = 🔥), 72x72px.
+
+Usados no editor de layouts do Marketing IA (marketing_ia/image_overlay.py)
+como emoji coloridos "de verdade" — o Pillow não tem suporte nativo a
+emoji colorido, então essas imagens PNG são coladas por cima da foto como
+qualquer outro elemento. Emoji fora deste conjunto continuam funcionando via
+fallback pra fonte NotoEmoji (contorno/vetor, sem cor).

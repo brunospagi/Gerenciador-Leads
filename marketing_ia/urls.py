@@ -13,6 +13,7 @@ urlpatterns = [
     path('lote/<int:lote_id>/', views.revisao_lote, name='marketing_revisao_lote'),
     path('lote/<int:lote_id>/status/', views.status_lote, name='marketing_status_lote'),
     path('lote/<int:lote_id>/salvar-todas/', views.aprovar_lote, name='marketing_aprovar_lote'),
+    path('lote/<int:lote_id>/enviar-webhook/', views.enviar_lote_webhook, name='marketing_enviar_lote_webhook'),
     path('post/<int:pk>/status/', views.post_atualizar_status, name='marketing_post_status'),
     path('post/<int:pk>/enviar-webhook/', views.enviar_post_webhook_view, name='marketing_post_enviar_webhook'),
     path('preview/<int:preview_id>/imagem/', views.preview_imagem, name='marketing_preview_imagem'),

@@ -19,7 +19,9 @@ from . import leonardo_client
 from . import openai_client
 from . import scraping
 from . import services
-from .models import LayoutOverlay, PostPromocional, PreviewPost, VeiculoAnuncio
+from configuracoes.models import WebhookIntegracao
+
+from .models import LayoutOverlay, LoteGeracao, PostPromocional, PreviewPost, VeiculoAnuncio
 
 User = get_user_model()
 
@@ -759,6 +761,46 @@ class DesenharElementoEmojiTests(TestCase):
         imagem_bytes, _ = image_overlay.montar_imagem_layout(_foto_fake_bytes(), anuncio, 'chamada', elementos)
         self.assertTrue(imagem_bytes)
 
+    def test_emoji_com_seletor_de_variacao_nao_quebra(self):
+        # Regressão do bug relatado: colar um emoji com seletor de variação
+        # (ex: 🏖️, 🏷️ = base + U+FE0F) deixava um "tofu" extra do lado dele.
+        elementos = [{'tipo': 'emoji', 'emoji': '🏖️', 'x': 0.1, 'y': 0.1, 'altura': 0.1}]
+        anuncio = SimpleNamespace(marca='Fiat', modelo='Palio', ano='2012', preco=Decimal('26900'))
+        imagem_bytes, _ = image_overlay.montar_imagem_layout(_foto_fake_bytes(), anuncio, 'chamada', elementos)
+        self.assertTrue(imagem_bytes)
+
+    def test_texto_fixo_com_emoji_colado_no_meio_nao_quebra(self):
+        # O mesmo bug, mas colando o emoji dentro de um texto normal (campo
+        # "fixo" do editor) em vez de um elemento "emoji" dedicado — a fonte
+        # de texto escolhida (Poppins etc) não tem glifo de emoji nenhum.
+        elementos = [{
+            'tipo': 'texto', 'campo': 'fixo', 'texto_fixo': 'PROMOÇÃO DE VERÃO 🏖️',
+            'x': 0.05, 'y': 0.1, 'largura': 0.9, 'tamanho_fonte': 0.06,
+        }]
+        anuncio = SimpleNamespace(marca='Fiat', modelo='Palio', ano='2012', preco=Decimal('26900'))
+        imagem_bytes, mime_type = image_overlay.montar_imagem_layout(_foto_fake_bytes(), anuncio, 'chamada', elementos)
+        self.assertEqual(mime_type, 'image/jpeg')
+        self.assertTrue(imagem_bytes)
+
+
+class LimparSelecionadoresVariacaoTests(TestCase):
+    def test_remove_seletor_de_variacao(self):
+        self.assertEqual(image_overlay._limpar_selecionadores_variacao('🏖️'), '🏖')
+        self.assertEqual(image_overlay._limpar_selecionadores_variacao('🏷️'), '🏷')
+
+    def test_texto_sem_seletor_fica_intacto(self):
+        self.assertEqual(image_overlay._limpar_selecionadores_variacao('SUPER OFERTA 🔥'), 'SUPER OFERTA 🔥')
+
+
+class EhEmojiTests(TestCase):
+    def test_detecta_emoji_comuns(self):
+        for emoji in ('🔥', '🚗', '⭐', '✅'):
+            self.assertTrue(image_overlay._eh_emoji(emoji))
+
+    def test_letras_e_numeros_nao_sao_emoji(self):
+        for caractere in ('A', 'ã', '3', ' '):
+            self.assertFalse(image_overlay._eh_emoji(caractere))
+
 
 class FonteComAcentuacaoTests(TestCase):
     def test_fonte_padrao_nao_e_mais_o_default_do_pillow_sem_acento(self):
@@ -847,3 +889,117 @@ class ContarLoteViewTests(TestCase):
         resp = self.client.get(reverse('marketing_contar_lote'))
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()['total'], 2)
+
+
+class TemplatesDatasComemorativasTests(TestCase):
+    def test_todas_as_datas_tem_elementos_e_renderizam(self):
+        anuncio = SimpleNamespace(marca='Fiat', modelo='Palio', ano='2012', preco=Decimal('26900'))
+        for chave, _ in image_overlay.DATA_COMEMORATIVA_CHOICES:
+            elementos = image_overlay.ELEMENTOS_DATAS_COMEMORATIVAS.get(chave)
+            self.assertIsNotNone(elementos, f'{chave} não tem elementos definidos')
+            imagem_bytes, mime_type = image_overlay.montar_imagem_layout(
+                _foto_fake_bytes(), anuncio, 'chamada', elementos,
+            )
+            self.assertEqual(mime_type, 'image/jpeg')
+            self.assertTrue(imagem_bytes)
+
+    def test_choices_e_dict_tem_as_mesmas_chaves(self):
+        chaves_choices = {chave for chave, _ in image_overlay.DATA_COMEMORATIVA_CHOICES}
+        chaves_dict = set(image_overlay.ELEMENTOS_DATAS_COMEMORATIVAS.keys())
+        self.assertEqual(chaves_choices, chaves_dict)
+
+    def test_pelo_menos_dez_datas_disponiveis(self):
+        self.assertGreaterEqual(len(image_overlay.DATA_COMEMORATIVA_CHOICES), 10)
+
+
+class EnviarLoteWebhookViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser('admin_envio_lote', 'admin_envio_lote@teste.com', 'senha12345')
+        self.client.login(username='admin_envio_lote', password='senha12345')
+        self.anuncio1 = _anuncio_persistido(external_id='lote-envio-1')
+        self.anuncio2 = _anuncio_persistido(external_id='lote-envio-2')
+        self.lote = LoteGeracao.objects.create(status='CONCLUIDO', total_alvo=2, total_gerado=2)
+        self.post1 = PostPromocional.objects.create(
+            anuncio=self.anuncio1, lote=self.lote, imagem='marketing_ia/posts/x/1.jpg', legenda='Legenda 1',
+        )
+        self.post2 = PostPromocional.objects.create(
+            anuncio=self.anuncio2, lote=self.lote, imagem='marketing_ia/posts/x/2.jpg', legenda='Legenda 2',
+            status='DESCARTADO',
+        )
+        self.webhook = WebhookIntegracao.objects.create(nome='Teste', slug='teste-envio-lote', url='https://exemplo.com/hook')
+
+    @patch('marketing_ia.views.enviar_post_webhook')
+    def test_envia_todos_os_posts_nao_descartados(self, mock_enviar):
+        mock_enviar.return_value = {'sucesso': True, 'status_code': 200, 'erro': None}
+
+        resp = self.client.post(
+            reverse('marketing_enviar_lote_webhook', args=[self.lote.pk]),
+            {'webhook_id': self.webhook.pk},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        mock_enviar.assert_called_once_with(self.post1, self.webhook)
+        self.assertEqual(self.post1.envios.count(), 1)
+        self.assertTrue(self.post1.envios.first().sucesso)
+        self.assertEqual(self.post2.envios.count(), 0)
+
+    @patch('marketing_ia.views.enviar_post_webhook')
+    def test_conta_falhas_separadamente(self, mock_enviar):
+        mock_enviar.return_value = {'sucesso': False, 'status_code': 500, 'erro': 'falhou'}
+
+        resp = self.client.post(
+            reverse('marketing_enviar_lote_webhook', args=[self.lote.pk]),
+            {'webhook_id': self.webhook.pk},
+        )
+
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(self.post1.envios.first().sucesso)
+
+    def test_sem_posts_nao_quebra(self):
+        lote_vazio = LoteGeracao.objects.create(status='CONCLUIDO', total_alvo=0, total_gerado=0)
+        resp = self.client.post(
+            reverse('marketing_enviar_lote_webhook', args=[lote_vazio.pk]),
+            {'webhook_id': self.webhook.pk},
+        )
+        self.assertEqual(resp.status_code, 302)
+
+
+class EmojiPngColoridoTests(TestCase):
+    def test_emoji_bundlado_encontra_arquivo_png(self):
+        caminho = image_overlay._arquivo_png_emoji('🔥')
+        self.assertIsNotNone(caminho)
+        self.assertTrue(caminho.exists())
+
+    def test_emoji_com_seletor_de_variacao_bundlado_encontra_arquivo(self):
+        # ❤️ tem seletor de variação (U+FE0F) mas o Twemoji nomeia o arquivo
+        # sem ele — _arquivo_png_emoji precisa descartar o seletor antes de montar o nome.
+        caminho = image_overlay._arquivo_png_emoji('❤️')
+        self.assertIsNotNone(caminho)
+
+    def test_emoji_nao_bundlado_retorna_none(self):
+        caminho = image_overlay._arquivo_png_emoji('🦕')
+        self.assertIsNone(caminho)
+
+    def test_elemento_emoji_bundlado_usa_png_colorido(self):
+        elementos = [{'tipo': 'emoji', 'emoji': '🔥', 'x': 0.1, 'y': 0.1, 'altura': 0.15}]
+        anuncio = SimpleNamespace(marca='Fiat', modelo='Palio', ano='2012', preco=Decimal('26900'))
+        imagem_bytes, mime_type = image_overlay.montar_imagem_layout(_foto_fake_bytes(), anuncio, 'chamada', elementos)
+        self.assertEqual(mime_type, 'image/jpeg')
+        self.assertTrue(imagem_bytes)
+
+    def test_elemento_emoji_nao_bundlado_cai_pro_fallback_vetorial(self):
+        elementos = [{'tipo': 'emoji', 'emoji': '🦕', 'x': 0.1, 'y': 0.1, 'altura': 0.15}]
+        anuncio = SimpleNamespace(marca='Fiat', modelo='Palio', ano='2012', preco=Decimal('26900'))
+        imagem_bytes, mime_type = image_overlay.montar_imagem_layout(_foto_fake_bytes(), anuncio, 'chamada', elementos)
+        self.assertEqual(mime_type, 'image/jpeg')
+        self.assertTrue(imagem_bytes)
+
+    def test_texto_misto_com_emoji_bundlado_e_nao_bundlado(self):
+        elementos = [{
+            'tipo': 'texto', 'campo': 'fixo', 'texto_fixo': 'OFERTA 🔥 RARA 🦕',
+            'x': 0.05, 'y': 0.1, 'largura': 0.9, 'tamanho_fonte': 0.06,
+        }]
+        anuncio = SimpleNamespace(marca='Fiat', modelo='Palio', ano='2012', preco=Decimal('26900'))
+        imagem_bytes, mime_type = image_overlay.montar_imagem_layout(_foto_fake_bytes(), anuncio, 'chamada', elementos)
+        self.assertEqual(mime_type, 'image/jpeg')
+        self.assertTrue(imagem_bytes)
