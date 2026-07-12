@@ -6,6 +6,21 @@ from django.db.models import Sum, Q
 from decimal import Decimal, ROUND_HALF_UP
 import calendar
 
+
+def _mes_atual():
+    # Callable (nao chamado na definicao do campo) para o default ser avaliado a
+    # cada novo registro, nao uma unica vez quando o modulo carrega. Com
+    # default=_mes_atual (sem os parenteses do callable) o valor fica
+    # congelado no mes em que o codigo foi importado pela primeira vez, e diverge
+    # do mes real assim que o mes muda - gerando uma migration pendente permanente
+    # e um default errado pra registros novos apos a virada do mes.
+    return timezone.now().month
+
+
+def _ano_atual():
+    return timezone.now().year
+
+
 # === 1. FERIADOS ===
 class Feriado(models.Model):
     descricao = models.CharField(max_length=100, verbose_name="Descrição do Feriado")
@@ -39,8 +54,8 @@ class Credito(models.Model):
     # Parcelamento
     parcelado = models.BooleanField(default=False, verbose_name="Parcelar?")
     qtd_parcelas = models.IntegerField(default=1, verbose_name="Qtd. Parcelas")
-    mes_inicio = models.IntegerField(verbose_name="Mês Início (1-12)", default=timezone.now().month)
-    ano_inicio = models.IntegerField(verbose_name="Ano Início", default=timezone.now().year)
+    mes_inicio = models.IntegerField(verbose_name="Mês Início (1-12)", default=_mes_atual)
+    ano_inicio = models.IntegerField(verbose_name="Ano Início", default=_ano_atual)
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
@@ -98,8 +113,8 @@ class Desconto(models.Model):
     # Parcelamento
     parcelado = models.BooleanField(default=False, verbose_name="Parcelar?")
     qtd_parcelas = models.IntegerField(default=1, verbose_name="Qtd. Parcelas")
-    mes_inicio = models.IntegerField(verbose_name="Mês Início (1-12)", default=timezone.now().month)
-    ano_inicio = models.IntegerField(verbose_name="Ano Início", default=timezone.now().year)
+    mes_inicio = models.IntegerField(verbose_name="Mês Início (1-12)", default=_mes_atual)
+    ano_inicio = models.IntegerField(verbose_name="Ano Início", default=_ano_atual)
 
     def gerar_parcelas(self):
         qtd_parcelas = self.qtd_parcelas if self.parcelado else 1
