@@ -1,8 +1,14 @@
 import base64
+import io
+from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from django.test import TestCase
+from PIL import Image
 
+from . import ai_promocional
+from . import image_overlay
 from . import leonardo_client
 from . import openai_client
 
@@ -115,3 +121,79 @@ class LeonardoClientTests(TestCase):
 
             _, kwargs = mock_post.call_args
             self.assertEqual(kwargs['json']['modelId'], leonardo_client.MODEL_ID_PADRAO)
+
+
+def _foto_fake_bytes(largura=640, altura=480):
+    imagem = Image.new('RGB', (largura, altura), color=(120, 140, 160))
+    saida = io.BytesIO()
+    imagem.save(saida, format='JPEG')
+    return saida.getvalue()
+
+
+class ImageOverlayTests(TestCase):
+    def _anuncio_fake(self, **overrides):
+        dados = {
+            'marca': 'Toyota',
+            'modelo': 'Corolla XEI',
+            'ano': '2022',
+            'preco': Decimal('98500.00'),
+        }
+        dados.update(overrides)
+        return SimpleNamespace(**dados)
+
+    def test_monta_imagem_com_sucesso(self):
+        imagem_bytes, mime_type = image_overlay.montar_imagem_overlay(
+            _foto_fake_bytes(), self._anuncio_fake(), 'OPORTUNIDADE ÚNICA',
+        )
+
+        self.assertEqual(mime_type, 'image/jpeg')
+        # Confere que o resultado e um JPEG valido, quadrado, no tamanho esperado.
+        resultado = Image.open(io.BytesIO(imagem_bytes))
+        self.assertEqual(resultado.format, 'JPEG')
+        self.assertEqual(resultado.size, image_overlay.TAMANHO_SAIDA)
+
+    def test_foto_invalida_levanta_image_overlay_error(self):
+        with self.assertRaises(image_overlay.ImageOverlayError):
+            image_overlay.montar_imagem_overlay(b'isso nao e uma imagem', self._anuncio_fake(), 'chamada')
+
+    def test_preco_ausente_nao_quebra(self):
+        # anuncio sem preco definido (None) - comum em veiculos "consulte o valor".
+        imagem_bytes, _ = image_overlay.montar_imagem_overlay(
+            _foto_fake_bytes(), self._anuncio_fake(preco=None), 'chamada',
+        )
+        self.assertTrue(imagem_bytes)
+
+    def test_titulo_longo_nao_quebra(self):
+        # marca/modelo bem longos, pra conferir que a quebra de linha nao estoura.
+        imagem_bytes, _ = image_overlay.montar_imagem_overlay(
+            _foto_fake_bytes(),
+            self._anuncio_fake(modelo='Cross Sahara Diesel Automático 4x4 Top de Linha Completo'),
+            'UMA CHAMADA BEM LONGA PRA TESTAR A QUEBRA DE LINHA TAMBEM',
+        )
+        self.assertTrue(imagem_bytes)
+
+
+class GerarChamadaIaTests(TestCase):
+    @patch('marketing_ia.ai_promocional.get_gemini_runtime')
+    def test_usa_texto_da_ia_quando_disponivel(self, mock_runtime):
+        client = Mock()
+        client.models.generate_content.return_value = Mock(text=' "SAIU MAIS BARATO" ')
+        mock_runtime.return_value = (client, 'gemini-2.5-flash', None)
+
+        chamada = ai_promocional.gerar_chamada_ia(SimpleNamespace(
+            titulo='Corolla 2022', marca='Toyota', modelo='Corolla', ano='2022',
+            km='30000', cor='Prata', preco=Decimal('98500'), condicoes=[],
+        ))
+
+        self.assertEqual(chamada, 'SAIU MAIS BARATO')
+
+    @patch('marketing_ia.ai_promocional.get_gemini_runtime')
+    def test_cai_pro_fallback_quando_gemini_indisponivel(self, mock_runtime):
+        mock_runtime.return_value = (None, None, 'sem chave configurada')
+
+        chamada = ai_promocional.gerar_chamada_ia(SimpleNamespace(
+            titulo='Corolla 2022', marca='Toyota', modelo='Corolla', ano='2022',
+            km='30000', cor='Prata', preco=Decimal('98500'), condicoes=[],
+        ))
+
+        self.assertEqual(chamada, ai_promocional.CHAMADA_FALLBACK)

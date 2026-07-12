@@ -79,6 +79,7 @@ class ConfiguracaoIntegracoes(models.Model):
         ('GEMINI', 'Gemini (Google)'),
         ('LEONARDO', 'Leonardo.Ai'),
         ('OPENAI', 'OpenAI (GPT Image)'),
+        ('OVERLAY', 'Sem IA de imagem (texto sobre a foto real)'),
     ]
     provedor_imagem_ia = models.CharField(
         max_length=20, choices=PROVEDOR_IMAGEM_CHOICES, default='GEMINI',
