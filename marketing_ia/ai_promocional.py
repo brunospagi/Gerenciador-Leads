@@ -11,6 +11,7 @@ from avaliacoes.ai_runtime import get_gemini_runtime
 from configuracoes.resolver import obter_integracao
 
 from . import leonardo_client
+from . import openai_client
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,8 @@ def gerar_imagem_promocional(anuncio, foto_bytes, mime_type, max_tentativas=3):
     provedor = ConfiguracaoIntegracoes.get_solo().provedor_imagem_ia
     if provedor == 'LEONARDO':
         return _gerar_imagem_leonardo(anuncio, foto_bytes, mime_type)
+    if provedor == 'OPENAI':
+        return _gerar_imagem_openai(anuncio, foto_bytes, mime_type)
     return _gerar_imagem_gemini(anuncio, foto_bytes, mime_type, max_tentativas=max_tentativas)
 
 
@@ -126,6 +129,25 @@ def _gerar_imagem_leonardo(anuncio, foto_bytes, mime_type):
         return None, None, None
     except Exception as exc:
         logger.warning('Erro inesperado ao chamar o Leonardo.Ai: %s', exc)
+        return None, None, None
+
+
+def _gerar_imagem_openai(anuncio, foto_bytes, mime_type):
+    api_key = obter_integracao('openai_api_key')
+    if not api_key:
+        logger.warning('OpenAI indisponível: chave da API não configurada (Admin/.env).')
+        return None, None, None
+
+    try:
+        imagem_bytes, mime_saida = openai_client.gerar_imagem_openai(
+            PROMPT_IMAGEM, foto_bytes, mime_type, api_key,
+        )
+        return imagem_bytes, mime_saida, f'openai:{openai_client.MODEL_ID_PADRAO}'
+    except openai_client.OpenAIImageError as exc:
+        logger.warning('Erro ao gerar imagem promocional com OpenAI: %s', exc)
+        return None, None, None
+    except Exception as exc:
+        logger.warning('Erro inesperado ao chamar a OpenAI: %s', exc)
         return None, None, None
 
 
