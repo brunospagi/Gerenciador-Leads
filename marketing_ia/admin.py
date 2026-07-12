@@ -6,8 +6,10 @@ from .models import EnvioWebhook, LoteGeracao, PostPromocional, VeiculoAnuncio
 
 @admin.register(VeiculoAnuncio)
 class VeiculoAnuncioAdmin(admin.ModelAdmin):
-    list_display = ('titulo', 'tipo', 'marca', 'preco', 'ano', 'ativo', 'atualizado_em')
-    list_filter = ('tipo', 'ativo', 'marca')
+    list_display = (
+        'titulo', 'tipo', 'marca', 'preco', 'ano', 'ipva_pago', 'aceita_troca', 'ativo', 'atualizado_em',
+    )
+    list_filter = ('tipo', 'ativo', 'marca', 'ipva_pago', 'aceita_troca')
     search_fields = ('titulo', 'marca', 'modelo', 'external_id')
     readonly_fields = ('external_id', 'coletado_em', 'atualizado_em')
     ordering = ('-atualizado_em',)

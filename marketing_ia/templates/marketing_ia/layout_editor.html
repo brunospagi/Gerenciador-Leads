@@ -1,0 +1,507 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h1 class="mb-0"><i class="bi bi-palette-fill me-2"></i>{% if layout %}Editando "{{ layout.nome }}"{% else %}Novo layout{% endif %}</h1>
+    <a href="{% url 'marketing_layout_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
+</div>
+
+<div class="card card-body shadow-sm mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small mb-1">Nome do layout</label>
+            <input type="text" id="layout-nome" class="form-control" value="{{ layout.nome|default:'' }}" placeholder="Ex: Promoção de fim de semana">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small mb-1">Resolução da prévia</label>
+            <select id="layout-resolucao" class="form-select">
+                {% for valor, rotulo in resolucao_choices %}
+                <option value="{{ valor }}">{{ rotulo }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small mb-1">Foto de exemplo (prévia real)</label>
+            <select id="layout-anuncio" class="form-select">
+                <option value="">Foto sintética de exemplo</option>
+                {% for veiculo in veiculos_com_foto %}
+                <option value="{{ veiculo.pk }}">{{ veiculo.titulo }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4 d-flex gap-2 justify-content-md-end">
+            <button type="button" class="btn btn-outline-dark btn-sm" id="btn-add-forma"><i class="bi bi-square me-1"></i>Forma</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="btn-add-texto"><i class="bi bi-fonts me-1"></i>Texto</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="btn-add-logo"><i class="bi bi-badge-tm me-1"></i>Logo</button>
+            <button type="button" class="btn btn-success btn-sm" id="btn-salvar"><i class="bi bi-check-lg me-1"></i>Salvar</button>
+        </div>
+    </div>
+    <div id="layout-msg" class="small mt-2"></div>
+</div>
+
+<div class="row">
+    <div class="col-lg-7 mb-3">
+        <p class="text-muted small mb-1">
+            Área de edição (esquemática — arraste/redimensione os elementos). A prévia real com a foto fica ao lado.
+        </p>
+        <div id="editor-canvas" class="position-relative border rounded shadow-sm" style="background: repeating-conic-gradient(#e9ecef 0% 25%, #f8f9fa 0% 50%) 0 0 / 24px 24px; overflow: hidden; max-width: 100%;">
+        </div>
+    </div>
+    <div class="col-lg-5 mb-3">
+        <p class="text-muted small mb-1">Prévia real (atualiza sozinha após parar de mexer)</p>
+        <div class="border rounded shadow-sm d-flex align-items-center justify-content-center bg-light" style="min-height:200px;">
+            <img id="preview-real-img" src="" alt="Prévia real" class="img-fluid d-none">
+            <div id="preview-real-loading" class="text-muted small p-4">Ajuste algo pra gerar a prévia...</div>
+        </div>
+
+        <div id="painel-propriedades" class="card card-body shadow-sm mt-3 d-none">
+            <h6 class="mb-2">Propriedades</h6>
+            <div id="painel-conteudo"></div>
+            <button type="button" class="btn btn-outline-danger btn-sm mt-2" id="btn-excluir-elemento">
+                <i class="bi bi-trash me-1"></i>Excluir elemento
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    function getCookieLocal(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    const RESOLUCOES = {
+        '1080x1080': [1080, 1080],
+        '1080x1350': [1080, 1350],
+        '1080x1920': [1080, 1920],
+    };
+    const TEXTO_EXEMPLO = {
+        chamada: 'SUPER OFERTA',
+        titulo: 'TOYOTA COROLLA 2.0 2022',
+        preco: 'R$ 98.500,00',
+    };
+
+    let elementos = {{ elementos_iniciais_json|safe }};
+    let selecionadoId = null;
+    let proximoId = 1;
+    elementos.forEach(function (el) { el._id = proximoId++; });
+
+    const canvas = document.getElementById('editor-canvas');
+    const selectResolucao = document.getElementById('layout-resolucao');
+    const selectAnuncio = document.getElementById('layout-anuncio');
+    const inputNome = document.getElementById('layout-nome');
+    const painel = document.getElementById('painel-propriedades');
+    const painelConteudo = document.getElementById('painel-conteudo');
+    const previewImg = document.getElementById('preview-real-img');
+    const previewLoading = document.getElementById('preview-real-loading');
+    const msgEl = document.getElementById('layout-msg');
+
+    function ajustarAlturaCanvas() {
+        const [w, h] = RESOLUCOES[selectResolucao.value];
+        const largura = canvas.parentElement.clientWidth;
+        canvas.style.width = largura + 'px';
+        canvas.style.height = (largura * h / w) + 'px';
+    }
+
+    function textoDoElemento(el) {
+        if (el.tipo !== 'texto') return '';
+        let texto = el.campo === 'fixo' ? (el.texto_fixo || 'Texto') : (TEXTO_EXEMPLO[el.campo] || '');
+        if (el.maiusculas !== false) texto = texto.toUpperCase();
+        return texto;
+    }
+
+    function renderElementos() {
+        canvas.querySelectorAll('.layout-elemento').forEach(function (n) { n.remove(); });
+
+        elementos.forEach(function (el) {
+            const div = document.createElement('div');
+            div.className = 'layout-elemento position-absolute';
+            div.dataset.id = el._id;
+            div.style.left = (el.x * 100) + '%';
+            div.style.top = (el.y * 100) + '%';
+            div.style.cursor = 'move';
+            div.style.userSelect = 'none';
+            div.style.boxSizing = 'border-box';
+
+            if (el._id === selecionadoId) {
+                div.style.outline = '2px dashed #0d6efd';
+            }
+
+            if (el.tipo === 'forma') {
+                div.style.width = (el.largura * 100) + '%';
+                div.style.height = (el.altura * 100) + '%';
+                div.style.background = hexParaRgba(el.cor_fundo || '#0f172a', el.opacidade != null ? el.opacidade : 0.9);
+                div.style.borderRadius = ((el.arredondado || 0) * 100 * 4) + 'px';
+            } else if (el.tipo === 'texto') {
+                div.style.width = (el.largura * 100) + '%';
+                div.style.minHeight = '1.4em';
+                div.style.color = el.cor_texto || '#ffffff';
+                div.style.fontSize = Math.max((el.tamanho_fonte || 0.05) * canvas.clientWidth, 10) + 'px';
+                div.style.textAlign = el.alinhamento === 'centro' ? 'center' : 'left';
+                div.style.textShadow = '1px 1px 2px rgba(0,0,0,.8)';
+                div.style.fontWeight = 'bold';
+                div.style.wordBreak = 'break-word';
+                div.textContent = textoDoElemento(el);
+            } else if (el.tipo === 'logo') {
+                div.style.width = 'auto';
+                div.style.height = ((el.altura || 0.06) * 100) + '%';
+                const img = document.createElement('img');
+                img.src = "{% static 'images/logo-spagi-motors.webp' %}";
+                img.style.height = '100%';
+                img.style.background = 'rgba(15,23,42,.5)';
+                img.style.pointerEvents = 'none';
+                div.appendChild(img);
+            }
+
+            const handle = document.createElement('div');
+            handle.className = 'resize-handle';
+            handle.style.position = 'absolute';
+            handle.style.right = '-6px';
+            handle.style.bottom = '-6px';
+            handle.style.width = '14px';
+            handle.style.height = '14px';
+            handle.style.background = '#0d6efd';
+            handle.style.borderRadius = '50%';
+            handle.style.cursor = 'nwse-resize';
+            if (el.tipo !== 'logo') {
+                div.appendChild(handle);
+            }
+
+            div.addEventListener('mousedown', function (ev) {
+                if (ev.target === handle) {
+                    iniciarResize(ev, el);
+                } else {
+                    selecionar(el);
+                    iniciarDrag(ev, el);
+                }
+                ev.stopPropagation();
+                ev.preventDefault();
+            });
+
+            canvas.appendChild(div);
+        });
+    }
+
+    function hexParaRgba(hex, opacidade) {
+        hex = (hex || '#0f172a').replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16) || 0;
+        const g = parseInt(hex.substring(2, 4), 16) || 0;
+        const b = parseInt(hex.substring(4, 6), 16) || 0;
+        return `rgba(${r},${g},${b},${opacidade})`;
+    }
+
+    function iniciarDrag(ev, el) {
+        const inicioX = ev.clientX;
+        const inicioY = ev.clientY;
+        const elX = el.x;
+        const elY = el.y;
+        const largura = el.largura || 0.1;
+        const altura = el.altura || 0.06;
+
+        function mover(e) {
+            const dx = (e.clientX - inicioX) / canvas.clientWidth;
+            const dy = (e.clientY - inicioY) / canvas.clientHeight;
+            el.x = Math.min(Math.max(elX + dx, 0), 1 - Math.min(largura, 1));
+            el.y = Math.min(Math.max(elY + dy, 0), 1 - Math.min(altura, 1));
+            renderElementos();
+        }
+        function soltar() {
+            document.removeEventListener('mousemove', mover);
+            document.removeEventListener('mouseup', soltar);
+            agendarPreviewReal();
+        }
+        document.addEventListener('mousemove', mover);
+        document.addEventListener('mouseup', soltar);
+    }
+
+    function iniciarResize(ev, el) {
+        const inicioX = ev.clientX;
+        const inicioY = ev.clientY;
+        const largInicial = el.largura || 0.2;
+        const altInicial = el.altura || 0.1;
+
+        function mover(e) {
+            const dx = (e.clientX - inicioX) / canvas.clientWidth;
+            const dy = (e.clientY - inicioY) / canvas.clientHeight;
+            if (el.tipo !== 'texto') {
+                el.altura = Math.min(Math.max(altInicial + dy, 0.02), 1 - el.y);
+            }
+            el.largura = Math.min(Math.max(largInicial + dx, 0.05), 1 - el.x);
+            renderElementos();
+            atualizarPainel();
+        }
+        function soltar() {
+            document.removeEventListener('mousemove', mover);
+            document.removeEventListener('mouseup', soltar);
+            agendarPreviewReal();
+        }
+        document.addEventListener('mousemove', mover);
+        document.addEventListener('mouseup', soltar);
+    }
+
+    function selecionar(el) {
+        selecionadoId = el._id;
+        renderElementos();
+        atualizarPainel();
+    }
+
+    canvas.addEventListener('mousedown', function () {
+        selecionadoId = null;
+        renderElementos();
+        atualizarPainel();
+    });
+
+    function elementoSelecionado() {
+        return elementos.find(function (e) { return e._id === selecionadoId; });
+    }
+
+    function campoNumero(label, valor, min, max, step, onChange) {
+        const wrap = document.createElement('div');
+        wrap.className = 'mb-2';
+        const lbl = document.createElement('label');
+        lbl.className = 'form-label small mb-1';
+        lbl.textContent = label;
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.className = 'form-range';
+        input.min = min; input.max = max; input.step = step; input.value = valor;
+        input.addEventListener('input', function () {
+            onChange(parseFloat(input.value));
+            renderElementos();
+            agendarPreviewReal();
+        });
+        wrap.appendChild(lbl);
+        wrap.appendChild(input);
+        return wrap;
+    }
+
+    function campoCor(label, valor, onChange) {
+        const wrap = document.createElement('div');
+        wrap.className = 'mb-2';
+        const lbl = document.createElement('label');
+        lbl.className = 'form-label small mb-1 d-block';
+        lbl.textContent = label;
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.className = 'form-control form-control-color';
+        input.value = valor || '#ffffff';
+        input.addEventListener('input', function () {
+            onChange(input.value);
+            renderElementos();
+            agendarPreviewReal();
+        });
+        wrap.appendChild(lbl);
+        wrap.appendChild(input);
+        return wrap;
+    }
+
+    function atualizarPainel() {
+        const el = elementoSelecionado();
+        painelConteudo.innerHTML = '';
+        if (!el) {
+            painel.classList.add('d-none');
+            return;
+        }
+        painel.classList.remove('d-none');
+
+        if (el.tipo === 'forma') {
+            painelConteudo.appendChild(campoCor('Cor de fundo', el.cor_fundo, function (v) { el.cor_fundo = v; }));
+            painelConteudo.appendChild(campoNumero('Opacidade', el.opacidade != null ? el.opacidade : 0.9, 0, 1, 0.05, function (v) { el.opacidade = v; }));
+            painelConteudo.appendChild(campoNumero('Cantos arredondados', el.arredondado || 0, 0, 0.1, 0.005, function (v) { el.arredondado = v; }));
+        } else if (el.tipo === 'texto') {
+            const wrapCampo = document.createElement('div');
+            wrapCampo.className = 'mb-2';
+            const lbl = document.createElement('label');
+            lbl.className = 'form-label small mb-1';
+            lbl.textContent = 'Conteúdo';
+            const select = document.createElement('select');
+            select.className = 'form-select form-select-sm';
+            [['chamada', 'Chamada (gerada por IA)'], ['titulo', 'Título do veículo'], ['preco', 'Preço'], ['fixo', 'Texto fixo']].forEach(function (opt) {
+                const option = document.createElement('option');
+                option.value = opt[0]; option.textContent = opt[1];
+                if (el.campo === opt[0]) option.selected = true;
+                select.appendChild(option);
+            });
+            select.addEventListener('change', function () {
+                el.campo = select.value;
+                renderElementos();
+                atualizarPainel();
+                agendarPreviewReal();
+            });
+            wrapCampo.appendChild(lbl);
+            wrapCampo.appendChild(select);
+            painelConteudo.appendChild(wrapCampo);
+
+            if (el.campo === 'fixo') {
+                const wrapTexto = document.createElement('div');
+                wrapTexto.className = 'mb-2';
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'form-control form-control-sm';
+                input.value = el.texto_fixo || '';
+                input.addEventListener('input', function () {
+                    el.texto_fixo = input.value;
+                    renderElementos();
+                    agendarPreviewReal();
+                });
+                wrapTexto.appendChild(input);
+                painelConteudo.appendChild(wrapTexto);
+            }
+
+            painelConteudo.appendChild(campoCor('Cor do texto', el.cor_texto, function (v) { el.cor_texto = v; }));
+            painelConteudo.appendChild(campoNumero('Tamanho da fonte', el.tamanho_fonte || 0.05, 0.02, 0.12, 0.005, function (v) { el.tamanho_fonte = v; }));
+
+            const wrapAlin = document.createElement('div');
+            wrapAlin.className = 'mb-2';
+            const lblAlin = document.createElement('label');
+            lblAlin.className = 'form-label small mb-1';
+            lblAlin.textContent = 'Alinhamento';
+            const selectAlin = document.createElement('select');
+            selectAlin.className = 'form-select form-select-sm';
+            [['esquerda', 'Esquerda'], ['centro', 'Centro']].forEach(function (opt) {
+                const option = document.createElement('option');
+                option.value = opt[0]; option.textContent = opt[1];
+                if (el.alinhamento === opt[0]) option.selected = true;
+                selectAlin.appendChild(option);
+            });
+            selectAlin.addEventListener('change', function () {
+                el.alinhamento = selectAlin.value;
+                renderElementos();
+                agendarPreviewReal();
+            });
+            wrapAlin.appendChild(lblAlin);
+            wrapAlin.appendChild(selectAlin);
+            painelConteudo.appendChild(wrapAlin);
+        }
+    }
+
+    document.getElementById('btn-excluir-elemento').addEventListener('click', function () {
+        elementos = elementos.filter(function (e) { return e._id !== selecionadoId; });
+        selecionadoId = null;
+        renderElementos();
+        atualizarPainel();
+        agendarPreviewReal();
+    });
+
+    document.getElementById('btn-add-forma').addEventListener('click', function () {
+        const el = { _id: proximoId++, tipo: 'forma', x: 0.1, y: 0.1, largura: 0.35, altura: 0.15, cor_fundo: '#0f172a', opacidade: 0.9, arredondado: 0 };
+        elementos.push(el);
+        selecionar(el);
+        agendarPreviewReal();
+    });
+    document.getElementById('btn-add-texto').addEventListener('click', function () {
+        const el = { _id: proximoId++, tipo: 'texto', campo: 'fixo', texto_fixo: 'Texto', x: 0.1, y: 0.1, largura: 0.4, tamanho_fonte: 0.05, cor_texto: '#ffffff', alinhamento: 'esquerda', maiusculas: true };
+        elementos.push(el);
+        selecionar(el);
+        agendarPreviewReal();
+    });
+    document.getElementById('btn-add-logo').addEventListener('click', function () {
+        const el = { _id: proximoId++, tipo: 'logo', x: 0.75, y: 0.05, altura: 0.08 };
+        elementos.push(el);
+        selecionar(el);
+        agendarPreviewReal();
+    });
+
+    let previewTimeout = null;
+    function agendarPreviewReal() {
+        if (previewTimeout) clearTimeout(previewTimeout);
+        previewTimeout = setTimeout(gerarPreviewReal, 600);
+    }
+
+    function limparElemento(el) {
+        const copia = Object.assign({}, el);
+        delete copia._id;
+        return copia;
+    }
+
+    function gerarPreviewReal() {
+        previewLoading.textContent = 'Gerando prévia...';
+        previewLoading.classList.remove('d-none');
+        previewImg.classList.add('d-none');
+
+        fetch("{% url 'marketing_layout_preview' %}", {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookieLocal('csrftoken') || '', 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                elementos: elementos.map(limparElemento),
+                resolucao: selectResolucao.value,
+                anuncio_pk: selectAnuncio.value || null,
+            }),
+        })
+            .then(function (resp) {
+                if (!resp.ok) return resp.json().then(function (data) { throw new Error(data.erro || 'Falha ao gerar prévia.'); });
+                return resp.blob();
+            })
+            .then(function (blob) {
+                previewImg.src = URL.createObjectURL(blob);
+                previewImg.classList.remove('d-none');
+                previewLoading.classList.add('d-none');
+            })
+            .catch(function (err) {
+                previewLoading.textContent = err.message || 'Falha ao gerar prévia.';
+                previewLoading.classList.remove('d-none');
+                previewImg.classList.add('d-none');
+            });
+    }
+
+    document.getElementById('btn-salvar').addEventListener('click', function () {
+        const nome = inputNome.value.trim();
+        if (!nome) {
+            msgEl.className = 'small mt-2 text-danger';
+            msgEl.textContent = 'Dê um nome pro layout antes de salvar.';
+            return;
+        }
+        const url = {% if layout %}"{% url 'marketing_layout_atualizar' layout.pk %}"{% else %}"{% url 'marketing_layout_salvar' %}"{% endif %};
+        fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCookieLocal('csrftoken') || '', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome: nome, elementos: elementos.map(limparElemento) }),
+        })
+            .then(function (resp) { return resp.json().then(function (data) { return { status: resp.status, data: data }; }); })
+            .then(function (result) {
+                if (!result.data.ok) {
+                    msgEl.className = 'small mt-2 text-danger';
+                    msgEl.textContent = result.data.erro || 'Falha ao salvar.';
+                    return;
+                }
+                window.location.href = "{% url 'marketing_layout_list' %}";
+            })
+            .catch(function () {
+                msgEl.className = 'small mt-2 text-danger';
+                msgEl.textContent = 'Falha ao salvar. Tente novamente.';
+            });
+    });
+
+    selectResolucao.addEventListener('change', function () {
+        ajustarAlturaCanvas();
+        renderElementos();
+        agendarPreviewReal();
+    });
+    selectAnuncio.addEventListener('change', agendarPreviewReal);
+
+    window.addEventListener('resize', function () {
+        ajustarAlturaCanvas();
+        renderElementos();
+    });
+
+    ajustarAlturaCanvas();
+    renderElementos();
+    atualizarPainel();
+    agendarPreviewReal();
+})();
+</script>
+{% endblock %}

@@ -41,8 +41,18 @@ class VeiculoAnuncio(models.Model):
     combustivel = models.CharField(max_length=50, blank=True, null=True)
     carroceria = models.CharField(max_length=50, blank=True, null=True)
     portas = models.CharField(max_length=30, blank=True, null=True)
+    motorizacao = models.CharField(
+        max_length=30, blank=True, null=True, verbose_name='Motorização',
+        help_text='Ex: 1.0, 1.6 Turbo — raspado do bloco técnico do anúncio, quando disponível.',
+    )
 
     condicoes = models.JSONField(default=list, blank=True, verbose_name='Ex: Aceita Troca, IPVA Pago')
+    # Sinalizadores próprios pra "Aceita troca"/"IPVA pago": derivados automaticamente
+    # das condições raspadas do site a cada sincronização, mas editáveis manualmente
+    # (checkbox no admin/detalhe) pra corrigir texto inconsistente do site sem
+    # depender só do que a IA entende do texto cru de `condicoes`.
+    ipva_pago = models.BooleanField(default=False, verbose_name='IPVA pago')
+    aceita_troca = models.BooleanField(default=False, verbose_name='Aceita troca')
     opcionais = models.JSONField(default=list, blank=True)
     descricao = models.TextField(blank=True, null=True)
 
@@ -88,6 +98,47 @@ class LoteGeracao(models.Model):
 
     def __str__(self):
         return f'Lote #{self.pk} ({self.get_status_display()})'
+
+
+class LayoutOverlay(models.Model):
+    """
+    Layout do overlay Pillow (provedor "sem IA de imagem") criado/editado
+    visualmente no editor drag-and-drop, em vez de um dos 3 templates fixos em
+    código (FAIXA_INFERIOR/SELO_DIAGONAL/CARTAO_CENTRAL).
+
+    `elementos` guarda a lista de camadas, na ordem em que são desenhadas
+    (o item seguinte fica por cima do anterior). Cada camada é um dict com
+    posição/tamanho em FRAÇÕES de 0 a 1 do canvas (não pixels), pra funcionar
+    em qualquer uma das resoluções de RESOLUCOES sem precisar converter nada:
+      {"tipo": "forma", "x": 0, "y": 0.7, "largura": 1, "altura": 0.3,
+       "cor_fundo": "#0f172a", "opacidade": 0.9, "arredondado": 0}
+      {"tipo": "texto", "campo": "chamada"|"titulo"|"preco"|"fixo",
+       "texto_fixo": "...", "x": 0.06, "y": 0.72, "largura": 0.6,
+       "tamanho_fonte": 0.05, "cor_texto": "#ffffff", "alinhamento": "esquerda",
+       "maiusculas": true}
+      {"tipo": "logo", "x": 0.8, "y": 0.7, "altura": 0.07}
+    """
+
+    nome = models.CharField(max_length=80, verbose_name='Nome do layout')
+    elementos = models.JSONField(default=list, blank=True)
+    criado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Layout de Overlay (customizado)'
+        verbose_name_plural = 'Layouts de Overlay (customizados)'
+        ordering = ['nome']
+
+    def __str__(self):
+        return self.nome
+
+    @property
+    def chave_template(self):
+        """Valor salvo em ConfiguracaoIntegracoes.template_imagem_overlay (ou
+        passado como override na prévia) pra apontar pra este layout em vez de
+        um dos 3 templates fixos — o prefixo distingue os dois casos."""
+        return f'CUSTOM:{self.pk}'
 
 
 class PostPromocional(models.Model):

@@ -53,3 +53,18 @@ class ConfiguracaoIntegracoesForm(forms.ModelForm):
             field: forms.Textarea(attrs={'class': 'form-control', 'rows': 4})
             for field in _CAMPOS_TEXTAREA_INTEGRACOES
         })
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Layouts customizados (editor drag-and-drop de marketing_ia) entram como
+        # opções extras de "Template do overlay", além dos 3 fixos em código —
+        # import local pra evitar import circular (marketing_ia já importa daqui).
+        from marketing_ia.models import LayoutOverlay
+        opcoes_customizadas = [
+            (layout.chave_template, f'Customizado: {layout.nome}')
+            for layout in LayoutOverlay.objects.all()
+        ]
+        if opcoes_customizadas:
+            self.fields['template_imagem_overlay'].choices = (
+                list(self.fields['template_imagem_overlay'].choices) + opcoes_customizadas
+            )

@@ -33,7 +33,10 @@ SYSTEM_INSTRUCTION_CHAMADA = (
     "Você é o social media da SPAGI Motors, uma revenda de carros e motos seminovos. "
     "A partir dos dados do veículo abaixo, escreva só UMA frase bem curta e chamativa "
     "(no máximo 5 palavras) para estampar em cima da foto do anúncio, tipo "
-    "'OPORTUNIDADE ÚNICA', 'SAIU MAIS BARATO' ou 'ACEITA TROCA'. Sem emoji, sem "
+    "'OPORTUNIDADE ÚNICA', 'SAIU MAIS BARATO' ou 'SUPER OFERTA'. Se houver 'Vantagens' "
+    "listadas, pode se inspirar nelas, mas SEMPRE reformule numa frase natural — nunca "
+    "cite a vantagem literalmente (ex: transforme 'IPVA pago' em algo como 'SEM DOR DE "
+    "CABEÇA' ou 'ZERO BUROCRACIA', nunca repita 'IPVA PAGO' na frase). Sem emoji, sem "
     "pontuação no final, sem aspas. Responda só com a frase, nada mais."
 )
 
@@ -51,8 +54,21 @@ def _dados_veiculo_para_prompt(anuncio):
         f"Preço: R$ {anuncio.preco:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
         if anuncio.preco else "Preço: consulte",
     ]
-    if anuncio.condicoes:
-        partes.append(f"Condições: {', '.join(anuncio.condicoes)}")
+    # "IPVA pago"/"Aceita troca" viram sinalizadores próprios (checkbox no admin),
+    # revisados manualmente — priorizados sobre o texto cru de `condicoes` (que às
+    # vezes vem com grafia inconsistente do site) pra montar a lista de vantagens.
+    vantagens = []
+    if getattr(anuncio, 'ipva_pago', False):
+        vantagens.append('IPVA pago')
+    if getattr(anuncio, 'aceita_troca', False):
+        vantagens.append('Aceita troca')
+    outras_condicoes = [
+        c for c in (anuncio.condicoes or [])
+        if 'ipva' not in c.lower() and 'troca' not in c.lower()
+    ]
+    vantagens.extend(outras_condicoes)
+    if vantagens:
+        partes.append(f"Vantagens: {', '.join(vantagens)}")
     return "\n".join(partes)
 
 
@@ -140,15 +156,35 @@ def gerar_imagem_promocional(anuncio, foto_bytes, mime_type, max_tentativas=3, t
 def _gerar_imagem_overlay(anuncio, foto_bytes, mime_type, template_overlay=None, resolucao_overlay=None):
     """Provedor 'sem IA de imagem': usa a foto real como está, só desenha o
     texto por cima (Pillow). O Gemini entra só pra gerar a frase de destaque —
-    se ele falhar, cai pro fallback fixo em vez de travar a geração inteira."""
+    se ele falhar, cai pro fallback fixo em vez de travar a geração inteira.
+
+    template pode ser um dos 3 fixos (FAIXA_INFERIOR/SELO_DIAGONAL/CARTAO_CENTRAL)
+    ou "CUSTOM:<id>", apontando pra um LayoutOverlay criado no editor visual."""
     chamada = gerar_chamada_ia(anuncio)
     template = template_overlay or obter_integracao('template_imagem_overlay') or image_overlay.TEMPLATE_PADRAO
     resolucao = resolucao_overlay or obter_integracao('resolucao_imagem_overlay') or image_overlay.RESOLUCAO_PADRAO
     try:
-        imagem_bytes, mime_saida = image_overlay.montar_imagem_overlay(
-            foto_bytes, anuncio, chamada, template=template, resolucao=resolucao,
-        )
-        return imagem_bytes, mime_saida, f'overlay:pillow:{template}:{resolucao}', chamada
+        if isinstance(template, str) and template.startswith('CUSTOM:'):
+            from .models import LayoutOverlay
+            layout_id = template.split(':', 1)[1]
+            layout = LayoutOverlay.objects.filter(pk=layout_id).first()
+            if not layout:
+                logger.warning('Layout customizado #%s não encontrado, usando o padrão.', layout_id)
+                imagem_bytes, mime_saida = image_overlay.montar_imagem_overlay(
+                    foto_bytes, anuncio, chamada, resolucao=resolucao,
+                )
+                modelo_usado = f'overlay:pillow:{image_overlay.TEMPLATE_PADRAO}:{resolucao}'
+            else:
+                imagem_bytes, mime_saida = image_overlay.montar_imagem_layout(
+                    foto_bytes, anuncio, chamada, layout.elementos, resolucao=resolucao,
+                )
+                modelo_usado = f'overlay:pillow:custom:{layout_id}:{resolucao}'
+        else:
+            imagem_bytes, mime_saida = image_overlay.montar_imagem_overlay(
+                foto_bytes, anuncio, chamada, template=template, resolucao=resolucao,
+            )
+            modelo_usado = f'overlay:pillow:{template}:{resolucao}'
+        return imagem_bytes, mime_saida, modelo_usado, chamada
     except image_overlay.ImageOverlayError as exc:
         logger.warning('Erro ao montar imagem com overlay: %s', exc)
         return None, None, None, None

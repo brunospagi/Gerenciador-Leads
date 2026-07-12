@@ -12,8 +12,11 @@
             </button>
         </form>
         <form method="post" action="{% url 'marketing_iniciar_lote' %}"
-              onsubmit="return confirm('Gerar posts com IA para {{ total_sem_post }} veículo(s) sem post ainda? Isso vai gastar chamadas de API.');">
+              onsubmit="return confirm('Gerar posts com IA para {{ total_sem_post }} veículo(s) sem post ainda (considerando os filtros selecionados)? Isso vai gastar chamadas de API.');">
             {% csrf_token %}
+            <input type="hidden" name="tipo" value="{{ tipo_filtro }}">
+            <input type="hidden" name="ipva_pago" value="{% if ipva_pago_filtro %}1{% endif %}">
+            <input type="hidden" name="aceita_troca" value="{% if aceita_troca_filtro %}1{% endif %}">
             <button type="submit" class="btn btn-primary" {% if lote_em_andamento or not total_sem_post %}disabled{% endif %}>
                 <i class="bi bi-magic me-1"></i>
                 {% if lote_em_andamento %}Gerando em lote...{% else %}Gerar para todos sem post ({{ total_sem_post }}){% endif %}
@@ -37,6 +40,7 @@
     {% else %}
     <span class="badge bg-secondary">{{ provedor_imagem_atual }}</span>
     {% endif %}
+    <a href="{% url 'marketing_layout_list' %}" class="small ms-2"><i class="bi bi-palette me-1"></i>Layouts de overlay</a>
 </div>
 
 <div id="sincronizacao-status" class="alert {% if sincronizacao.status == 'ERRO' %}alert-danger{% elif sincronizacao.status == 'RODANDO' %}alert-info{% elif sincronizacao.status == 'CONCLUIDO' %}alert-success{% else %}alert-secondary{% endif %} d-flex align-items-center"
@@ -83,6 +87,18 @@
         <div class="col-md-4 text-md-end">
             <small class="text-muted">{{ total_anuncios }} veículo(s) no estoque · {{ total_posts }} post(s) gerado(s)</small>
         </div>
+        <div class="col-md-12 d-flex gap-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="ipva_pago" value="1" id="ipvaPagoCheck"
+                       {% if ipva_pago_filtro %}checked{% endif %} onchange="this.form.submit()">
+                <label class="form-check-label" for="ipvaPagoCheck">IPVA pago</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="aceita_troca" value="1" id="aceitaTrocaCheck"
+                       {% if aceita_troca_filtro %}checked{% endif %} onchange="this.form.submit()">
+                <label class="form-check-label" for="aceitaTrocaCheck">Aceita troca</label>
+            </div>
+        </div>
     </form>
 </div>
 
@@ -105,9 +121,13 @@
                 <p class="card-text mb-2">
                     <small class="text-muted">{{ anuncio.ano|default:"-" }} · {{ anuncio.km|default:"-" }} km</small>
                 </p>
-                <span class="badge {% if anuncio.num_posts %}bg-success{% else %}bg-secondary{% endif %} mb-2 align-self-start">
-                    {% if anuncio.num_posts %}{{ anuncio.num_posts }} post(s) gerado(s){% else %}Sem post ainda{% endif %}
-                </span>
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                    <span class="badge {% if anuncio.num_posts %}bg-success{% else %}bg-secondary{% endif %}">
+                        {% if anuncio.num_posts %}{{ anuncio.num_posts }} post(s) gerado(s){% else %}Sem post ainda{% endif %}
+                    </span>
+                    {% if anuncio.ipva_pago %}<span class="badge bg-info text-dark">IPVA pago</span>{% endif %}
+                    {% if anuncio.aceita_troca %}<span class="badge bg-info text-dark">Aceita troca</span>{% endif %}
+                </div>
                 <div class="mt-auto pt-2">
                     <a href="{% url 'marketing_veiculo_detail' anuncio.pk %}" class="btn btn-dark w-100">Ver / Gerar Post</a>
                 </div>
