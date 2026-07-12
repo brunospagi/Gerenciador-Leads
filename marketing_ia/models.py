@@ -41,8 +41,18 @@ class VeiculoAnuncio(models.Model):
     combustivel = models.CharField(max_length=50, blank=True, null=True)
     carroceria = models.CharField(max_length=50, blank=True, null=True)
     portas = models.CharField(max_length=30, blank=True, null=True)
+    motorizacao = models.CharField(
+        max_length=30, blank=True, null=True, verbose_name='Motorização',
+        help_text='Ex: 1.0, 1.6 Turbo — raspado do bloco técnico do anúncio, quando disponível.',
+    )
 
     condicoes = models.JSONField(default=list, blank=True, verbose_name='Ex: Aceita Troca, IPVA Pago')
+    # Sinalizadores próprios pra "Aceita troca"/"IPVA pago": derivados automaticamente
+    # das condições raspadas do site a cada sincronização, mas editáveis manualmente
+    # (checkbox no admin/detalhe) pra corrigir texto inconsistente do site sem
+    # depender só do que a IA entende do texto cru de `condicoes`.
+    ipva_pago = models.BooleanField(default=False, verbose_name='IPVA pago')
+    aceita_troca = models.BooleanField(default=False, verbose_name='Aceita troca')
     opcionais = models.JSONField(default=list, blank=True)
     descricao = models.TextField(blank=True, null=True)
 

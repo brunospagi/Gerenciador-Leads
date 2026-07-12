@@ -81,7 +81,13 @@ def _formatar_preco(preco):
 
 
 def _titulo_veiculo(anuncio):
-    return f"{(anuncio.marca or '').upper()} {(anuncio.modelo or '').upper()} {anuncio.ano or ''}".strip()
+    partes = [(anuncio.marca or '').upper(), (anuncio.modelo or '').upper()]
+    motorizacao = getattr(anuncio, 'motorizacao', None)
+    if motorizacao:
+        partes.append(motorizacao.upper())
+    if anuncio.ano:
+        partes.append(str(anuncio.ano))
+    return ' '.join(p for p in partes if p).strip()
 
 
 def _quebrar_linhas(texto, fonte, draw, largura_max):

@@ -166,6 +166,29 @@ def coletar_links_estoque(driver, max_paginas=None, espera=8):
     return unicos
 
 
+LABELS_MOTORIZACAO = ('Motor', 'Motorização', 'Motorizacao')
+
+
+def _campo_motorizacao(driver):
+    for rotulo in LABELS_MOTORIZACAO:
+        valor = _campo_tecnico(driver, rotulo)
+        if valor:
+            return valor
+    return None
+
+
+def _derivar_flags_condicoes(condicoes):
+    """"IPVA pago"/"Aceita troca" viram campos booleanos próprios (checkbox no
+    admin) em vez de dependerem só do texto cru de `condicoes` — o texto cru
+    ainda é salvo em `condicoes`, mas repassar ele inteiro pra IA de chamada é
+    o que causava frases estranhas tipo "OFERTA TROCA IPVA PAGO" (a IA citando
+    a tag literal em vez de reformular)."""
+    texto_junto = ' '.join(condicoes).lower()
+    ipva_pago = 'ipva' in texto_junto
+    aceita_troca = 'troca' in texto_junto
+    return ipva_pago, aceita_troca
+
+
 def _campo_tecnico(driver, rotulo):
     """Lê um par rótulo/valor dentro de .vehicle__technical__information."""
     try:
@@ -236,6 +259,7 @@ def extrair_detalhes_anuncio(driver, url, foto_url=None, espera=8):
     fotos_urls = [foto_url] if foto_url else []
 
     features_texto = f"{marca_modelo} {titulo}"
+    ipva_pago, aceita_troca = _derivar_flags_condicoes(condicoes)
 
     return {
         'external_id': external_id,
@@ -252,7 +276,10 @@ def extrair_detalhes_anuncio(driver, url, foto_url=None, espera=8):
         'combustivel': _campo_tecnico(driver, 'Combustível'),
         'carroceria': _campo_tecnico(driver, 'Carroceria'),
         'portas': _campo_tecnico(driver, 'Portas'),
+        'motorizacao': _campo_motorizacao(driver),
         'condicoes': condicoes,
+        'ipva_pago': ipva_pago,
+        'aceita_troca': aceita_troca,
         'opcionais': opcionais,
         'descricao': descricao,
         'foto_principal_url': fotos_urls[0] if fotos_urls else None,

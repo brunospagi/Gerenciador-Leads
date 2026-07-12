@@ -64,13 +64,28 @@ def _executar_lote_em_background(lote_id):
         connection.close()
 
 
+def _dado_filtro(request, campo):
+    """GET na listagem, POST no disparo do lote — mesmos nomes de campo nos dois."""
+    return request.GET.get(campo) or request.POST.get(campo)
+
+
+def _aplicar_filtros_vantagens(queryset, request):
+    """Filtros de vantagem (IPVA pago / Aceita troca) usados tanto na listagem
+    quanto no 'gerar para todos' — o mesmo seletor serve pra escolher o que
+    aparece na tela e o que entra no lote."""
+    tipo = _dado_filtro(request, 'tipo')
+    if tipo in ('CARRO', 'MOTO'):
+        queryset = queryset.filter(tipo=tipo)
+    if _dado_filtro(request, 'ipva_pago'):
+        queryset = queryset.filter(ipva_pago=True)
+    if _dado_filtro(request, 'aceita_troca'):
+        queryset = queryset.filter(aceita_troca=True)
+    return queryset
+
+
 @require_module_action('marketing_ia', 'visualizar')
 def veiculo_list(request):
-    veiculos = VeiculoAnuncio.objects.filter(ativo=True)
-
-    tipo = request.GET.get('tipo')
-    if tipo in ('CARRO', 'MOTO'):
-        veiculos = veiculos.filter(tipo=tipo)
+    veiculos = _aplicar_filtros_vantagens(VeiculoAnuncio.objects.filter(ativo=True), request)
 
     sem_post = request.GET.get('sem_post')
     if sem_post:
@@ -85,16 +100,24 @@ def veiculo_list(request):
     paginator = Paginator(veiculos, 12)
     page_obj = paginator.get_page(request.GET.get('page'))
 
+    # mesmos filtros (tipo/vantagens) aplicados no total do botão "gerar para
+    # todos sem post", pra ele contar exatamente o que o seletor vai mandar pro lote.
+    total_sem_post_filtrado = _aplicar_filtros_vantagens(
+        VeiculoAnuncio.objects.filter(ativo=True, posts__isnull=True), request,
+    ).distinct().count()
+
     context = {
         'page_obj': page_obj,
         'is_paginated': page_obj.has_other_pages(),
         'veiculos': page_obj,
         'sincronizacao': SincronizacaoEstoque.load(),
-        'tipo_filtro': tipo or '',
+        'tipo_filtro': request.GET.get('tipo') or '',
         'sem_post_filtro': bool(sem_post),
+        'ipva_pago_filtro': bool(request.GET.get('ipva_pago')),
+        'aceita_troca_filtro': bool(request.GET.get('aceita_troca')),
         'total_anuncios': VeiculoAnuncio.objects.filter(ativo=True).count(),
         'total_posts': PostPromocional.objects.count(),
-        'total_sem_post': VeiculoAnuncio.objects.filter(ativo=True, posts__isnull=True).distinct().count(),
+        'total_sem_post': total_sem_post_filtrado,
         'lote_em_andamento': LoteGeracao.objects.filter(status='RODANDO').order_by('-criado_em').first(),
         'ultimo_lote': LoteGeracao.objects.exclude(status='RODANDO').order_by('-criado_em').first(),
         'provedor_imagem_atual': ConfiguracaoIntegracoes.get_solo().provedor_imagem_ia,
@@ -269,7 +292,9 @@ def iniciar_geracao_lote(request):
         messages.warning(request, 'Já existe uma geração em lote em andamento.')
         return redirect('marketing_veiculo_list')
 
-    anuncios = VeiculoAnuncio.objects.filter(ativo=True, posts__isnull=True).distinct()
+    anuncios = _aplicar_filtros_vantagens(
+        VeiculoAnuncio.objects.filter(ativo=True, posts__isnull=True), request,
+    ).distinct()
     ids = list(anuncios.values_list('pk', flat=True))
     if not ids:
         messages.warning(request, 'Não há veículos sem post para gerar.')

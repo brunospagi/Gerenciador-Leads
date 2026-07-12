@@ -33,7 +33,10 @@ SYSTEM_INSTRUCTION_CHAMADA = (
     "Você é o social media da SPAGI Motors, uma revenda de carros e motos seminovos. "
     "A partir dos dados do veículo abaixo, escreva só UMA frase bem curta e chamativa "
     "(no máximo 5 palavras) para estampar em cima da foto do anúncio, tipo "
-    "'OPORTUNIDADE ÚNICA', 'SAIU MAIS BARATO' ou 'SUPER OFERTA'. Sem emoji, sem "
+    "'OPORTUNIDADE ÚNICA', 'SAIU MAIS BARATO' ou 'SUPER OFERTA'. Se houver 'Vantagens' "
+    "listadas, pode se inspirar nelas, mas SEMPRE reformule numa frase natural — nunca "
+    "cite a vantagem literalmente (ex: transforme 'IPVA pago' em algo como 'SEM DOR DE "
+    "CABEÇA' ou 'ZERO BUROCRACIA', nunca repita 'IPVA PAGO' na frase). Sem emoji, sem "
     "pontuação no final, sem aspas. Responda só com a frase, nada mais."
 )
 
@@ -51,8 +54,21 @@ def _dados_veiculo_para_prompt(anuncio):
         f"Preço: R$ {anuncio.preco:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
         if anuncio.preco else "Preço: consulte",
     ]
-    if anuncio.condicoes:
-        partes.append(f"Condições: {', '.join(anuncio.condicoes)}")
+    # "IPVA pago"/"Aceita troca" viram sinalizadores próprios (checkbox no admin),
+    # revisados manualmente — priorizados sobre o texto cru de `condicoes` (que às
+    # vezes vem com grafia inconsistente do site) pra montar a lista de vantagens.
+    vantagens = []
+    if getattr(anuncio, 'ipva_pago', False):
+        vantagens.append('IPVA pago')
+    if getattr(anuncio, 'aceita_troca', False):
+        vantagens.append('Aceita troca')
+    outras_condicoes = [
+        c for c in (anuncio.condicoes or [])
+        if 'ipva' not in c.lower() and 'troca' not in c.lower()
+    ]
+    vantagens.extend(outras_condicoes)
+    if vantagens:
+        partes.append(f"Vantagens: {', '.join(vantagens)}")
     return "\n".join(partes)
 
 

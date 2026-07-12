@@ -14,6 +14,7 @@ from . import ai_promocional
 from . import image_overlay
 from . import leonardo_client
 from . import openai_client
+from . import scraping
 from . import services
 from .models import PostPromocional, PreviewPost, VeiculoAnuncio
 
@@ -427,3 +428,85 @@ class LimparImagensOrfasCommandTests(TestCase):
 
         self.assertIn('Nenhum arquivo órfão', out.getvalue())
         mock_storage.delete.assert_not_called()
+
+
+class DerivarFlagsCondicoesTests(TestCase):
+    def test_detecta_ipva_pago_e_aceita_troca(self):
+        ipva_pago, aceita_troca = scraping._derivar_flags_condicoes(['Aceita Troca', 'IPVA Pago'])
+        self.assertTrue(ipva_pago)
+        self.assertTrue(aceita_troca)
+
+    def test_condicoes_sem_essas_tags_nao_marca_nada(self):
+        ipva_pago, aceita_troca = scraping._derivar_flags_condicoes(['Único Dono', 'Revisões em dia'])
+        self.assertFalse(ipva_pago)
+        self.assertFalse(aceita_troca)
+
+    def test_lista_vazia_nao_quebra(self):
+        ipva_pago, aceita_troca = scraping._derivar_flags_condicoes([])
+        self.assertFalse(ipva_pago)
+        self.assertFalse(aceita_troca)
+
+
+class TituloVeiculoComMotorizacaoTests(TestCase):
+    def test_inclui_motorizacao_quando_presente(self):
+        anuncio = SimpleNamespace(marca='Fiat', modelo='Palio', ano='2012', motorizacao='1.0')
+        titulo = image_overlay._titulo_veiculo(anuncio)
+        self.assertEqual(titulo, 'FIAT PALIO 1.0 2012')
+
+    def test_sem_motorizacao_nao_quebra(self):
+        anuncio = SimpleNamespace(marca='Fiat', modelo='Palio', ano='2012', motorizacao=None)
+        titulo = image_overlay._titulo_veiculo(anuncio)
+        self.assertEqual(titulo, 'FIAT PALIO 2012')
+
+    def test_sem_atributo_motorizacao_nao_quebra(self):
+        # SimpleNamespace sem o atributo (simula um objeto que nunca passou por
+        # getattr) -- _titulo_veiculo usa getattr(..., None) por causa disso.
+        anuncio = SimpleNamespace(marca='Fiat', modelo='Palio', ano='2012')
+        titulo = image_overlay._titulo_veiculo(anuncio)
+        self.assertEqual(titulo, 'FIAT PALIO 2012')
+
+
+class DadosVeiculoParaPromptTests(TestCase):
+    def _anuncio(self, **overrides):
+        dados = dict(
+            titulo='Fiat Palio 2012', marca='Fiat', modelo='Palio', ano='2012', km='50000',
+            cor='Branco', preco=Decimal('26900'), condicoes=[], ipva_pago=False, aceita_troca=False,
+        )
+        dados.update(overrides)
+        return SimpleNamespace(**dados)
+
+    def test_flags_geram_vantagens_reformulaveis_sem_citar_a_tag_crua(self):
+        anuncio = self._anuncio(ipva_pago=True, aceita_troca=True, condicoes=['IPVA Pago', 'Aceita Troca'])
+        prompt = ai_promocional._dados_veiculo_para_prompt(anuncio)
+        self.assertIn('Vantagens: IPVA pago, Aceita troca', prompt)
+
+    def test_outras_condicoes_nao_relacionadas_sao_preservadas(self):
+        anuncio = self._anuncio(condicoes=['Único Dono'])
+        prompt = ai_promocional._dados_veiculo_para_prompt(anuncio)
+        self.assertIn('Vantagens: Único Dono', prompt)
+
+    def test_sem_vantagens_nao_inclui_a_linha(self):
+        anuncio = self._anuncio()
+        prompt = ai_promocional._dados_veiculo_para_prompt(anuncio)
+        self.assertNotIn('Vantagens:', prompt)
+
+
+class VeiculoListFiltroVantagensTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser('admin_vant', 'admin_vant@teste.com', 'senha12345')
+        self.client.login(username='admin_vant', password='senha12345')
+        self.com_ipva = _anuncio_persistido(external_id='ipva-1', ipva_pago=True, aceita_troca=False)
+        self.sem_flags = _anuncio_persistido(external_id='sem-flags-1', ipva_pago=False, aceita_troca=False)
+
+    def test_filtro_ipva_pago_na_listagem(self):
+        resp = self.client.get(reverse('marketing_veiculo_list'), {'ipva_pago': '1'})
+        veiculos = list(resp.context['veiculos'])
+        self.assertIn(self.com_ipva, veiculos)
+        self.assertNotIn(self.sem_flags, veiculos)
+
+    def test_lote_respeita_filtro_de_vantagem(self):
+        resp = self.client.post(reverse('marketing_iniciar_lote'), {'ipva_pago': '1'})
+        self.assertEqual(resp.status_code, 302)
+        from .models import LoteGeracao
+        lote = LoteGeracao.objects.latest('criado_em')
+        self.assertEqual(lote.alvo_ids, [self.com_ipva.pk])
