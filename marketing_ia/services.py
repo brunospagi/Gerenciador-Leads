@@ -84,7 +84,7 @@ def gerar_post_para_anuncio(anuncio, usuario=None, lote=None):
     except Exception as exc:
         raise GeracaoPostError(f'Falha ao baixar a foto original: {exc}') from exc
 
-    imagem_bytes, imagem_mime, modelo_imagem = gerar_imagem_promocional(anuncio, foto_bytes, mime_type)
+    imagem_bytes, imagem_mime, modelo_imagem, prompt_usado = gerar_imagem_promocional(anuncio, foto_bytes, mime_type)
     if not imagem_bytes:
         raise GeracaoPostError('A IA não conseguiu gerar a imagem promocional. Tente novamente em instantes.')
 
@@ -99,7 +99,7 @@ def gerar_post_para_anuncio(anuncio, usuario=None, lote=None):
         lote=lote,
         legenda=legenda,
         hashtags=hashtags or '',
-        prompt_imagem='PROMPT_IMAGEM padrão (marketing_ia/ai_promocional.py)',
+        prompt_imagem=prompt_usado or '',
         modelo_ia_imagem=modelo_imagem,
         modelo_ia_texto=modelo_texto,
         gerado_por=usuario,

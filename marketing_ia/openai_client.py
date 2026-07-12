@@ -38,7 +38,7 @@ def _extrair_mensagem_erro(resp):
         return resp.text[:500]
 
 
-def gerar_imagem_openai(prompt, foto_bytes, mime_type, api_key):
+def gerar_imagem_openai(prompt, foto_bytes, mime_type, api_key, model_id=None, quality=None):
     """
     Gera a imagem promocional usando a foto real do veículo como referência,
     via /images/edits. Retorna (bytes, mime_type) ou levanta OpenAIImageError
@@ -53,11 +53,11 @@ def gerar_imagem_openai(prompt, foto_bytes, mime_type, api_key):
         f'{BASE_URL}/images/edits',
         headers={'authorization': f'Bearer {api_key}'},
         data={
-            'model': MODEL_ID_PADRAO,
+            'model': model_id or MODEL_ID_PADRAO,
             'prompt': prompt,
             'n': '1',
             'size': '1024x1024',
-            'quality': 'low',  # tier mais barato
+            'quality': quality or 'medium',
             'output_format': 'jpeg',
         },
         files={'image': (f'referencia.{extensao}', foto_bytes, mime_type)},
