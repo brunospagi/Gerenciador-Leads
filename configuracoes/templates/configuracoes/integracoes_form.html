@@ -117,11 +117,23 @@
 
         <div class="provedor-imagem-grupo border rounded p-3 mb-3 bg-light-subtle" data-provedor-grupo="OVERLAY">
           <div class="fw-bold small text-uppercase text-muted mb-2">Sem IA de imagem</div>
-          <div class="small text-muted">
+          <div class="small text-muted mb-3">
             Usa a foto real do veículo como está (sem trocar cenário) e desenha marca, modelo,
             ano e preço por cima com Pillow — sem custo de geração de imagem. O Gemini entra só
             pra escrever a frase de destaque (ex: "OPORTUNIDADE ÚNICA"); se ele estiver indisponível,
-            usa uma frase padrão fixa. Nenhuma chave de API extra é necessária aqui.
+            usa uma frase padrão fixa. Nenhuma chave de API extra é necessária aqui. Dá pra trocar o
+            template e a resolução na hora, na tela de prévia de cada veículo — os valores abaixo são
+            só o padrão inicial.
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.template_imagem_overlay.label }}</label>
+              {{ form.template_imagem_overlay }}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.resolucao_imagem_overlay.label }}</label>
+              {{ form.resolucao_imagem_overlay }}
+            </div>
           </div>
         </div>
 

@@ -127,6 +127,36 @@ class PostPromocional(models.Model):
         return f"Post {self.anuncio.titulo} ({self.get_status_display()})"
 
 
+class PreviewPost(models.Model):
+    """
+    Prévia de um post gerado, aguardando confirmação do usuário antes de virar
+    um PostPromocional de verdade. A imagem fica em BinaryField (banco), não em
+    ImageField/S3: assim uma prévia descartada nunca cria lixo no MinIO, e o
+    conteúdo fica visível a qualquer worker do gunicorn (o cache padrão do
+    Django aqui é por processo, não seria confiável entre a requisição que gera
+    e a que confirma/descarta).
+    """
+
+    anuncio = models.ForeignKey(VeiculoAnuncio, on_delete=models.CASCADE, related_name='previews')
+    imagem_bytes = models.BinaryField()
+    imagem_mime_type = models.CharField(max_length=30, default='image/jpeg')
+    legenda = models.TextField(blank=True, null=True)
+    hashtags = models.CharField(max_length=500, blank=True, null=True)
+    prompt_imagem = models.TextField(blank=True, null=True)
+    modelo_ia_imagem = models.CharField(max_length=100, blank=True, null=True)
+    modelo_ia_texto = models.CharField(max_length=100, blank=True, null=True)
+    gerado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Prévia de Post (IA)'
+        verbose_name_plural = 'Prévias de Post (IA)'
+        ordering = ['-criado_em']
+
+    def __str__(self):
+        return f"Prévia {self.anuncio.titulo} (#{self.pk})"
+
+
 class SincronizacaoEstoque(models.Model):
     """Registro (singleton) do status da última raspagem disparada pela tela do CRM."""
 

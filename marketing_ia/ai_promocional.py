@@ -113,13 +113,17 @@ def gerar_chamada_ia(anuncio):
         return CHAMADA_FALLBACK
 
 
-def gerar_imagem_promocional(anuncio, foto_bytes, mime_type, max_tentativas=3):
+def gerar_imagem_promocional(anuncio, foto_bytes, mime_type, max_tentativas=3, template_overlay=None, resolucao_overlay=None):
     """
     Gera a imagem promocional usando o provedor configurado em
     Configurações > Integrações Externas (padrão: Gemini). Retorna
     (imagem_bytes, mime_type_saida, modelo_usado, prompt_usado) ou
     (None, None, None, None) se a IA estiver indisponível ou falhar — o
     caller deve tratar isso como uma falha esperada, não uma exceção.
+
+    template_overlay/resolucao_overlay: só valem pro provedor OVERLAY — permitem
+    a tela de prévia sobrepor o template/resolução padrão configurados, sem
+    precisar alterar a configuração global.
     """
     from configuracoes.models import ConfiguracaoIntegracoes
 
@@ -129,18 +133,22 @@ def gerar_imagem_promocional(anuncio, foto_bytes, mime_type, max_tentativas=3):
     if provedor == 'OPENAI':
         return _gerar_imagem_openai(anuncio, foto_bytes, mime_type)
     if provedor == 'OVERLAY':
-        return _gerar_imagem_overlay(anuncio, foto_bytes, mime_type)
+        return _gerar_imagem_overlay(anuncio, foto_bytes, mime_type, template_overlay, resolucao_overlay)
     return _gerar_imagem_gemini(anuncio, foto_bytes, mime_type, max_tentativas=max_tentativas)
 
 
-def _gerar_imagem_overlay(anuncio, foto_bytes, mime_type):
+def _gerar_imagem_overlay(anuncio, foto_bytes, mime_type, template_overlay=None, resolucao_overlay=None):
     """Provedor 'sem IA de imagem': usa a foto real como está, só desenha o
     texto por cima (Pillow). O Gemini entra só pra gerar a frase de destaque —
     se ele falhar, cai pro fallback fixo em vez de travar a geração inteira."""
     chamada = gerar_chamada_ia(anuncio)
+    template = template_overlay or obter_integracao('template_imagem_overlay') or image_overlay.TEMPLATE_PADRAO
+    resolucao = resolucao_overlay or obter_integracao('resolucao_imagem_overlay') or image_overlay.RESOLUCAO_PADRAO
     try:
-        imagem_bytes, mime_saida = image_overlay.montar_imagem_overlay(foto_bytes, anuncio, chamada)
-        return imagem_bytes, mime_saida, 'overlay:pillow', chamada
+        imagem_bytes, mime_saida = image_overlay.montar_imagem_overlay(
+            foto_bytes, anuncio, chamada, template=template, resolucao=resolucao,
+        )
+        return imagem_bytes, mime_saida, f'overlay:pillow:{template}:{resolucao}', chamada
     except image_overlay.ImageOverlayError as exc:
         logger.warning('Erro ao montar imagem com overlay: %s', exc)
         return None, None, None, None

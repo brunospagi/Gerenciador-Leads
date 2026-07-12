@@ -155,6 +155,26 @@ class ConfiguracaoIntegracoes(models.Model):
         verbose_name="OpenAI - Qualidade",
     )
 
+    # --- Sem IA de imagem (overlay Pillow) ---
+    TEMPLATE_IMAGEM_CHOICES = [
+        ('FAIXA_INFERIOR', 'Faixa inferior (chamada + título + preço empilhados)'),
+        ('SELO_DIAGONAL', 'Selo diagonal de oferta + faixa inferior compacta'),
+        ('CARTAO_CENTRAL', 'Cartão arredondado flutuante'),
+    ]
+    RESOLUCAO_IMAGEM_CHOICES = [
+        ('1080x1080', 'Quadrado 1080x1080 (Feed)'),
+        ('1080x1350', 'Retrato 1080x1350 (Feed 4:5)'),
+        ('1080x1920', 'Vertical 1080x1920 (Stories/Reels)'),
+    ]
+    template_imagem_overlay = models.CharField(
+        max_length=20, choices=TEMPLATE_IMAGEM_CHOICES, default='FAIXA_INFERIOR',
+        verbose_name="Template do overlay",
+    )
+    resolucao_imagem_overlay = models.CharField(
+        max_length=12, choices=RESOLUCAO_IMAGEM_CHOICES, default='1080x1080',
+        verbose_name="Resolução do overlay",
+    )
+
     atualizado_em = models.DateTimeField(auto_now=True)
     atualizado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
