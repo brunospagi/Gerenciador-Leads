@@ -36,8 +36,11 @@ SYSTEM_INSTRUCTION_CHAMADA = (
     "'OPORTUNIDADE ÚNICA', 'SAIU MAIS BARATO' ou 'SUPER OFERTA'. Se houver 'Vantagens' "
     "listadas, pode se inspirar nelas, mas SEMPRE reformule numa frase natural — nunca "
     "cite a vantagem literalmente (ex: transforme 'IPVA pago' em algo como 'SEM DOR DE "
-    "CABEÇA' ou 'ZERO BUROCRACIA', nunca repita 'IPVA PAGO' na frase). Sem emoji, sem "
-    "pontuação no final, sem aspas. Responda só com a frase, nada mais."
+    "CABEÇA' ou 'ZERO BUROCRACIA', nunca repita 'IPVA PAGO' na frase). Se houver "
+    "'Opcionais' listados, pode citar um equipamento de destaque (ex: ar condicionado, "
+    "airbag, ABS, direção elétrica) pra veículos mais novos, mas sem virar uma lista — "
+    "continua sendo só uma frase curta. Sem emoji, sem pontuação no final, sem aspas. "
+    "Responda só com a frase, nada mais."
 )
 
 CHAMADA_FALLBACK = "OPORTUNIDADE IMPERDÍVEL"
@@ -54,14 +57,17 @@ def _dados_veiculo_para_prompt(anuncio):
         f"Preço: R$ {anuncio.preco:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
         if anuncio.preco else "Preço: consulte",
     ]
-    # "IPVA pago"/"Aceita troca" viram sinalizadores próprios (checkbox no admin),
-    # revisados manualmente — priorizados sobre o texto cru de `condicoes` (que às
-    # vezes vem com grafia inconsistente do site) pra montar a lista de vantagens.
+    # "IPVA pago"/"Aceita troca"/"Veículo completo" viram sinalizadores próprios
+    # (checkbox no admin), revisados manualmente — priorizados sobre o texto cru
+    # de `condicoes` (que às vezes vem com grafia inconsistente do site) pra
+    # montar a lista de vantagens.
     vantagens = []
     if getattr(anuncio, 'ipva_pago', False):
         vantagens.append('IPVA pago')
     if getattr(anuncio, 'aceita_troca', False):
         vantagens.append('Aceita troca')
+    if getattr(anuncio, 'veiculo_completo', False):
+        vantagens.append('Veículo completo')
     outras_condicoes = [
         c for c in (anuncio.condicoes or [])
         if 'ipva' not in c.lower() and 'troca' not in c.lower()
@@ -69,6 +75,12 @@ def _dados_veiculo_para_prompt(anuncio):
     vantagens.extend(outras_condicoes)
     if vantagens:
         partes.append(f"Vantagens: {', '.join(vantagens)}")
+    # Opcionais reais do anúncio (raspados do site) — dão à IA equipamentos
+    # concretos pra citar (airbag, ABS etc. em veículos mais novos) em vez de
+    # só frases genéricas.
+    opcionais = getattr(anuncio, 'opcionais', None)
+    if opcionais:
+        partes.append(f"Opcionais: {', '.join(opcionais)}")
     return "\n".join(partes)
 
 

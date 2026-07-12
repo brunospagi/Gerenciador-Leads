@@ -189,6 +189,22 @@ def _derivar_flags_condicoes(condicoes):
     return ipva_pago, aceita_troca
 
 
+PALAVRAS_VEICULO_COMPLETO = (
+    ('ar condicionado', 'ar-condicionado'),
+    ('direção hidráulica', 'direção elétrica', 'direcao hidraulica', 'direcao eletrica'),
+    ('vidro elétrico', 'vidros elétricos', 'vidro eletrico', 'vidros eletricos'),
+)
+
+
+def _derivar_veiculo_completo(opcionais):
+    """"Veículo completo" — mesma ideia de ipva_pago/aceita_troca, mas a partir
+    da lista de `opcionais`: considera completo quando tem ar condicionado +
+    direção hidráulica/elétrica + vidro elétrico juntos (o combo clássico do
+    "carro completo" nos anúncios de seminovos)."""
+    texto_junto = ' '.join(opcionais).lower()
+    return all(any(variacao in texto_junto for variacao in grupo) for grupo in PALAVRAS_VEICULO_COMPLETO)
+
+
 def _campo_tecnico(driver, rotulo):
     """Lê um par rótulo/valor dentro de .vehicle__technical__information."""
     try:
@@ -260,6 +276,7 @@ def extrair_detalhes_anuncio(driver, url, foto_url=None, espera=8):
 
     features_texto = f"{marca_modelo} {titulo}"
     ipva_pago, aceita_troca = _derivar_flags_condicoes(condicoes)
+    veiculo_completo = _derivar_veiculo_completo(opcionais)
 
     return {
         'external_id': external_id,
@@ -280,6 +297,7 @@ def extrair_detalhes_anuncio(driver, url, foto_url=None, espera=8):
         'condicoes': condicoes,
         'ipva_pago': ipva_pago,
         'aceita_troca': aceita_troca,
+        'veiculo_completo': veiculo_completo,
         'opcionais': opcionais,
         'descricao': descricao,
         'foto_principal_url': fotos_urls[0] if fotos_urls else None,

@@ -1,9 +1,11 @@
 import os
 import uuid
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.utils import timezone
 
 from crmspagi.storage_backends import PublicMediaStorage
 
@@ -53,6 +55,10 @@ class VeiculoAnuncio(models.Model):
     # depender só do que a IA entende do texto cru de `condicoes`.
     ipva_pago = models.BooleanField(default=False, verbose_name='IPVA pago')
     aceita_troca = models.BooleanField(default=False, verbose_name='Aceita troca')
+    # Mesma lógica: derivado automaticamente dos `opcionais` raspados (presença de
+    # ar condicionado + direção hidráulica/elétrica + vidro elétrico), editável no
+    # admin. Vira uma vantagem pronta pra IA usar (ex: "Veículo completo").
+    veiculo_completo = models.BooleanField(default=False, verbose_name='Veículo completo')
     opcionais = models.JSONField(default=list, blank=True)
     descricao = models.TextField(blank=True, null=True)
 
@@ -218,6 +224,12 @@ class SincronizacaoEstoque(models.Model):
         ('ERRO', 'Erro'),
     ]
 
+    # Se a sincronização ficar "RODANDO" por mais tempo que isso, load() considera
+    # que travou (ex: o servidor de desenvolvimento reiniciou no meio da raspagem,
+    # matando a thread em segundo plano sem chance de atualizar o status) e destrava
+    # sozinha — sem isso, o botão "Atualizar estoque" ficava bloqueado pra sempre.
+    TIMEOUT_MINUTOS = 30
+
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='OCIOSO')
     iniciado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     iniciado_em = models.DateTimeField(null=True, blank=True)
@@ -235,6 +247,15 @@ class SincronizacaoEstoque(models.Model):
     @classmethod
     def load(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
+        if obj.status == 'RODANDO' and obj.iniciado_em:
+            if timezone.now() - obj.iniciado_em > timedelta(minutes=cls.TIMEOUT_MINUTOS):
+                obj.status = 'ERRO'
+                obj.concluido_em = timezone.now()
+                obj.resultado = (
+                    f'Sincronização interrompida (mais de {cls.TIMEOUT_MINUTOS} min sem concluir — '
+                    'provavelmente o servidor reiniciou no meio da raspagem). Tente novamente.'
+                )
+                obj.save(update_fields=['status', 'concluido_em', 'resultado'])
         return obj
 
 

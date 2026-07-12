@@ -78,9 +78,9 @@ def _dado_filtro(request, campo):
 
 
 def _aplicar_filtros_vantagens(queryset, request):
-    """Filtros de vantagem (IPVA pago / Aceita troca) usados tanto na listagem
-    quanto no 'gerar para todos' — o mesmo seletor serve pra escolher o que
-    aparece na tela e o que entra no lote."""
+    """Filtros de vantagem (IPVA pago / Aceita troca / Veículo completo) usados
+    tanto na listagem quanto no 'gerar para todos' — o mesmo seletor serve pra
+    escolher o que aparece na tela e o que entra no lote."""
     tipo = _dado_filtro(request, 'tipo')
     if tipo in ('CARRO', 'MOTO'):
         queryset = queryset.filter(tipo=tipo)
@@ -88,6 +88,8 @@ def _aplicar_filtros_vantagens(queryset, request):
         queryset = queryset.filter(ipva_pago=True)
     if _dado_filtro(request, 'aceita_troca'):
         queryset = queryset.filter(aceita_troca=True)
+    if _dado_filtro(request, 'veiculo_completo'):
+        queryset = queryset.filter(veiculo_completo=True)
     return queryset
 
 
@@ -123,6 +125,7 @@ def veiculo_list(request):
         'sem_post_filtro': bool(sem_post),
         'ipva_pago_filtro': bool(request.GET.get('ipva_pago')),
         'aceita_troca_filtro': bool(request.GET.get('aceita_troca')),
+        'veiculo_completo_filtro': bool(request.GET.get('veiculo_completo')),
         'total_anuncios': VeiculoAnuncio.objects.filter(ativo=True).count(),
         'total_posts': PostPromocional.objects.count(),
         'total_sem_post': total_sem_post_filtrado,
@@ -180,6 +183,22 @@ def iniciar_sincronizacao(request):
     thread.start()
 
     messages.success(request, 'Sincronização com o site iniciada em segundo plano. Isso pode levar alguns minutos.')
+    return redirect('marketing_veiculo_list')
+
+
+@require_module_action('marketing_ia', 'editar')
+@require_POST
+def cancelar_sincronizacao(request):
+    """Destrava manualmente uma sincronização travada em 'RODANDO' (ex: o
+    servidor reiniciou no meio da raspagem) sem precisar esperar o timeout
+    automático de SincronizacaoEstoque.load()."""
+    sync = SincronizacaoEstoque.load()
+    if sync.status == 'RODANDO':
+        sync.status = 'ERRO'
+        sync.concluido_em = timezone.now()
+        sync.resultado = 'Sincronização cancelada manualmente.'
+        sync.save(update_fields=['status', 'concluido_em', 'resultado'])
+        messages.success(request, 'Sincronização cancelada — pode iniciar uma nova.')
     return redirect('marketing_veiculo_list')
 
 
@@ -300,6 +319,17 @@ def post_atualizar_status(request, pk):
     return redirect('marketing_veiculo_detail', pk=post.anuncio_id)
 
 
+@require_module_action('marketing_ia', 'visualizar')
+def contar_lote(request):
+    """Recalcula quantos veículos entrariam no lote com os filtros marcados no
+    modal de 'Gerar para todos', pra mostrar a contagem em tempo real antes de
+    confirmar (os mesmos filtros de request.GET usados na listagem)."""
+    total = _aplicar_filtros_vantagens(
+        VeiculoAnuncio.objects.filter(ativo=True, posts__isnull=True), request,
+    ).distinct().count()
+    return JsonResponse({'total': total})
+
+
 @require_module_action('marketing_ia', 'criar')
 @require_POST
 def iniciar_geracao_lote(request):
@@ -418,6 +448,7 @@ def layout_list(request):
     context = {
         'layouts': LayoutOverlay.objects.all(),
         'templates_fixos': ConfiguracaoIntegracoes.TEMPLATE_IMAGEM_CHOICES,
+        'datas_comemorativas': image_overlay.DATA_COMEMORATIVA_CHOICES,
     }
     return render(request, 'marketing_ia/layout_list.html', context)
 
@@ -430,6 +461,8 @@ def layout_editor(request, pk=None):
     base = request.GET.get('base')
     if not layout and base in image_overlay.ELEMENTOS_BASE:
         elementos_iniciais = image_overlay.ELEMENTOS_BASE[base]
+    elif not layout and base in image_overlay.ELEMENTOS_DATAS_COMEMORATIVAS:
+        elementos_iniciais = image_overlay.ELEMENTOS_DATAS_COMEMORATIVAS[base]
 
     context = {
         'layout': layout,
@@ -438,6 +471,7 @@ def layout_editor(request, pk=None):
             VeiculoAnuncio.objects.filter(ativo=True).exclude(foto_principal_url='').order_by('-atualizado_em')[:30]
         ),
         'resolucao_choices': ConfiguracaoIntegracoes.RESOLUCAO_IMAGEM_CHOICES,
+        'fonte_choices': json.dumps(image_overlay.FONTE_CHOICES),
     }
     return render(request, 'marketing_ia/layout_editor.html', context)
 
