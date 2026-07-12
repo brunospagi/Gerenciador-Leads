@@ -6,6 +6,7 @@ _CAMPOS_SELECT_INTEGRACOES = (
     'provedor_imagem_ia', 'gemini_image_model', 'leonardo_model_id',
     'openai_image_model', 'openai_image_quality',
 )
+_CAMPOS_TEXTAREA_INTEGRACOES = ('prompt_imagem', 'prompt_imagem_leonardo')
 
 
 class WebhookIntegracaoForm(forms.ModelForm):
@@ -32,16 +33,21 @@ class ConfiguracaoIntegracoesForm(forms.ModelForm):
         fields = [
             'evolution_api_url', 'evolution_api_key', 'evolution_instance',
             'evo_crm_api_url', 'evo_crm_api_token', 'evo_crm_pipeline_id', 'evo_crm_pipeline_stage_id',
-            'provedor_imagem_ia',
+            'provedor_imagem_ia', 'prompt_imagem',
             'gemini_image_model',
-            'leonardo_api_key', 'leonardo_model_id',
+            'leonardo_api_key', 'leonardo_model_id', 'prompt_imagem_leonardo',
             'openai_api_key', 'openai_image_model', 'openai_image_quality',
         ]
         widgets = {
             field: forms.TextInput(attrs={'class': 'form-control'})
-            for field in fields if field not in _CAMPOS_SELECT_INTEGRACOES
+            for field in fields
+            if field not in _CAMPOS_SELECT_INTEGRACOES and field not in _CAMPOS_TEXTAREA_INTEGRACOES
         }
         widgets.update({
             field: forms.Select(attrs={'class': 'form-select'})
             for field in _CAMPOS_SELECT_INTEGRACOES
+        })
+        widgets.update({
+            field: forms.Textarea(attrs={'class': 'form-control', 'rows': 4})
+            for field in _CAMPOS_TEXTAREA_INTEGRACOES
         })

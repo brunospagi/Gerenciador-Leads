@@ -43,6 +43,26 @@ class ServicoWebhook:
     WHATSAPP_VENDA_REJEITADA = 'WHATSAPP_VENDA_REJEITADA'
 
 
+PROMPT_IMAGEM_PADRAO = (
+    "Use a foto enviada como referência do veículo real (mantenha a carroceria, cor e "
+    "detalhes fiéis ao original, sem alterar o veículo). Recrie a cena colocando o "
+    "veículo em um showroom moderno e bem iluminado (ou pátio externo elegante ao "
+    "entardecer), com reflexo sutil no chão, aparência profissional de anúncio "
+    "publicitário para redes sociais, formato quadrado (1:1), alta qualidade "
+    "fotorrealista. Não inclua nenhum texto, logotipo ou marca d'água na imagem."
+)
+
+# O Leonardo.Ai não aceita a foto embutida na mesma chamada (ela vai como
+# init_image_id, separado) — por isso o prompt aqui é só a descrição textual da
+# cena desejada, sem "use a foto enviada como referência".
+PROMPT_IMAGEM_LEONARDO_PADRAO = (
+    "Professional automotive advertisement photo, the vehicle placed in a modern, "
+    "well-lit showroom (or an elegant outdoor lot at dusk), subtle floor reflection, "
+    "photorealistic, high quality, social media ad style, square composition. "
+    "No text, no logo, no watermark."
+)
+
+
 class ConfiguracaoIntegracoes(models.Model):
     """Singleton (get_solo) para credenciais externas hoje só disponíveis via env var."""
 
@@ -63,6 +83,21 @@ class ConfiguracaoIntegracoes(models.Model):
     provedor_imagem_ia = models.CharField(
         max_length=20, choices=PROVEDOR_IMAGEM_CHOICES, default='GEMINI',
         verbose_name="Provedor de geração de imagem (Marketing IA)",
+    )
+
+    # Prompt da cena para Gemini/OpenAI: os dois recebem a foto do veículo na mesma
+    # chamada (inline_data/multipart), por isso o texto assume "use a foto enviada...".
+    prompt_imagem = models.TextField(
+        default=PROMPT_IMAGEM_PADRAO, blank=True,
+        verbose_name="Prompt da cena (Gemini / OpenAI)",
+        help_text="Usado por Gemini e OpenAI, que recebem a foto do veículo junto com o prompt.",
+    )
+    # Prompt do Leonardo.Ai: só texto (a foto vai separada, como init_image_id), por
+    # isso não deve mencionar "a foto enviada" - só a descrição da cena desejada.
+    prompt_imagem_leonardo = models.TextField(
+        default=PROMPT_IMAGEM_LEONARDO_PADRAO, blank=True,
+        verbose_name="Prompt da cena (Leonardo.Ai)",
+        help_text="Só a descrição da cena (em inglês, se possível) — a foto do veículo vai separada, não mencione 'a foto enviada'.",
     )
 
     # --- Gemini ---

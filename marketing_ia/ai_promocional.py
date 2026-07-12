@@ -8,6 +8,7 @@ import requests
 from django.conf import settings
 
 from avaliacoes.ai_runtime import get_gemini_runtime
+from configuracoes.models import PROMPT_IMAGEM_PADRAO, PROMPT_IMAGEM_LEONARDO_PADRAO
 from configuracoes.resolver import obter_integracao
 
 from . import leonardo_client
@@ -25,25 +26,6 @@ SYSTEM_INSTRUCTION_LEGENDA = (
     "com uma chamada para ação (WhatsApp/DM). Depois da legenda, na última linha, "
     "liste de 5 a 8 hashtags relevantes separadas por espaço, prefixadas com '#'. "
     "Retorne apenas JSON válido com as chaves 'legenda' e 'hashtags' (string única)."
-)
-
-PROMPT_IMAGEM = (
-    "Use a foto enviada como referência do veículo real (mantenha a carroceria, cor e "
-    "detalhes fiéis ao original, sem alterar o veículo). Recrie a cena colocando o "
-    "veículo em um showroom moderno e bem iluminado (ou pátio externo elegante ao "
-    "entardecer), com reflexo sutil no chão, aparência profissional de anúncio "
-    "publicitário para redes sociais, formato quadrado (1:1), alta qualidade "
-    "fotorrealista. Não inclua nenhum texto, logotipo ou marca d'água na imagem."
-)
-
-# O Leonardo.Ai não aceita a foto embutida na mesma chamada (ela vai como
-# init_image_id, separado) — por isso o prompt aqui é só a descrição textual da
-# cena desejada, sem "use a foto enviada como referência".
-PROMPT_IMAGEM_LEONARDO = (
-    "Professional automotive advertisement photo, the vehicle placed in a modern, "
-    "well-lit showroom (or an elegant outdoor lot at dusk), subtle floor reflection, "
-    "photorealistic, high quality, social media ad style, square composition. "
-    "No text, no logo, no watermark."
 )
 
 
@@ -99,9 +81,9 @@ def gerar_imagem_promocional(anuncio, foto_bytes, mime_type, max_tentativas=3):
     """
     Gera a imagem promocional usando o provedor configurado em
     Configurações > Integrações Externas (padrão: Gemini). Retorna
-    (imagem_bytes, mime_type_saida, modelo_usado) ou (None, None, None) se a
-    IA estiver indisponível ou falhar — o caller deve tratar isso como uma
-    falha esperada, não uma exceção.
+    (imagem_bytes, mime_type_saida, modelo_usado, prompt_usado) ou
+    (None, None, None, None) se a IA estiver indisponível ou falhar — o
+    caller deve tratar isso como uma falha esperada, não uma exceção.
     """
     from configuracoes.models import ConfiguracaoIntegracoes
 
@@ -117,52 +99,55 @@ def _gerar_imagem_leonardo(anuncio, foto_bytes, mime_type):
     api_key = obter_integracao('leonardo_api_key')
     if not api_key:
         logger.warning('Leonardo.Ai indisponível: chave da API não configurada (Admin/.env).')
-        return None, None, None
+        return None, None, None, None
 
     model_id = obter_integracao('leonardo_model_id') or leonardo_client.MODEL_ID_PADRAO
+    prompt = obter_integracao('prompt_imagem_leonardo') or PROMPT_IMAGEM_LEONARDO_PADRAO
     try:
         imagem_bytes, mime_saida = leonardo_client.gerar_imagem_leonardo(
-            PROMPT_IMAGEM_LEONARDO, foto_bytes, mime_type, api_key, model_id=model_id,
+            prompt, foto_bytes, mime_type, api_key, model_id=model_id,
         )
-        return imagem_bytes, mime_saida, f'leonardo:{model_id}'
+        return imagem_bytes, mime_saida, f'leonardo:{model_id}', prompt
     except leonardo_client.LeonardoError as exc:
         logger.warning('Erro ao gerar imagem promocional com Leonardo.Ai: %s', exc)
-        return None, None, None
+        return None, None, None, None
     except Exception as exc:
         logger.warning('Erro inesperado ao chamar o Leonardo.Ai: %s', exc)
-        return None, None, None
+        return None, None, None, None
 
 
 def _gerar_imagem_openai(anuncio, foto_bytes, mime_type):
     api_key = obter_integracao('openai_api_key')
     if not api_key:
         logger.warning('OpenAI indisponível: chave da API não configurada (Admin/.env).')
-        return None, None, None
+        return None, None, None, None
 
     model_id = obter_integracao('openai_image_model') or openai_client.MODEL_ID_PADRAO
     quality = obter_integracao('openai_image_quality') or 'medium'
+    prompt = obter_integracao('prompt_imagem') or PROMPT_IMAGEM_PADRAO
     try:
         imagem_bytes, mime_saida = openai_client.gerar_imagem_openai(
-            PROMPT_IMAGEM, foto_bytes, mime_type, api_key, model_id=model_id, quality=quality,
+            prompt, foto_bytes, mime_type, api_key, model_id=model_id, quality=quality,
         )
-        return imagem_bytes, mime_saida, f'openai:{model_id}:{quality}'
+        return imagem_bytes, mime_saida, f'openai:{model_id}:{quality}', prompt
     except openai_client.OpenAIImageError as exc:
         logger.warning('Erro ao gerar imagem promocional com OpenAI: %s', exc)
-        return None, None, None
+        return None, None, None, None
     except Exception as exc:
         logger.warning('Erro inesperado ao chamar a OpenAI: %s', exc)
-        return None, None, None
+        return None, None, None, None
 
 
 def _gerar_imagem_gemini(anuncio, foto_bytes, mime_type, max_tentativas=3):
     client, _, erro = get_gemini_runtime()
     if erro or not client:
         logger.warning('Gemini indisponível para gerar imagem promocional: %s', erro)
-        return None, None, None
+        return None, None, None, None
 
     modelo = obter_integracao('gemini_image_model') or IMAGE_MODEL
+    prompt = obter_integracao('prompt_imagem') or PROMPT_IMAGEM_PADRAO
     contents = [
-        {"text": PROMPT_IMAGEM},
+        {"text": prompt},
         {"inline_data": {"mime_type": mime_type, "data": base64.b64encode(foto_bytes).decode('utf-8')}},
     ]
 
@@ -176,9 +161,9 @@ def _gerar_imagem_gemini(anuncio, foto_bytes, mime_type, max_tentativas=3):
                         dados = inline_data.data
                         if isinstance(dados, str):
                             dados = base64.b64decode(dados)
-                        return dados, inline_data.mime_type or 'image/png', modelo
+                        return dados, inline_data.mime_type or 'image/png', modelo, prompt
             logger.warning('Resposta da Gemini não trouxe imagem para %s', anuncio.titulo)
-            return None, None, None
+            return None, None, None, None
         except Exception as exc:
             error_upper = str(exc).upper()
             transitorio = '503' in error_upper or 'UNAVAILABLE' in error_upper or 'HIGH DEMAND' in error_upper
@@ -186,6 +171,6 @@ def _gerar_imagem_gemini(anuncio, foto_bytes, mime_type, max_tentativas=3):
                 time.sleep(tentativa)
                 continue
             logger.warning('Erro ao gerar imagem promocional com Gemini: %s', exc)
-            return None, None, None
+            return None, None, None, None
 
-    return None, None, None
+    return None, None, None, None
