@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from django.utils import timezone
+from configuracoes.models import ConfiguracaoIntegracoes
 from notificacoes.models import Notificacao
 from clientes.models import Cliente
 from usuarios.models import Profile
@@ -9,6 +10,10 @@ class Command(BaseCommand):
     help = 'Verifica clientes com contato atrasado e notifica vendedores e administradores.'
 
     def handle(self, *args, **kwargs):
+        if not ConfiguracaoIntegracoes.get_solo().notificar_leads_atrasados:
+            self.stdout.write('Notificação de leads atrasados está desativada em Configurações. Nada a fazer.')
+            return
+
         self.stdout.write('Iniciando verificação de clientes com contato atrasado...')
 
         # Encontra clientes com contato atrasado que não estão finalizados

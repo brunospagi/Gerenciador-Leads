@@ -138,6 +138,16 @@
           </div>
         </div>
 
+        <hr>
+        <h5 class="mb-3">Notificações automáticas</h5>
+        <div class="form-check mb-3">
+          {{ form.notificar_leads_atrasados }}
+          <label class="form-check-label" for="{{ form.notificar_leads_atrasados.id_for_label }}">
+            {{ form.notificar_leads_atrasados.label }}
+          </label>
+          <div class="form-text">{{ form.notificar_leads_atrasados.help_text }}</div>
+        </div>
+
         <button type="submit" class="btn btn-primary">Salvar</button>
       </form>
     </div>

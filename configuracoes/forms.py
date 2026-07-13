@@ -28,6 +28,9 @@ class WebhookIntegracaoForm(forms.ModelForm):
             self.fields['slug'].disabled = True
 
 
+_CAMPOS_CHECKBOX_INTEGRACOES = ('notificar_leads_atrasados',)
+
+
 class ConfiguracaoIntegracoesForm(forms.ModelForm):
     class Meta:
         model = ConfiguracaoIntegracoes
@@ -39,11 +42,14 @@ class ConfiguracaoIntegracoesForm(forms.ModelForm):
             'leonardo_api_key', 'leonardo_model_id', 'prompt_imagem_leonardo',
             'openai_api_key', 'openai_image_model', 'openai_image_quality',
             'template_imagem_overlay', 'resolucao_imagem_overlay',
+            'notificar_leads_atrasados',
         ]
         widgets = {
             field: forms.TextInput(attrs={'class': 'form-control'})
             for field in fields
-            if field not in _CAMPOS_SELECT_INTEGRACOES and field not in _CAMPOS_TEXTAREA_INTEGRACOES
+            if field not in _CAMPOS_SELECT_INTEGRACOES
+            and field not in _CAMPOS_TEXTAREA_INTEGRACOES
+            and field not in _CAMPOS_CHECKBOX_INTEGRACOES
         }
         widgets.update({
             field: forms.Select(attrs={'class': 'form-select'})
@@ -52,6 +58,10 @@ class ConfiguracaoIntegracoesForm(forms.ModelForm):
         widgets.update({
             field: forms.Textarea(attrs={'class': 'form-control', 'rows': 4})
             for field in _CAMPOS_TEXTAREA_INTEGRACOES
+        })
+        widgets.update({
+            field: forms.CheckboxInput(attrs={'class': 'form-check-input'})
+            for field in _CAMPOS_CHECKBOX_INTEGRACOES
         })
 
     def __init__(self, *args, **kwargs):
