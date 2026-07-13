@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
@@ -219,3 +220,63 @@ class MigrationValorEstimadoParseTests(TestCase):
     def test_valor_no_limite_exato_e_aceito(self):
         parse = self._carregar_parse_valor_estimado()
         self.assertEqual(parse('9999999999,99'), Decimal('9999999999.99'))
+
+
+class ClienteCreateViewWebhookTests(TestCase):
+    """Regressao: criar um lead pelo formulario 'Novo Cliente' (ClienteCreateView)
+    nunca chamava enviar_webhook_n8n — só o painel de distribuição (PainelDistribuicaoView)
+    disparava o webhook. Um lead cadastrado direto por este formulário nunca gerava
+    nenhuma notificação pro n8n."""
+
+    def setUp(self):
+        self.vendedor = User.objects.create_user('vendedor_webhook', password='senha12345')
+        _liberar_modulo(self.vendedor, 'clientes')
+        self.client.login(username='vendedor_webhook', password='senha12345')
+
+    @patch('clientes.views.enviar_webhook_n8n')
+    def test_criar_cliente_dispara_webhook(self, mock_enviar):
+        resp = self.client.post(reverse('cliente_create'), {
+            'whatsapp': '41988887777',
+            'nome_cliente': 'Lead Novo',
+            'tipo_veiculo': 'carros',
+            'tipo_contato': Cliente.TipoContato.MENSAGEM,
+            'proximo_passo': Cliente.ProximoPasso.MENSAGEM,
+            'status_negociacao': Cliente.StatusNegociacao.NOVO,
+            'status_contato': Cliente.StatusContato.NAO_CONTATADO,
+            'etapa_funil': Cliente.EtapaFunil.RECEPCAO,
+            'tipo_negociacao': Cliente.TipoNegociacao.VENDA,
+            'prioridade': Cliente.Prioridade.MORNO,
+            'quantidade_ligacoes': 0,
+        })
+        self.assertEqual(resp.status_code, 302)
+        cliente = Cliente.objects.get(whatsapp='41988887777')
+        mock_enviar.assert_called_once_with(cliente)
+
+    @patch('clientes.views.enviar_webhook_n8n', side_effect=Exception('falha simulada'))
+    def test_falha_no_webhook_nao_impede_criacao_do_cliente(self, mock_enviar):
+        resp = self.client.post(reverse('cliente_create'), {
+            'whatsapp': '41988887778',
+            'nome_cliente': 'Lead Novo 2',
+            'tipo_veiculo': 'carros',
+            'tipo_contato': Cliente.TipoContato.MENSAGEM,
+            'proximo_passo': Cliente.ProximoPasso.MENSAGEM,
+            'status_negociacao': Cliente.StatusNegociacao.NOVO,
+            'status_contato': Cliente.StatusContato.NAO_CONTATADO,
+            'etapa_funil': Cliente.EtapaFunil.RECEPCAO,
+            'tipo_negociacao': Cliente.TipoNegociacao.VENDA,
+            'prioridade': Cliente.Prioridade.MORNO,
+            'quantidade_ligacoes': 0,
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(Cliente.objects.filter(whatsapp='41988887778').exists())
+
+
+class N8nWebhookUrlSettingTests(TestCase):
+    """Regressao: settings.py nunca lia N8N_WEBHOOK_URL do .env (só os outros dois
+    webhooks - WEBHOOK_PONTO_URL e N8N_WHATSAPP_WEBHOOK_URL - eram lidos), então o
+    fallback de configuracoes.resolver.obter_webhook_url pra DISTRIBUICAO_LEADS nunca
+    encontrava uma URL quando o painel não tinha uma cadastrada manualmente."""
+
+    def test_settings_expõe_n8n_webhook_url(self):
+        from django.conf import settings
+        self.assertTrue(hasattr(settings, 'N8N_WEBHOOK_URL'))

@@ -17,6 +17,10 @@ from collections import defaultdict
 from django.contrib import messages
 from core.audit import create_audit_log, get_client_ip
 from configuracoes.access import ModuleActionRequiredMixin, require_module_action
+from distribuicao.logic import enviar_webhook_n8n
+import logging
+
+logger = logging.getLogger(__name__)
 
 CLOSED_STATUSES = [Cliente.StatusNegociacao.FINALIZADO, Cliente.StatusNegociacao.VENDIDO]
 
@@ -246,7 +250,13 @@ class ClienteCreateView(ModuleActionRequiredMixin, CreateView):
             self.object.data_proximo_contato = timezone.now() + timedelta(days=5)
             
         self.object.save()
-        messages.success(self.request, "Cliente cadastrado com sucesso!") 
+
+        try:
+            enviar_webhook_n8n(self.object)
+        except Exception as e:
+            logger.warning('Erro ao enviar webhook na criação do cliente %s: %s', self.object.pk, e)
+
+        messages.success(self.request, "Cliente cadastrado com sucesso!")
         return redirect(self.success_url)
 # --- FIM DA VIEW DE CRIAÇÃO ---
 
