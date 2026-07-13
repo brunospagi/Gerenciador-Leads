@@ -1136,8 +1136,13 @@ class LoteListViewTests(TestCase):
         self.client.login(username='admin_lote_list', password='senha12345')
 
     def test_lista_lotes_do_mais_recente_pro_mais_antigo(self):
+        # criado_em vem de auto_now_add — criar os dois em sequência rápida
+        # pode gravar o mesmo timestamp (resolução do SQLite), deixando a
+        # ordem ambígua. Força um intervalo explícito pra ordenação não
+        # virar flaky.
         lote_antigo = LoteGeracao.objects.create(status='CONCLUIDO', total_alvo=1, total_gerado=1)
         lote_recente = LoteGeracao.objects.create(status='CONCLUIDO', total_alvo=2, total_gerado=2)
+        LoteGeracao.objects.filter(pk=lote_antigo.pk).update(criado_em=timezone.now() - timedelta(minutes=1))
 
         resp = self.client.get(reverse('marketing_lote_list'))
         self.assertEqual(resp.status_code, 200)
