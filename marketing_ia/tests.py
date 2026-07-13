@@ -1003,3 +1003,148 @@ class EmojiPngColoridoTests(TestCase):
         imagem_bytes, mime_type = image_overlay.montar_imagem_layout(_foto_fake_bytes(), anuncio, 'chamada', elementos)
         self.assertEqual(mime_type, 'image/jpeg')
         self.assertTrue(imagem_bytes)
+
+
+class IniciarGeracaoLoteTemplateResolucaoTests(TestCase):
+    """O modal de 'gerar em lote' não perguntava template/resolução do
+    overlay — o lote inteiro sempre usava o que estivesse configurado
+    globalmente no momento em que cada post da fila fosse processado. Agora
+    o lote grava o que foi escolhido no disparo e usa isso pra todos os posts."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser('admin_lote_tpl', 'admin_lote_tpl@teste.com', 'senha12345')
+        self.client.login(username='admin_lote_tpl', password='senha12345')
+        _anuncio_persistido(external_id='lote-tpl-1')
+
+    def test_grava_template_e_resolucao_escolhidos_no_lote(self):
+        resp = self.client.post(reverse('marketing_iniciar_lote'), {
+            'template_overlay': 'SELO_DIAGONAL',
+            'resolucao_overlay': '1080x1350',
+        })
+        self.assertEqual(resp.status_code, 302)
+        lote = LoteGeracao.objects.latest('criado_em')
+        self.assertEqual(lote.template_overlay, 'SELO_DIAGONAL')
+        self.assertEqual(lote.resolucao_overlay, '1080x1350')
+
+    def test_grava_provedor_de_imagem_atual_no_lote(self):
+        resp = self.client.post(reverse('marketing_iniciar_lote'), {})
+        self.assertEqual(resp.status_code, 302)
+        lote = LoteGeracao.objects.latest('criado_em')
+        self.assertTrue(lote.provedor_imagem_ia)
+
+    def test_template_invalido_vira_none(self):
+        resp = self.client.post(reverse('marketing_iniciar_lote'), {'template_overlay': 'INEXISTENTE'})
+        self.assertEqual(resp.status_code, 302)
+        lote = LoteGeracao.objects.latest('criado_em')
+        self.assertIsNone(lote.template_overlay)
+
+    @patch('marketing_ia.views.gerar_posts_em_lote')
+    def test_repassa_template_e_resolucao_pra_geracao_em_lote(self, mock_gerar):
+        mock_gerar.return_value = (1, 0)
+        resp = self.client.post(reverse('marketing_iniciar_lote'), {
+            'template_overlay': 'CARTAO_CENTRAL',
+            'resolucao_overlay': '1080x1920',
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        lote = LoteGeracao.objects.latest('criado_em')
+        # a geração roda numa thread em background — como o teste não tem
+        # tempo pra corrida, chama a função de execução direto pra checar
+        # se ela repassa os valores gravados no lote.
+        from .views import _executar_lote_em_background
+        _executar_lote_em_background(lote.pk)
+
+        mock_gerar.assert_called_once()
+        _, kwargs = mock_gerar.call_args
+        self.assertEqual(kwargs['template_overlay'], 'CARTAO_CENTRAL')
+        self.assertEqual(kwargs['resolucao_overlay'], '1080x1920')
+
+
+class PostAtualizarStatusDescartaImagemTests(TestCase):
+    """Descartar um post não pode só trocar o status — tem que apagar a
+    imagem do storage (MinIO/S3), senão cada descarte vira lixo lá."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser('admin_descarte', 'admin_descarte@teste.com', 'senha12345')
+        self.client.login(username='admin_descarte', password='senha12345')
+        self.anuncio = _anuncio_persistido(external_id='descarte-1')
+        self.post = PostPromocional.objects.create(
+            anuncio=self.anuncio, imagem='marketing_ia/posts/descarte-1/post.jpg', legenda='Legenda',
+        )
+
+    @patch('crmspagi.storage_backends.MinioMediaStorage.delete')
+    def test_descartar_apaga_arquivo_do_storage(self, mock_delete):
+        resp = self.client.post(
+            reverse('marketing_post_status', args=[self.post.pk]), {'status': 'DESCARTADO'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        mock_delete.assert_called_once_with('marketing_ia/posts/descarte-1/post.jpg')
+
+    @patch('crmspagi.storage_backends.MinioMediaStorage.delete')
+    def test_descartar_remove_o_registro_do_post(self, mock_delete):
+        resp = self.client.post(
+            reverse('marketing_post_status', args=[self.post.pk]), {'status': 'DESCARTADO'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(PostPromocional.objects.filter(pk=self.post.pk).exists())
+
+    @patch('crmspagi.storage_backends.MinioMediaStorage.delete')
+    def test_outros_status_nao_apagam_nada(self, mock_delete):
+        resp = self.client.post(
+            reverse('marketing_post_status', args=[self.post.pk]), {'status': 'APROVADO'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        mock_delete.assert_not_called()
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.status, 'APROVADO')
+
+
+class DescartarLoteViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser('admin_desc_lote', 'admin_desc_lote@teste.com', 'senha12345')
+        self.client.login(username='admin_desc_lote', password='senha12345')
+        self.anuncio1 = _anuncio_persistido(external_id='desc-lote-1')
+        self.anuncio2 = _anuncio_persistido(external_id='desc-lote-2')
+        self.lote = LoteGeracao.objects.create(status='CONCLUIDO', total_alvo=2, total_gerado=2)
+        self.post_rascunho = PostPromocional.objects.create(
+            anuncio=self.anuncio1, lote=self.lote, imagem='marketing_ia/posts/x/1.jpg', legenda='L1',
+        )
+        self.post_publicado = PostPromocional.objects.create(
+            anuncio=self.anuncio2, lote=self.lote, imagem='marketing_ia/posts/x/2.jpg', legenda='L2',
+            status='PUBLICADO',
+        )
+
+    @patch('crmspagi.storage_backends.MinioMediaStorage.delete')
+    def test_descarta_todos_menos_os_ja_publicados(self, mock_delete):
+        resp = self.client.post(reverse('marketing_descartar_lote', args=[self.lote.pk]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(PostPromocional.objects.filter(pk=self.post_rascunho.pk).exists())
+        self.assertTrue(PostPromocional.objects.filter(pk=self.post_publicado.pk).exists())
+        mock_delete.assert_called_once_with('marketing_ia/posts/x/1.jpg')
+
+    @patch('crmspagi.storage_backends.MinioMediaStorage.delete')
+    def test_lote_sem_posts_pendentes_nao_quebra(self, mock_delete):
+        self.post_rascunho.delete()
+        resp = self.client.post(reverse('marketing_descartar_lote', args=[self.lote.pk]))
+        self.assertEqual(resp.status_code, 302)
+        mock_delete.assert_not_called()
+
+
+class LoteListViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser('admin_lote_list', 'admin_lote_list@teste.com', 'senha12345')
+        self.client.login(username='admin_lote_list', password='senha12345')
+
+    def test_lista_lotes_do_mais_recente_pro_mais_antigo(self):
+        lote_antigo = LoteGeracao.objects.create(status='CONCLUIDO', total_alvo=1, total_gerado=1)
+        lote_recente = LoteGeracao.objects.create(status='CONCLUIDO', total_alvo=2, total_gerado=2)
+
+        resp = self.client.get(reverse('marketing_lote_list'))
+        self.assertEqual(resp.status_code, 200)
+        lotes = list(resp.context['lotes'])
+        self.assertEqual(lotes[0].pk, lote_recente.pk)
+        self.assertEqual(lotes[1].pk, lote_antigo.pk)
+
+    def test_pagina_vazia_nao_quebra(self):
+        resp = self.client.get(reverse('marketing_lote_list'))
+        self.assertEqual(resp.status_code, 200)

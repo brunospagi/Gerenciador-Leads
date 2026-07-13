@@ -57,7 +57,10 @@ def _executar_lote_em_background(lote_id):
         return
     try:
         anuncios = VeiculoAnuncio.objects.filter(pk__in=lote.alvo_ids)
-        gerados, falhas = gerar_posts_em_lote(anuncios, usuario=lote.iniciado_por, lote=lote)
+        gerados, falhas = gerar_posts_em_lote(
+            anuncios, usuario=lote.iniciado_por, lote=lote,
+            template_overlay=lote.template_overlay, resolucao_overlay=lote.resolucao_overlay,
+        )
         lote.status = 'CONCLUIDO'
         lote.total_gerado = gerados
         lote.total_falhas = falhas
@@ -116,6 +119,11 @@ def veiculo_list(request):
         VeiculoAnuncio.objects.filter(ativo=True, posts__isnull=True), request,
     ).distinct().count()
 
+    config = ConfiguracaoIntegracoes.get_solo()
+    template_choices = list(ConfiguracaoIntegracoes.TEMPLATE_IMAGEM_CHOICES) + [
+        (layout.chave_template, f'Customizado: {layout.nome}') for layout in LayoutOverlay.objects.all()
+    ]
+
     context = {
         'page_obj': page_obj,
         'is_paginated': page_obj.has_other_pages(),
@@ -131,8 +139,10 @@ def veiculo_list(request):
         'total_sem_post': total_sem_post_filtrado,
         'lote_em_andamento': LoteGeracao.objects.filter(status='RODANDO').order_by('-criado_em').first(),
         'ultimo_lote': LoteGeracao.objects.exclude(status='RODANDO').order_by('-criado_em').first(),
-        'provedor_imagem_atual': ConfiguracaoIntegracoes.get_solo().provedor_imagem_ia,
+        'provedor_imagem_atual': config.provedor_imagem_ia,
         'provedor_imagem_choices': ConfiguracaoIntegracoes.PROVEDOR_IMAGEM_CHOICES,
+        'template_imagem_overlay_choices': template_choices,
+        'resolucao_imagem_overlay_choices': ConfiguracaoIntegracoes.RESOLUCAO_IMAGEM_CHOICES,
         'pode_trocar_provedor_imagem': (
             request.user.is_superuser
             or (hasattr(request.user, 'profile') and request.user.profile.nivel_acesso == 'ADMIN')
@@ -307,16 +317,26 @@ def descartar_preview(request, preview_id):
 def post_atualizar_status(request, pk):
     post = get_object_or_404(PostPromocional, pk=pk)
     novo_status = request.POST.get('status')
+    lote_id = post.lote_id
+    anuncio_id = post.anuncio_id
+
     if novo_status not in dict(PostPromocional.STATUS_CHOICES):
         messages.error(request, 'Status inválido.')
+    elif novo_status == 'DESCARTADO':
+        # Descartar apaga o registro E o arquivo do storage (MinIO/S3) — só
+        # marcar o status como DESCARTADO deixava a imagem pra sempre lá,
+        # virando lixo sem nenhuma referência que a use.
+        post.imagem.delete(save=False)
+        post.delete()
+        messages.success(request, 'Post descartado e imagem removida do armazenamento.')
     else:
         post.status = novo_status
         post.save(update_fields=['status'])
         messages.success(request, f'Post marcado como "{post.get_status_display()}".')
 
-    if post.lote_id:
-        return redirect('marketing_revisao_lote', lote_id=post.lote_id)
-    return redirect('marketing_veiculo_detail', pk=post.anuncio_id)
+    if lote_id:
+        return redirect('marketing_revisao_lote', lote_id=lote_id)
+    return redirect('marketing_veiculo_detail', pk=anuncio_id)
 
 
 @require_module_action('marketing_ia', 'visualizar')
@@ -345,10 +365,25 @@ def iniciar_geracao_lote(request):
         messages.warning(request, 'Não há veículos sem post para gerar.')
         return redirect('marketing_veiculo_list')
 
+    config = ConfiguracaoIntegracoes.get_solo()
+    template_overlay = request.POST.get('template_overlay') or None
+    resolucao_overlay = request.POST.get('resolucao_overlay') or None
+    template_valido = template_overlay in dict(ConfiguracaoIntegracoes.TEMPLATE_IMAGEM_CHOICES) or (
+        template_overlay and template_overlay.startswith('CUSTOM:')
+        and LayoutOverlay.objects.filter(pk=template_overlay.split(':', 1)[1]).exists()
+    )
+    if not template_valido:
+        template_overlay = None
+    if resolucao_overlay not in dict(ConfiguracaoIntegracoes.RESOLUCAO_IMAGEM_CHOICES):
+        resolucao_overlay = None
+
     lote = LoteGeracao.objects.create(
         iniciado_por=request.user,
         alvo_ids=ids,
         total_alvo=len(ids),
+        provedor_imagem_ia=config.provedor_imagem_ia,
+        template_overlay=template_overlay,
+        resolucao_overlay=resolucao_overlay,
     )
 
     thread = threading.Thread(target=_executar_lote_em_background, args=(lote.pk,), daemon=True)
@@ -374,6 +409,22 @@ def status_lote(request, lote_id):
 
 
 @require_module_action('marketing_ia', 'visualizar')
+def lote_list(request):
+    """Histórico de todos os lotes já disparados — antes só dava pra ver o
+    lote em andamento ou o último concluído, ficando impossível voltar num
+    lote mais antigo pra revisar/enviar posts que ficaram pra trás."""
+    lotes = LoteGeracao.objects.all().order_by('-criado_em')
+    paginator = Paginator(lotes, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    context = {
+        'page_obj': page_obj,
+        'is_paginated': page_obj.has_other_pages(),
+        'lotes': page_obj,
+    }
+    return render(request, 'marketing_ia/lote_list.html', context)
+
+
+@require_module_action('marketing_ia', 'visualizar')
 def revisao_lote(request, lote_id):
     lote = get_object_or_404(LoteGeracao, pk=lote_id)
     posts = lote.posts.select_related('anuncio').order_by('-gerado_em')
@@ -391,6 +442,27 @@ def aprovar_lote(request, lote_id):
     lote = get_object_or_404(LoteGeracao, pk=lote_id)
     total = lote.posts.filter(status='RASCUNHO').update(status='APROVADO')
     messages.success(request, f'{total} post(s) aprovado(s) e prontos para publicar.')
+    return redirect('marketing_revisao_lote', lote_id=lote.pk)
+
+
+@require_module_action('marketing_ia', 'editar')
+@require_POST
+def descartar_lote(request, lote_id):
+    """Descarta de uma vez todos os posts do lote que ainda não foram
+    publicados — cada um apaga sua imagem do storage (mesma limpeza do
+    descarte individual), em vez de precisar clicar 'Descartar' post por
+    post quando um lote inteiro saiu ruim."""
+    lote = get_object_or_404(LoteGeracao, pk=lote_id)
+    posts = lote.posts.exclude(status='PUBLICADO')
+    total = posts.count()
+    for post in posts:
+        post.imagem.delete(save=False)
+        post.delete()
+
+    if not total:
+        messages.warning(request, 'Não há posts pra descartar neste lote (todos já foram publicados).')
+    else:
+        messages.success(request, f'{total} post(s) descartado(s) e removido(s) do armazenamento.')
     return redirect('marketing_revisao_lote', lote_id=lote.pk)
 
 

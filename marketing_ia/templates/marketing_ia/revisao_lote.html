@@ -19,6 +19,13 @@
         {% endif %}
     </span>
 </div>
+{% if lote.provedor_imagem_ia %}
+<p class="text-muted small mb-3">
+    IA de imagem: <strong>{{ lote.provedor_imagem_ia }}</strong>
+    {% if lote.template_overlay %} · Template: <strong>{{ lote.template_overlay }}</strong>{% endif %}
+    {% if lote.resolucao_overlay %} · Resolução: <strong>{{ lote.resolucao_overlay }}</strong>{% endif %}
+</p>
+{% endif %}
 
 {% if posts %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -27,6 +34,11 @@
         <form method="post" action="{% url 'marketing_aprovar_lote' lote.pk %}" onsubmit="return confirm('Salvar (aprovar) todos os posts em rascunho deste lote?');">
             {% csrf_token %}
             <button type="submit" class="btn btn-success"><i class="bi bi-check2-all me-1"></i>Salvar todas</button>
+        </form>
+        <form method="post" action="{% url 'marketing_descartar_lote' lote.pk %}"
+              onsubmit="return confirm('Descartar TODOS os posts deste lote (exceto os já publicados)? As imagens serão apagadas do armazenamento e não dá pra desfazer.');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-trash me-1"></i>Descartar todas</button>
         </form>
         {% if webhooks_ativos %}
         <form method="post" action="{% url 'marketing_enviar_lote_webhook' lote.pk %}" class="d-flex gap-2"
