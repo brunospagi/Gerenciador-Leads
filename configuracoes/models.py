@@ -175,6 +175,14 @@ class ConfiguracaoIntegracoes(models.Model):
         verbose_name="Resolução do overlay",
     )
 
+    # Liga/desliga o job diario (check_overdue_clients) que notifica vendedor +
+    # admins quando data_proximo_contato de um lead ja passou. Default True
+    # preserva o comportamento atual pra quem ja tinha o cron rodando.
+    notificar_leads_atrasados = models.BooleanField(
+        default=True, verbose_name="Notificar leads com contato atrasado",
+        help_text="Desliga o alerta diário (job check_overdue_clients) pro vendedor e admins quando o próximo contato de um lead já passou.",
+    )
+
     atualizado_em = models.DateTimeField(auto_now=True)
     atualizado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
