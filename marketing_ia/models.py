@@ -97,6 +97,15 @@ class LoteGeracao(models.Model):
     concluido_em = models.DateTimeField(null=True, blank=True)
     erro = models.CharField(max_length=255, blank=True, null=True)
 
+    # Guardados no momento do disparo pra esse lote inteiro usar o mesmo
+    # modelo/tamanho (em vez de cada post pegar o valor atual da config global
+    # no instante em que sua vez chega na fila) e pra aparecerem no histórico
+    # de lotes — provedor_imagem_ia sempre é preenchido; template/resolução só
+    # valem de fato pro provedor OVERLAY (os demais não têm essas opções).
+    provedor_imagem_ia = models.CharField(max_length=20, blank=True, null=True, verbose_name='Provedor de IA de imagem usado')
+    template_overlay = models.CharField(max_length=20, blank=True, null=True, verbose_name='Template do overlay usado')
+    resolucao_overlay = models.CharField(max_length=12, blank=True, null=True, verbose_name='Resolução usada')
+
     class Meta:
         verbose_name = 'Lote de Geração'
         verbose_name_plural = 'Lotes de Geração'

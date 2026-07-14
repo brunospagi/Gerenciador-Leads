@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1 class="mb-0"><i class="bi bi-collection-fill me-2"></i>Histórico de Lotes</h1>
+    <a href="{% url 'marketing_veiculo_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead>
+            <tr>
+                <th>Lote</th>
+                <th>Status</th>
+                <th>Gerados</th>
+                <th>IA de imagem</th>
+                <th>Template / Resolução</th>
+                <th>Iniciado em</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for lote in lotes %}
+            <tr>
+                <td>#{{ lote.pk }}</td>
+                <td>
+                    <span class="badge {% if lote.status == 'ERRO' %}bg-danger{% elif lote.status == 'RODANDO' %}bg-info{% else %}bg-success{% endif %}">
+                        {{ lote.get_status_display }}
+                    </span>
+                </td>
+                <td>
+                    {{ lote.total_gerado }}/{{ lote.total_alvo }}
+                    {% if lote.total_falhas %}<span class="text-danger small">({{ lote.total_falhas }} falha(s))</span>{% endif %}
+                </td>
+                <td>{{ lote.provedor_imagem_ia|default:"-" }}</td>
+                <td class="small text-muted">
+                    {% if lote.template_overlay or lote.resolucao_overlay %}
+                        {{ lote.template_overlay|default:"-" }} · {{ lote.resolucao_overlay|default:"-" }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="small text-muted">{{ lote.criado_em|date:"d/m/Y H:i" }}</td>
+                <td class="text-end">
+                    <a href="{% url 'marketing_revisao_lote' lote.pk %}" class="btn btn-sm btn-outline-dark">Ver posts</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7">
+                    <div class="alert alert-info mb-0">Nenhum lote gerado ainda.</div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if is_paginated %}
+<nav aria-label="Navegação das páginas">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page=1">&laquo;&laquo;</a></li>
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">&laquo;</a></li>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+            {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">&raquo;</a></li>
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">&raquo;&raquo;</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

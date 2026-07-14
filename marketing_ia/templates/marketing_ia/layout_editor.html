@@ -46,7 +46,7 @@
         <p class="text-muted small mb-1">
             Área de edição (esquemática — arraste/redimensione os elementos). A prévia real com a foto fica ao lado.
         </p>
-        <div id="editor-canvas" class="position-relative border rounded shadow-sm" style="background: repeating-conic-gradient(#e9ecef 0% 25%, #f8f9fa 0% 50%) 0 0 / 24px 24px; overflow: hidden; max-width: 100%;">
+        <div id="editor-canvas" class="position-relative border rounded shadow-sm" style="background: repeating-conic-gradient(#e9ecef 0% 25%, #f8f9fa 0% 50%) 0 0 / 24px 24px; overflow: hidden; width: 100%;">
         </div>
     </div>
     <div class="col-lg-5 mb-3">
@@ -131,11 +131,16 @@
     // refresh visual toda hora durante o arrastar).
     const divsPorId = {};
 
+    // `aspect-ratio` deixa o navegador manter a proporção sozinho, sempre em
+    // dia com o layout real — calcular altura em px a partir de um snapshot
+    // de canvas.parentElement.clientWidth (jeito antigo) ficava desatualizado
+    // sempre que o container reflowasse depois (ex: fontes/ícones carregando,
+    // sidebar recolhendo) e ainda ignorava o padding do próprio container,
+    // fazendo o canvas renderizar fora de proporção (retangular em vez de
+    // quadrado) — a área de edição "descolava" (drift) da imagem real.
     function ajustarAlturaCanvas() {
         const [w, h] = RESOLUCOES[selectResolucao.value];
-        const largura = canvas.parentElement.clientWidth;
-        canvas.style.width = largura + 'px';
-        canvas.style.height = (largura * h / w) + 'px';
+        canvas.style.aspectRatio = w + ' / ' + h;
     }
 
     function textoDoElemento(el) {

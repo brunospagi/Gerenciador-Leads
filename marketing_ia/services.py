@@ -99,7 +99,7 @@ def _gerar_conteudo_promocional(anuncio, template_overlay=None, resolucao_overla
     return imagem_bytes, imagem_mime, modelo_imagem, prompt_usado, legenda, hashtags, modelo_texto
 
 
-def gerar_post_para_anuncio(anuncio, usuario=None, lote=None):
+def gerar_post_para_anuncio(anuncio, usuario=None, lote=None, template_overlay=None, resolucao_overlay=None):
     """
     Gera (foto com IA + legenda) para um único VeiculoAnuncio e salva
     diretamente um PostPromocional — usado pelo fluxo em lote ("gerar para
@@ -107,7 +107,7 @@ def gerar_post_para_anuncio(anuncio, usuario=None, lote=None):
     GeracaoPostError com uma mensagem amigável em caso de falha esperada.
     """
     imagem_bytes, imagem_mime, modelo_imagem, prompt_usado, legenda, hashtags, modelo_texto = (
-        _gerar_conteudo_promocional(anuncio)
+        _gerar_conteudo_promocional(anuncio, template_overlay=template_overlay, resolucao_overlay=resolucao_overlay)
     )
 
     extensao = mimetypes.guess_extension(imagem_mime) or '.png'
@@ -169,7 +169,7 @@ def salvar_preview_como_post(preview, lote=None):
     return post
 
 
-def gerar_posts_em_lote(anuncios, usuario=None, lote=None):
+def gerar_posts_em_lote(anuncios, usuario=None, lote=None, template_overlay=None, resolucao_overlay=None):
     """
     Gera um post para cada anúncio da lista, tolerando falhas individuais
     (sem foto, IA indisponível etc) sem interromper o restante do lote.
@@ -178,7 +178,10 @@ def gerar_posts_em_lote(anuncios, usuario=None, lote=None):
     gerados, falhas = 0, 0
     for anuncio in anuncios:
         try:
-            gerar_post_para_anuncio(anuncio, usuario=usuario, lote=lote)
+            gerar_post_para_anuncio(
+                anuncio, usuario=usuario, lote=lote,
+                template_overlay=template_overlay, resolucao_overlay=resolucao_overlay,
+            )
             gerados += 1
         except GeracaoPostError:
             falhas += 1
