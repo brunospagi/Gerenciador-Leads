@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1 class="mb-0"><i class="bi bi-grid-3x3-gap-fill me-2"></i>Posts Combinados</h1>
+    <a href="{% url 'marketing_veiculo_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
+</div>
+
+<div class="alert alert-info">
+    Junta 2 ou 4 veículos numa colagem só (sem custo de IA de imagem) — os grupos abaixo são sugeridos
+    automaticamente a partir do estoque que ainda não entrou em nenhum combinado, agrupados por
+    <strong>tipo</strong> ou <strong>marca</strong> e ordenados por preço.
+</div>
+
+<div class="card card-body shadow-sm mb-4">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small mb-1">Quantidade de veículos</label>
+            <select name="quantidade" class="form-select" onchange="this.form.submit()">
+                {% for valor, rotulo in quantidade_choices %}
+                <option value="{{ valor }}" {% if valor == quantidade %}selected{% endif %}>{{ rotulo }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small mb-1">Agrupar por</label>
+            <select name="criterio" class="form-select" onchange="this.form.submit()">
+                {% for valor, rotulo in criterio_choices %}
+                <option value="{{ valor }}" {% if valor == criterio %}selected{% endif %}>{{ rotulo }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
+
+<h5 class="mb-3">Grupos sugeridos ({{ grupos_sugeridos|length }})</h5>
+<div class="row mb-5">
+    {% for grupo in grupos_sugeridos %}
+    <div class="col-lg-6 mb-3">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    {% for veiculo in grupo %}
+                    <div class="text-center" style="width: 100px;">
+                        {% if veiculo.foto_principal_url %}
+                        <img src="{{ veiculo.foto_principal_url }}" class="rounded mb-1" style="width:100px;height:70px;object-fit:cover;" alt="{{ veiculo.titulo }}">
+                        {% else %}
+                        <div class="rounded mb-1 bg-light d-flex align-items-center justify-content-center" style="width:100px;height:70px;">
+                            <i class="bi bi-image-alt text-muted"></i>
+                        </div>
+                        {% endif %}
+                        <div class="small text-truncate">{{ veiculo.marca }} {{ veiculo.modelo }}</div>
+                        <div class="small text-muted">{% if veiculo.preco %}R$ {{ veiculo.preco }}{% else %}Consulte{% endif %}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <form method="post" action="{% url 'marketing_gerar_combinado' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="criterio" value="{{ criterio }}">
+                    {% for veiculo in grupo %}
+                    <input type="hidden" name="veiculo_ids" value="{{ veiculo.pk }}">
+                    {% endfor %}
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-magic me-1"></i>Gerar post combinado
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-secondary">
+            Nenhum grupo de {{ quantidade }} veículos disponível com esse critério — falta estoque
+            suficiente sem post combinado ainda, ou tente agrupar pelo outro critério.
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<h5 class="mb-3">Combinados gerados ({{ posts.count }})</h5>
+<div class="row">
+    {% for post in posts %}
+    <div class="col-lg-4 col-md-6 mb-4">
+        <div class="card h-100 shadow-sm">
+            <img src="{{ post.imagem.url }}" class="card-img-top" alt="Post combinado" style="height:220px;object-fit:cover;">
+            <div class="card-body d-flex flex-column">
+                <span class="badge bg-secondary mb-2 align-self-start">{{ post.quantidade }} veículos · {{ post.get_criterio_display }}</span>
+                <p class="card-text small" style="white-space: pre-line;">{{ post.legenda|truncatewords:30 }}</p>
+                <p class="small text-muted mb-2">
+                    {% for veiculo in post.veiculos.all %}{{ veiculo.marca }} {{ veiculo.modelo }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                </p>
+                <div class="mt-auto pt-2">
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <a href="{{ post.imagem.url }}" download class="btn btn-sm btn-outline-dark"><i class="bi bi-download"></i></a>
+                        <form method="post" action="{% url 'marketing_descartar_combinado' post.pk %}"
+                              onsubmit="return confirm('Descartar este post combinado? A imagem será apagada do armazenamento.');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Descartar</button>
+                        </form>
+                    </div>
+                    {% if webhooks_ativos %}
+                    <form method="post" action="{% url 'marketing_combinado_enviar_webhook' post.pk %}" class="d-flex gap-2">
+                        {% csrf_token %}
+                        <select name="webhook_id" class="form-select form-select-sm" required>
+                            {% for webhook in webhooks_ativos %}
+                            <option value="{{ webhook.pk }}">{{ webhook.nome }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-info text-white text-nowrap">
+                            <i class="bi bi-send-fill me-1"></i>Enviar
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-secondary">Nenhum post combinado gerado ainda.</div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

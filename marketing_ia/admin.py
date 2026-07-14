@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import EnvioWebhook, LoteGeracao, PostPromocional, VeiculoAnuncio
+from .models import EnvioWebhook, LoteGeracao, PostCombinado, PostPromocional, VeiculoAnuncio
 
 
 @admin.register(VeiculoAnuncio)
@@ -30,6 +30,26 @@ class PostPromocionalAdmin(admin.ModelAdmin):
     search_fields = ('anuncio__titulo', 'legenda')
     readonly_fields = ('preview_grande', 'prompt_imagem', 'modelo_ia_imagem', 'modelo_ia_texto', 'gerado_em')
     autocomplete_fields = ('anuncio',)
+
+    def preview(self, obj):
+        if not obj.imagem:
+            return '-'
+        return format_html('<img src="{}" style="height:60px;border-radius:4px;" />', obj.imagem.url)
+    preview.short_description = 'Prévia'
+
+    def preview_grande(self, obj):
+        if not obj.imagem:
+            return '-'
+        return format_html('<img src="{}" style="max-height:400px;border-radius:8px;" />', obj.imagem.url)
+    preview_grande.short_description = 'Prévia'
+
+
+@admin.register(PostCombinado)
+class PostCombinadoAdmin(admin.ModelAdmin):
+    list_display = ('pk', 'quantidade', 'criterio', 'status', 'preview', 'gerado_por', 'gerado_em')
+    list_filter = ('quantidade', 'criterio', 'status')
+    readonly_fields = ('preview_grande', 'gerado_em')
+    autocomplete_fields = ('veiculos',)
 
     def preview(self, obj):
         if not obj.imagem:

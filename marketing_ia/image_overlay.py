@@ -786,6 +786,116 @@ def montar_imagem_layout(foto_bytes, anuncio, chamada, elementos, resolucao=None
     return saida.getvalue(), 'image/jpeg'
 
 
+# Chamadas pra post combinado (2 ou 4 veículos numa colagem só) — rotação de
+# frases comuns em posts de "comparação"/"escolha" de revenda de veículos
+# (pesquisa de mercado: posts desse tipo raramente usam preço único agregado,
+# preferem "escolha"/"compare" no topo + preço individual por veículo).
+CHAMADAS_COMBINADO = [
+    'ESCOLHA O SEU',
+    'OFERTAS IMPERDÍVEIS',
+    'QUAL É O SEU FAVORITO?',
+    'COMPARE E DECIDA',
+    'NOVIDADES CHEGARAM',
+]
+
+
+def _foto_grade(foto_bytes, tamanho_celula):
+    """Prepara uma foto pra preencher exatamente uma célula da grade (corta o
+    excesso pra caber sem sobra) — diferente de _preparar_foto (post de um
+    veículo só), que prefere manter o carro inteiro visível com fundo
+    desfocado; numa célula pequena de colagem, cortar levemente as bordas
+    fica mais limpo visualmente do que sobrar uma tarja."""
+    try:
+        foto = Image.open(io.BytesIO(foto_bytes))
+        foto = ImageOps.exif_transpose(foto)
+        foto = foto.convert('RGB')
+    except Exception as exc:
+        raise ImageOverlayError(f'Não foi possível abrir a foto original: {exc}') from exc
+    return ImageOps.fit(foto, tamanho_celula, method=Image.LANCZOS)
+
+
+def _desenhar_legenda_celula(overlay, draw, anuncio, x, y, largura_celula, altura_celula):
+    """Barra escura compacta no rodapé da própria célula com modelo + preço
+    do veículo — rótulo individual por veículo (não um preço único agregado),
+    padrão dominante em posts reais de comparação entre modelos."""
+    fonte_titulo = _fonte(largura_celula * 0.075)
+    fonte_preco = _fonte(largura_celula * 0.09)
+    altura_barra = int(altura_celula * 0.24)
+    topo_barra = y + altura_celula - altura_barra
+    draw.rectangle([(x, topo_barra), (x + largura_celula, y + altura_celula)], fill=COR_FAIXA)
+
+    padding = int(largura_celula * 0.05)
+    titulo = _titulo_veiculo(anuncio)
+    linha_titulo = _quebrar_linhas(titulo, fonte_titulo, draw, largura_celula - 2 * padding)[:1]
+    ty = topo_barra + padding * 0.5
+    for linha in linha_titulo:
+        _texto_com_contorno(draw, (x + padding, ty), linha, fonte_titulo, COR_TEXTO_PRINCIPAL)
+        ty += int(fonte_titulo.size * 1.2)
+    _texto_com_contorno(draw, (x + padding, ty), _formatar_preco(anuncio.preco), fonte_preco, COR_TEXTO_PRECO)
+
+
+def montar_imagem_grid(fotos_bytes_lista, anuncios, chamada, resolucao=None):
+    """
+    Monta uma colagem em grade com 2 ou 4 veículos juntos numa imagem só —
+    faixa superior com a chamada + logo da Spagi Motors, e abaixo os veículos
+    lado a lado (2) ou em grade 2x2 (4), cada um com uma barra de
+    modelo+preço no rodapé da própria célula. Sem custo de IA de geração de
+    imagem (só Pillow), igual ao overlay de post individual.
+
+    fotos_bytes_lista e anuncios precisam ter o mesmo tamanho (2 ou 4).
+    Retorna (bytes, mime_type) ou levanta ImageOverlayError.
+    """
+    quantidade = len(anuncios)
+    if quantidade not in (2, 4) or len(fotos_bytes_lista) != quantidade:
+        raise ImageOverlayError('É preciso exatamente 2 ou 4 veículos (com foto) pra montar a grade combinada.')
+
+    tamanho_saida = RESOLUCOES.get(resolucao, RESOLUCOES[RESOLUCAO_PADRAO])
+    largura, altura = tamanho_saida
+
+    gutter = max(int(largura * 0.015), 4)
+    altura_banner = int(altura * 0.11)
+
+    if quantidade == 2:
+        celula_largura = (largura - gutter) // 2
+        celula_altura = altura - altura_banner
+        posicoes = [(0, altura_banner), (celula_largura + gutter, altura_banner)]
+    else:
+        celula_largura = (largura - gutter) // 2
+        celula_altura = (altura - altura_banner - gutter) // 2
+        posicoes = [
+            (0, altura_banner),
+            (celula_largura + gutter, altura_banner),
+            (0, altura_banner + celula_altura + gutter),
+            (celula_largura + gutter, altura_banner + celula_altura + gutter),
+        ]
+    tamanho_celula = (celula_largura, celula_altura)
+
+    base = Image.new('RGB', tamanho_saida, (20, 20, 24))
+    for foto_bytes, (x, y) in zip(fotos_bytes_lista, posicoes):
+        foto_celula = _foto_grade(foto_bytes, tamanho_celula)
+        base.paste(foto_celula, (x, y))
+    base = base.convert('RGBA')
+
+    overlay = Image.new('RGBA', tamanho_saida, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    for anuncio, (x, y) in zip(anuncios, posicoes):
+        _desenhar_legenda_celula(overlay, draw, anuncio, x, y, *tamanho_celula)
+
+    draw.rectangle([(0, 0), (largura, altura_banner)], fill=COR_FAIXA)
+    fonte_chamada = _fonte(largura * 0.06)
+    margem = int(largura * 0.05)
+    _texto_com_contorno(
+        draw, (margem, int(altura_banner * 0.28)), (chamada or '').upper(), fonte_chamada, COR_TEXTO_PRINCIPAL,
+    )
+    _colar_logo(overlay, largura, largura, 0, altura_banner)
+
+    final = Image.alpha_composite(base, overlay).convert('RGB')
+    saida = io.BytesIO()
+    final.save(saida, format='JPEG', quality=90)
+    return saida.getvalue(), 'image/jpeg'
+
+
 def montar_imagem_overlay(foto_bytes, anuncio, chamada, template=None, resolucao=None):
     """
     anuncio: VeiculoAnuncio (usa marca, modelo, ano, preco).

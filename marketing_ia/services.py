@@ -1,9 +1,11 @@
 import mimetypes
+import random
 
 from django.core.files.base import ContentFile
 
+from . import image_overlay
 from .ai_promocional import baixar_foto, gerar_imagem_promocional, gerar_legenda
-from .models import PostPromocional, PreviewPost, VeiculoAnuncio
+from .models import PostCombinado, PostPromocional, PreviewPost, VeiculoAnuncio
 from .scraping import scrape_estoque
 
 
@@ -186,3 +188,97 @@ def gerar_posts_em_lote(anuncios, usuario=None, lote=None, template_overlay=None
         except GeracaoPostError:
             falhas += 1
     return gerados, falhas
+
+
+def _campo_agrupamento(criterio):
+    return 'marca' if criterio == 'MESMA_MARCA' else 'tipo'
+
+
+def sugerir_grupos_combinados(quantidade, criterio='MESMO_TIPO'):
+    """
+    Sugere grupos de `quantidade` (2 ou 4) veículos ativos, com foto, que
+    ainda não entraram em nenhum post combinado — agrupados por tipo ou marca
+    (critério) e fatiados em blocos de `quantidade`, ordenados por preço (pra
+    juntar veículos de faixa parecida no mesmo post). Não persiste nada, só
+    devolve as sugestões pra tela confirmar/gerar. Feito em memória (em vez de
+    filtro de JSONField no banco) porque fotos_urls/foto_principal_url variam
+    entre os backends de banco suportados (sqlite nos testes, produção real).
+    """
+    campo = _campo_agrupamento(criterio)
+    ids_ja_combinados = VeiculoAnuncio.objects.filter(posts_combinados__isnull=False).values_list('pk', flat=True)
+    candidatos = list(
+        VeiculoAnuncio.objects.filter(ativo=True)
+        .exclude(pk__in=ids_ja_combinados)
+        .order_by(campo, 'preco')
+    )
+    candidatos = [v for v in candidatos if v.foto_principal_url or v.fotos_urls]
+
+    por_chave = {}
+    for veiculo in candidatos:
+        chave = (getattr(veiculo, campo) or '').strip()
+        if not chave:
+            continue
+        por_chave.setdefault(chave, []).append(veiculo)
+
+    grupos = []
+    for veiculos in por_chave.values():
+        limite = len(veiculos) - (len(veiculos) % quantidade)
+        for i in range(0, limite, quantidade):
+            grupos.append(veiculos[i:i + quantidade])
+    return grupos
+
+
+def _montar_legenda_combinada(veiculos, chamada):
+    """Legenda determinística (sem IA — o post combinado usa só Pillow,
+    mesma filosofia de custo zero do provedor OVERLAY): uma linha de chamada
+    + uma linha por veículo com modelo e preço, já que o rótulo individual
+    por veículo é o padrão em posts reais de comparação/lineup."""
+    linhas = [f'{chamada}! 🚗', '']
+    for veiculo in veiculos:
+        titulo = image_overlay._titulo_veiculo(veiculo)
+        preco = image_overlay._formatar_preco(veiculo.preco)
+        linhas.append(f'• {titulo} — {preco}')
+    linhas.append('')
+    linhas.append('Fale com a gente e agende uma visita! 📲')
+    legenda = '\n'.join(linhas)
+    hashtags = '#carrosseminovos #revendadeveiculos #ofertas'
+    return legenda, hashtags
+
+
+def gerar_post_combinado(veiculos, criterio, usuario=None):
+    """
+    Baixa a foto principal de cada veículo do grupo (2 ou 4) e monta uma
+    única imagem em grade (image_overlay.montar_imagem_grid), sem IA de
+    geração de imagem. Levanta GeracaoPostError em caso de falha esperada
+    (veículo sem foto, download falhou etc) — nenhum veículo é salvo se
+    algum do grupo falhar, pra não gerar um combinado pela metade.
+    """
+    quantidade = len(veiculos)
+    if quantidade not in (2, 4):
+        raise GeracaoPostError('É preciso exatamente 2 ou 4 veículos pra gerar um post combinado.')
+
+    fotos_bytes = []
+    for veiculo in veiculos:
+        url_foto = veiculo.foto_principal_url or (veiculo.fotos_urls[0] if veiculo.fotos_urls else None)
+        if not url_foto:
+            raise GeracaoPostError(f'O veículo "{veiculo.titulo}" não tem foto para usar no combinado.')
+        try:
+            foto_bytes, _ = baixar_foto(url_foto)
+        except Exception as exc:
+            raise GeracaoPostError(f'Falha ao baixar a foto de "{veiculo.titulo}": {exc}') from exc
+        fotos_bytes.append(foto_bytes)
+
+    chamada = random.choice(image_overlay.CHAMADAS_COMBINADO)
+    try:
+        imagem_bytes, imagem_mime = image_overlay.montar_imagem_grid(fotos_bytes, veiculos, chamada)
+    except image_overlay.ImageOverlayError as exc:
+        raise GeracaoPostError(str(exc)) from exc
+
+    legenda, hashtags = _montar_legenda_combinada(veiculos, chamada)
+
+    extensao = mimetypes.guess_extension(imagem_mime) or '.jpg'
+    post = PostCombinado(quantidade=quantidade, criterio=criterio, legenda=legenda, hashtags=hashtags, gerado_por=usuario)
+    post.imagem.save(f'combinado{extensao}', ContentFile(imagem_bytes), save=False)
+    post.save()
+    post.veiculos.set(veiculos)
+    return post
