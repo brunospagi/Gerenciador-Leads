@@ -21,7 +21,7 @@
         </form>
         {% endif %}
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalGerarLote"
-                {% if lote_em_andamento or not total_sem_post %}disabled{% endif %}>
+                {% if lote_em_andamento or not total_anuncios %}disabled{% endif %}>
             <i class="bi bi-magic me-1"></i>
             {% if lote_em_andamento %}Gerando em lote...{% else %}Gerar para todos sem post ({{ total_sem_post }}){% endif %}
         </button>
@@ -52,6 +52,16 @@
                         <input class="form-check-input" type="checkbox" name="veiculo_completo" value="1" id="modalVeiculoCompleto" {% if veiculo_completo_filtro %}checked{% endif %}>
                         <label class="form-check-label" for="modalVeiculoCompleto">Só veículo completo</label>
                     </div>
+                    <hr class="my-2">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="incluir_com_post" value="1" id="modalIncluirComPost">
+                        <label class="form-check-label" for="modalIncluirComPost">
+                            Incluir veículos que já têm post (gera um post novo além dos já existentes)
+                        </label>
+                        <div class="form-text">
+                            Marque pra gerar posts regularmente pro estoque inteiro, não só pra quem ainda não tem nenhum.
+                        </div>
+                    </div>
                     {% if provedor_imagem_atual == 'OVERLAY' %}
                     <hr class="my-2">
                     <p class="text-muted small mb-2">Template e resolução usados em todos os posts deste lote (provedor atual não usa IA de imagem):</p>
@@ -79,7 +89,7 @@
                     </p>
                     {% endif %}
                     <div class="alert alert-secondary mb-0">
-                        <strong id="modal-lote-contagem">{{ total_sem_post }}</strong> veículo(s) sem post vão entrar no lote com esses filtros.
+                        <strong id="modal-lote-contagem">{{ total_sem_post }}</strong> veículo(s) vão entrar no lote com esses filtros.
                     </div>
                 </div>
                 <div class="modal-footer">

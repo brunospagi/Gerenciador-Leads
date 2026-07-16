@@ -972,6 +972,41 @@ class ContarLoteViewTests(TestCase):
         self.assertEqual(resp.json()['total'], 2)
 
 
+class IncluirComPostNoLoteTests(TestCase):
+    """Por padrão o lote só pega veículo sem post ainda (evita recriar sem
+    querer), mas o checkbox 'incluir_com_post' permite regerar posts pra quem
+    já tem — pensado pra gerar posts regularmente pro estoque inteiro."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser('admin_incluir_post', 'admin_incluir_post@teste.com', 'senha12345')
+        self.client.login(username='admin_incluir_post', password='senha12345')
+        self.sem_post = _anuncio_persistido(external_id='sem-post-1')
+        self.com_post = _anuncio_persistido(external_id='com-post-1')
+        PostPromocional.objects.create(
+            anuncio=self.com_post, imagem='marketing_ia/posts/x/1.jpg', legenda='Legenda existente',
+        )
+
+    def test_contar_lote_sem_flag_ignora_quem_ja_tem_post(self):
+        resp = self.client.get(reverse('marketing_contar_lote'))
+        self.assertEqual(resp.json()['total'], 1)
+
+    def test_contar_lote_com_flag_inclui_quem_ja_tem_post(self):
+        resp = self.client.get(reverse('marketing_contar_lote'), {'incluir_com_post': '1'})
+        self.assertEqual(resp.json()['total'], 2)
+
+    def test_iniciar_lote_sem_flag_so_pega_sem_post(self):
+        resp = self.client.post(reverse('marketing_iniciar_lote'), {})
+        self.assertEqual(resp.status_code, 302)
+        lote = LoteGeracao.objects.latest('criado_em')
+        self.assertEqual(lote.alvo_ids, [self.sem_post.pk])
+
+    def test_iniciar_lote_com_flag_inclui_quem_ja_tem_post(self):
+        resp = self.client.post(reverse('marketing_iniciar_lote'), {'incluir_com_post': '1'})
+        self.assertEqual(resp.status_code, 302)
+        lote = LoteGeracao.objects.latest('criado_em')
+        self.assertEqual(set(lote.alvo_ids), {self.sem_post.pk, self.com_post.pk})
+
+
 class TemplatesDatasComemorativasTests(TestCase):
     def test_todas_as_datas_tem_elementos_e_renderizam(self):
         anuncio = SimpleNamespace(marca='Fiat', modelo='Palio', ano='2012', preco=Decimal('26900'))
