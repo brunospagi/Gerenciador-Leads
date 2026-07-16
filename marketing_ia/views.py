@@ -103,6 +103,18 @@ def _aplicar_filtros_vantagens(queryset, request):
     return queryset
 
 
+def _veiculos_para_lote(request):
+    """Veículos candidatos ao lote de geração. Por padrão só entra quem ainda
+    não tem post (evita recriar sem querer), mas o checkbox 'incluir_com_post'
+    no modal permite incluir também quem já tem — pensado pra quem quer gerar
+    posts pra todo o estoque regularmente, sem precisar descartar os antigos
+    só pra poder gerar de novo."""
+    queryset = VeiculoAnuncio.objects.filter(ativo=True)
+    if not _dado_filtro(request, 'incluir_com_post'):
+        queryset = queryset.filter(posts__isnull=True)
+    return _aplicar_filtros_vantagens(queryset, request).distinct()
+
+
 @require_module_action('marketing_ia', 'visualizar')
 def veiculo_list(request):
     veiculos = _aplicar_filtros_vantagens(VeiculoAnuncio.objects.filter(ativo=True), request)
@@ -351,9 +363,7 @@ def contar_lote(request):
     """Recalcula quantos veículos entrariam no lote com os filtros marcados no
     modal de 'Gerar para todos', pra mostrar a contagem em tempo real antes de
     confirmar (os mesmos filtros de request.GET usados na listagem)."""
-    total = _aplicar_filtros_vantagens(
-        VeiculoAnuncio.objects.filter(ativo=True, posts__isnull=True), request,
-    ).distinct().count()
+    total = _veiculos_para_lote(request).count()
     return JsonResponse({'total': total})
 
 
@@ -364,12 +374,10 @@ def iniciar_geracao_lote(request):
         messages.warning(request, 'Já existe uma geração em lote em andamento.')
         return redirect('marketing_veiculo_list')
 
-    anuncios = _aplicar_filtros_vantagens(
-        VeiculoAnuncio.objects.filter(ativo=True, posts__isnull=True), request,
-    ).distinct()
+    anuncios = _veiculos_para_lote(request)
     ids = list(anuncios.values_list('pk', flat=True))
     if not ids:
-        messages.warning(request, 'Não há veículos sem post para gerar.')
+        messages.warning(request, 'Não há veículos pra gerar com esses filtros.')
         return redirect('marketing_veiculo_list')
 
     config = ConfiguracaoIntegracoes.get_solo()
