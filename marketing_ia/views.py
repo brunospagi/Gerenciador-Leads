@@ -21,13 +21,14 @@ from configuracoes.models import ConfiguracaoIntegracoes, WebhookIntegracao
 from . import image_overlay
 from .ai_promocional import baixar_foto
 from .models import (
-    EnvioWebhook, LayoutOverlay, LoteGeracao, PostPromocional, PreviewPost, SincronizacaoEstoque, VeiculoAnuncio,
+    EnvioWebhook, LayoutOverlay, LoteGeracao, PostCombinado, PostPromocional, PreviewPost, SincronizacaoEstoque,
+    VeiculoAnuncio,
 )
 from .services import (
-    GeracaoPostError, gerar_posts_em_lote, gerar_preview_post,
-    salvar_preview_como_post, sincronizar_estoque,
+    GeracaoPostError, gerar_post_combinado, gerar_posts_em_lote, gerar_preview_post,
+    salvar_preview_como_post, sincronizar_estoque, sugerir_grupos_combinados,
 )
-from .webhooks import enviar_post_webhook
+from .webhooks import enviar_post_combinado_webhook, enviar_post_webhook
 
 # Espaço entre um disparo e outro no envio em massa (marketing_enviar_lote_webhook)
 # — um post de cada vez, não tudo de uma rajada só, pra não sobrecarregar/
@@ -688,3 +689,74 @@ def layout_preview(request):
         return JsonResponse({'erro': str(exc)}, status=400)
 
     return HttpResponse(imagem_bytes, content_type=mime_type)
+
+
+@require_module_action('marketing_ia', 'visualizar')
+def combinados_list(request):
+    """Tela de posts combinados (2 ou 4 veículos juntos numa colagem só):
+    mostra grupos sugeridos automaticamente (por tipo ou marca, a partir do
+    estoque que ainda não entrou em nenhum combinado) pra gerar com um clique,
+    além dos combinados já gerados pra revisar/descartar/enviar."""
+    quantidade = 4 if request.GET.get('quantidade') == '4' else 2
+    criterio = request.GET.get('criterio') or 'MESMO_TIPO'
+    if criterio not in dict(PostCombinado.CRITERIO_CHOICES):
+        criterio = 'MESMO_TIPO'
+
+    context = {
+        'quantidade': quantidade,
+        'criterio': criterio,
+        'quantidade_choices': PostCombinado.QUANTIDADE_CHOICES,
+        'criterio_choices': PostCombinado.CRITERIO_CHOICES,
+        'grupos_sugeridos': sugerir_grupos_combinados(quantidade, criterio),
+        'posts': PostCombinado.objects.prefetch_related('veiculos').all(),
+        'webhooks_ativos': WebhookIntegracao.objects.filter(ativo=True),
+    }
+    return render(request, 'marketing_ia/combinados_list.html', context)
+
+
+@require_module_action('marketing_ia', 'criar')
+@require_POST
+def gerar_combinado(request):
+    ids = request.POST.getlist('veiculo_ids')
+    criterio = request.POST.get('criterio') or 'MESMO_TIPO'
+    if criterio not in dict(PostCombinado.CRITERIO_CHOICES):
+        criterio = 'MESMO_TIPO'
+
+    veiculos_por_id = {str(v.pk): v for v in VeiculoAnuncio.objects.filter(pk__in=ids)}
+    # mantém a ordem em que os ids vieram do form (grupo já ordenado por
+    # preço na sugestão) em vez da ordem arbitrária do queryset.
+    veiculos = [veiculos_por_id[i] for i in ids if i in veiculos_por_id]
+
+    if len(veiculos) not in (2, 4) or len(veiculos) != len(ids):
+        messages.error(request, 'Selecione exatamente 2 ou 4 veículos válidos pra gerar o combinado.')
+        return redirect('marketing_combinados_list')
+
+    try:
+        post = gerar_post_combinado(veiculos, criterio, usuario=request.user)
+        messages.success(request, f'Post combinado com {post.quantidade} veículo(s) gerado com sucesso.')
+    except GeracaoPostError as exc:
+        messages.error(request, str(exc))
+    return redirect('marketing_combinados_list')
+
+
+@require_module_action('marketing_ia', 'editar')
+@require_POST
+def descartar_combinado(request, pk):
+    post = get_object_or_404(PostCombinado, pk=pk)
+    post.imagem.delete(save=False)
+    post.delete()
+    messages.success(request, 'Post combinado descartado e imagem removida do armazenamento.')
+    return redirect('marketing_combinados_list')
+
+
+@require_module_action('marketing_ia', 'editar')
+@require_POST
+def enviar_combinado_webhook_view(request, pk):
+    post = get_object_or_404(PostCombinado, pk=pk)
+    webhook = get_object_or_404(WebhookIntegracao, pk=request.POST.get('webhook_id'), ativo=True)
+    resultado = enviar_post_combinado_webhook(post, webhook)
+    if resultado['sucesso']:
+        messages.success(request, f'Post combinado enviado para o webhook "{webhook.nome}".')
+    else:
+        messages.error(request, f'Falha ao enviar para "{webhook.nome}": {resultado["erro"]}')
+    return redirect('marketing_combinados_list')

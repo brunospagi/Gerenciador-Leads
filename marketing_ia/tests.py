@@ -23,7 +23,7 @@ from . import services
 from . import views
 from configuracoes.models import WebhookIntegracao
 
-from .models import LayoutOverlay, LoteGeracao, PostPromocional, PreviewPost, VeiculoAnuncio
+from .models import LayoutOverlay, LoteGeracao, PostCombinado, PostPromocional, PreviewPost, VeiculoAnuncio
 
 User = get_user_model()
 
@@ -1273,3 +1273,181 @@ class LoteListViewTests(TestCase):
     def test_pagina_vazia_nao_quebra(self):
         resp = self.client.get(reverse('marketing_lote_list'))
         self.assertEqual(resp.status_code, 200)
+
+
+class MontarImagemGridTests(TestCase):
+    def _anuncio_fake(self, **overrides):
+        dados = {'marca': 'Fiat', 'modelo': 'Palio', 'ano': '2015', 'preco': Decimal('25000')}
+        dados.update(overrides)
+        return SimpleNamespace(**dados)
+
+    def test_grade_de_2_veiculos_gera_imagem_quadrada(self):
+        anuncios = [self._anuncio_fake(modelo='Palio'), self._anuncio_fake(modelo='Gol', marca='VW')]
+        fotos = [_foto_fake_bytes(), _foto_fake_bytes()]
+        imagem_bytes, mime_type = image_overlay.montar_imagem_grid(fotos, anuncios, 'COMPARE E DECIDA')
+        self.assertEqual(mime_type, 'image/jpeg')
+        resultado = Image.open(io.BytesIO(imagem_bytes))
+        self.assertEqual(resultado.format, 'JPEG')
+        self.assertEqual(resultado.size, image_overlay.RESOLUCOES[image_overlay.RESOLUCAO_PADRAO])
+
+    def test_grade_de_4_veiculos_gera_imagem_valida(self):
+        anuncios = [self._anuncio_fake(modelo=f'Modelo{i}') for i in range(4)]
+        fotos = [_foto_fake_bytes() for _ in range(4)]
+        imagem_bytes, mime_type = image_overlay.montar_imagem_grid(fotos, anuncios, 'ESCOLHA O SEU')
+        self.assertEqual(mime_type, 'image/jpeg')
+        resultado = Image.open(io.BytesIO(imagem_bytes))
+        self.assertEqual(resultado.format, 'JPEG')
+
+    def test_quantidade_invalida_levanta_erro(self):
+        anuncios = [self._anuncio_fake() for _ in range(3)]
+        fotos = [_foto_fake_bytes() for _ in range(3)]
+        with self.assertRaises(image_overlay.ImageOverlayError):
+            image_overlay.montar_imagem_grid(fotos, anuncios, 'CHAMADA')
+
+    def test_fotos_e_anuncios_com_tamanhos_diferentes_levanta_erro(self):
+        anuncios = [self._anuncio_fake() for _ in range(2)]
+        fotos = [_foto_fake_bytes()]
+        with self.assertRaises(image_overlay.ImageOverlayError):
+            image_overlay.montar_imagem_grid(fotos, anuncios, 'CHAMADA')
+
+
+class SugerirGruposCombinadosTests(TestCase):
+    def test_agrupa_por_mesmo_tipo_em_blocos_da_quantidade(self):
+        for i in range(4):
+            _anuncio_persistido(external_id=f'grp-tipo-{i}', tipo='CARRO', preco=Decimal(10000 + i * 1000))
+
+        grupos = services.sugerir_grupos_combinados(quantidade=2, criterio='MESMO_TIPO')
+        self.assertEqual(len(grupos), 2)
+        for grupo in grupos:
+            self.assertEqual(len(grupo), 2)
+
+    def test_agrupa_por_marca(self):
+        for i in range(2):
+            _anuncio_persistido(external_id=f'grp-marca-a-{i}', marca='Fiat', preco=Decimal(10000 + i))
+        for i in range(2):
+            _anuncio_persistido(external_id=f'grp-marca-b-{i}', marca='VW', preco=Decimal(20000 + i))
+
+        grupos = services.sugerir_grupos_combinados(quantidade=2, criterio='MESMA_MARCA')
+        marcas_dos_grupos = {grupo[0].marca for grupo in grupos}
+        self.assertEqual(marcas_dos_grupos, {'Fiat', 'VW'})
+
+    def test_ignora_veiculos_ja_combinados(self):
+        veiculo1 = _anuncio_persistido(external_id='ja-combinado-1', tipo='CARRO')
+        veiculo2 = _anuncio_persistido(external_id='ja-combinado-2', tipo='CARRO')
+        _anuncio_persistido(external_id='disponivel-1', tipo='CARRO')
+        _anuncio_persistido(external_id='disponivel-2', tipo='CARRO')
+
+        post = PostCombinado.objects.create(quantidade=2, criterio='MESMO_TIPO', imagem='marketing_ia/combinados/x.jpg', legenda='L')
+        post.veiculos.set([veiculo1, veiculo2])
+
+        grupos = services.sugerir_grupos_combinados(quantidade=2, criterio='MESMO_TIPO')
+        todos_veiculos = {v.external_id for grupo in grupos for v in grupo}
+        self.assertNotIn('ja-combinado-1', todos_veiculos)
+        self.assertNotIn('ja-combinado-2', todos_veiculos)
+        self.assertIn('disponivel-1', todos_veiculos)
+
+    def test_sobra_menor_que_quantidade_nao_forma_grupo(self):
+        _anuncio_persistido(external_id='sobra-1', tipo='MOTO')
+        grupos = services.sugerir_grupos_combinados(quantidade=2, criterio='MESMO_TIPO')
+        self.assertEqual(grupos, [])
+
+    def test_veiculo_sem_foto_e_ignorado(self):
+        _anuncio_persistido(external_id='sem-foto-1', tipo='CARRO', foto_principal_url='', fotos_urls=[])
+        _anuncio_persistido(external_id='sem-foto-2', tipo='CARRO', foto_principal_url='', fotos_urls=[])
+        grupos = services.sugerir_grupos_combinados(quantidade=2, criterio='MESMO_TIPO')
+        self.assertEqual(grupos, [])
+
+
+class GerarPostCombinadoTests(TestCase):
+    def setUp(self):
+        self.usuario = User.objects.create_superuser('admin_combo', 'admin_combo@teste.com', 'senha12345')
+        self.v1 = _anuncio_persistido(external_id='combo-1', marca='Fiat', modelo='Palio')
+        self.v2 = _anuncio_persistido(external_id='combo-2', marca='VW', modelo='Gol')
+
+    @patch('marketing_ia.services.baixar_foto')
+    def test_gera_post_combinado_com_sucesso(self, mock_baixar_foto):
+        mock_baixar_foto.return_value = (_foto_fake_bytes(), 'image/jpeg')
+
+        post = services.gerar_post_combinado([self.v1, self.v2], 'MESMO_TIPO', usuario=self.usuario)
+
+        self.assertEqual(post.quantidade, 2)
+        self.assertEqual(post.criterio, 'MESMO_TIPO')
+        self.assertEqual(set(post.veiculos.all()), {self.v1, self.v2})
+        self.assertTrue(post.imagem.name)
+        # _titulo_veiculo deixa marca/modelo em maiúsculas na legenda.
+        self.assertIn('FIAT', post.legenda)
+        self.assertIn('VW', post.legenda)
+
+    @patch('marketing_ia.services.baixar_foto')
+    def test_falha_ao_baixar_foto_levanta_geracao_post_error(self, mock_baixar_foto):
+        mock_baixar_foto.side_effect = Exception('timeout')
+        with self.assertRaises(services.GeracaoPostError):
+            services.gerar_post_combinado([self.v1, self.v2], 'MESMO_TIPO', usuario=self.usuario)
+
+    def test_veiculo_sem_foto_levanta_geracao_post_error(self):
+        veiculo_sem_foto = _anuncio_persistido(external_id='combo-sem-foto', foto_principal_url='', fotos_urls=[])
+        with self.assertRaises(services.GeracaoPostError):
+            services.gerar_post_combinado([self.v1, veiculo_sem_foto], 'MESMO_TIPO', usuario=self.usuario)
+
+    def test_quantidade_invalida_levanta_erro(self):
+        with self.assertRaises(services.GeracaoPostError):
+            services.gerar_post_combinado([self.v1], 'MESMO_TIPO', usuario=self.usuario)
+
+
+class CombinadosViewsTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser('admin_combo_view', 'admin_combo_view@teste.com', 'senha12345')
+        self.client.login(username='admin_combo_view', password='senha12345')
+        self.v1 = _anuncio_persistido(external_id='combo-view-1', tipo='CARRO')
+        self.v2 = _anuncio_persistido(external_id='combo-view-2', tipo='CARRO')
+
+    def test_lista_renderiza_grupos_sugeridos(self):
+        resp = self.client.get(reverse('marketing_combinados_list'), {'quantidade': '2', 'criterio': 'MESMO_TIPO'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.context['grupos_sugeridos']), 1)
+
+    @patch('marketing_ia.views.gerar_post_combinado')
+    def test_gerar_combinado_chama_service_com_veiculos_na_ordem_certa(self, mock_gerar):
+        mock_gerar.return_value = SimpleNamespace(quantidade=2)
+        resp = self.client.post(reverse('marketing_gerar_combinado'), {
+            'criterio': 'MESMO_TIPO',
+            'veiculo_ids': [str(self.v2.pk), str(self.v1.pk)],
+        })
+        self.assertEqual(resp.status_code, 302)
+        args, kwargs = mock_gerar.call_args
+        self.assertEqual([v.pk for v in args[0]], [self.v2.pk, self.v1.pk])
+
+    def test_gerar_combinado_com_quantidade_invalida_nao_chama_service(self):
+        resp = self.client.post(reverse('marketing_gerar_combinado'), {
+            'criterio': 'MESMO_TIPO',
+            'veiculo_ids': [str(self.v1.pk)],
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(PostCombinado.objects.count(), 0)
+
+    @patch('crmspagi.storage_backends.MinioMediaStorage.delete')
+    def test_descartar_combinado_apaga_imagem_e_registro(self, mock_delete):
+        post = PostCombinado.objects.create(
+            quantidade=2, criterio='MESMO_TIPO', imagem='marketing_ia/combinados/x.jpg', legenda='L',
+        )
+        post.veiculos.set([self.v1, self.v2])
+
+        resp = self.client.post(reverse('marketing_descartar_combinado', args=[post.pk]))
+        self.assertEqual(resp.status_code, 302)
+        mock_delete.assert_called_once_with('marketing_ia/combinados/x.jpg')
+        self.assertFalse(PostCombinado.objects.filter(pk=post.pk).exists())
+
+    @patch('marketing_ia.views.enviar_post_combinado_webhook')
+    def test_enviar_webhook_view_chama_funcao_de_envio(self, mock_enviar):
+        mock_enviar.return_value = {'sucesso': True, 'status_code': 200, 'erro': None}
+        post = PostCombinado.objects.create(
+            quantidade=2, criterio='MESMO_TIPO', imagem='marketing_ia/combinados/x.jpg', legenda='L',
+        )
+        post.veiculos.set([self.v1, self.v2])
+        webhook = WebhookIntegracao.objects.create(nome='Teste', slug='teste-combo', url='https://exemplo.com/hook')
+
+        resp = self.client.post(
+            reverse('marketing_combinado_enviar_webhook', args=[post.pk]), {'webhook_id': webhook.pk},
+        )
+        self.assertEqual(resp.status_code, 302)
+        mock_enviar.assert_called_once_with(post, webhook)

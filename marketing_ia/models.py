@@ -18,6 +18,12 @@ def get_post_upload_path(instance, filename):
     return f"marketing_ia/posts/{instance.anuncio.external_id}/{unique_filename}"
 
 
+def get_post_combinado_upload_path(instance, filename):
+    ext = os.path.splitext(filename)[1] or '.jpg'
+    unique_filename = f"{uuid.uuid4()}{ext}"
+    return f"marketing_ia/combinados/{unique_filename}"
+
+
 class VeiculoAnuncio(models.Model):
     """Anúncio de veículo raspado do estoque público (spagimotors.com.br)."""
 
@@ -191,6 +197,52 @@ class PostPromocional(models.Model):
 
     def __str__(self):
         return f"Post {self.anuncio.titulo} ({self.get_status_display()})"
+
+
+class PostCombinado(models.Model):
+    """
+    Post com 2 ou 4 veículos juntos numa colagem só (grade), pra anunciar
+    várias opções de uma vez em vez de uma foto por veículo — os grupos são
+    sugeridos automaticamente (mesmo tipo ou mesma marca) a partir do estoque
+    sem post combinado ainda, e a imagem é montada com Pillow (sem IA de
+    geração de imagem, mesma lógica de custo zero do provedor OVERLAY do post
+    individual). Sem status DESCARTADO: descartar aqui apaga a imagem do
+    storage e remove o registro de vez (mesmo padrão adotado pro descarte de
+    PostPromocional), então não faz sentido guardar um status pra isso.
+    """
+
+    QUANTIDADE_CHOICES = [(2, '2 veículos'), (4, '4 veículos')]
+    CRITERIO_CHOICES = [
+        ('MESMO_TIPO', 'Mesmo tipo (carro/moto)'),
+        ('MESMA_MARCA', 'Mesma marca'),
+    ]
+    STATUS_CHOICES = [
+        ('RASCUNHO', 'Rascunho'),
+        ('APROVADO', 'Aprovado'),
+        ('PUBLICADO', 'Publicado'),
+    ]
+
+    veiculos = models.ManyToManyField(VeiculoAnuncio, related_name='posts_combinados')
+    quantidade = models.PositiveSmallIntegerField(choices=QUANTIDADE_CHOICES)
+    criterio = models.CharField(max_length=20, choices=CRITERIO_CHOICES)
+    imagem = models.ImageField(
+        upload_to=get_post_combinado_upload_path,
+        storage=PublicMediaStorage(),
+        verbose_name='Imagem combinada gerada',
+    )
+    legenda = models.TextField(verbose_name='Legenda para redes sociais')
+    hashtags = models.CharField(max_length=500, blank=True, null=True)
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='RASCUNHO')
+    gerado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    gerado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Post Combinado (múltiplos veículos)'
+        verbose_name_plural = 'Posts Combinados (múltiplos veículos)'
+        ordering = ['-gerado_em']
+
+    def __str__(self):
+        return f'Combinado #{self.pk} ({self.quantidade} veículos)'
 
 
 class PreviewPost(models.Model):
