@@ -1,6 +1,7 @@
 import io
 import json
 import threading
+import time
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -27,6 +28,11 @@ from .services import (
     salvar_preview_como_post, sincronizar_estoque,
 )
 from .webhooks import enviar_post_webhook
+
+# Espaço entre um disparo e outro no envio em massa (marketing_enviar_lote_webhook)
+# — um post de cada vez, não tudo de uma rajada só, pra não sobrecarregar/
+# atropelar o webhook receptor (ex: fluxo do n8n processando um de cada vez).
+INTERVALO_ENVIO_LOTE_WEBHOOK_SEGUNDOS = 1.5
 
 
 def _executar_sincronizacao_em_background(sync_id):
@@ -466,41 +472,60 @@ def descartar_lote(request, lote_id):
     return redirect('marketing_revisao_lote', lote_id=lote.pk)
 
 
+def _enviar_lote_webhook_em_background(lote_id, webhook_id, usuario_id):
+    """Dispara os posts do lote pro webhook um de cada vez, com uma pequena
+    pausa entre um envio e outro (INTERVALO_ENVIO_LOTE_WEBHOOK_SEGUNDOS) —
+    evita mandar tudo de uma rajada só, que podia sobrecarregar/atropelar o
+    lado receptor (ex: workflow do n8n processando post por post). Roda em
+    background pra não segurar a requisição pelo tempo total de todos os
+    envios + pausas."""
+    webhook = WebhookIntegracao.objects.filter(pk=webhook_id).first()
+    if not webhook:
+        return
+    try:
+        posts = list(LoteGeracao.objects.get(pk=lote_id).posts.exclude(status='DESCARTADO'))
+        for indice, post in enumerate(posts):
+            resultado = enviar_post_webhook(post, webhook)
+            EnvioWebhook.objects.create(
+                post=post,
+                webhook=webhook,
+                enviado_por_id=usuario_id,
+                sucesso=resultado['sucesso'],
+                status_code=resultado['status_code'],
+                erro=resultado['erro'],
+            )
+            if indice < len(posts) - 1:
+                time.sleep(INTERVALO_ENVIO_LOTE_WEBHOOK_SEGUNDOS)
+    finally:
+        connection.close()
+
+
 @require_module_action('marketing_ia', 'editar')
 @require_POST
 def enviar_lote_webhook(request, lote_id):
     """Envia TODOS os posts do lote (exceto os descartados) pro webhook
-    escolhido de uma vez, em vez de precisar clicar 'Enviar' post por post —
-    pensado pro fluxo de 'gerar em massa e mandar tudo de uma vez'."""
+    escolhido, um de cada vez (com pausa entre os disparos) em segundo
+    plano, em vez de precisar clicar 'Enviar' post por post — pensado pro
+    fluxo de 'gerar em massa e mandar tudo de uma vez'."""
     lote = get_object_or_404(LoteGeracao, pk=lote_id)
     webhook = get_object_or_404(WebhookIntegracao, pk=request.POST.get('webhook_id'), ativo=True)
 
-    posts = lote.posts.exclude(status='DESCARTADO')
-    sucessos, falhas = 0, 0
-    for post in posts:
-        resultado = enviar_post_webhook(post, webhook)
-        EnvioWebhook.objects.create(
-            post=post,
-            webhook=webhook,
-            enviado_por=request.user,
-            sucesso=resultado['sucesso'],
-            status_code=resultado['status_code'],
-            erro=resultado['erro'],
-        )
-        if resultado['sucesso']:
-            sucessos += 1
-        else:
-            falhas += 1
-
-    if not posts:
+    total = lote.posts.exclude(status='DESCARTADO').count()
+    if not total:
         messages.warning(request, 'Não há posts pra enviar neste lote (todos foram descartados).')
-    elif falhas:
-        messages.warning(
-            request,
-            f'{sucessos} post(s) enviado(s) para "{webhook.nome}", {falhas} falharam — confira abaixo.',
-        )
-    else:
-        messages.success(request, f'{sucessos} post(s) enviado(s) para "{webhook.nome}" com sucesso.')
+        return redirect('marketing_revisao_lote', lote_id=lote.pk)
+
+    thread = threading.Thread(
+        target=_enviar_lote_webhook_em_background,
+        args=(lote.pk, webhook.pk, request.user.pk),
+        daemon=True,
+    )
+    thread.start()
+
+    messages.success(
+        request,
+        f'Envio de {total} post(s) pro webhook "{webhook.nome}" iniciado em segundo plano, um de cada vez.',
+    )
     return redirect('marketing_revisao_lote', lote_id=lote.pk)
 
 

@@ -92,28 +92,44 @@ def baixar_foto(url, timeout=20):
     return resposta.content, mime_type
 
 
-def gerar_legenda(anuncio):
-    """Retorna (legenda, hashtags, modelo_usado) ou (None, None, None) se a IA falhar."""
+def gerar_legenda(anuncio, max_tentativas=3):
+    """
+    Retorna (legenda, hashtags, modelo_usado) ou (None, None, None) se a IA
+    falhar. Tenta de novo (com backoff) em erros transitórios do Gemini
+    (503/sobrecarga) — mesma lógica já usada em _gerar_imagem_gemini. Sem
+    isso, a legenda (o texto que efetivamente vai no webhook) caía pro
+    fallback (só o título do veículo, sem nada escrito pela IA) com muito
+    mais frequência durante a geração em lote, onde várias chamadas seguidas
+    à API aumentam a chance de bater num erro transitório.
+    """
     client, model_name, erro = get_gemini_runtime()
     if erro or not client:
         logger.warning('Gemini indisponível para gerar legenda: %s', erro)
         return None, None, None
 
-    try:
-        response = client.models.generate_content(
-            model=model_name,
-            contents=[{"text": _dados_veiculo_para_prompt(anuncio)}],
-            config={
-                "system_instruction": SYSTEM_INSTRUCTION_LEGENDA,
-                "response_mime_type": "application/json",
-            },
-        )
-        cleaned = re.sub(r'```json\s*|\s*```', '', response.text or '', flags=re.DOTALL).strip()
-        data = json.loads(cleaned)
-        return data.get('legenda'), data.get('hashtags'), model_name
-    except Exception as exc:
-        logger.warning('Erro ao gerar legenda com Gemini: %s', exc)
-        return None, None, None
+    for tentativa in range(1, max_tentativas + 1):
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=[{"text": _dados_veiculo_para_prompt(anuncio)}],
+                config={
+                    "system_instruction": SYSTEM_INSTRUCTION_LEGENDA,
+                    "response_mime_type": "application/json",
+                },
+            )
+            cleaned = re.sub(r'```json\s*|\s*```', '', response.text or '', flags=re.DOTALL).strip()
+            data = json.loads(cleaned)
+            return data.get('legenda'), data.get('hashtags'), model_name
+        except Exception as exc:
+            error_upper = str(exc).upper()
+            transitorio = '503' in error_upper or 'UNAVAILABLE' in error_upper or 'HIGH DEMAND' in error_upper
+            if transitorio and tentativa < max_tentativas:
+                time.sleep(tentativa)
+                continue
+            logger.warning('Erro ao gerar legenda com Gemini: %s', exc)
+            return None, None, None
+
+    return None, None, None
 
 
 def gerar_chamada_ia(anuncio):

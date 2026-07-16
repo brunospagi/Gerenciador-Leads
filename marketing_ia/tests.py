@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.messages import get_messages
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
@@ -19,6 +20,7 @@ from . import leonardo_client
 from . import openai_client
 from . import scraping
 from . import services
+from . import views
 from configuracoes.models import WebhookIntegracao
 
 from .models import LayoutOverlay, LoteGeracao, PostPromocional, PreviewPost, VeiculoAnuncio
@@ -233,6 +235,85 @@ class GerarChamadaIaTests(TestCase):
         ))
 
         self.assertEqual(chamada, ai_promocional.CHAMADA_FALLBACK)
+
+
+class GerarLegendaTests(TestCase):
+    """gerar_legenda é a fonte do texto que efetivamente vai no webhook (o
+    'texto escrito pela IA') — precisa da mesma resiliência a erro
+    transitório (503/sobrecarga) que gerar_imagem_promocional já tem, senão
+    cai pro fallback (só o título do veículo) com muito mais frequência
+    durante a geração em lote (várias chamadas seguidas à API)."""
+
+    def _anuncio(self):
+        return SimpleNamespace(
+            titulo='Corolla 2022', marca='Toyota', modelo='Corolla', ano='2022',
+            km='30000', cor='Prata', preco=Decimal('98500'), condicoes=[],
+        )
+
+    @patch('marketing_ia.ai_promocional.get_gemini_runtime')
+    def test_usa_texto_da_ia_quando_disponivel(self, mock_runtime):
+        client = Mock()
+        client.models.generate_content.return_value = Mock(
+            text='{"legenda": "Texto escrito pela IA", "hashtags": "#oferta #carro"}',
+        )
+        mock_runtime.return_value = (client, 'gemini-2.5-flash', None)
+
+        legenda, hashtags, modelo = ai_promocional.gerar_legenda(self._anuncio())
+
+        self.assertEqual(legenda, 'Texto escrito pela IA')
+        self.assertEqual(hashtags, '#oferta #carro')
+        self.assertEqual(modelo, 'gemini-2.5-flash')
+
+    @patch('marketing_ia.ai_promocional.get_gemini_runtime')
+    def test_retorna_none_quando_gemini_indisponivel(self, mock_runtime):
+        mock_runtime.return_value = (None, None, 'sem chave configurada')
+
+        legenda, hashtags, modelo = ai_promocional.gerar_legenda(self._anuncio())
+
+        self.assertIsNone(legenda)
+        self.assertIsNone(hashtags)
+        self.assertIsNone(modelo)
+
+    @patch('marketing_ia.ai_promocional.time.sleep')
+    @patch('marketing_ia.ai_promocional.get_gemini_runtime')
+    def test_tenta_de_novo_em_erro_transitorio_e_acerta_na_segunda(self, mock_runtime, mock_sleep):
+        client = Mock()
+        client.models.generate_content.side_effect = [
+            Exception('503 UNAVAILABLE: model overloaded'),
+            Mock(text='{"legenda": "Recuperou na segunda tentativa", "hashtags": "#oferta"}'),
+        ]
+        mock_runtime.return_value = (client, 'gemini-2.5-flash', None)
+
+        legenda, hashtags, modelo = ai_promocional.gerar_legenda(self._anuncio())
+
+        self.assertEqual(legenda, 'Recuperou na segunda tentativa')
+        self.assertEqual(client.models.generate_content.call_count, 2)
+        mock_sleep.assert_called_once()
+
+    @patch('marketing_ia.ai_promocional.time.sleep')
+    @patch('marketing_ia.ai_promocional.get_gemini_runtime')
+    def test_esgota_tentativas_em_erro_transitorio_persistente_e_cai_pro_fallback(self, mock_runtime, mock_sleep):
+        client = Mock()
+        client.models.generate_content.side_effect = Exception('503 UNAVAILABLE: model overloaded')
+        mock_runtime.return_value = (client, 'gemini-2.5-flash', None)
+
+        legenda, hashtags, modelo = ai_promocional.gerar_legenda(self._anuncio(), max_tentativas=3)
+
+        self.assertIsNone(legenda)
+        self.assertEqual(client.models.generate_content.call_count, 3)
+
+    @patch('marketing_ia.ai_promocional.time.sleep')
+    @patch('marketing_ia.ai_promocional.get_gemini_runtime')
+    def test_erro_nao_transitorio_nao_tenta_de_novo(self, mock_runtime, mock_sleep):
+        client = Mock()
+        client.models.generate_content.side_effect = Exception('erro de parsing qualquer')
+        mock_runtime.return_value = (client, 'gemini-2.5-flash', None)
+
+        legenda, hashtags, modelo = ai_promocional.gerar_legenda(self._anuncio(), max_tentativas=3)
+
+        self.assertIsNone(legenda)
+        self.assertEqual(client.models.generate_content.call_count, 1)
+        mock_sleep.assert_not_called()
 
 
 def _anuncio_persistido(**overrides):
@@ -913,6 +994,13 @@ class TemplatesDatasComemorativasTests(TestCase):
 
 
 class EnviarLoteWebhookViewTests(TestCase):
+    """Envio em massa roda em background (thread), um post de cada vez com
+    pausa entre os disparos (INTERVALO_ENVIO_LOTE_WEBHOOK_SEGUNDOS) — não
+    manda tudo de uma rajada só. Como o teste não tem tempo pra corrida com a
+    thread, a view só é testada quanto a disparar (mensagem + redirect) e a
+    função de background (_enviar_lote_webhook_em_background) é chamada
+    direto pra verificar o envio/contagem em si, com time.sleep mockado."""
+
     def setUp(self):
         self.user = User.objects.create_superuser('admin_envio_lote', 'admin_envio_lote@teste.com', 'senha12345')
         self.client.login(username='admin_envio_lote', password='senha12345')
@@ -928,40 +1016,72 @@ class EnviarLoteWebhookViewTests(TestCase):
         )
         self.webhook = WebhookIntegracao.objects.create(nome='Teste', slug='teste-envio-lote', url='https://exemplo.com/hook')
 
-    @patch('marketing_ia.views.enviar_post_webhook')
-    def test_envia_todos_os_posts_nao_descartados(self, mock_enviar):
-        mock_enviar.return_value = {'sucesso': True, 'status_code': 200, 'erro': None}
-
+    def test_view_dispara_em_background_e_avisa_o_usuario(self):
         resp = self.client.post(
             reverse('marketing_enviar_lote_webhook', args=[self.lote.pk]),
             {'webhook_id': self.webhook.pk},
         )
-
         self.assertEqual(resp.status_code, 302)
-        mock_enviar.assert_called_once_with(self.post1, self.webhook)
-        self.assertEqual(self.post1.envios.count(), 1)
-        self.assertTrue(self.post1.envios.first().sucesso)
-        self.assertEqual(self.post2.envios.count(), 0)
+        mensagens = [str(m) for m in get_messages(resp.wsgi_request)]
+        self.assertTrue(any('segundo plano' in m and 'um de cada vez' in m for m in mensagens))
 
-    @patch('marketing_ia.views.enviar_post_webhook')
-    def test_conta_falhas_separadamente(self, mock_enviar):
-        mock_enviar.return_value = {'sucesso': False, 'status_code': 500, 'erro': 'falhou'}
-
-        resp = self.client.post(
-            reverse('marketing_enviar_lote_webhook', args=[self.lote.pk]),
-            {'webhook_id': self.webhook.pk},
-        )
-
-        self.assertEqual(resp.status_code, 302)
-        self.assertFalse(self.post1.envios.first().sucesso)
-
-    def test_sem_posts_nao_quebra(self):
+    def test_view_sem_posts_nao_dispara_e_avisa(self):
         lote_vazio = LoteGeracao.objects.create(status='CONCLUIDO', total_alvo=0, total_gerado=0)
         resp = self.client.post(
             reverse('marketing_enviar_lote_webhook', args=[lote_vazio.pk]),
             {'webhook_id': self.webhook.pk},
         )
         self.assertEqual(resp.status_code, 302)
+        mensagens = [str(m) for m in get_messages(resp.wsgi_request)]
+        self.assertTrue(any('Não há posts' in m for m in mensagens))
+
+    @patch('marketing_ia.views.time.sleep')
+    @patch('marketing_ia.views.enviar_post_webhook')
+    def test_envia_todos_os_posts_nao_descartados(self, mock_enviar, mock_sleep):
+        from .views import _enviar_lote_webhook_em_background
+
+        mock_enviar.return_value = {'sucesso': True, 'status_code': 200, 'erro': None}
+        _enviar_lote_webhook_em_background(self.lote.pk, self.webhook.pk, self.user.pk)
+
+        mock_enviar.assert_called_once_with(self.post1, self.webhook)
+        self.assertEqual(self.post1.envios.count(), 1)
+        self.assertTrue(self.post1.envios.first().sucesso)
+        self.assertEqual(self.post2.envios.count(), 0)
+        # só 1 post enviado — não deve pausar depois do último (nem antes dele).
+        mock_sleep.assert_not_called()
+
+    @patch('marketing_ia.views.time.sleep')
+    @patch('marketing_ia.views.enviar_post_webhook')
+    def test_pausa_entre_um_disparo_e_outro_mas_nao_depois_do_ultimo(self, mock_enviar, mock_sleep):
+        from .views import _enviar_lote_webhook_em_background
+
+        post3 = PostPromocional.objects.create(
+            anuncio=_anuncio_persistido(external_id='lote-envio-3'), lote=self.lote,
+            imagem='marketing_ia/posts/x/3.jpg', legenda='Legenda 3',
+        )
+        mock_enviar.return_value = {'sucesso': True, 'status_code': 200, 'erro': None}
+
+        _enviar_lote_webhook_em_background(self.lote.pk, self.webhook.pk, self.user.pk)
+
+        # post1 + post3 (post2 está descartado) = 2 envios -> 1 pausa entre eles.
+        self.assertEqual(mock_enviar.call_count, 2)
+        mock_sleep.assert_called_once_with(views.INTERVALO_ENVIO_LOTE_WEBHOOK_SEGUNDOS)
+        self.assertEqual(post3.envios.count(), 1)
+
+    @patch('marketing_ia.views.time.sleep')
+    @patch('marketing_ia.views.enviar_post_webhook')
+    def test_conta_falhas_separadamente(self, mock_enviar, mock_sleep):
+        from .views import _enviar_lote_webhook_em_background
+
+        mock_enviar.return_value = {'sucesso': False, 'status_code': 500, 'erro': 'falhou'}
+        _enviar_lote_webhook_em_background(self.lote.pk, self.webhook.pk, self.user.pk)
+
+        self.assertFalse(self.post1.envios.first().sucesso)
+
+    def test_sem_posts_nao_quebra(self):
+        lote_vazio = LoteGeracao.objects.create(status='CONCLUIDO', total_alvo=0, total_gerado=0)
+        from .views import _enviar_lote_webhook_em_background
+        _enviar_lote_webhook_em_background(lote_vazio.pk, self.webhook.pk, self.user.pk)
 
 
 class EmojiPngColoridoTests(TestCase):
