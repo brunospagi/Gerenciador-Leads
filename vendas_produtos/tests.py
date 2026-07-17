@@ -169,3 +169,97 @@ class RejeitarVendaWhatsappTests(TestCase):
         mock_enviar.assert_called_once()
         args, _ = mock_enviar.call_args
         self.assertEqual(args[1]['telefone'], '41977776666')
+
+
+class VendaProdutoDuplicidadeTests(TestCase):
+    """Regressao: a guarda anti-duplo-envio antiga só olhava se já existia uma
+    venda igual criada nos últimos 25s ("olha antes de criar", sem lock nem
+    constraint) — duas requisições quase simultâneas (duplo clique rápido,
+    reenvio de rede) podiam passar as duas pela checagem antes de qualquer
+    uma terminar de gravar, duplicando a venda. Agora o idempotency_key
+    (token gerado no navegador, reenviado igual em qualquer reenvio do MESMO
+    envio) tem unique constraint no banco, que bloqueia de verdade."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(
+            username='admin_dup_venda', password='123456', email='admin_dup@teste.com',
+        )
+
+    def _dados_post(self, **overrides):
+        # GARANTIA exige valor_venda >= 1300 e a soma dos pagamentos batendo
+        # com o valor total (model.clean()) — pgto_pix igual ao valor_venda
+        # satisfaz as duas coisas nos testes abaixo.
+        valor = overrides.pop('valor_venda', '1500.00')
+        dados = {
+            'vendedor': self.admin.pk,
+            'tipo_produto': 'GARANTIA',
+            'com_desconto': 'False',
+            'cliente_nome': 'Cliente Duplicidade',
+            'origem_cliente': 'OUTRO',
+            'modelo_veiculo': 'Onix',
+            'placa': 'DUP0001',
+            'valor_venda': valor,
+            'pgto_debito': valor,
+            'data_venda': '2026-01-10',
+            'idempotency_key': 'token-teste-abc123',
+        }
+        dados.update(overrides)
+        return dados
+
+    def test_idempotency_key_e_unico_no_banco(self):
+        VendaProduto.objects.create(
+            vendedor=self.admin, tipo_produto='GARANTIA', cliente_nome='Cliente 1',
+            placa='DUP0001', valor_venda=Decimal('1000.00'), idempotency_key='token-repetido',
+        )
+        with self.assertRaises(Exception):
+            VendaProduto.objects.create(
+                vendedor=self.admin, tipo_produto='GARANTIA', cliente_nome='Cliente 2',
+                placa='DUP0002', valor_venda=Decimal('2000.00'), idempotency_key='token-repetido',
+            )
+
+    def test_varias_vendas_sem_token_nao_conflitam(self):
+        # idempotency_key nulo (fluxos que nao mandam token) nao deve colidir
+        # entre si — NULL != NULL na constraint unica.
+        VendaProduto.objects.create(
+            vendedor=self.admin, tipo_produto='GARANTIA', cliente_nome='Cliente 1',
+            placa='DUP0003', valor_venda=Decimal('1000.00'),
+        )
+        VendaProduto.objects.create(
+            vendedor=self.admin, tipo_produto='GARANTIA', cliente_nome='Cliente 2',
+            placa='DUP0004', valor_venda=Decimal('2000.00'),
+        )
+        self.assertEqual(VendaProduto.objects.count(), 2)
+
+    def test_reenvio_com_mesmo_token_nao_duplica(self):
+        self.client.force_login(self.admin)
+        dados = self._dados_post()
+
+        resp1 = self.client.post(reverse('venda_produto_create'), dados)
+        self.assertEqual(resp1.status_code, 302)
+        self.assertEqual(VendaProduto.objects.filter(idempotency_key='token-teste-abc123').count(), 1)
+
+        # Simula o reenvio do MESMO formulário (duplo clique/retry) — mesmo token.
+        resp2 = self.client.post(reverse('venda_produto_create'), dados)
+        self.assertEqual(resp2.status_code, 302)
+
+        self.assertEqual(VendaProduto.objects.filter(cliente_nome='Cliente Duplicidade').count(), 1)
+
+    def test_tokens_diferentes_permitem_duas_vendas_legitimas(self):
+        self.client.force_login(self.admin)
+
+        # Placa/valor diferentes pra não cair na checagem de janela de tempo
+        # (essa é intencional: bloqueia vendas com os MESMOS dados em poucos
+        # segundos, o que este teste não quer exercitar) — o que se quer
+        # confirmar aqui é só que tokens diferentes não geram falso positivo.
+        resp1 = self.client.post(
+            reverse('venda_produto_create'),
+            self._dados_post(idempotency_key='token-1', placa='DUP0005', valor_venda='1500.00'),
+        )
+        self.assertEqual(resp1.status_code, 302)
+        resp2 = self.client.post(
+            reverse('venda_produto_create'),
+            self._dados_post(idempotency_key='token-2', placa='DUP0006', valor_venda='2500.00'),
+        )
+        self.assertEqual(resp2.status_code, 302)
+
+        self.assertEqual(VendaProduto.objects.filter(cliente_nome='Cliente Duplicidade').count(), 2)
