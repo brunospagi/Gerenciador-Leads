@@ -216,6 +216,16 @@ class VendaProduto(models.Model):
     data_criacao = models.DateTimeField(auto_now_add=True)
     data_aprovacao = models.DateTimeField(null=True, blank=True)
 
+    # Chave gerada no navegador (um valor novo a cada carregamento da página,
+    # reenviado igual em qualquer reenvio acidental do MESMO envio — duplo
+    # clique, timeout de rede seguido de retry, F5 no meio do POST). A
+    # unicidade no banco é o que de fato bloqueia a duplicata: a checagem por
+    # janela de tempo sozinha (mais abaixo, em views.py) é "olha antes de
+    # criar" e tem uma corrida entre duas requisições quase simultâneas —
+    # essa aqui é reforçada pelo próprio banco, não tem essa brecha. Nulo pra
+    # não quebrar registros antigos/outros pontos de criação que não mandam token.
+    idempotency_key = models.CharField(max_length=64, unique=True, null=True, blank=True, editable=False)
+
     class Meta:
         verbose_name = "Venda de Produto/Serviço"
         verbose_name_plural = "Vendas de Produtos"

@@ -163,6 +163,7 @@
     <div class="ia-step-panel" id="painelPasso4">
         <form method="post" enctype="multipart/form-data" id="vendaIaForm">
             {% csrf_token %}
+            <input type="hidden" name="idempotency_key" id="idempotencyKeyInput" value="">
             <div class="clean-card">
                 <div class="clean-header"><i class="fa fa-file-invoice-dollar"></i>Passo 4 — Dados da Venda</div>
                 <div class="clean-body">
@@ -261,6 +262,18 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const temErros = {% if form.errors %}true{% else %}false{% endif %};
+
+    // Token gerado UMA vez ao carregar a página — o backend usa isso pra
+    // bloquear duplicata via constraint única no banco (duplo clique,
+    // reenvio de rede, voltar/reenviar do navegador no passo final).
+    (function gerarTokenIdempotencia() {
+        var input = document.getElementById('idempotencyKeyInput');
+        if (!input) return;
+        var token = (window.crypto && window.crypto.randomUUID)
+            ? window.crypto.randomUUID()
+            : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+        input.value = token;
+    })();
 
     function getCookieLocal(name) {
         let cookieValue = null;

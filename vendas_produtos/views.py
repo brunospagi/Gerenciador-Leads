@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.http import JsonResponse
 from django.contrib import messages
 from django.utils import timezone
+from django.db import IntegrityError, transaction
 from django.db.models import Sum, Q
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
@@ -250,7 +251,18 @@ class VendaProdutoCreateView(ModuleActionRequiredMixin, CreateView):
         if not main_venda.vendedor_id:
             main_venda.vendedor = self.request.user
 
-        # Guarda backend contra duplo envio acidental (duplo clique/reenvio de rede).
+        # Guarda contra duplo envio acidental (duplo clique/reenvio de rede/F5
+        # no meio do POST). A janela de tempo abaixo é só uma triagem rápida
+        # (evita nem tentar gravar de novo no caso comum) — quem realmente
+        # BLOQUEIA a duplicata é o idempotency_key único no banco logo
+        # abaixo: o token é gerado uma vez só no navegador (permanece igual
+        # em qualquer reenvio do MESMO envio, ao contrário da janela de tempo
+        # sozinha, que tem uma corrida entre duas requisições quase
+        # simultâneas passando as duas pela checagem antes de qualquer uma
+        # terminar de gravar).
+        token = (self.request.POST.get('idempotency_key') or '').strip() or None
+        main_venda.idempotency_key = token
+
         janela = timezone.now() - timedelta(seconds=25)
         vendedor_ref = main_venda.vendedor
         duplicada = VendaProduto.objects.filter(
@@ -266,7 +278,12 @@ class VendaProdutoCreateView(ModuleActionRequiredMixin, CreateView):
             messages.warning(self.request, "Envio duplicado detectado. O lançamento já foi registrado.")
             return redirect('venda_produto_list')
 
-        response = super().form_valid(form)
+        try:
+            with transaction.atomic():
+                response = super().form_valid(form)
+        except IntegrityError:
+            messages.warning(self.request, "Envio duplicado detectado. O lançamento já foi registrado.")
+            return redirect('venda_produto_list')
 
         if 'comprovante' in form.changed_data and main_venda.comprovante:
             _validar_comprovante_upload(main_venda, self.request)
@@ -296,7 +313,18 @@ class VendaProdutoCreateView(ModuleActionRequiredMixin, CreateView):
                             status='PENDENTE'
                         )
                         setattr(nova_venda, metodo_key, valor)
-                        nova_venda.save()
+                        # Mesmo token da venda principal + sufixo por tipo —
+                        # se este trecho rodar duas vezes pro mesmo envio (o
+                        # que as guardas acima já deveriam impedir antes de
+                        # chegar aqui), o adicional também fica protegido pela
+                        # unicidade no banco em vez de duplicar silenciosamente.
+                        if token:
+                            nova_venda.idempotency_key = f"{token}:{tipo_prod}"
+                        try:
+                            with transaction.atomic():
+                                nova_venda.save()
+                        except IntegrityError:
+                            return 0
                         return 1
                 return 0
             c1 = processar_adicional('GARANTIA', 'adicional_garantia', 'valor_garantia', 'metodo_garantia')

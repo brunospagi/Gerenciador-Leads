@@ -31,6 +31,9 @@
 
     <form method="post" enctype="multipart/form-data" id="vendaForm">
         {% csrf_token %}
+        {% if not form.instance.pk %}
+        <input type="hidden" name="idempotency_key" id="idempotencyKeyInput" value="">
+        {% endif %}
         {% if form.instance.pk and form.instance.status == 'REJEITADO' %}
             <div class="alert alert-danger rounded-3 mb-4 shadow-sm">
                 <div class="fw-bold mb-1"><i class="fa fa-times-circle me-2"></i>Esta venda foi rejeitada pelo gestor</div>
@@ -255,6 +258,21 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+
+    // Token gerado UMA vez ao carregar a página — continua o mesmo em
+    // qualquer reenvio do MESMO envio (duplo clique, timeout de rede seguido
+    // de retry, voltar/reenviar do navegador). O backend usa isso pra
+    // bloquear duplicata via constraint única no banco, não só a checagem de
+    // "olha antes de criar" que sozinha tem uma corrida entre requisições
+    // quase simultâneas.
+    (function gerarTokenIdempotencia() {
+        var input = document.getElementById('idempotencyKeyInput');
+        if (!input) return;
+        var token = (window.crypto && window.crypto.randomUUID)
+            ? window.crypto.randomUUID()
+            : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+        input.value = token;
+    })();
 
     // --- MARCA CAMPOS COM ERRO DE VALIDACAO DO SERVIDOR (borda vermelha + rolagem ate o resumo) ---
     (function highlightServerErrors() {
